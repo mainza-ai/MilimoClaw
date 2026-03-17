@@ -1,7 +1,7 @@
 # 🦀 Milimo Claw
 
 <p align="center">
-  <img src="assets/Milimo-Claw.png" alt="Milimo Claw Logo" width="400" />
+  <img src="assets/Milimo-Claw.png" alt="Milimo Claw Logo" width="800" />
 </p>
 
 > *"Your friend group is a startup. Your laptops are the infrastructure. Your claws do the work."*
