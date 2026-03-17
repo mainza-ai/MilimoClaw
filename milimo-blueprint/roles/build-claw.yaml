@@ -1,0 +1,39 @@
+name: "build-claw"
+version: "0.1.0"
+description: "Engineering — code, PRs, deploys, monitoring."
+
+capabilities:
+  tools:
+    - github_manager (read/write PRs, issues, code review)
+    - deployment_trigger (Vercel, Railway integrations)
+    - test_runner (Execute unit and integration suites)
+    - error_analyzer (Process Sentry/Datadog logs)
+    - code_generator (Write boilerplate, patch bugs)
+
+evolution_timeline:
+  week_2: "PR style enforcer"
+  week_5: "Issue complexity scorer"
+  week_9: "Prompt regression tester"
+  week_14: "Cost anomaly detector"
+  week_18: "Dependency audit runner"
+  week_22: "Error pattern classifier"
+  week_28: "Churn signal correlator (cross-claw analysis)"
+  week_36: "Auto-roadmap drafter"
+
+mesh_integration:
+  inbound_messages:
+    - feature_brief (Source: Ops)
+    - user_behavior_signal (Source: Analytics)
+    - operator_override (Source: WarRoom)
+  outbound_messages:
+    - deployment_completion (Target: Ops)
+    - shipping_summary (Target: Content)
+    - production_incident (Target: WarRoom)
+
+approval_thresholds:
+  code_generation: AUTO
+  test_execution: AUTO
+  pull_request_open: AUTO
+  pull_request_merge: REVIEW
+  production_deploy: REVIEW
+  security_patch: HOLD

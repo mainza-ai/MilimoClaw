@@ -1,0 +1,30 @@
+name: "Design Studio"
+category: "Creative & Content"
+description: "A 3-claw mesh focused on client deliverables, formal proposals, and invoicing."
+
+active_claws:
+  - content
+  - ops
+  - finance
+
+shared_policies:
+  approval_thresholds:
+    # Client-facing creative work requires review
+    deliverable: REVIEW
+    # All financial actions require strict oversight
+    invoice_generation: REVIEW
+    invoice_send: VETO  # Any squad member can block an invoice send
+    payment_alert: AUTO # Alerts surface immediately
+    # Proposals tying scope to pricing require review
+    proposal: REVIEW
+
+  mesh_rules:
+    # Enable finance routing
+    allow_finance_routes: true
+    # Disable advanced behavioral analytics (no Analytics Claw in this template)
+    allow_analytics_insights: false
+
+  escalations:
+    - trigger: "invoice_over_1000"
+      action: "HOLD"
+      message: "High-value invoice requires unanimous squad sign-off."

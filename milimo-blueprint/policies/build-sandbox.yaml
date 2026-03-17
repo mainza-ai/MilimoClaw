@@ -1,0 +1,32 @@
+version: "1.0"
+role: "build"
+
+isolation:
+  fs_mounts:
+    - path: "/sandbox/build/"
+      permissions: "rw"
+      description: "Build Claw workspace. Contains codebase, build configs, deploy scripts, and secrets."
+  kernel:
+    seccomp: "strict"
+    landlock: true
+
+network_egress:
+  allowlist:
+    - "*.github.com"
+    - "api.github.com"
+    - "api.vercel.com"
+    - "api.railway.app"
+    - "registry.npmjs.org"
+    - "pypi.org"
+    - "sentry.io"
+  deny_all_others: true
+
+inference_routing:
+  - data_type: "source_code"
+    backend: "local_nim"
+  - data_type: "secrets"
+    backend: "local_nim"
+  - data_type: "documentation"
+    backend: "cloud_nemotron_120b"
+  - data_type: "general"
+    backend: "local_nim"

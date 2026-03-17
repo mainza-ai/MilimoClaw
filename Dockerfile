@@ -1,4 +1,4 @@
-# NemoClaw sandbox image — OpenClaw + NemoClaw plugin inside OpenShell
+# MilimoClaw sandbox image — OpenClaw + MilimoClaw plugin inside OpenShell
 
 FROM node:22-slim
 
@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Create sandbox user (matches OpenShell convention)
 RUN groupadd -r sandbox && useradd -r -g sandbox -d /sandbox -s /bin/bash sandbox \
-    && mkdir -p /sandbox/.openclaw /sandbox/.nemoclaw \
+    && mkdir -p /sandbox/.openclaw /sandbox/.milimo \
     && chown -R sandbox:sandbox /sandbox
 
 # Install OpenClaw CLI
@@ -22,22 +22,23 @@ RUN npm install -g openclaw@2026.3.11
 RUN pip3 install --break-system-packages pyyaml
 
 # Copy our plugin and blueprint into the sandbox
-COPY nemoclaw/dist/ /opt/nemoclaw/dist/
-COPY nemoclaw/openclaw.plugin.json /opt/nemoclaw/
-COPY nemoclaw/package.json /opt/nemoclaw/
-COPY nemoclaw-blueprint/ /opt/nemoclaw-blueprint/
+COPY milimo/dist/ /opt/milimo/dist/
+COPY milimo/openclaw.plugin.json /opt/milimo/
+COPY milimo/package.json /opt/milimo/
+COPY milimo-blueprint/ /opt/milimo-blueprint/
+COPY test/ /opt/milimo/test/
 
 # Install runtime dependencies only (no devDependencies, no build step)
-WORKDIR /opt/nemoclaw
+WORKDIR /opt/milimo
 RUN npm install --omit=dev
 
 # Set up blueprint for local resolution
-RUN mkdir -p /sandbox/.nemoclaw/blueprints/0.1.0 \
-    && cp -r /opt/nemoclaw-blueprint/* /sandbox/.nemoclaw/blueprints/0.1.0/
+RUN mkdir -p /sandbox/.milimo/blueprints/0.1.0 \
+    && cp -r /opt/milimo-blueprint/* /sandbox/.milimo/blueprints/0.1.0/
 
 # Copy startup script
-COPY scripts/nemoclaw-start.sh /usr/local/bin/nemoclaw-start
-RUN chmod +x /usr/local/bin/nemoclaw-start
+COPY scripts/milimo-start.sh /usr/local/bin/milimo-start
+RUN chmod +x /usr/local/bin/milimo-start
 
 WORKDIR /sandbox
 USER sandbox
@@ -64,9 +65,9 @@ path = os.path.expanduser('~/.openclaw/openclaw.json'); \
 json.dump(config, open(path, 'w'), indent=2); \
 os.chmod(path, 0o600)"
 
-# Install NemoClaw plugin into OpenClaw
+# Install MilimoClaw plugin into OpenClaw
 RUN openclaw doctor --fix > /dev/null 2>&1 || true \
-    && openclaw plugins install /opt/nemoclaw > /dev/null 2>&1 || true
+    && openclaw plugins install /opt/milimo > /dev/null 2>&1 || true
 
 ENTRYPOINT ["/bin/bash"]
 CMD []

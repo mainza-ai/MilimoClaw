@@ -1,0 +1,24 @@
+name: "Campus AI Tool"
+category: "Tech Startups (AI Era)"
+description: "Build + Content + Ops. A lean 3-claw squad for developing viral campus utilities."
+
+active_claws:
+  - build
+  - content
+  - ops
+
+shared_policies:
+  approval_thresholds:
+    feature_deploy: REVIEW
+    app_announcement: REVIEW
+    user_outreach: AUTO
+
+  mesh_rules:
+    allow_build_routes: true
+    allow_finance_routes: false
+    allow_analytics_insights: false
+
+  escalations:
+    - trigger: "university_terms_violation_risk"
+      action: "VETO"
+      message: "Build claw flagged feature as potential violation of campus data guidelines."

@@ -18,7 +18,8 @@
     "format": "prettier --write 'src/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.ts'",
     "check": "npm run lint && npm run format:check && tsc --noEmit",
-    "clean": "rm -rf dist/"
+    "clean": "rm -rf dist/",
+    "test:e2e": "cd .. && docker build -t milimoclaw-sandbox . && docker run --rm -v ~/.openclaw:/sandbox/.openclaw milimoclaw-sandbox /opt/milimo/test/milimo-e2e.sh"
   },
   "dependencies": {
     "commander": "^13.1.0",
