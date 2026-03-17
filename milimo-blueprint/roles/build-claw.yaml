@@ -1,39 +1,155 @@
-name: "build-claw"
-version: "0.1.0"
-description: "Engineering — code, PRs, deploys, monitoring."
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
-capabilities:
-  tools:
-    - github_manager (read/write PRs, issues, code review)
-    - deployment_trigger (Vercel, Railway integrations)
-    - test_runner (Execute unit and integration suites)
-    - error_analyzer (Process Sentry/Datadog logs)
-    - code_generator (Write boilerplate, patch bugs)
+# ═══════════════════════════════════════════════════════════════════════
+#  BUILD CLAW — Role Blueprint
+# ═══════════════════════════════════════════════════════════════════════
+# Primary responsibility: The engineering department. Writes code, opens
+# pull requests, runs tests, monitors production systems, maintains
+# documentation, and manages the development backlog — autonomously and
+# continuously. The Build Claw is not a code assistant you prompt. It is
+# an always-on engineering operator that takes the mechanical work off
+# the squad's plate so the human engineers can focus entirely on
+# architecture and product decisions.
 
-evolution_timeline:
-  week_2: "PR style enforcer"
-  week_5: "Issue complexity scorer"
-  week_9: "Prompt regression tester"
-  week_14: "Cost anomaly detector"
-  week_18: "Dependency audit runner"
-  week_22: "Error pattern classifier"
-  week_28: "Churn signal correlator (cross-claw analysis)"
-  week_36: "Auto-roadmap drafter"
+schema_version: "0.1.0"
 
-mesh_integration:
-  inbound_messages:
-    - feature_brief (Source: Ops)
-    - user_behavior_signal (Source: Analytics)
-    - operator_override (Source: WarRoom)
-  outbound_messages:
-    - deployment_completion (Target: Ops)
-    - shipping_summary (Target: Content)
-    - production_incident (Target: WarRoom)
+role: build
+display_name: "Build Claw"
+description: >
+  Engineering — code, PRs, deploys, monitoring.
+  The Build Claw is an always-on engineering operator that writes code,
+  opens pull requests, runs tests, monitors production, maintains docs,
+  and manages the dev backlog autonomously.
 
+icon: "🔨"
+
+# ── Filesystem ─────────────────────────────────────────────────────────
+filesystem_mount:
+  primary: "/sandbox/build"
+  mode: read_write
+  contents:
+    - squad codebase (via approved GitHub repository mount)
+    - environment configuration (secrets encrypted at rest)
+    - test suites
+    - deployment configs
+    - error logs
+  cross_mounts: []
+  # NOTE: Source code and secrets are among the most sensitive assets
+  # in the squad. Never exposed to any other claw or inter-sandbox
+  # message.
+
+# ── Network Egress ─────────────────────────────────────────────────────
+egress_policy: build-sandbox
+egress_summary:
+  allowed:
+    - GitHub API (repos, PRs, issues, code review)
+    - Vercel API (deployments)
+    - Railway API (deployments)
+    - npm registry
+    - PyPI
+    - Sentry (error monitoring)
+    - Datadog (metrics)
+  blocked:
+    - Social platforms
+    - Client communication channels
+    - Financial records / payment processors
+    - Client contact databases
+
+# ── Inference Routing ──────────────────────────────────────────────────
+inference_routing:
+  rules:
+    - data_type: source_code
+      description: "Proprietary source code, API keys, environment variables"
+      backend: local-nim
+      rationale: "Code is IP — it never leaves the machine"
+
+    - data_type: architecture_review
+      description: "Architecture discussions and code review"
+      backend: local-nim
+      rationale: "Sensitive design decisions stay local"
+
+    - data_type: boilerplate
+      description: "Boilerplate generation, test writing, documentation drafts"
+      backend: cloud
+      rationale: "Non-sensitive, quality preferred"
+
+    - data_type: public_docs
+      description: "Public-facing docs and changelogs"
+      backend: cloud
+      rationale: "Client and community will read these"
+
+    - data_type: production_logs
+      description: "Production log analysis with user data"
+      backend: local-nim
+      rationale: "User data privacy is non-negotiable"
+
+  cloud_allowed: true
+  default_backend: local-nim
+
+# ── Inter-Claw Policy ─────────────────────────────────────────────────
+inter_claw_policy:
+  inbound:
+    - from: ops
+      message_types:
+        - type: brief
+          description: "Feature brief for approved client request"
+
+    - from: analytics
+      message_types:
+        - type: response
+          description: "User behavior patterns for roadmap planning"
+        - type: signal
+          description: "Retention signals and churn indicators"
+
+    - from: war_room
+      message_types:
+        - type: signal
+          description: "Operator override instruction"
+
+  outbound:
+    - to: ops
+      message_types:
+        - type: signal
+          description: "Deployment completion signal"
+        - type: deliverable
+          description: "Feature release ready for client notification"
+
+    - to: content
+      message_types:
+        - type: signal
+          description: "Weekly shipping summary for devlog / build-in-public posts"
+
+    - to: analytics
+      message_types:
+        - type: query
+          description: "Request for user behavior data or retention signals"
+
+    - to: war_room
+      message_types:
+        - type: signal
+          description: "Production incident or security alert escalation"
+        - type: deliverable
+          description: "PR or deployment queued for human approval"
+
+# ── Approval Thresholds ────────────────────────────────────────────────
 approval_thresholds:
-  code_generation: AUTO
-  test_execution: AUTO
-  pull_request_open: AUTO
-  pull_request_merge: REVIEW
-  production_deploy: REVIEW
-  security_patch: HOLD
+  code_generation: auto
+  test_execution: auto
+  pull_request_open: auto
+  pull_request_merge: review
+  production_deploy: review
+  dependency_update: review
+  security_patch: hold
+  secret_rotation: veto
+
+# ── Self-Evolution Seed ────────────────────────────────────────────────
+evolution_signals:
+  primary: "PR merge patterns, production error logs, user retention data"
+  initial_tools:
+    - name: pr_style_enforcer
+      target_week: 2
+      description: "Flags PRs that don't meet the squad's code conventions before human review"
+    - name: issue_complexity_scorer
+      target_week: 5
+      description: "Estimates engineering hours from issue descriptions, calibrated to the squad's actual velocity"

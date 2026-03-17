@@ -1,184 +1,390 @@
-# NVIDIA NemoClaw: OpenClaw Plugin for OpenShell
+# 🦀 Milimo Claw
+
+<p align="center">
+  <img src="assets/Milimo-Claw.png" alt="Milimo Claw Logo" width="400" />
+</p>
+
+> *"Your friend group is a startup. Your laptops are the infrastructure. Your claws do the work."*
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue)](LICENSE)
-[![Security Policy](https://img.shields.io/badge/Security-Report%20a%20Vulnerability-red)](SECURITY.md)
-[![Project Status](https://img.shields.io/badge/status-alpha-orange)](docs/about/release-notes.md)
+[![Status](https://img.shields.io/badge/status-Phase_0_Complete-green)](#roadmap)
+[![Built on NemoClaw](https://img.shields.io/badge/built_on-NemoClaw-purple)](NemoClaw-README.md)
 
-NVIDIA NemoClaw is an open source stack that simplifies running [OpenClaw](https://openclaw.ai) always-on assistants safely. It installs the [NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell) runtime, part of [NVIDIA Agent Toolkit](https://docs.nvidia.com/nemo/agent-toolkit/latest), a secure environment for running autonomous agents, and open source models like [NVIDIA Nemotron](https://build.nvidia.com).
+**Milimo Claw** is a multi-agent autonomous hustle platform built on [NVIDIA NemoClaw](NemoClaw-README.md). It turns a squad of college students — each running a NemoClaw sandbox on their RTX laptop — into a coordinated AI-powered business operation that runs 24/7.
 
-> **Alpha software**
-> 
-> NemoClaw is early-stage. Expect rough edges. We are building toward production-ready sandbox orchestration, but the starting point is getting your own environment up and running.
-> Interfaces, APIs, and behavior may change without notice as we iterate on the design.
-> The project is shared to gather feedback and enable early experimentation, but it
-> should not yet be considered production-ready.
-> We welcome issues and discussion from the community while the project evolves.
+> **On the name:** *Milimo* (mi-LEE-mo) is a Zambian name from the Tonga people, meaning **"works," "tasks," or "labour."**
+
+---
+
+## Table of Contents
+
+- [Why Milimo Claw](#why-milimo-claw)
+- [Architecture](#architecture)
+- [The Five Claws](#the-five-claws)
+- [Quick Start](#quick-start)
+- [CLI Reference](#cli-reference)
+- [Privacy & Security](#privacy--security)
+- [Blueprint Economy](#blueprint-economy)
+- [Project Structure](#project-structure)
+- [Testing](#testing)
+- [Roadmap](#roadmap)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
+- [Author](#author)
+
+---
+
+## Why Milimo Claw
+
+Current AI tools are assistants — you prompt them, they respond, they forget. They don't grow, they don't specialize, they don't run without you.
+
+Milimo Claw is different:
+
+| Feature | Traditional AI Tools | Milimo Claw |
+|---|---|---|
+| **Memory** | Resets every session | Blueprint versioning preserves everything |
+| **Specialization** | Generic, one-size-fits-all | 5 role-specific claws, each with domain expertise |
+| **Autonomy** | Reactive — waits for prompts | Proactive — claws operate 24/7 |
+| **Growth** | Static | Self-evolving — claws build new tools weekly |
+| **Collaboration** | Single-user | Squad mesh — distributed across laptops |
+| **Privacy** | Data goes to cloud | Privacy router keeps sensitive data on-device |
+| **Portability** | Locked to a platform | Blueprint export — your intelligence is forkable |
+
+---
+
+## Architecture
+
+Milimo Claw exploits every layer of the NemoClaw stack for a consumer use case:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                        MILIMO CLAW MESH                          │
+│                                                                  │
+│  [Laptop A]           [Laptop B]           [Laptop C]            │
+│  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐     │
+│  │ CONTENT CLAW │     │   OPS CLAW   │     │  ANALYTICS   │     │
+│  │ /sandbox/    │     │  /sandbox/   │     │    CLAW      │     │
+│  │ content      │     │  clients     │     │  /sandbox/   │     │
+│  │ OpenShell GW─┼─────┼─ OpenShell GW┼─────┼─ analytics   │     │
+│  └──────────────┘     └──────────────┘     └──────────────┘     │
+│          │                    │                     │             │
+│          └────────────────────┼─────────────────────┘             │
+│                               │                                  │
+│                ╔══════════════╧══════════════╗                   │
+│                ║   INTER-SANDBOX CHANNEL      ║                   │
+│                ║  typed contracts · logged ·   ║                   │
+│                ║  policy-enforced by OpenShell ║                   │
+│                ╚══════════════╤══════════════╝                   │
+│                               │                                  │
+│                      [Laptop D]                                  │
+│                 ┌──────────────┐                                 │
+│                 │ FINANCE CLAW │                                 │
+│                 │ /sandbox/    │                                 │
+│                 │ finance      │                                 │
+│                 └──────────────┘                                 │
+│                                                                  │
+│  ════════════════════════════════════════════════════════════════ │
+│                        WAR ROOM (TUI)                            │
+│          Every squad member · every pending action · one view    │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Key architectural primitives:**
+
+| NemoClaw Layer | Milimo Claw Exploitation |
+|---|---|
+| Multi-sandbox mesh | Each claw = a department in your company |
+| Inter-sandbox gateway | Typed contract messaging between claws |
+| Landlock + seccomp | Kernel-level trust boundaries between squad members |
+| Blueprint versioning | Institutional memory + tradeable intelligence |
+| Inference routing | Privacy router — sensitive data never leaves the laptop |
+| Operator TUI | War Room — squad-wide approval dashboard |
+
+---
+
+## The Five Claws
+
+Every squad is assembled from 5 specialized claw roles. Creative/commerce squads typically run 4; tech squads unlock all 5.
+
+| Claw | Role | Filesystem Mount | Key Capability |
+|---|---|---|---|
+| 🎨 **Content** | Creative output — posts, copy, campaigns | `/sandbox/content` | Platform-calibrated content with evolved style |
+| 📋 **Ops** | Client lifecycle — intake to offboarding | `/sandbox/clients` | 24/7 client communications & project management |
+| 📊 **Analytics** | Intelligence — performance, trends, signals | `/sandbox/analytics` | Weekly cross-claw intelligence reports |
+| 💰 **Finance** | Revenue — invoicing, pricing, margins | `/sandbox/finance` | All data stays local — zero cloud inference |
+| 🔨 **Build** | Engineering — code, PRs, deploys, monitoring | `/sandbox/build` | Autonomous PR cycle & production monitoring |
+
+Each claw has its own **network egress policy**, **inference routing rules**, **inter-claw messaging policy**, and **self-evolution cycle**.
+
+> See the full claw specification in [milimo-claw-docs/MILIMO_CLAW_PROJECT_DESCRIPTION.md](milimo-claw-docs/MILIMO_CLAW_PROJECT_DESCRIPTION.md#6-product-features).
 
 ---
 
 ## Quick Start
 
-<!-- start-quickstart-guide -->
-
-Follow these steps to get started with NemoClaw and your first sandboxed OpenClaw agent.
-
-:::{note}
-NemoClaw currently requires a fresh installation of OpenClaw.
-:::
-
 ### Prerequisites
 
-Check the prerequisites before you start to ensure you have the necessary software and hardware to run NemoClaw.
+- **Hardware:** RTX-capable NVIDIA GPU laptop (for local inference)
+- **Software:** Docker, Node.js ≥ 20, Git
+- **NemoClaw:** [NVIDIA NemoClaw](NemoClaw-README.md) installed
 
-#### Software
+### 1. Clone & Install
 
-- Linux Ubuntu 22.04 LTS releases and later
-- Docker installed and running
-- [NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell) installed
-
-### Install NemoClaw and Onboard OpenClaw Agent
-
-Download and run the installer script.
-The script installs Node.js if it is not already present, then runs the guided onboard wizard to create a sandbox, configure inference, and apply security policies.
-
-```console
-$ git clone https://github.com/NVIDIA/NemoClaw.git
-$ cd NemoClaw
-$ ./install.sh
+```bash
+git clone https://github.com/mainza-ai/MilimoClaw.git
+cd MilimoClaw
+npm install
 ```
 
-When the install completes, a summary confirms the running environment:
+### 2. Build the Docker Image
 
-```
-──────────────────────────────────────────────────
-Sandbox      my-assistant (Landlock + seccomp + netns)
-Model        nvidia/nemotron-3-super-120b-a12b (NVIDIA Cloud API)
-──────────────────────────────────────────────────
-Run:         nemoclaw my-assistant connect
-Status:      nemoclaw my-assistant status
-Logs:        nemoclaw my-assistant logs --follow
-──────────────────────────────────────────────────
-
-[INFO]  === Installation complete ===
+```bash
+docker build -t milimo-claw -f Dockerfile .
 ```
 
-### Chat with the Agent
+### 3. Initialize Your Squad
 
-Connect to the sandbox, then chat with the agent through the TUI or the CLI.
-
-```console
-$ nemoclaw my-assistant connect
+```bash
+# Inside the container or via the CLI tool
+openclaw milimo init --squad my-squad --role content --template content-agency
 ```
 
-#### OpenClaw TUI
+### 4. Launch the War Room
 
-The OpenClaw TUI opens an interactive chat interface. Type a message and press Enter to send it to the agent:
-
-```console
-sandbox@my-assistant:~$ openclaw tui
+```bash
+openclaw milimo warroom
 ```
 
-Send a test message to the agent and verify you receive a response.
-
-#### OpenClaw CLI
-
-Use the OpenClaw CLI to send a single message and print the response:
-
-```console
-sandbox@my-assistant:~$ openclaw agent --agent main --local -m "hello" --session-id test
-```
-
-<!-- end-quickstart-guide -->
+> For detailed Docker commands, see [milimo-claw-docs/docker-run-commands.md](milimo-claw-docs/docker-run-commands.md).
 
 ---
 
-## How It Works
+## CLI Reference
 
-NemoClaw installs the NVIDIA OpenShell runtime and Nemotron models, then uses a versioned blueprint to create a sandboxed environment where every network request, file access, and inference call is governed by declarative policy. The `nemoclaw` CLI orchestrates the full stack: OpenShell gateway, sandbox, inference provider, and network policy.
+### Squad Management
 
-| Component        | Role                                                                                      |
-|------------------|-------------------------------------------------------------------------------------------|
-| **Plugin**       | TypeScript CLI commands for launch, connect, status, and logs.                            |
-| **Blueprint**    | Versioned Python artifact that orchestrates sandbox creation, policy, and inference setup. |
-| **Sandbox**      | Isolated OpenShell container running OpenClaw with policy-enforced egress and filesystem.  |
-| **Inference**    | NVIDIA-routed model calls (cloud, local NIM, or vLLM), transparent to the agent.          |
-
-The blueprint lifecycle follows four stages: resolve the artifact, verify its digest, plan the resources, and apply through the OpenShell CLI.
-
-When something goes wrong, errors may originate from either NemoClaw or the OpenShell layer underneath. Run `nemoclaw <name> status` for NemoClaw-level health and `openshell sandbox list` to check the underlying sandbox state.
-
-## Inference Profiles
-
-Inference requests from the agent never leave the sandbox directly. OpenShell intercepts every call and routes it to the configured provider. NemoClaw ships with three profiles:
-
-| Profile     | Provider     | Model                               | Use Case                                       |
-|-------------|--------------|--------------------------------------|-------------------------------------------------|
-| `default`   | NVIDIA cloud | `nvidia/nemotron-3-super-120b-a12b` | Production. Requires an NVIDIA API key.         |
-| `nim-local` | Local NIM    | `nvidia/nemotron-3-super-120b-a12b` | On-premises. NIM deployed as a local container. |
-| `vllm`      | vLLM         | `nvidia/nemotron-3-nano-30b-a3b`    | Local development. vLLM on the host.            |
-
-Select a profile at launch with `--profile`, or switch at runtime without restarting the sandbox:
-
-```console
-$ openclaw nemoclaw launch --profile vllm
-$ openshell inference set --provider vllm-local --model nvidia/nemotron-3-nano-30b-a3b
+```bash
+openclaw milimo init                              # Initialize squad / join mesh
+openclaw milimo squad status [--json]              # Show topology & claw health
+openclaw milimo squad finals-mode --duration 2w    # Activate Finals Mode
+openclaw milimo squad resume                       # Resume from Finals Mode
 ```
 
-## Protection Layers
+### Blueprint Operations
 
-The sandbox starts with a strict baseline policy that controls network egress and filesystem access:
+```bash
+openclaw milimo blueprint list [--json]            # List role blueprints & templates
+openclaw milimo blueprint fork <source> [--into]   # Fork a public blueprint
+openclaw milimo blueprint diff <v1> <v2>           # Compare blueprint versions
+openclaw milimo blueprint publish [--name] [--price] # Export to marketplace
+openclaw milimo blueprint rollback --to <version>  # Roll back to previous version
+```
 
-| Layer      | What it protects                                    | When it applies             |
-|------------|-----------------------------------------------------|-----------------------------|
-| Network    | Blocks unauthorized outbound connections.           | Hot-reloadable at runtime.  |
-| Filesystem | Prevents reads/writes outside `/sandbox` and `/tmp`.| Locked at sandbox creation. |
-| Process    | Blocks privilege escalation and dangerous syscalls. | Locked at sandbox creation. |
-| Inference  | Reroutes model API calls to controlled backends.    | Hot-reloadable at runtime.  |
+### War Room
 
-When the agent tries to reach an unlisted host, OpenShell blocks the request and surfaces it in the TUI for operator approval.
+```bash
+openclaw milimo warroom [-o operator-name]         # Launch interactive dashboard
+```
 
-## Key Commands
+Inside the War Room TUI:
 
-### Host commands (`nemoclaw`)
+| Command | Action |
+|---|---|
+| `ls` | List pending actions in queue |
+| `view <id>` | View details of a pending action |
+| `approve <id>` | Approve an action |
+| `veto <id>` | Reject an action |
+| `hold <id>` | Defer an action |
+| `feed` | View recent audit trail |
+| `exit` | Leave the War Room |
 
-Run these on the host to set up, connect to, and manage sandboxes.
+### Chat Interface
 
-| Command                              | Description                                            |
-|--------------------------------------|--------------------------------------------------------|
-| `nemoclaw setup`                     | Full host-side setup: gateway, providers, sandbox.     |
-| `nemoclaw deploy <instance>`         | Deploy to a remote GPU instance through Brev.          |
-| `nemoclaw <name> connect`            | Open an interactive shell inside the sandbox.          |
-| `nemoclaw term`                      | Launch the OpenShell TUI for monitoring and approvals. |
-| `nemoclaw start` / `stop` / `status` | Manage auxiliary services (Telegram bridge, tunnel).   |
+```
+/milimo status     — Squad status
+/milimo roles      — Available claw roles
+/milimo mesh       — Mesh topology
+/milimo help       — Full command list
+```
 
-### Plugin commands (`openclaw nemoclaw`)
+> Full CLI documentation: [milimo-claw-docs/CLI_REFERENCE.md](milimo-claw-docs/CLI_REFERENCE.md)
 
-Run these inside the OpenClaw CLI. These commands are under active development and may not all be functional yet.
+---
 
-| Command                                    | Description                                              |
-|--------------------------------------------|----------------------------------------------------------|
-| `openclaw nemoclaw launch [--profile ...]` | Bootstrap OpenClaw inside an OpenShell sandbox.          |
-| `openclaw nemoclaw status`                 | Show sandbox health, blueprint state, and inference.     |
-| `openclaw nemoclaw logs [-f]`              | Stream blueprint execution and sandbox logs.             |
+## Privacy & Security
 
-See the full [CLI reference](https://docs.nvidia.com/nemoclaw/latest/reference/commands.md) for all commands, flags, and options.
+Milimo Claw adds a **privacy router** on top of NemoClaw's existing security layers:
 
-> **Known limitations:**
-> - The `openclaw nemoclaw` plugin commands are under active development. Use the `nemoclaw` host CLI as the primary interface.
-> - Setup may require manual workarounds on some platforms. File an issue if you encounter blockers.
+| Data Type | Routing Decision | Rationale |
+|---|---|---|
+| Client proposals, public drafts | ☁️ Cloud Nemotron 120B | Max quality for client-facing work |
+| Internal comms, client contacts | 🔒 Local NIM | Business data stays on device |
+| Financial records, payment details | 🔒 Local NIM only | Zero cloud touch for financial data |
+| Personal notes, private context | 🔐 Local vLLM | Tightest isolation |
+| Source code, API keys | 🔒 Local NIM | Code is IP — never leaves the machine |
 
+**Security layers:**
 
-## Learn More
+| Layer | Protection | Enforcement |
+|---|---|---|
+| **Landlock** | Kernel-level filesystem isolation per claw | Cannot be bypassed by any instruction |
+| **seccomp** | Blocks privilege escalation & dangerous syscalls | Locked at sandbox creation |
+| **Network egress** | Per-claw API allowlists | Hot-reloadable at runtime |
+| **Privacy router** | Sensitivity classification → routing | Transparent to the claw |
+| **Typed contracts** | Inter-claw messages validated against policy | Unauthorized types dropped & logged |
+| **War Room** | Human oversight for REVIEW/HOLD/VETO actions | All decisions audit-logged |
 
-Refer to the documentation for more information on NemoClaw.
+> Full details: [milimo-claw-docs/PRIVACY_AND_SECURITY.md](milimo-claw-docs/PRIVACY_AND_SECURITY.md)
 
-- [Overview](https://docs.nvidia.com/nemoclaw/latest/about/overview.html): what NemoClaw does and how it fits together
-- [How It Works](https://docs.nvidia.com/nemoclaw/latest/about/how-it-works.html): plugin, blueprint, and sandbox lifecycle
-- [Architecture](https://docs.nvidia.com/nemoclaw/latest/reference/architecture.html): plugin structure, blueprint lifecycle, and sandbox environment
-- [Inference Profiles](https://docs.nvidia.com/nemoclaw/latest/reference/inference-profiles.html): NVIDIA cloud, NIM, and vLLM configuration
-- [Network Policies](https://docs.nvidia.com/nemoclaw/latest/reference/network-policies.html): egress control and policy customization
-- [CLI Commands](https://docs.nvidia.com/nemoclaw/latest/reference/commands.html): full command reference
+---
+
+## Blueprint Economy
+
+Every claw's state is a **versioned blueprint** — a cryptographically verified artifact encoding months of accumulated intelligence:
+
+- **Fork** — take someone's evolved blueprint as your starting point
+- **Diff** — compare two blueprint versions side-by-side
+- **Publish** — list your evolved blueprint on the marketplace
+- **Rollback** — revert to a previous version
+- **Handoff** — export your claw when graduating, the next person inherits your intelligence
+
+> Full details: [milimo-claw-docs/BLUEPRINT_ECONOMY.md](milimo-claw-docs/BLUEPRINT_ECONOMY.md)
+
+---
+
+## Project Structure
+
+```
+MilimoClaw/
+├── milimo/                      # Milimo Claw plugin (TypeScript)
+│   ├── src/
+│   │   ├── index.ts             # Plugin entry point
+│   │   ├── cli.ts               # CLI registrar
+│   │   ├── commands/            # init, squad, blueprint, warroom, slash
+│   │   └── warroom/             # War Room TUI, approval engine, audit
+│   ├── openclaw.plugin.json     # Plugin manifest
+│   └── package.json
+│
+├── milimo-blueprint/            # Role blueprints & orchestrator (Python + YAML)
+│   ├── roles/                   # 5 claw role blueprints
+│   ├── policies/                # 5 per-role sandbox policies
+│   ├── templates/               # Pre-built squad templates
+│   ├── orchestrator/            # Privacy router, contracts, mesh coordinator
+│   ├── claw-schema.yaml         # Blueprint schema definition
+│   ├── mesh_config.yaml         # Inter-claw message matrix
+│   └── privacy_policy.yaml      # Default sensitivity routing policy
+│
+├── milimo-claw-docs/            # Project documentation
+├── nemoclaw/                    # NemoClaw plugin (upstream)
+├── nemoclaw-blueprint/          # NemoClaw base blueprint (upstream)
+├── test/                        # Test suite (JS + Python)
+├── Dockerfile                   # Sandbox image
+├── Dockerfile.tool              # CLI tool image
+└── NemoClaw-README.md           # Original NemoClaw README
+```
+
+---
+
+## Testing
+
+### JavaScript Tests (Blueprints, CLI, Contracts)
+
+```bash
+npm test
+```
+
+Runs 76 tests covering:
+- Plugin exports & config parsing
+- All 5 role blueprint schema validation
+- Filesystem isolation checks
+- Inference routing enforcement
+- Inter-claw policy verification
+- Sandbox policy structure
+- Contract validation (valid routes, unauthorized routes, War Room access)
+- Approval requirements
+
+### Python Tests (Privacy Router, Mesh Protocol)
+
+```bash
+python3 -m unittest discover -s milimo-blueprint/tests -v
+```
+
+Runs 73 tests covering:
+- Data type → routing decision classification
+- Role-specific routing overrides
+- Fallback behavior for unknown data types
+- Locked route enforcement
+- Contract validation & matrix enforcement
+- Mesh coordinator (registration, routing, health monitoring)
+- Topology persistence
+
+---
+
+## Roadmap
+
+### ✅ Phase 0 — Foundation (Complete)
+
+| Sub-Phase | Status |
+|---|---|
+| 0.1 Milimo CLI Foundation | ✅ |
+| 0.2 Claw Role Blueprints | ✅ |
+| 0.3 Privacy Router | ✅ |
+| 0.4 Squad Mesh Protocol | ✅ |
+| 0.5 War Room TUI | ✅ |
+| 0.6 Milimo Templates | ✅ |
+| 0.7 Build Claw Alpha | ✅ |
+| 0.8 Integration & Verification | ✅ |
+
+### 🔲 Phase 1 — Self-Evolution Engine
+
+- Weekly evolution cycle implementation
+- Tool proposal → build → test → deploy pipeline
+- Cross-claw evolution signals
+
+### 🔲 Phase 2 — Blueprint Marketplace
+
+- Peer-to-peer blueprint listing & discovery
+- Cryptographic provenance verification
+- Fork, merge, and inheritance protocols
+
+### 🔲 Phase 3 — Production Hardening
+
+- Multi-region mesh support
+- Real-time mesh health monitoring
+- Automated failover & recovery
+
+---
+
+## Documentation
+
+| Document | Description |
+|---|---|
+| [Project Description](milimo-claw-docs/MILIMO_CLAW_PROJECT_DESCRIPTION.md) | Full product spec — architecture, features, user flows |
+| [Architecture Guide](milimo-claw-docs/ARCHITECTURE.md) | Technical deep-dive into the multi-sandbox mesh |
+| [CLI Reference](milimo-claw-docs/CLI_REFERENCE.md) | Complete command documentation |
+| [Privacy & Security](milimo-claw-docs/PRIVACY_AND_SECURITY.md) | Data routing, isolation, and trust model |
+| [Blueprint Economy](milimo-claw-docs/BLUEPRINT_ECONOMY.md) | Versioning, marketplace, and inheritance |
+| [Squad Setup Guide](milimo-claw-docs/SQUAD_SETUP_GUIDE.md) | Step-by-step squad formation walkthrough |
+| [Docker Commands](milimo-claw-docs/docker-run-commands.md) | Docker build, run, and management reference |
+| [NemoClaw README](NemoClaw-README.md) | Original upstream NemoClaw documentation |
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+
+---
 
 ## License
 
 This project is licensed under the [Apache License 2.0](LICENSE).
+
+---
+
+## Author
+
+**Mainza Kangombe** — [LinkedIn](https://www.linkedin.com/in/mainza-kangombe-6214295)
+
+*Milimo (mi-LEE-mo) — from the Tonga people of Zambia, meaning "works," "tasks," or "labour."*

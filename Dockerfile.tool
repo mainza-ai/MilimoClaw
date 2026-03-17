@@ -1,4 +1,4 @@
-# Dockerfile for NemoClaw CLI tool
+# Dockerfile for NemoClaw + MilimoClaw CLI tool
 FROM docker:cli as docker-cli
 
 FROM node:22-slim
@@ -23,6 +23,10 @@ COPY . .
 
 # Install dependencies and link
 RUN npm install --ignore-scripts && npm install -g . --ignore-scripts
+
+# Install Milimo plugin into OpenClaw so `milimo` commands are available
+RUN openclaw doctor --fix > /dev/null 2>&1 || true \
+    && openclaw plugins install /app/milimo > /dev/null 2>&1 || true
 
 # Create a non-root user for the tool (optional, but good practice)
 # However, to talk to docker.sock, the user often needs to be in the docker group

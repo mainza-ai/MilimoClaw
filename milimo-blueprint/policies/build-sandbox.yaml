@@ -1,32 +1,125 @@
-version: "1.0"
-role: "build"
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Build Claw Sandbox Policy
+# Mount: /sandbox/build (read-write) — squad's codebase, secrets,
+# test suites, and deployment configs.
+# No access to social, financial, or client communication channels.
 
-isolation:
-  fs_mounts:
-    - path: "/sandbox/build/"
-      permissions: "rw"
-      description: "Build Claw workspace. Contains codebase, build configs, deploy scripts, and secrets."
-  kernel:
-    seccomp: "strict"
-    landlock: true
+version: 1
 
-network_egress:
-  allowlist:
-    - "*.github.com"
-    - "api.github.com"
-    - "api.vercel.com"
-    - "api.railway.app"
-    - "registry.npmjs.org"
-    - "pypi.org"
-    - "sentry.io"
-  deny_all_others: true
+filesystem_policy:
+  include_workdir: true
+  read_only:
+    - /usr
+    - /lib
+    - /proc
+    - /dev/urandom
+    - /app
+    - /etc
+    - /var/log
+  read_write:
+    - /sandbox/build              # Primary mount — codebase & configs
+    - /tmp
+    - /dev/null
 
-inference_routing:
-  - data_type: "source_code"
-    backend: "local_nim"
-  - data_type: "secrets"
-    backend: "local_nim"
-  - data_type: "documentation"
-    backend: "cloud_nemotron_120b"
-  - data_type: "general"
-    backend: "local_nim"
+landlock:
+  compatibility: best_effort
+
+process:
+  run_as_user: sandbox
+  run_as_group: sandbox
+
+network_policies:
+  # ── Inference ───────────────────────────────────────────────────────
+  nvidia:
+    name: nvidia
+    endpoints:
+      - host: integrate.api.nvidia.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: "*", path: "/**" }
+    binaries:
+      - { path: /usr/local/bin/openclaw }
+
+  # ── GitHub ──────────────────────────────────────────────────────────
+  github_api:
+    name: github_api
+    endpoints:
+      - host: api.github.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: "*", path: "/**" }
+      - host: github.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+
+  # ── Deployment: Vercel ──────────────────────────────────────────────
+  vercel_api:
+    name: vercel_api
+    endpoints:
+      - host: api.vercel.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: "*", path: "/**" }
+
+  # ── Deployment: Railway ─────────────────────────────────────────────
+  railway_api:
+    name: railway_api
+    endpoints:
+      - host: backboard.railway.app
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: "*", path: "/**" }
+
+  # ── Package Registries ──────────────────────────────────────────────
+  npm_registry:
+    name: npm_registry
+    endpoints:
+      - host: registry.npmjs.org
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+
+  pypi_registry:
+    name: pypi_registry
+    endpoints:
+      - host: pypi.org
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+
+  # ── Error Monitoring ────────────────────────────────────────────────
+  sentry_api:
+    name: sentry_api
+    endpoints:
+      - host: sentry.io
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: "*", path: "/api/**" }

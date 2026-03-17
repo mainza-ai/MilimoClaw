@@ -23,7 +23,7 @@ const BLUEPRINT_DIR = path.join(__dirname, "..", "milimo-blueprint");
 const ROLES_DIR = path.join(BLUEPRINT_DIR, "roles");
 const POLICIES_DIR = path.join(BLUEPRINT_DIR, "policies");
 
-const EXPECTED_ROLES = ["content", "ops", "analytics", "finance"];
+const EXPECTED_ROLES = ["content", "ops", "analytics", "finance", "build"];
 const REQUIRED_BLUEPRINT_FIELDS = [
   "role",
   "display_name",
