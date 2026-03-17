@@ -1,0 +1,117 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Ops Claw Sandbox Policy
+# Mount: /sandbox/clients (read-write) — the squad's most sensitive data store.
+# No cross-claw read access except Finance (billing context via inter-claw msg).
+
+version: 1
+
+filesystem_policy:
+  include_workdir: true
+  read_only:
+    - /usr
+    - /lib
+    - /proc
+    - /dev/urandom
+    - /app
+    - /etc
+    - /var/log
+  read_write:
+    - /sandbox/clients             # Primary mount — client records
+    - /tmp
+    - /dev/null
+
+landlock:
+  compatibility: best_effort
+
+process:
+  run_as_user: sandbox
+  run_as_group: sandbox
+
+network_policies:
+  # ── Inference ───────────────────────────────────────────────────────
+  nvidia:
+    name: nvidia
+    endpoints:
+      - host: integrate.api.nvidia.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: "*", path: "/**" }
+    binaries:
+      - { path: /usr/local/bin/openclaw }
+
+  # ── Email APIs ──────────────────────────────────────────────────────
+  sendgrid:
+    name: sendgrid
+    endpoints:
+      - host: api.sendgrid.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: POST, path: "/v3/mail/send" }
+          - allow: { method: GET, path: "/v3/**" }
+
+  gmail_api:
+    name: gmail_api
+    endpoints:
+      - host: gmail.googleapis.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: "*", path: "/**" }
+
+  outlook:
+    name: outlook
+    endpoints:
+      - host: graph.microsoft.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: "*", path: "/v1.0/me/messages/**" }
+          - allow: { method: "*", path: "/v1.0/me/sendMail" }
+
+  # ── Scheduling & PM ─────────────────────────────────────────────────
+  calendly:
+    name: calendly
+    endpoints:
+      - host: api.calendly.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: "*", path: "/**" }
+
+  notion_api:
+    name: notion_api
+    endpoints:
+      - host: api.notion.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: "*", path: "/v1/**" }
+
+  # ── Messaging (Telegram — inherited from base) ─────────────────────
+  telegram:
+    name: telegram
+    endpoints:
+      - host: api.telegram.org
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/bot*/**" }
+          - allow: { method: POST, path: "/bot*/**" }

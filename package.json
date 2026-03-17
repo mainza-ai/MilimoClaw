@@ -18,7 +18,11 @@
     "nemoclaw/dist/",
     "nemoclaw/openclaw.plugin.json",
     "nemoclaw/package.json",
+    "milimo/dist/",
+    "milimo/openclaw.plugin.json",
+    "milimo/package.json",
     "nemoclaw-blueprint/",
+    "milimo-blueprint/",
     "scripts/",
     "Dockerfile",
     ".dockerignore"

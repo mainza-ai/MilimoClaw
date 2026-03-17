@@ -1,0 +1,108 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Finance Claw Sandbox Policy
+# Mount: /sandbox/finance (read-write) — tightest isolation in the squad.
+# Egress: Payment processors (read-only + invoice gen), accounting APIs.
+# ⚠️ NO CLOUD INFERENCE ENDPOINTS — enforced at policy level.
+
+version: 1
+
+filesystem_policy:
+  include_workdir: true
+  read_only:
+    - /usr
+    - /lib
+    - /proc
+    - /dev/urandom
+    - /app
+    - /etc
+    - /var/log
+  read_write:
+    - /sandbox/finance             # Primary mount — financial records
+    - /tmp
+    - /dev/null
+  # NOTE: /sandbox/finance is the most restricted store.
+  # No other claw has ANY filesystem access to this directory.
+
+landlock:
+  compatibility: best_effort
+
+process:
+  run_as_user: sandbox
+  run_as_group: sandbox
+
+network_policies:
+  # ── LOCAL Inference ONLY ────────────────────────────────────────────
+  # ⚠️ CRITICAL: No cloud inference endpoints for the Finance Claw.
+  # Financial data NEVER leaves the device. The NIM local endpoint
+  # is the only inference route available.
+  nim_local:
+    name: nim_local
+    endpoints:
+      - host: nim-service.local
+        port: 8000
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: "*", path: "/**" }
+
+  # ── Payment Processors (restricted) ─────────────────────────────────
+  stripe_api:
+    name: stripe_api
+    endpoints:
+      - host: api.stripe.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          # Read-only status checks
+          - allow: { method: GET, path: "/v1/invoices/**" }
+          - allow: { method: GET, path: "/v1/charges/**" }
+          - allow: { method: GET, path: "/v1/customers/**" }
+          - allow: { method: GET, path: "/v1/balance/**" }
+          # Invoice generation (not payment execution)
+          - allow: { method: POST, path: "/v1/invoices" }
+          - allow: { method: POST, path: "/v1/invoices/*/send" }
+
+  paypal_api:
+    name: paypal_api
+    endpoints:
+      - host: api-m.paypal.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          # Read-only status checks
+          - allow: { method: GET, path: "/v2/invoicing/invoices/**" }
+          - allow: { method: GET, path: "/v1/reporting/**" }
+          # Invoice generation
+          - allow: { method: POST, path: "/v2/invoicing/invoices" }
+          - allow: { method: POST, path: "/v2/invoicing/invoices/*/send" }
+
+  # ── Accounting ──────────────────────────────────────────────────────
+  quickbooks_api:
+    name: quickbooks_api
+    endpoints:
+      - host: quickbooks.api.intuit.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**/invoice" }
+          - allow: { method: POST, path: "/**/expense" }
+
+  wave_api:
+    name: wave_api
+    endpoints:
+      - host: gql.waveapps.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: POST, path: "/graphql/public" }

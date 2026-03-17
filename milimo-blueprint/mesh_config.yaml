@@ -1,0 +1,100 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Milimo Claw — Default Mesh Configuration
+# ═══════════════════════════════════════════════════════════════════════
+# Defines the inter-claw message types matrix, default escalation rules,
+# and approval thresholds for the squad mesh protocol.
+
+mesh_version: "0.1.0"
+
+# ── Inter-Claw Message Types Matrix ───────────────────────────────────
+# Defines which message types each role can send and receive.
+# Format: sender → recipient → allowed message types
+# Messages not in this matrix are dropped and logged.
+
+message_matrix:
+  content:
+    ops:       [deliverable]
+    analytics: [query]
+    war_room:  [deliverable]
+
+  ops:
+    content:   [brief, signal]
+    finance:   [query, signal]
+    build:     [brief]
+    war_room:  [signal, deliverable]
+
+  analytics:
+    content:   [response, summary]
+    ops:       [signal]
+    finance:   [summary]
+    build:     [response, signal]
+    war_room:  [signal, summary]
+
+  finance:
+    ops:       [response, signal]
+    analytics: [summary]
+    war_room:  [signal, deliverable]
+
+  build:
+    ops:       [signal, deliverable]
+    analytics: [query]
+    content:   [summary]
+    war_room:  [signal, deliverable]
+
+# ── Valid Message Types ────────────────────────────────────────────────
+message_types:
+  brief:
+    description: "Project or creative brief"
+    requires_approval: false
+  query:
+    description: "Data request"
+    requires_approval: false
+  response:
+    description: "Query response with requested data"
+    requires_approval: false
+  signal:
+    description: "Alert — deadline, risk, anomaly, completion"
+    requires_approval: false
+  deliverable:
+    description: "Completed work product queued for review"
+    requires_approval: true
+  summary:
+    description: "Periodic report — weekly intelligence, revenue, shipping"
+    requires_approval: false
+
+# ── Escalation Rules ──────────────────────────────────────────────────
+# Default escalation rules for the squad.
+escalation_rules:
+  - trigger: "invoice_over_500"
+    action: veto
+    description: "Any invoice >$500 requires squad-wide approval"
+
+  - trigger: "client_offboarding"
+    action: hold
+    description: "Client offboarding requires explicit squad confirmation"
+
+  - trigger: "brand_voice_change"
+    action: hold
+    description: "Brand voice modifications require explicit confirmation"
+
+  - trigger: "payment_execution"
+    action: veto
+    description: "Any payment execution requires squad-wide approval"
+
+  - trigger: "rate_change"
+    action: veto
+    description: "Pricing rate changes require squad-wide approval"
+
+  - trigger: "external_data_sharing"
+    action: veto
+    description: "Sharing squad data externally requires squad-wide approval"
+
+# ── Health Check Configuration ─────────────────────────────────────────
+health_check:
+  interval_seconds: 30
+  timeout_seconds: 10
+  unhealthy_threshold: 3
+  recovery_action: notify_war_room

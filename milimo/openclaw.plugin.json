@@ -1,0 +1,33 @@
+{
+  "id": "milimo",
+  "name": "Milimo Claw",
+  "version": "0.1.0",
+  "description": "Multi-agent autonomous hustle platform — squad mesh, claw roles, and blueprint economy",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "squadName": {
+        "type": "string",
+        "description": "Name of the squad this claw belongs to",
+        "default": ""
+      },
+      "clawRole": {
+        "type": "string",
+        "description": "Role of this claw instance (content, ops, analytics, finance, build)",
+        "enum": ["content", "ops", "analytics", "finance", "build", ""],
+        "default": ""
+      },
+      "meshSecret": {
+        "type": "string",
+        "description": "Shared secret for squad mesh authentication",
+        "default": ""
+      },
+      "blueprintDir": {
+        "type": "string",
+        "description": "Path to milimo-blueprint directory",
+        "default": "/opt/milimo-blueprint"
+      }
+    },
+    "additionalProperties": false
+  }
+}

@@ -1,0 +1,106 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Analytics Claw Sandbox Policy
+# Mount: /sandbox/analytics (read-write)
+# Egress: Platform analytics APIs (read-only), market research feeds.
+# No write access to any external platform.
+
+version: 1
+
+filesystem_policy:
+  include_workdir: true
+  read_only:
+    - /usr
+    - /lib
+    - /proc
+    - /dev/urandom
+    - /app
+    - /etc
+    - /var/log
+  read_write:
+    - /sandbox/analytics           # Primary mount
+    - /tmp
+    - /dev/null
+
+landlock:
+  compatibility: best_effort
+
+process:
+  run_as_user: sandbox
+  run_as_group: sandbox
+
+network_policies:
+  # ── Inference ───────────────────────────────────────────────────────
+  nvidia:
+    name: nvidia
+    endpoints:
+      - host: integrate.api.nvidia.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: "*", path: "/**" }
+    binaries:
+      - { path: /usr/local/bin/openclaw }
+
+  # ── Platform Analytics (READ-ONLY) ──────────────────────────────────
+  google_analytics:
+    name: google_analytics
+    endpoints:
+      - host: analyticsdata.googleapis.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/v1beta/**:runReport" }
+
+  meta_insights:
+    name: meta_insights
+    endpoints:
+      - host: graph.facebook.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**/insights" }
+          - allow: { method: GET, path: "/**/analytics" }
+
+  twitter_analytics:
+    name: twitter_analytics
+    endpoints:
+      - host: api.twitter.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/2/tweets/**/metrics" }
+          - allow: { method: GET, path: "/2/users/**/tweets" }
+
+  # ── Market Research ─────────────────────────────────────────────────
+  google_trends:
+    name: google_trends
+    endpoints:
+      - host: trends.google.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+
+  semrush_api:
+    name: semrush_api
+    endpoints:
+      - host: api.semrush.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }

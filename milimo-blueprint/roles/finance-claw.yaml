@@ -1,0 +1,137 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# ═══════════════════════════════════════════════════════════════════════
+#  FINANCE CLAW — Role Blueprint
+# ═══════════════════════════════════════════════════════════════════════
+# Primary responsibility: The complete financial nervous system of the
+# squad — revenue tracking, proposal pricing, invoicing, payment
+# follow-up, expense logging, profit margin monitoring, and tax-ready
+# reporting. Every financial action requires explicit operator approval.
+# No money moves without a human sign-off.
+
+schema_version: "0.1.0"
+
+role: finance
+display_name: "Finance Claw"
+description: >
+  Financial ops — invoicing, pricing, margins, tax prep.
+  The most tightly isolated claw. ALL inference runs locally.
+  Every financial action requires explicit human approval.
+
+icon: "💰"
+
+# ── Filesystem ─────────────────────────────────────────────────────────
+filesystem_mount:
+  primary: "/sandbox/finance"
+  mode: read_write
+  contents:
+    - revenue records
+    - invoice history
+    - expense logs
+    - pricing rules
+    - payment status
+  cross_mounts: []
+  # The most tightly isolated store in the squad.
+  # Zero cross-claw read access except approved summary queries
+  # from the Analytics Claw (revenue totals only, no line-item detail).
+
+# ── Network Egress ─────────────────────────────────────────────────────
+egress_policy: finance-sandbox
+egress_summary:
+  allowed:
+    - Stripe API (read-only status checks and invoice generation)
+    - PayPal API (read-only status checks and invoice generation)
+    - Accounting APIs
+    - Banking APIs (read-only balance checks)
+  blocked:
+    - Social platforms
+    - Code repositories
+    - Client communication channels
+    - Market research feeds
+    - Cloud inference endpoints  # CRITICAL: financial data never touches cloud
+
+# ── Inference Routing ──────────────────────────────────────────────────
+# ⚠️ ARCHITECTURAL CONSTRAINT: All financial data routes to local NIM.
+# No exceptions. This is enforced by the privacy router, not a
+# policy preference. Financial records, payment details, pricing
+# strategy, and tax data NEVER touch a cloud inference endpoint.
+inference_routing:
+  rules:
+    - data_type: financial_records
+      description: "Revenue, invoices, expenses, payment status"
+      backend: local-nim
+      rationale: "Financial data never leaves the device"
+
+    - data_type: pricing_strategy
+      description: "Rate calculations, margin analysis, cost estimation"
+      backend: local-nim
+      rationale: "Pricing intelligence is competitive advantage"
+
+    - data_type: tax_data
+      description: "Tax categorization and reporting"
+      backend: local-nim
+      rationale: "Tax data is legally sensitive"
+
+  default_backend: local-nim
+  cloud_allowed: false  # Explicit — no override possible
+
+# ── Inter-Claw Policy ─────────────────────────────────────────────────
+inter_claw_policy:
+  inbound:
+    - from: ops
+      message_types:
+        - type: query
+          description: "Pricing floor query before client proposal"
+        - type: signal
+          description: "Project completion signal to trigger invoicing"
+
+    - from: analytics
+      message_types:
+        - type: signal
+          description: "Revenue anomaly alert"
+
+  outbound:
+    - to: ops
+      message_types:
+        - type: response
+          description: "Pricing estimates and rate floor data"
+        - type: signal
+          description: "Invoice triggers, overdue alerts, rate warnings"
+
+    - to: analytics
+      message_types:
+        - type: summary
+          description: "Revenue totals for reporting (totals only — no line items)"
+
+    - to: war_room
+      message_types:
+        - type: signal
+          description: "Overdue payment alert, margin compression warning"
+        - type: deliverable
+          description: "Invoice staged for approval before sending"
+
+# ── Approval Thresholds ────────────────────────────────────────────────
+# Finance Claw has the strictest approval requirements in the squad.
+# No money moves without human sign-off.
+approval_thresholds:
+  expense_logging: review
+  cost_estimation: auto
+  pricing_recommendation: review
+  invoice_generation: review
+  invoice_send: hold
+  payment_follow_up: review
+  payment_over_500: veto
+  tax_report_generation: hold
+  rate_change: veto
+
+# ── Self-Evolution Seed ────────────────────────────────────────────────
+evolution_signals:
+  primary: "Invoice outcomes, scope estimates vs actuals"
+  initial_tools:
+    - name: scope_cost_estimator
+      target_week: 3
+      description: "Estimates project cost from brief keywords, calibrated to actual delivery velocity"
+    - name: pricing_floor_guardian
+      target_week: 7
+      description: "Automatically flags proposals below the squad's profitable rate threshold"
