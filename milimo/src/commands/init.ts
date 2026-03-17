@@ -56,7 +56,7 @@ export function loadMilimoState(): MilimoState | null {
   }
 }
 
-function saveMilimoState(state: MilimoState): void {
+export function saveMilimoState(state: MilimoState): void {
   const dir = getMilimoStateDir();
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(getMilimoStatePath(), JSON.stringify(state, null, 2), { mode: 0o600 });

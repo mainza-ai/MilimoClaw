@@ -99,6 +99,22 @@ export class ApprovalEngine {
       }
     }
 
+    // Handle tool proposals based on evolution config
+    if (message.message_type === 'tool_proposal') {
+      let requireApproval = false;
+      try {
+        const configPath = join(process.cwd(), 'milimo-blueprint', 'evolution_config.yaml');
+        const content = readFileSync(configPath, 'utf8');
+        const config = yamlParse(content);
+        if (config && config.deployment && typeof config.deployment.require_proposal_approval === 'boolean') {
+          requireApproval = config.deployment.require_proposal_approval;
+        }
+      } catch (e) {
+        // Default to false if config not found
+      }
+      return requireApproval ? { mode: 'REVIEW', description: 'Tool proposal review' } : { mode: 'AUTO' };
+    }
+
     // Default modes based on needs_approval flag from Contracts
     if (message.needs_approval) {
       return { mode: 'REVIEW' };

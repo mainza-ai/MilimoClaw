@@ -60,6 +60,22 @@ function saveFinalsMode(state: FinalsModeState): void {
   fs.writeFileSync(getFinalsModePath(), JSON.stringify(state, null, 2), { mode: 0o600 });
 }
 
+export function checkFinalsModeAutoResume(logger: PluginLogger): void {
+  const finalsMode = loadFinalsMode();
+  if (!finalsMode?.active || !finalsMode.resumeDate) return;
+
+  const today = new Date().toISOString().split("T")[0];
+  if (today >= finalsMode.resumeDate) {
+    logger.info("");
+    logger.info(`⏰ Finals Mode resume date (${finalsMode.resumeDate}) reached. Auto-resuming operations.`);
+    
+    finalsMode.active = false;
+    saveFinalsMode(finalsMode);
+
+    logger.info("  All claw policies restored to pre-finals configuration.");
+  }
+}
+
 // ── Squad Status ──────────────────────────────────────────────────────
 
 export async function cliSquadStatus(opts: SquadStatusOptions): Promise<void> {

@@ -4,16 +4,14 @@
 /**
  * `openclaw milimo blueprint` — Blueprint operations.
  *
- * Subcommands: list, fork, diff, publish, rollback.
- * Phase 0 implements list and stubs for fork/diff/publish/rollback.
- * Full marketplace integration arrives in Phase 3.
+ * Subcommands: list, fork, diff, publish, rollback, search, merge, info.
  */
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { execSync } from "node:child_process";
 import type { PluginLogger, MilimoConfig } from "../index.js";
-import { CLAW_ROLES } from "../index.js";
-import { loadMilimoState } from "./init.js";
+import { loadMilimoState, saveMilimoState } from "./init.js";
 
 interface BlueprintListOptions {
   json: boolean;
@@ -57,6 +55,14 @@ interface BlueprintInfo {
   description: string;
 }
 
+/**
+ * Helper to call Python logic with proper path handling.
+ */
+function callPython(blueprintDir: string, code: string): string {
+  const cmd = `python3 -c "import sys; sys.path.insert(0, '${blueprintDir}'); ${code}"`;
+  return execSync(cmd, { cwd: blueprintDir, encoding: "utf-8" }).trim();
+}
+
 function discoverBlueprints(blueprintDir: string): BlueprintInfo[] {
   const blueprints: BlueprintInfo[] = [];
 
@@ -65,7 +71,7 @@ function discoverBlueprints(blueprintDir: string): BlueprintInfo[] {
   if (fs.existsSync(rolesDir)) {
     for (const file of fs.readdirSync(rolesDir)) {
       if (!file.endsWith(".yaml") && !file.endsWith(".yml")) continue;
-      const roleName = file.replace(/-claw\.ya?ml$/, "");
+      const roleName = file.replace(/-claw\.ya?ml$/, "").replace(/\.ya?ml$/, "");
       blueprints.push({
         name: `${roleName}-claw`,
         type: "role",
@@ -99,44 +105,70 @@ export async function cliBlueprintList(opts: BlueprintListOptions): Promise<void
   const { logger, pluginConfig } = opts;
   const blueprintDir = pluginConfig.blueprintDir;
   const blueprints = discoverBlueprints(blueprintDir);
+  const state = loadMilimoState();
+
+  let activeInventory: any = null;
+  let currentVersion = "0.1.0";
+
+  if (state) {
+    try {
+      const code = `from orchestrator.blueprint_manager import BlueprintManager; from orchestrator.tool_registry import ToolRegistry; reg = ToolRegistry('${state.squadName}', '${state.clawRole}'); mgr = BlueprintManager('${state.squadName}', '${state.clawRole}', '${blueprintDir}', tool_registry=reg); import json; print(json.dumps({'version': mgr.current_version(), 'tools': reg.get_inventory()}))`;
+      const result = callPython(blueprintDir, code);
+      const output = JSON.parse(result);
+      currentVersion = output.version;
+      activeInventory = output.tools;
+    } catch (err) {
+      logger.debug(`Could not load active blueprint state: ${(err as Error).message}`);
+    }
+  }
 
   if (opts.json) {
-    logger.info(JSON.stringify(blueprints, null, 2));
+    logger.info(JSON.stringify({ catalog: blueprints, active: { version: currentVersion, tools: activeInventory } }, null, 2));
     return;
   }
 
   logger.info("");
   logger.info("  ┌─────────────────────────────────────────────────────┐");
-  logger.info("  │           🦀  AVAILABLE BLUEPRINTS  🦀              │");
+  logger.info("  │           🦀  MILIMO BLUEPRINT STATUS  🦀           │");
   logger.info("  └─────────────────────────────────────────────────────┘");
   logger.info("");
+
+  if (state) {
+    logger.info(`  Active Squad:  ${state.squadName}`);
+    logger.info(`  Claw Role:     ${state.clawRole}`);
+    logger.info(`  Current Ver:   v${currentVersion}`);
+    logger.info("");
+    
+    logger.info("  Evolved Tools:");
+    if (activeInventory && Object.keys(activeInventory).length > 0) {
+      for (const [name, tool] of Object.entries<any>(activeInventory)) {
+        const mark = tool.status === "deployed" ? "🟢" : "🔴";
+        logger.info(`    ${mark} ${name.padEnd(20)} v${tool.version} (+${tool.performance_delta.toFixed(1)}% uplift)`);
+      }
+    } else {
+      logger.info("    (no evolved tools deployed yet)");
+    }
+    logger.info("");
+  }
+
+  logger.info("  Blueprint Catalog:");
 
   // List roles
   const roles = blueprints.filter((b) => b.type === "role");
   if (roles.length > 0) {
-    logger.info("  Claw Roles:");
+    logger.info("    Claw Roles:");
     for (const bp of roles) {
-      logger.info(`    ${bp.name.padEnd(20)} ${bp.description}`);
-    }
-  } else {
-    logger.info("  Claw Roles:");
-    logger.info("    (built-in roles available)");
-    for (const role of CLAW_ROLES) {
-      logger.info(`    ${(role + "-claw").padEnd(20)} ${getRoleBlurb(role)}`);
+      logger.info(`      ${bp.name.padEnd(18)} ${bp.description}`);
     }
   }
-  logger.info("");
-
+  
   // List templates
   const templates = blueprints.filter((b) => b.type === "template");
   if (templates.length > 0) {
-    logger.info("  Squad Templates:");
+    logger.info("    Squad Templates:");
     for (const bp of templates) {
-      logger.info(`    ${bp.name.padEnd(20)} ${bp.description}`);
+      logger.info(`      ${bp.name.padEnd(18)} ${bp.description}`);
     }
-  } else {
-    logger.info("  Squad Templates:");
-    logger.info("    (no templates deployed yet — coming in Phase 0.6)");
   }
 
   logger.info("");
@@ -147,47 +179,51 @@ export async function cliBlueprintList(opts: BlueprintListOptions): Promise<void
 // ── Blueprint Fork ────────────────────────────────────────────────────
 
 export async function cliBlueprintFork(opts: BlueprintForkOptions): Promise<void> {
-  const { logger } = opts;
+  const { logger, pluginConfig } = opts;
   const state = loadMilimoState();
+  const blueprintDir = pluginConfig.blueprintDir;
 
   if (!state) {
     logger.error("No Milimo Claw configuration found. Run 'openclaw milimo init' first.");
     return;
   }
 
-  const targetName = opts.into ?? `${opts.source}-fork`;
+  const targetName = opts.into ?? `${opts.source.replace(/^@/, "").replace(/\//, "-")}-fork`;
 
   logger.info("");
   logger.info(`  Forking blueprint: ${opts.source}`);
   logger.info(`  Into:              ${targetName}`);
   logger.info("");
 
-  // Phase 0: stub — real forking requires blueprint marketplace (Phase 3)
-  const home = process.env["HOME"] ?? process.env["USERPROFILE"] ?? "/tmp";
-  const forkDir = path.join(home, ".milimo", "blueprints", targetName);
-  fs.mkdirSync(forkDir, { recursive: true });
+  try {
+    const code = `from orchestrator.marketplace_manager import MarketplaceManager; mgr = MarketplaceManager(); snapshot = mgr.download('${opts.source}'); import json; print(json.dumps(snapshot.to_dict()) if snapshot else 'None')`;
+    const result = callPython(blueprintDir, code);
+    
+    if (result === "None") {
+      logger.error(`  ✗ Blueprint ${opts.source} not found in marketplace.`);
+      return;
+    }
 
-  const forkMeta = {
-    name: targetName,
-    forkedFrom: opts.source,
-    forkedAt: new Date().toISOString(),
-    version: "0.1.0",
-    squad: state.squadName,
-  };
-  fs.writeFileSync(path.join(forkDir, "fork.json"), JSON.stringify(forkMeta, null, 2));
+    const snapshot = JSON.parse(result);
+    // Locally save the forked blueprint
+    const home = process.env["HOME"] ?? process.env["USERPROFILE"] ?? "/tmp";
+    const forkDir = path.join(home, ".milimo", "blueprints", targetName);
+    fs.mkdirSync(forkDir, { recursive: true });
+    fs.writeFileSync(path.join(forkDir, "v0.1.0.json"), JSON.stringify(snapshot, null, 2));
 
-  logger.info(`  ✓ Fork metadata created at ~/.milimo/blueprints/${targetName}/`);
-  logger.info("");
-  logger.info("  Note: Full blueprint forking with marketplace integration");
-  logger.info("  will be available in Phase 3 (Blueprint Economy).");
+    logger.info(`  ✓ Blueprint forked and saved to ~/.milimo/blueprints/${targetName}/`);
+  } catch (err) {
+    logger.error(`  ✗ Error forking blueprint: ${(err as Error).message}`);
+  }
   logger.info("");
 }
 
 // ── Blueprint Diff ────────────────────────────────────────────────────
 
 export async function cliBlueprintDiff(opts: BlueprintDiffOptions): Promise<void> {
-  const { logger } = opts;
+  const { logger, pluginConfig } = opts;
   const state = loadMilimoState();
+  const blueprintDir = pluginConfig.blueprintDir;
 
   if (!state) {
     logger.error("No Milimo Claw configuration found. Run 'openclaw milimo init' first.");
@@ -195,26 +231,62 @@ export async function cliBlueprintDiff(opts: BlueprintDiffOptions): Promise<void
   }
 
   logger.info("");
-  logger.info(`  Comparing blueprint versions: ${opts.versionA} ↔ ${opts.versionB}`);
+  logger.info("  ┌─────────────────────────────────────────────────────┐");
+  logger.info("  │           🦀  BLUEPRINT DIFF  🦀                    │");
+  logger.info("  └─────────────────────────────────────────────────────┘");
+  logger.info("");
+  logger.info(`  Versions: ${opts.versionA} ↔ ${opts.versionB}`);
   logger.info("");
 
-  // Phase 0: stub — real diffing requires versioned blueprint storage
-  logger.info("  Blueprint diff will show:");
-  logger.info("    • Tool inventory changes");
-  logger.info("    • Policy modifications");
-  logger.info("    • Learned prior deltas");
-  logger.info("    • Configuration drift");
-  logger.info("");
-  logger.info("  Note: Full blueprint diffing will be available once");
-  logger.info("  blueprint versioning is implemented (Phase 1).");
+  try {
+    const code = `from orchestrator.blueprint_manager import BlueprintManager; mgr = BlueprintManager('${state.squadName}', '${state.clawRole}', '${blueprintDir}'); diff = mgr.diff('${opts.versionA}', '${opts.versionB}'); import json; print(json.dumps({'tools_added': diff.tools_added, 'tools_removed': diff.tools_removed, 'tools_modified': diff.tools_modified, 'policy_changes': diff.policy_changes, 'config_changes': diff.config_changes}))`;
+    const result = callPython(blueprintDir, code);
+    const diff = JSON.parse(result);
+
+    if (diff.tools_added.length > 0) {
+      logger.info("  Tools Added:");
+      for (const t of diff.tools_added) logger.info(`    + ${t}`);
+    }
+    if (diff.tools_removed.length > 0) {
+      logger.info("  Tools Removed:");
+      for (const t of diff.tools_removed) logger.info(`    - ${t}`);
+    }
+    if (diff.tools_modified.length > 0) {
+      logger.info("  Tools Modified:");
+      for (const t of diff.tools_modified) logger.info(`    ~ ${t}`);
+    }
+
+    if (Object.keys(diff.policy_changes).length > 0) {
+      logger.info("");
+      logger.info("  Policy Changes:");
+      for (const [k, v] of Object.entries<any>(diff.policy_changes)) {
+        logger.info(`    ${k}: ${JSON.stringify(v.from)} → ${JSON.stringify(v.to)}`);
+      }
+    }
+
+    if (Object.keys(diff.config_changes).length > 0) {
+      logger.info("");
+      logger.info("  Config Changes:");
+      for (const [k, v] of Object.entries<any>(diff.config_changes)) {
+        logger.info(`    ${k}: ${JSON.stringify(v.from)} → ${JSON.stringify(v.to)}`);
+      }
+    }
+
+    if (diff.tools_added.length === 0 && diff.tools_removed.length === 0 && diff.tools_modified.length === 0 && Object.keys(diff.policy_changes).length === 0) {
+      logger.info("  No significant changes detected.");
+    }
+  } catch (err) {
+    logger.error(`  ✗ Error diffing blueprints: ${(err as Error).message}`);
+  }
   logger.info("");
 }
 
 // ── Blueprint Publish ─────────────────────────────────────────────────
 
 export async function cliBlueprintPublish(opts: BlueprintPublishOptions): Promise<void> {
-  const { logger } = opts;
+  const { logger, pluginConfig } = opts;
   const state = loadMilimoState();
+  const blueprintDir = pluginConfig.blueprintDir;
 
   if (!state) {
     logger.error("No Milimo Claw configuration found. Run 'openclaw milimo init' first.");
@@ -224,7 +296,7 @@ export async function cliBlueprintPublish(opts: BlueprintPublishOptions): Promis
   const displayName = opts.name ?? `${state.squadName}-${state.clawRole}-blueprint`;
 
   logger.info("");
-  logger.info("  📦 Blueprint Publish (Preview)");
+  logger.info("  📦 Blueprint Publish");
   logger.info("");
   logger.info(`  Name:     ${displayName}`);
   logger.info(`  Price:    ${opts.price}`);
@@ -232,16 +304,24 @@ export async function cliBlueprintPublish(opts: BlueprintPublishOptions): Promis
   logger.info(`  Role:     ${state.clawRole}`);
   logger.info(`  Version:  v${state.blueprintVersion}`);
   logger.info("");
-  logger.info("  Note: Blueprint Marketplace launches in Phase 3.");
-  logger.info("  Your blueprint will be publishable once the marketplace is live.");
+
+  try {
+    const code = `from orchestrator.blueprint_manager import BlueprintManager; from orchestrator.marketplace_manager import MarketplaceManager; mgr = BlueprintManager('${state.squadName}', '${state.clawRole}', '${blueprintDir}'); market = MarketplaceManager(); snapshot = mgr.export(); id = market.publish(snapshot, '${opts.price}', '${displayName}', '${state.squadName}'); print(id)`;
+    const result = callPython(blueprintDir, code);
+    
+    logger.info(`  ✓ Published to marketplace with ID: ${result}`);
+  } catch (err) {
+    logger.error(`  ✗ Error publishing blueprint: ${(err as Error).message}`);
+  }
   logger.info("");
 }
 
 // ── Blueprint Rollback ────────────────────────────────────────────────
 
 export async function cliBlueprintRollback(opts: BlueprintRollbackOptions): Promise<void> {
-  const { logger } = opts;
+  const { logger, pluginConfig } = opts;
   const state = loadMilimoState();
+  const blueprintDir = pluginConfig.blueprintDir;
 
   if (!state) {
     logger.error("No Milimo Claw configuration found. Run 'openclaw milimo init' first.");
@@ -260,9 +340,120 @@ export async function cliBlueprintRollback(opts: BlueprintRollbackOptions): Prom
   }
   logger.info("");
 
-  // Phase 0: stub — real rollback requires versioned blueprint history
-  logger.info("  Note: Full blueprint rollback requires version history.");
-  logger.info("  This feature will be fully functional in Phase 1.");
+  try {
+    const code = `from orchestrator.blueprint_manager import BlueprintManager; mgr = BlueprintManager('${state.squadName}', '${state.clawRole}', '${blueprintDir}'); print(mgr.rollback('${opts.to}', '${opts.reason || ""}'))`;
+    const result = callPython(blueprintDir, code);
+    
+    if (result === "True") {
+      // Sync local state
+      state.blueprintVersion = opts.to;
+      saveMilimoState(state);
+      logger.info(`  ✓ Successfully rolled back to v${opts.to}`);
+    } else {
+      logger.error(`  ✗ Rollback failed. Version v${opts.to} might not exist.`);
+    }
+  } catch (err) {
+    logger.error(`  ✗ Error during rollback: ${(err as Error).message}`);
+  }
+
+  logger.info("");
+}
+
+// ── Blueprint Search ─────────────────────────────────────────────────
+
+export async function cliBlueprintSearch(opts: { query?: string; category?: string; logger: PluginLogger; pluginConfig: MilimoConfig }): Promise<void> {
+  const { logger, pluginConfig } = opts;
+  const blueprintDir = pluginConfig.blueprintDir;
+  
+  logger.info("");
+  logger.info("  🔍 Searching Blueprint Marketplace...");
+  if (opts.query) logger.info(`     Query:    ${opts.query}`);
+  if (opts.category) logger.info(`     Category: ${opts.category}`);
+  logger.info("");
+
+  try {
+    const code = `from orchestrator.marketplace_manager import MarketplaceManager; mgr = MarketplaceManager(); results = mgr.search('${opts.query || ""}', '${opts.category || ""}'); import json; print(json.dumps(results))`;
+    const result = callPython(blueprintDir, code);
+    const listings = JSON.parse(result);
+
+    if (listings.length === 0) {
+      logger.info("  No blueprints found matching your criteria.");
+    } else {
+      logger.info("  ID".padEnd(35) + "Author".padEnd(15) + "Price".padEnd(10) + "Verified");
+      logger.info("  " + "─".repeat(70));
+      for (const l of listings) {
+        const verified = l.verified ? "✅" : "❌";
+        logger.info(`  ${l.id.padEnd(33)} ${l.author.padEnd(14)} ${l.price.padEnd(9)} ${verified}`);
+      }
+    }
+  } catch (err) {
+    logger.error(`  ✗ Error searching marketplace: ${(err as Error).message}`);
+  }
+  logger.info("");
+}
+
+// ── Blueprint Merge ──────────────────────────────────────────────────
+
+export async function cliBlueprintMerge(opts: { incoming: string; logger: PluginLogger; pluginConfig: MilimoConfig }): Promise<void> {
+  const { logger, pluginConfig } = opts;
+  const state = loadMilimoState();
+  const blueprintDir = pluginConfig.blueprintDir;
+
+  if (!state) {
+    logger.error("No Milimo Claw configuration found. Run 'openclaw milimo init' first.");
+    return;
+  }
+
+  logger.info("");
+  logger.info(`  🤝 Merging blueprint: ${opts.incoming}`);
+  logger.info("");
+
+  try {
+    const code = `from orchestrator.blueprint_manager import BlueprintManager; from orchestrator.blueprint_merger import BlueprintMerger; from orchestrator.marketplace_manager import MarketplaceManager; mgr = BlueprintManager('${state.squadName}', '${state.clawRole}', '${blueprintDir}'); market = MarketplaceManager(); base = mgr._load_snapshot(mgr.current_version()); incoming_snap = market.download('${opts.incoming}') or mgr._load_snapshot('${opts.incoming}'); merged = BlueprintMerger.merge(base, incoming_snap); mgr.bump_version('merged with ${opts.incoming}'); import json; snapshot_file = mgr._versions_dir / f'v{mgr.current_version()}.json'; merged.meta.version = mgr.current_version(); with snapshot_file.open("w") as f: json.dump(merged.to_dict(), f, indent=2, default=str); print(mgr.current_version())`;
+    const result = callPython(blueprintDir, code);
+    
+    logger.info(`  ✓ Successfully merged. New version: v${result}`);
+  } catch (err) {
+    logger.error(`  ✗ Error during merge: ${(err as Error).message}`);
+  }
+  logger.info("");
+}
+
+// ── Blueprint Info ───────────────────────────────────────────────────
+
+export async function cliBlueprintInfo(opts: { blueprintId: string; logger: PluginLogger; pluginConfig: MilimoConfig }): Promise<void> {
+  const { logger, pluginConfig } = opts;
+  const blueprintDir = pluginConfig.blueprintDir;
+  
+  logger.info("");
+  logger.info(`  ℹ️  Fetching blueprint details: ${opts.blueprintId}`);
+  logger.info("");
+
+  try {
+    const code = `from orchestrator.marketplace_manager import MarketplaceManager; mgr = MarketplaceManager(); info = mgr.get_listing('${opts.blueprintId}'); import json; print(json.dumps(info) if info else 'None')`;
+    const result = callPython(blueprintDir, code);
+    
+    if (result === "None") {
+      logger.error(`  ✗ Blueprint ${opts.blueprintId} not found.`);
+      return;
+    }
+
+    const info = JSON.parse(result);
+    logger.info(`  ID:          ${info.id}`);
+    logger.info(`  Name:        ${info.name}`);
+    logger.info(`  Author:      ${info.author}`);
+    logger.info(`  Version:     v${info.version}`);
+    logger.info(`  Price:       ${info.price}`);
+    logger.info(`  Tools:       ${info.tool_count}`);
+    logger.info(`  Forks:       ${info.fork_count}`);
+    logger.info(`  Published:   ${info.published_at}`);
+    logger.info(`  Verified:    ${info.verified ? "YES ✅" : "NO ❌"}`);
+    if (info.tags && info.tags.length > 0) {
+      logger.info(`  Tags:        ${info.tags.join(", ")}`);
+    }
+  } catch (err) {
+    logger.error(`  ✗ Error fetching info: ${(err as Error).message}`);
+  }
   logger.info("");
 }
 

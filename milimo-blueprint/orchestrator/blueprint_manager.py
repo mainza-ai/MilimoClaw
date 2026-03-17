@@ -229,6 +229,60 @@ class BlueprintManager:
         logger.info("Exported blueprint v%s (digest: %s...)", meta.version, digest[:16])
         return snapshot
 
+    def export_handoff(self) -> str:
+        """
+        Export a Handoff Blueprint bundle for a departing squad member.
+        Returns the path to the handoff file.
+        """
+        snapshot = self.export()
+        handoff_path = self._versions_dir / f"handoff_{self.claw_role}_v{snapshot.meta.version}.json"
+        
+        bundle = {
+            "type": "milimo-handoff",
+            "snapshot": snapshot.to_dict(),
+            "exported_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        with handoff_path.open("w") as f:
+            json.dump(bundle, f, indent=2, default=str)
+            
+        logger.info(f"Generated handoff bundle at {handoff_path}")
+        return str(handoff_path)
+
+    def import_handoff(self, handoff_path: str) -> bool:
+        """Import a Handoff Blueprint from a departing member."""
+        path = Path(handoff_path)
+        if not path.exists():
+            logger.error(f"Handoff file {handoff_path} not found.")
+            return False
+            
+        with path.open() as f:
+            bundle = json.load(f)
+            
+        if bundle.get("type") != "milimo-handoff":
+            logger.error("Invalid handoff bundle format.")
+            return False
+            
+        snapshot = BlueprintSnapshot.from_dict(bundle.get("snapshot", {}))
+        
+        # Verify integrity before accepting
+        if not self.verify_integrity(snapshot):
+            logger.error("Handoff bundle failed integrity verification. Rejected.")
+            return False
+            
+        # Import to state
+        self._state["version"] = snapshot.meta.version
+        self._state["provenance_chain"] = snapshot.integrity.get("provenance_chain", [])
+        
+        # Save snapshot file locally so it exists in version history
+        snapshot_file = self._versions_dir / f"v{snapshot.meta.version}.json"
+        with snapshot_file.open("w") as f:
+            json.dump(snapshot.to_dict(), f, indent=2, default=str)
+            
+        self._save_state()
+        logger.info(f"Successfully imported handoff blueprint v{snapshot.meta.version}")
+        return True
+
     def diff(self, version_a: str, version_b: str) -> BlueprintDiff:
         """Compare two blueprint versions."""
         snap_a = self._load_snapshot(version_a)
@@ -316,6 +370,26 @@ class BlueprintManager:
         )
         actual = self._compute_digest(clean)
         return actual == expected
+
+    def verify_provenance(self, snapshot: BlueprintSnapshot) -> bool:
+        """
+        Verify the provenance chain of a snapshot.
+        Checks if the integrity digest matches and if the provenance chain exists.
+        For a deeper check, it would verify each parent's digest in the marketplace.
+        """
+        if not self.verify_integrity(snapshot):
+            return False
+            
+        chain = snapshot.integrity.get("provenance_chain", [])
+        if not chain:
+            return False
+            
+        # The last element in the provenance chain should be this snapshot's digest
+        expected_digest = snapshot.integrity.get("digest")
+        if chain[-1] != expected_digest:
+            return False
+            
+        return True
 
     def list_versions(self) -> list[dict[str, Any]]:
         """List all saved blueprint versions."""

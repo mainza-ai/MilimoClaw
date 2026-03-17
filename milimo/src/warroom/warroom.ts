@@ -1,11 +1,13 @@
 import * as readline from 'readline';
 import { ApprovalEngine, PendingMessage } from './approval';
 import { AuditLogger } from './audit';
+import { EvolutionManager } from './evolution';
 
 export class WarRoomTUI {
   private rl: readline.Interface;
   private engine: ApprovalEngine;
   private audit: AuditLogger;
+  private evolution: EvolutionManager;
   private isRunning: boolean = false;
   private refreshInterval: NodeJS.Timeout | null = null;
   private pendingQueue: PendingMessage[] = [];
@@ -13,6 +15,7 @@ export class WarRoomTUI {
   constructor(private squadId: string, private operatorId: string = 'local-operator') {
     this.engine = new ApprovalEngine(squadId);
     this.audit = new AuditLogger(squadId);
+    this.evolution = new EvolutionManager(squadId);
     
     this.rl = readline.createInterface({
       input: process.stdin,
@@ -78,6 +81,10 @@ Commands:
   veto <id>   - Reject an action (moves to rejected)
   hold <id>   - Defer an action (leaves in queue)
   feed        - View recent audit trail
+  evolution   - View squad evolution log and deployed tools
+  disable-tool <role> <tool> - Disable an evolved tool
+  enable-tool <role> <tool>  - Enable an evolved tool
+  flows       - View cross-claw evolution signal flows
   exit        - Leave the War Room
 `);
         break;
@@ -104,6 +111,23 @@ Commands:
 
       case 'feed':
         this.showFeed();
+        break;
+
+      case 'evolution':
+      case 'tools':
+        this.evolution.showEvolutionLog();
+        break;
+      
+      case 'disable-tool':
+        this.evolution.toggleTool(parts[1], parts[2], false);
+        break;
+      
+      case 'enable-tool':
+        this.evolution.toggleTool(parts[1], parts[2], true);
+        break;
+
+      case 'flows':
+        this.evolution.showCrossClawFlows();
         break;
 
       case 'exit':
@@ -156,7 +180,15 @@ Commands:
     console.log(`Route: ${msg.sender_role} -> ${msg.recipient_role}`);
     console.log(`Type: ${msg.message_type}`);
     console.log(`Payload:`);
-    console.log(JSON.stringify(msg.payload, null, 2));
+    
+    if (msg.message_type === 'tool_proposal') {
+      console.log(`  Tool Name: ${msg.payload?.tool_name}`);
+      console.log(`  Trigger:   ${msg.payload?.trigger_pattern?.trigger_description}`);
+      console.log(`  Expected Uplift: +${msg.payload?.estimated_improvement}% on ${msg.payload?.metric_target}`);
+      console.log(`  Data Sources: ${msg.payload?.data_sources_required?.join(', ')}`);
+    } else {
+      console.log(JSON.stringify(msg.payload, null, 2));
+    }
     
     const evalResult = this.engine.evaluateAction(msg);
     if (evalResult.description) {

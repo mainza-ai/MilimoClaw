@@ -14,6 +14,7 @@
 import type { Command } from "commander";
 import { registerCliCommands } from "./cli.js";
 import { handleSlashCommand } from "./commands/slash.js";
+import { checkFinalsModeAutoResume } from "./commands/squad.js";
 
 // ---------------------------------------------------------------------------
 // OpenClaw Plugin SDK compatible types (mirrors openclaw/plugin-sdk)
@@ -160,6 +161,10 @@ export default function register(api: OpenClawPluginApi): void {
 
   // 3. Display registration banner
   const config = getPluginConfig(api);
+  
+  // 4. Auto-resume check for Finals mode
+  checkFinalsModeAutoResume(api.logger);
+
   const roleDisplay = config.clawRole || "not assigned";
   const squadDisplay = config.squadName || "not configured";
 

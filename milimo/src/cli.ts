@@ -18,6 +18,9 @@ import {
   cliBlueprintPublish,
   cliBlueprintRollback,
   cliBlueprintList,
+  cliBlueprintSearch,
+  cliBlueprintMerge,
+  cliBlueprintInfo,
 } from "./commands/blueprint.js";
 import { cliWarRoom } from "./commands/warroom.js";
 
@@ -108,6 +111,29 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
     .option("--reason <reason>", "Reason for rollback")
     .action(async (opts: { to?: string; reason?: string }) => {
       await cliBlueprintRollback({ ...opts, logger, pluginConfig });
+    });
+
+  blueprint
+    .command("search")
+    .description("Search the blueprint marketplace")
+    .option("--query <query>", "Search query")
+    .option("--category <category>", "Filter by business category")
+    .action(async (opts: { query?: string; category?: string }) => {
+      await cliBlueprintSearch({ ...opts, logger, pluginConfig });
+    });
+
+  blueprint
+    .command("info <blueprintId>")
+    .description("Show detailed information for a marketplace blueprint")
+    .action(async (blueprintId: string) => {
+      await cliBlueprintInfo({ blueprintId, logger, pluginConfig });
+    });
+
+  blueprint
+    .command("merge <incoming>")
+    .description("Merge an external blueprint into your local workspace")
+    .action(async (incoming: string) => {
+      await cliBlueprintMerge({ incoming, logger, pluginConfig });
     });
 
   // ── openclaw milimo warroom ───────────────────────────────────────

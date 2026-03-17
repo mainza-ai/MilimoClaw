@@ -7,7 +7,7 @@
 > *"Your friend group is a startup. Your laptops are the infrastructure. Your claws do the work."*
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue)](LICENSE)
-[![Status](https://img.shields.io/badge/status-Phase_0_Complete-green)](#roadmap)
+[![Status](https://img.shields.io/badge/status-Phase_2_Complete-green)](#roadmap)
 [![Built on NemoClaw](https://img.shields.io/badge/built_on-NemoClaw-purple)](NemoClaw-README.md)
 
 **Milimo Claw** is a multi-agent autonomous hustle platform built on [NVIDIA NemoClaw](NemoClaw-README.md). It turns a squad of college students — each running a NemoClaw sandbox on their RTX laptop — into a coordinated AI-powered business operation that runs 24/7.
@@ -336,17 +336,17 @@ Runs 73 tests covering:
 | 0.7 Build Claw Alpha | ✅ |
 | 0.8 Integration & Verification | ✅ |
 
-### 🔲 Phase 1 — Self-Evolution Engine
+### ✅ Phase 1 — Self-Evolution Engine (Complete)
 
-- Weekly evolution cycle implementation
-- Tool proposal → build → test → deploy pipeline
-- Cross-claw evolution signals
+- Weekly evolution cycle implementation ✅
+- Tool proposal → build → test → deploy pipeline ✅
+- Cross-claw evolution signals ✅
 
-### 🔲 Phase 2 — Blueprint Marketplace
+### ✅ Phase 2 — Blueprint Marketplace (Complete)
 
-- Peer-to-peer blueprint listing & discovery
-- Cryptographic provenance verification
-- Fork, merge, and inheritance protocols
+- Peer-to-peer blueprint listing & discovery ✅
+- Cryptographic provenance verification ✅
+- Fork, merge, and inheritance protocols ✅
 
 ### 🔲 Phase 3 — Production Hardening
 
