@@ -19,6 +19,7 @@ import {
   cliBlueprintRollback,
   cliBlueprintList,
 } from "./commands/blueprint.js";
+import { cliWarRoom } from "./commands/warroom.js";
 
 export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginApi): void {
   const { program, logger } = ctx;
@@ -107,5 +108,14 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
     .option("--reason <reason>", "Reason for rollback")
     .action(async (opts: { to?: string; reason?: string }) => {
       await cliBlueprintRollback({ ...opts, logger, pluginConfig });
+    });
+
+  // ── openclaw milimo warroom ───────────────────────────────────────
+  milimo
+    .command("warroom")
+    .description("Launch the War Room interactive operator dashboard")
+    .option("-o, --operator <name>", "Override operator ID", "local-operator")
+    .action(async (opts: { operator: string }) => {
+      await cliWarRoom({ operator: opts.operator, logger, pluginConfig });
     });
 }
