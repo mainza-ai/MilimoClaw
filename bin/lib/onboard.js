@@ -89,7 +89,7 @@ async function startGateway(gpu) {
   // Destroy old gateway
   run("openshell gateway destroy -g nemoclaw 2>/dev/null || true", { ignoreError: true });
 
-  const gwArgs = ["--name", "nemoclaw"];
+  const gwArgs = ["--name", "nemoclaw", "--gateway-host", "host.docker.internal"];
   if (gpu && gpu.nimCapable) gwArgs.push("--gpu");
 
   run(`openshell gateway start ${gwArgs.join(" ")}`, { ignoreError: false });
