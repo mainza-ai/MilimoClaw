@@ -143,19 +143,48 @@ openclaw plugins list
 
 ---
 
-## Step 6: Initialize Solo Founder
+## Step 6: Onboard MilimoClaw
 
 Inside the Docker container:
 
 ```bash
-# Initialize with solo founder template
-openclaw milimo init --squad solo --template solo-founder
+# Run the onboarding wizard
+openclaw milimo onboard
 
-# Verify initialization
-openclaw milimo squad status
+# Or non-interactive setup
+openclaw milimo onboard --squad solo --role content --template solo-founder --solo
+
+# Verify onboarding
+openclaw milimo squad onboard-status
 
 # Launch the War Room
 openclaw milimo warroom
+```
+
+**Onboarding wizard steps:**
+
+1. **NemoClaw Check** — Verifies inference is configured
+2. **Template Selection** — Choose `solo-founder` for single operator
+3. **Solo/Mesh Mode** — Confirm solo mode
+4. **Squad Name** — Enter a unique squad name
+5. **Role Assignment** — Select your primary claw role
+6. **Operator Name** — Enter your name
+7. **War Room Mode** — Choose `full`, `minimal`, or `disabled`
+8. **Confirmation** — Review and apply
+
+---
+
+## Step 7: Verify Installation
+
+```bash
+# Check onboarding status
+openclaw milimo squad onboard-status
+
+# Check squad status
+openclaw milimo squad status
+
+# Verify solo founder template loaded
+cat ~/.milimo/config.json
 ```
 
 ---
@@ -181,7 +210,10 @@ docker run -it --rm -e NVIDIA_API_KEY=$NVIDIA_API_KEY milimo-claw:latest
 ### Inside Docker Container
 
 ```bash
-# Check status
+# Check onboarding status
+openclaw milimo squad onboard-status
+
+# Check squad status
 openclaw milimo squad status
 
 # View War Room
@@ -192,6 +224,9 @@ openclaw milimo squad finals-mode --resume-date 2026-04-01
 
 # View logs
 cat ~/.milimo/logs/warroom.log
+
+# Re-run onboarding (will prompt to reconfigure)
+openclaw milimo onboard
 ```
 
 ---

@@ -156,18 +156,20 @@ function printClawHealth(claw: ClawHealth): void {
   const color = getStatusColor(claw.status);
   const reset = "\x1b[0m";
 
-  console.log(`  ${icon} ${color}${claw.role.padEnd(12)}${reset} ${claw.score.toFixed(1).padStart(5)}  ${claw.status.padEnd(10)} ${claw.region || "unknown"}`);
+  console.log(` ${icon} ${color}${claw.role.padEnd(12)}${reset} ${claw.score.toFixed(1).padStart(5)} ${claw.status.padEnd(10)} ${claw.region || "unknown"}`);
 }
 
 function printDetailedHealth(health: SquadHealth): void {
+  const reset = "\x1b[0m";
+
   console.log("\n" + "─".repeat(60));
-  console.log(`  Squad Health Overview`);
+  console.log(` Squad Health Overview`);
   console.log("─".repeat(60));
-  console.log(`  Overall: ${health.overall_score.toFixed(1)} (${health.overall_status})`);
-  console.log(`  Squad: ${health.squad_id}`);
-  console.log(`  Updated: ${health.last_updated}`);
+  console.log(` Overall: ${health.overall_score.toFixed(1)} (${health.overall_status})`);
+  console.log(` Squad: ${health.squad_id}`);
+  console.log(` Updated: ${health.last_updated}`);
   console.log("─".repeat(60));
-  console.log("  Claw          Score  Status      Region");
+  console.log(" Claw Score Status Region");
   console.log("─".repeat(60));
 
   for (const claw of health.claws) {
@@ -176,12 +178,12 @@ function printDetailedHealth(health: SquadHealth): void {
 
   if (health.alerts.length > 0) {
     console.log("\n" + "─".repeat(60));
-    console.log("  Alerts:");
+    console.log(" Alerts:");
     console.log("─".repeat(60));
 
     for (const alert of health.alerts) {
       const color = alert.level === "critical" ? "\x1b[31m" : "\x1b[33m";
-      console.log(`  ${color}[${alert.level.toUpperCase()}]${reset} ${alert.role}: ${alert.message}`);
+      console.log(` ${color}[${alert.level.toUpperCase()}]${reset} ${alert.role}: ${alert.message}`);
     }
   }
 
@@ -197,7 +199,7 @@ function printCompactHealth(health: SquadHealth): void {
 
   for (const claw of health.claws) {
     const clawIcon = getStatusIcon(claw.status);
-    console.log(`  ${clawIcon} ${claw.role}: ${claw.score.toFixed(1)}`);
+    console.log(` ${clawIcon} ${claw.role}: ${claw.score.toFixed(1)}`);
   }
 }
 

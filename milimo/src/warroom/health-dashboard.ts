@@ -9,7 +9,8 @@
 
 import { readFile } from "fs/promises";
 import { existsSync } from "fs";
-import { join, homedir } from "os";
+import { homedir } from "os";
+import { join } from "path";
 import { EventEmitter } from "events";
 
 interface HealthMetrics {

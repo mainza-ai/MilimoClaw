@@ -165,8 +165,8 @@ else:
       return;
     }
 
-    const attestation = data as PerformanceAttestation;
-    renderAttestation(attestation, opts.json, logger);
+const attestation = data as PerformanceAttestation;
+renderAttestation(attestation, opts.json ?? false, logger);
 
   } catch (err) {
     logger.error(`  ✗ Failed to load attestation: ${(err as Error).message}`);
@@ -281,9 +281,9 @@ print(json.dumps({"success": True, "attestation": attestation_data}))
     if (response.success) {
       const attestation = response.attestation as PerformanceAttestation;
 
-      logger.info("  ✅ Performance attestation generated!");
-      logger.info("");
-      renderAttestation(attestation, opts.json, logger);
+logger.info(" ✅ Performance attestation generated!");
+logger.info("");
+renderAttestation(attestation, opts.json ?? false, logger);
 
       logger.info("  Note: This is a self-attested performance claim.");
       logger.info("  For verified status, request auditor verification:");
@@ -371,8 +371,8 @@ else:
       return;
     }
 
-    const attestation = response.attestation as PerformanceAttestation;
-    renderAttestation(attestation, opts.json, logger);
+const attestation = response.attestation as PerformanceAttestation;
+renderAttestation(attestation, opts.json ?? false, logger);
 
   } catch (err) {
     logger.error(`  ✗ Verification failed: ${(err as Error).message}`);

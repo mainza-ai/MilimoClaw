@@ -16,9 +16,75 @@ The `/milimo` slash command is also available from in-chat interfaces (Telegram,
 
 ---
 
+## `milimo onboard`
+
+Interactive setup wizard for squad configuration, template selection, and role assignment.
+
+```bash
+openclaw milimo onboard [options]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--squad <name>` | Squad name | Interactive prompt |
+| `--role <role>` | Claw role: `content`, `ops`, `analytics`, `finance`, `build` | Interactive prompt |
+| `--template <template>` | Squad template (e.g., `solo-founder`, `content-agency`) | Interactive prompt |
+| `--solo` | Initialize as solo operator (no mesh) | `false` |
+| `--operator <name>` | Operator name | `$USER` |
+| `--war-room-mode <mode>` | War Room mode: `full`, `minimal`, `disabled` | `full` |
+
+**Examples:**
+
+```bash
+# Interactive wizard
+openclaw milimo onboard
+
+# Non-interactive setup
+openclaw milimo onboard \
+  --squad my-squad \
+  --role content \
+  --template solo-founder \
+  --solo
+
+# With custom operator and minimal War Room
+openclaw milimo onboard \
+  --squad agency-team \
+  --role ops \
+  --template content-agency \
+  --operator "John Doe" \
+  --war-room-mode minimal
+```
+
+**Onboarding Steps:**
+
+1. **NemoClaw Check** — Verifies inference is configured
+2. **Template Selection** — Choose from built-in or discovered templates
+3. **Solo/Mesh Mode** — Single operator vs. team mesh
+4. **Squad Name** — Unique identifier for your squad
+5. **Role Assignment** — Your primary claw role
+6. **Operator Name** — Human operator identifier
+7. **War Room Mode** — Dashboard complexity level
+8. **Mesh Secret** — Generated for mesh authentication (if applicable)
+9. **Template Validation** — Python validation of template config
+10. **Confirmation** — Review before applying
+11. **Apply** — Create directories, save config
+12. **Success** — Next steps displayed
+
+**Built-in Templates:**
+
+| Template | Category | Squad Size | Description |
+|----------|----------|------------|-------------|
+| `solo-founder` | solo | 1 | One-person operation with all claws |
+| `content-agency` | agency | 3 | Content-first squad for agencies |
+| `design-studio` | studio | 4 | Visual creative squad for designers |
+| `tech-consultancy` | consultancy | 5 | Full-stack tech squad with build focus |
+| `custom` | custom | — | Manual configuration from scratch |
+
+---
+
 ## `milimo init`
 
-Initialize a new squad or join an existing mesh.
+Initialize a new squad or join an existing mesh (legacy command, use `onboard` for full setup).
 
 ```bash
 openclaw milimo init [options]
@@ -94,6 +160,22 @@ openclaw milimo squad finals-mode [options]
 3. Pauses all new client intake routes
 4. Flags all pending deadlines in War Room with urgency scoring
 5. Sets Analytics claw to passive monitoring only
+
+### `milimo squad onboard-status`
+
+Show current onboarding configuration.
+
+```bash
+openclaw milimo squad onboard-status
+```
+
+**Output includes:**
+- Squad name and role
+- Template selection
+- Solo/Mesh mode
+- Operator name
+- War Room mode
+- Onboarding timestamp
 
 ### `milimo squad resume`
 
@@ -253,9 +335,41 @@ Available from chat interfaces (Telegram bridge, TUI):
 | `meshSecret` | string | Shared secret for mesh authentication |
 | `blueprintDir` | string | Path to the milimo-blueprint directory |
 
-### State File (`~/.milimo/state.json`)
+### State File (`~/.milimo/config.json`)
 
-Created by `milimo init`. Contains squad configuration, role assignment, template selection, and initialization timestamp.
+Created by `milimo onboard`. Contains:
+
+```json
+{
+  "squadName": "my-squad",
+  "clawRole": "content",
+  "template": "solo-founder",
+  "solo": true,
+  "meshMembers": ["content"],
+  "meshSecret": null,
+  "operatorName": "operator",
+  "warRoomMode": "full",
+  "onboardedAt": "2026-03-19T12:00:00.000Z",
+  "initializedAt": "2026-03-19T12:00:00.000Z",
+  "blueprintVersion": "0.1.0"
+}
+```
+
+| Property | Type | Description |
+|---|---|---|
+| `squadName` | string | Squad identifier |
+| `clawRole` | string | Role: `content`, `ops`, `analytics`, `finance`, `build` |
+| `template` | string | Template ID (e.g., `solo-founder`) |
+| `solo` | boolean | Solo mode flag |
+| `meshMembers` | string[] | Array of claw roles in mesh |
+| `meshSecret` | string \| null | Shared secret for mesh auth |
+| `operatorName` | string | Human operator name |
+| `warRoomMode` | string | `full`, `minimal`, or `disabled` |
+| `onboardedAt` | string | ISO timestamp of onboarding |
+
+### Legacy State File (`~/.milimo/state.json`)
+
+Created by `milimo init` (legacy). Contains squad configuration, role assignment, template selection, and initialization timestamp.
 
 ### Audit Trail (`~/.milimo/audit/<squadId>/audit.jsonl`)
 

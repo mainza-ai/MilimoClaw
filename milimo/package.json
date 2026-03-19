@@ -1,5 +1,5 @@
 {
-  "name": "milimo-claw",
+  "name": "milimo",
   "version": "0.1.0",
   "description": "Milimo Claw — multi-agent autonomous hustle platform built on NemoClaw",
   "license": "Apache-2.0",
@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "commander": "^13.1.0",
-    "yaml": "^2.4.0"
+    "yaml": "^2.8.2"
   },
   "devDependencies": {
     "@types/node": "^20.19.37",

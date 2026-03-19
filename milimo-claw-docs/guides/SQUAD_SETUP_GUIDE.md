@@ -62,27 +62,47 @@ This creates a Docker image with:
 
 ---
 
-## Step 3: Choose a Template
+## Step 3: Onboard NemoClaw (Inference)
 
-Before running `milimo init`, decide which template fits your squad:
+Before using MilimoClaw, each member must onboard NemoClaw for inference:
 
-### Creative & Commerce (4-Claw Mesh)
+```bash
+openclaw nemoclaw onboard
+```
+
+This configures:
+- Inference endpoint (NVIDIA Build, NCP, or local)
+- API key authentication
+- Model selection
+
+---
+
+## Step 4: Choose a Template
+
+Before running `milimo onboard`, decide which template fits your squad:
+
+### Creative & Commerce (3-Claw Mesh)
 
 | Template | Best For | Claws |
 |---|---|---|
 | `content-agency` | Social media content creation | Content + Ops + Analytics |
-| `design-studio` | Design services with invoicing | Content + Ops + Finance |
+| `design-studio` | Design services with invoicing | Content + Ops + Analytics + Build |
 
 ### Tech Startups (5-Claw Mesh)
 
 | Template | Best For | Claws |
 |---|---|---|
-| `ai-micro-saas` | AI-powered SaaS products | Build + Ops + Analytics + Finance |
-| `campus-ai-tool` | University-specific tools | Build + Content + Ops |
+| `tech-consultancy` | Full-stack tech consulting | Build + Ops + Analytics + Finance + Content |
+
+### Solo Operation
+
+| Template | Best For | Claws |
+|---|---|---|
+| `solo-founder` | One-person operation | All 5 claws |
 
 ---
 
-## Step 4: Assign Roles
+## Step 5: Assign Roles
 
 Each squad member owns one or more claw roles:
 
@@ -122,38 +142,51 @@ Each squad member owns one or more claw roles:
 
 ---
 
-## Step 5: Initialize the Squad
+## Step 6: Onboard the Squad
 
 ### First Member (Squad Creator)
 
 The first person creates the squad:
 
 ```bash
-openclaw milimo init --squad my-squad --role content --template content-agency
+openclaw milimo onboard
 ```
 
-This will:
-1. Create squad state at `~/.milimo/state.json`
-2. Set up the mesh directory at `~/.milimo/mesh/`
-3. Deploy the template's blueprint
-4. Register this claw with the mesh
+Follow the wizard:
+1. Select template (e.g., `content-agency`)
+2. Choose **Mesh mode** (not solo)
+3. Enter squad name
+4. Select your role
+5. Enter operator name
+6. Choose War Room mode
+7. **Generate mesh secret** — save this!
+
+The wizard will output:
+```
+Generated mesh secret (share with squad members):
+  AbCdEf1234567890...
+```
 
 ### Subsequent Members
 
 Each additional member joins with their assigned role:
 
 ```bash
-openclaw milimo init --squad my-squad --role ops
+openclaw milimo onboard
 ```
 
-The mesh coordinator will:
-1. Register the new claw in the topology
-2. Establish inter-sandbox messaging channels
-3. Deploy the role-specific blueprint and policies
+Follow the wizard:
+1. Select same template
+2. Choose **Mesh mode**
+3. Enter same squad name
+4. Select their role
+5. Enter operator name
+6. Choose War Room mode
+7. **Enter existing mesh secret** (from step 6)
 
 ---
 
-## Step 6: Verify the Mesh
+## Step 7: Verify the Mesh
 
 Every member can check the mesh status:
 
@@ -170,17 +203,23 @@ Blueprint: v0.1.0
 Mode: normal
 
 Mesh Topology:
-  ✅ content  — online (Laptop A)
-  ✅ ops      — online (Laptop B)
-  ✅ analytics — online (Laptop C)
-  ✅ finance  — online (Laptop D)
+✅ content — online (Laptop A)
+✅ ops — online (Laptop B)
+✅ analytics — online (Laptop C)
+✅ finance — online (Laptop D)
 
 Pending War Room Actions: 0
 ```
 
+Check onboarding configuration:
+
+```bash
+openclaw milimo squad onboard-status
+```
+
 ---
 
-## Step 7: Launch the War Room
+## Step 8: Launch the War Room
 
 Any squad member can open the War Room:
 
@@ -196,9 +235,9 @@ The War Room shows:
 
 ---
 
-## Step 8: Set Squad Policies
+## Step 9: Set Squad Policies
 
-During initialization, the squad sets shared policies:
+During onboarding, the squad sets shared policies:
 
 ### Approval Thresholds
 
@@ -238,10 +277,12 @@ Once the mesh is live:
 
 | Issue | Solution |
 |---|---|
-| `milimo init` fails with "no template found" | Ensure `milimo-blueprint/templates/` is in the Docker image |
+| `milimo onboard` says "NemoClaw not onboarded" | Run `openclaw nemoclaw onboard` first |
+| `milimo onboard` fails with "no template found" | Ensure `milimo-blueprint/templates/` is in the Docker image |
 | Mesh shows claw as "offline" | Check Docker container is running: `docker ps` |
 | War Room shows no pending actions | Normal for fresh installs — actions appear as claws operate |
 | Privacy router error | Verify `privacy_policy.yaml` exists in blueprint directory |
+| "Invalid mesh secret" | Ensure all members use the exact same secret |
 
 ### Getting Help
 

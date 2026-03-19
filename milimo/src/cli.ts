@@ -10,6 +10,7 @@
 
 import type { OpenClawPluginApi, PluginCliContext } from "./index.js";
 import { getPluginConfig } from "./index.js";
+import { cliOnboard, cliOnboardStatus } from "./commands/onboard.js";
 import { cliInit } from "./commands/init.js";
 import { cliSquadStatus, cliSquadFinalsMode, cliSquadResume } from "./commands/squad.js";
 import {
@@ -29,6 +30,31 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
   const pluginConfig = getPluginConfig(api);
 
   const milimo = program.command("milimo").description("Milimo Claw squad management");
+
+  // ── openclaw milimo onboard ───────────────────────────────────────
+  milimo
+    .command("onboard")
+    .description("Interactive setup: configure squad, template, role, and War Room")
+    .option("--squad <name>", "Squad name")
+    .option("--role <role>", "Claw role: content, ops, analytics, finance, build")
+    .option("--template <template>", "Squad template (e.g., solo-founder, content-agency)")
+    .option("--solo", "Initialize as a solo operator (no mesh)", false)
+    .option("--operator <name>", "Operator name")
+    .option(
+      "--war-room-mode <mode>",
+      "War Room mode: full, minimal, disabled",
+      "full" as const,
+    )
+    .action(async (opts: {
+      squad?: string;
+      role?: string;
+      template?: string;
+      solo: boolean;
+      operator?: string;
+      warRoomMode: "full" | "minimal" | "disabled";
+    }) => {
+      await cliOnboard({ ...opts, logger, pluginConfig });
+    });
 
   // ── openclaw milimo init ──────────────────────────────────────────
   milimo
@@ -51,6 +77,13 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
     .option("--json", "Output as JSON", false)
     .action(async (opts: { json: boolean }) => {
       await cliSquadStatus({ json: opts.json, logger, pluginConfig });
+    });
+
+  squad
+    .command("onboard-status")
+    .description("Show current onboarding configuration")
+    .action(async () => {
+      await cliOnboardStatus(logger);
     });
 
   squad
