@@ -9,18 +9,18 @@ Manages the squad mesh topology: which claws are online, message routing
 between sandboxes via the OpenShell gateway, health monitoring, and
 squad formation protocol.
 
-In Phase 0, the mesh runs within a single Docker container where all
-claws share the same host. Messages are routed through a local message
-bus (file-based queue). In later phases, OpenShell gateway will provide
-true inter-sandbox IPC.
+Supports multiple transport modes:
+- "file": File-based queues (fallback, development)
+- "unix": Unix socket via OpenShell gateway (single host)
+- "websocket": WebSocket via OpenShell gateway (multi-host)
 
 Usage:
-    from mesh import MeshCoordinator
+from mesh import MeshCoordinator
 
-    mesh = MeshCoordinator.from_config_file("mesh_config.yaml")
-    mesh.register_claw("content", address="local://content")
-    mesh.register_claw("ops", address="local://ops")
-    mesh.send_message(message)
+mesh = MeshCoordinator.from_config_file("mesh_config.yaml")
+mesh.register_claw("content", address="local://content")
+mesh.register_claw("ops", address="local://ops")
+mesh.send_message(message)
 """
 
 from __future__ import annotations
@@ -31,13 +31,23 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 
 from .contracts import ClawMessage, ContractValidator, ValidationResult
+from .gateway_adapter import (
+    GatewayAdapter,
+    GatewayConfig,
+    FileBasedGateway,
+    UnixSocketGateway,
+    WebSocketGateway,
+    ConnectionState,
+)
 
 logger = logging.getLogger("milimo.mesh")
+
+TransportMode = Literal["file", "unix", "websocket"]
 
 
 # ---------------------------------------------------------------------------
@@ -69,6 +79,16 @@ class DeliveryResult:
     requires_approval: bool = False
 
 
+@dataclass
+class MeshConfig:
+    """Configuration for mesh coordinator."""
+
+    mesh_secret: str = ""
+    gateway_endpoint: str = ""  # unix://, tcp://, or empty for file-based
+    transport_mode: TransportMode = "file"
+    timeout_ms: int = 5000
+
+
 # ---------------------------------------------------------------------------
 # Squad Mesh Coordinator
 # ---------------------------------------------------------------------------
@@ -78,6 +98,11 @@ class MeshCoordinator:
     """
     Coordinates the squad mesh: claw registration, message routing,
     health monitoring, and topology management.
+
+    Supports pluggable transport via GatewayAdapter:
+    - FileBasedGateway: Development/fallback (file-based queues)
+    - UnixSocketGateway: Single host via OpenShell gateway
+    - WebSocketGateway: Multi-host via OpenShell gateway
     """
 
     def __init__(
@@ -85,12 +110,18 @@ class MeshCoordinator:
         validator: ContractValidator,
         squad_id: str = "",
         mesh_dir: str | None = None,
+        mesh_config: MeshConfig | None = None,
     ) -> None:
         self._validator = validator
         self._squad_id = squad_id
         self._nodes: dict[str, ClawNode] = {}
+        self._mesh_config = mesh_config or MeshConfig()
 
-        # Message queue directory (file-based for Phase 0)
+        # Initialize gateway adapter
+        self._gateway: GatewayAdapter | None = None
+        self._gateway_role: str = ""
+
+        # Message queue directory (for file-based fallback and persistence)
         if mesh_dir:
             self._mesh_dir = Path(mesh_dir)
         else:
@@ -108,7 +139,29 @@ class MeshCoordinator:
     ) -> MeshCoordinator:
         """Create a mesh coordinator from a mesh config YAML file."""
         validator = ContractValidator.from_config_file(path)
-        return cls(validator=validator, squad_id=squad_id, mesh_dir=mesh_dir)
+
+        # Load mesh configuration
+        config_path = Path(path)
+        mesh_config = MeshConfig()
+
+        if config_path.exists():
+            with config_path.open() as f:
+                raw = yaml.safe_load(f) or {}
+
+                mesh_config.mesh_secret = raw.get("mesh_secret", "")
+                mesh_config.gateway_endpoint = raw.get("gateway_endpoint", "")
+                mesh_config.timeout_ms = raw.get("timeout_ms", 5000)
+
+                # Determine transport mode from endpoint
+                endpoint = mesh_config.gateway_endpoint
+                if endpoint.startswith("unix://"):
+                    mesh_config.transport_mode = "unix"
+                elif endpoint.startswith("tcp://") or endpoint.startswith("ws://"):
+                    mesh_config.transport_mode = "websocket"
+                else:
+                    mesh_config.transport_mode = "file"
+
+        return cls(validator=validator, squad_id=squad_id, mesh_dir=mesh_dir, mesh_config=mesh_config)
 
     @classmethod
     def from_dict(
@@ -116,7 +169,22 @@ class MeshCoordinator:
     ) -> MeshCoordinator:
         """Create from a parsed config dictionary."""
         validator = ContractValidator.from_dict(raw)
-        return cls(validator=validator, squad_id=squad_id, mesh_dir=mesh_dir)
+
+        mesh_config = MeshConfig(
+            mesh_secret=raw.get("mesh_secret", ""),
+            gateway_endpoint=raw.get("gateway_endpoint", ""),
+            timeout_ms=raw.get("timeout_ms", 5000),
+        )
+
+        endpoint = mesh_config.gateway_endpoint
+        if endpoint.startswith("unix://"):
+            mesh_config.transport_mode = "unix"
+        elif endpoint.startswith("tcp://") or endpoint.startswith("ws://"):
+            mesh_config.transport_mode = "websocket"
+        else:
+            mesh_config.transport_mode = "file"
+
+        return cls(validator=validator, squad_id=squad_id, mesh_dir=mesh_dir, mesh_config=mesh_config)
 
     @property
     def squad_id(self) -> str:
@@ -126,6 +194,64 @@ class MeshCoordinator:
     def topology(self) -> dict[str, ClawNode]:
         """Return the current mesh topology."""
         return dict(self._nodes)
+
+    @property
+    def transport_mode(self) -> TransportMode:
+        """Return the current transport mode."""
+        return self._mesh_config.transport_mode
+
+    @property
+    def gateway_connected(self) -> bool:
+        """Check if gateway adapter is connected."""
+        return self._gateway is not None and self._gateway.state == ConnectionState.CONNECTED
+
+    # ── Gateway Management ─────────────────────────────────────────────
+
+    def connect_gateway(self, role: str) -> bool:
+        """
+        Connect to the gateway as a specific role.
+
+        Args:
+            role: The claw role to connect as
+
+        Returns:
+            True if connection successful
+        """
+        if self._gateway is not None and self._gateway_role == role:
+            return self.gateway_connected
+
+        # Create gateway adapter based on transport mode
+        config = GatewayConfig(
+            endpoint=self._mesh_config.gateway_endpoint or "",
+            mesh_secret=self._mesh_config.mesh_secret,
+            squad_id=self._squad_id,
+            role=role,
+            timeout_ms=self._mesh_config.timeout_ms,
+        )
+
+        if self._mesh_config.transport_mode == "unix":
+            self._gateway = UnixSocketGateway(config)
+        elif self._mesh_config.transport_mode == "websocket":
+            self._gateway = WebSocketGateway(config)
+        else:
+            self._gateway = FileBasedGateway(config)
+
+        self._gateway_role = role
+        connected = self._gateway.connect()
+
+        if connected:
+            logger.info("Gateway connected as %s (mode: %s)", role, self._mesh_config.transport_mode)
+        else:
+            logger.warning("Gateway connection failed for role %s", role)
+
+        return connected
+
+    def disconnect_gateway(self) -> None:
+        """Disconnect from the gateway."""
+        if self._gateway:
+            self._gateway.close()
+            self._gateway = None
+            self._gateway_role = ""
 
     # ── Registration ──────────────────────────────────────────────────
 
@@ -165,10 +291,12 @@ class MeshCoordinator:
         """
         Route a message through the mesh.
 
+        Uses gateway adapter if connected, otherwise falls back to file-based.
+
         Steps:
         1. Validate the message against contracts
         2. Check recipient is registered and online
-        3. Queue the message for delivery
+        3. Send via gateway or queue the message
         4. Flag if approval is required
         """
         # 1. Validate contract
@@ -204,18 +332,58 @@ class MeshCoordinator:
         # 3. Check if approval is required
         needs_approval = self._validator.requires_approval(message.message_type)
 
-        # 4. Queue for delivery
+        # 4. Send via gateway if connected, otherwise use file-based
+        if self._gateway and self._gateway.state == ConnectionState.CONNECTED:
+            return self._send_via_gateway(message, needs_approval)
+        else:
+            return self._send_via_file(message, needs_approval)
+
+    def _send_via_gateway(self, message: ClawMessage, needs_approval: bool) -> DeliveryResult:
+        """Send message through gateway adapter."""
+        from .gateway_adapter import SendResult
+
+        msg_dict = {
+            "message_id": message.message_id,
+            "sender_role": message.sender_role,
+            "recipient_role": message.recipient_role,
+            "message_type": message.message_type,
+            "payload": message.payload,
+            "squad_id": message.squad_id,
+            "timestamp": message.timestamp,
+            "needs_approval": needs_approval,
+        }
+
+        assert self._gateway is not None, "Gateway must be connected"
+        result: SendResult = self._gateway.send(msg_dict)
+
+        return DeliveryResult(
+            delivered=result.success,
+            reason="Message sent via gateway" if result.success else result.error_message,
+            message_id=message.message_id,
+            requires_approval=result.requires_approval,
+        )
+
+    def _send_via_file(self, message: ClawMessage, needs_approval: bool) -> DeliveryResult:
+        """Send message via file-based queue (fallback)."""
         self._write_message(message, needs_approval)
 
         return DeliveryResult(
             delivered=True,
-            reason="Message queued for delivery",
+            reason="Message queued for delivery (file-based)",
             message_id=message.message_id,
             requires_approval=needs_approval,
         )
 
     def get_pending_messages(self, role: str) -> list[dict[str, Any]]:
-        """Get all pending messages for a claw role."""
+        """
+        Get all pending messages for a claw role.
+
+        Uses gateway if connected, otherwise reads from file inbox.
+        """
+        if self._gateway and self._gateway.state == ConnectionState.CONNECTED:
+            return self._gateway.receive()
+
+        # File-based fallback
         inbox = self._mesh_dir / "inbox" / role
         if not inbox.exists():
             return []

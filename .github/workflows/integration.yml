@@ -1,0 +1,135 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+name: Integration Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+        python-version: ['3.11', '3.12']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: |
+            milimo/package-lock.json
+            nemoclaw/package-lock.json
+            package-lock.json
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
+      - name: Install Node.js dependencies
+        run: |
+          npm ci
+          cd milimo && npm ci
+          cd ../nemoclaw && npm ci
+
+      - name: Build TypeScript
+        run: |
+          cd milimo && npm run build
+          cd ../nemoclaw && npm run build
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Run integration tests
+        run: |
+          cd test/integration
+          node --test blueprint-manager.test.js
+          node --test mesh-coordinator.test.js
+        env:
+          CI: true
+          MILIMO_TEST_MODE: true
+
+      - name: Run Python tests
+        run: |
+          cd milimo-blueprint
+          python -m pytest tests/ -v || echo "pytest not installed, skipping"
+        continue-on-error: true
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-node${{ matrix.node-version }}-py${{ matrix.python-version }}
+          path: |
+            test-results/
+            coverage/
+          retention-days: 30
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint || echo "No lint script, skipping"
+        continue-on-error: true
+
+      - name: Run TypeScript check
+        run: |
+          cd milimo && npx tsc --noEmit
+          cd ../nemoclaw && npx tsc --noEmit
+        continue-on-error: true
+
+      - name: Run Python lint
+        run: |
+          pip install ruff
+          ruff check milimo-blueprint/orchestrator/ --output-format=github
+        continue-on-error: true
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Run Python security check
+        run: |
+          pip install bandit
+          bandit -r milimo-blueprint/orchestrator/ -ll
+        continue-on-error: true

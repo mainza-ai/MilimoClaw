@@ -7,7 +7,7 @@
 > *"Your friend group is a startup. Your laptops are the infrastructure. Your claws do the work."*
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue)](LICENSE)
-[![Status](https://img.shields.io/badge/status-Phase_2_Complete-green)](#roadmap)
+[![Status](https://img.shields.io/badge/status-Phase_5_Complete-brightgreen)](#roadmap)
 [![Built on NemoClaw](https://img.shields.io/badge/built_on-NemoClaw-purple)](NemoClaw-README.md)
 
 **Milimo Claw** is a multi-agent autonomous hustle platform built on [NVIDIA NemoClaw](NemoClaw-README.md). It turns a squad of college students — each running a NemoClaw sandbox on their RTX laptop — into a coordinated AI-powered business operation that runs 24/7.
@@ -261,6 +261,165 @@ MilimoClaw/
 │   ├── src/
 │   │   ├── index.ts             # Plugin entry point
 │   │   ├── cli.ts               # CLI registrar
+│   │   ├── commands/            # init, squad, blueprint, warroom, health, slash
+│   │   └── warroom/             # War Room TUI, approval engine, audit, rate limiter, health dashboard
+│   ├── openclaw.plugin.json     # Plugin manifest
+│   └── package.json
+│
+├── milimo-blueprint/ # Role blueprints & orchestrator (Python + YAML)
+│   ├── roles/ # 5 claw role blueprints
+│   ├── policies/ # 5 per-role sandbox policies
+│   ├── templates/ # Pre-built squad templates
+│   ├── orchestrator/ # Core engine components
+│   │   ├── privacy_router.py # Sensitivity classification & routing
+│   │   ├── contracts.py # Inter-claw message contracts
+│   │   ├── mesh.py # Mesh coordinator with gateway support
+│   │   ├── gateway_adapter.py # Multi-transport gateway (Unix/WS/File)
+│   │   ├── mesh_relay.py # Relay client/server for NAT traversal
+│   │   ├── region_detector.py # Region detection via IP/latency
+│   │   ├── latency_monitor.py # Inter-region latency tracking
+│   │   ├── mesh_failover.py # Failover & split-brain resolution
+│   │   ├── health_collector.py # Health metric collection
+│   │   ├── provenance_signer.py # Ed25519 blueprint signing
+│   │   ├── provenance_verifier.py # Signature verification
+│   │   ├── chain_validator.py # Provenance chain validation
+│   │   ├── attestation_generator.py # Performance attestation generation
+│   │   ├── tool_generator.py # LLM-based tool code generation
+│   │   ├── tool_validator.py # AST security validation
+│   │   ├── tool_sandbox.py # Isolated tool execution
+│   │   └── evolution_cycle.py # Weekly self-evolution pipeline
+│   ├── schemas/ # JSON schemas
+│   │   ├── tool-spec.json # Tool specification schema
+│   │   └── performance-attestation.json # Attestation schema
+│   ├── prompts/ # LLM prompt templates
+│   │   └── tool-generation/ # Tool generation prompts
+│   ├── claw-schema.yaml # Blueprint schema definition
+│   ├── mesh_config.yaml # Inter-claw message matrix
+│   ├── privacy_policy.yaml # Default sensitivity routing policy
+│   ├── regions.yaml # Multi-region configuration
+│   └── rate-limits.yaml # Tier-based rate limit config
+│
+├── milimo-server/ # War Room API Server (TypeScript/Fastify)
+│   ├── src/
+│   │   ├── server.ts # Fastify server entry point
+│   │   ├── routes/ # REST API routes
+│   │   │   ├── auth.ts # Authentication routes
+│   │   │   ├── pending.ts # Pending actions
+│   │   │   ├── actions.ts # Approve/veto actions
+│   │   │   └── status.ts # Squad status
+│   │   ├── notifications/ # Push notifications
+│   │   │   ├── firebase.ts # Firebase Cloud Messaging
+│   │   │   └── apns.ts # Apple Push Notifications
+│   │   ├── auth/ # Authentication
+│   │   │   ├── jwt.ts # JWT token utilities
+│   │   │   └── biometric.ts # Biometric verification
+│   │   └── payments/ # Stripe Connect integration
+│   │       ├── stripe.ts # Stripe client & core functions
+│   │       ├── fee-calculator.ts # Platform fee calculation
+│   │       ├── payouts.ts # Seller payout processing
+│   │       ├── invoices.ts # Invoice generation
+│   │       └── webhooks.ts # Stripe webhook handler
+│   ├── .env # Environment variables (git-ignored)
+│   ├── .env.example # Environment template
+│   ├── package.json
+│   └── tsconfig.json
+│
+├── milimo-mobile/ # Mobile War Room App (React Native)
+│   ├── src/
+│   │   ├── App.tsx # Main application
+│   │   ├── screens/ # App screens
+│   │   │   ├── PendingList.tsx # Pending actions list
+│   │   │   ├── ActionDetail.tsx # Action details & approve/veto
+│   │   │   └── Settings.tsx # App settings
+│   │   ├── components/ # UI components
+│   │   │   └── ActionCard.tsx # Action card component
+│   │   ├── hooks/ # React hooks
+│   │   │   └── useAuth.ts # Authentication hook
+│   │   └── api/ # API client
+│   │       └── warroom.ts # War Room API client
+│   ├── package.json
+│   └── app.json
+│
+├── test/                        # Test suite
+│   ├── milimo-*.test.js         # Unit tests
+│   └── integration/             # Integration tests
+│       ├── harness.js           # Test harness
+│       ├── blueprint-manager.test.js
+│       ├── mesh-coordinator.test.js
+│       ├── privacy-router.test.js
+│       ├── evolution-cycle.test.js
+│       └── multi-region.test.js
+│
+├── docs/technical/              # Technical documentation
+│   ├── openshell-ipc.md         # OpenShell IPC documentation
+│   ├── multi-region-mesh.md     # Multi-region architecture
+│   ├── war-room-api.md          # War Room API spec
+│   └── health-metrics.md        # Health metrics spec
+│
+├── milimo-claw-docs/            # Project documentation
+├── nemoclaw/                    # NemoClaw plugin (upstream)
+├── nemoclaw-blueprint/          # NemoClaw base blueprint (upstream)
+├── .github/workflows/           # CI/CD pipelines
+├── Dockerfile                   # Sandbox image
+├── Dockerfile.tool              # CLI tool image
+└── NemoClaw-README.md           # Original NemoClaw README
+```
+MilimoClaw/
+├── milimo/                    # Milimo Claw plugin (TypeScript)
+│   ├── src/
+│   │   ├── index.ts           # Plugin entry point
+│   │   ├── cli.ts             # CLI registrar
+│   │   ├── commands/          # init, squad, blueprint, warroom, slash
+│   │   └── warroom/           # War Room TUI, approval engine, audit, rate limiter
+│   ├── openclaw.plugin.json   # Plugin manifest
+│   └── package.json
+│
+├── milimo-blueprint/          # Role blueprints & orchestrator (Python + YAML)
+│   ├── roles/                 # 5 claw role blueprints
+│   ├── policies/              # 5 per-role sandbox policies
+│   ├── templates/             # Pre-built squad templates
+│   ├── orchestrator/          # Core engine components
+│   │   ├── privacy_router.py  # Sensitivity classification & routing
+│   │   ├── contracts.py       # Inter-claw message contracts
+│   │   ├── mesh.py            # Mesh coordinator with gateway support
+│   │   ├── gateway_adapter.py # Multi-transport gateway (Unix/WS/File)
+│   │   ├── tool_generator.py  # LLM-based tool code generation
+│   │   ├── tool_validator.py  # AST security validation
+│   │   ├── tool_sandbox.py    # Isolated tool execution
+│   │   ├── evolution_cycle.py # Weekly self-evolution pipeline
+│   │   └── ...
+│   ├── schemas/               # JSON schemas
+│   │   └── tool-spec.json     # Tool specification schema
+│   ├── prompts/               # LLM prompt templates
+│   │   └── tool-generation/   # Tool generation prompts
+│   ├── claw-schema.yaml       # Blueprint schema definition
+│   ├── mesh_config.yaml       # Inter-claw message matrix
+│   ├── privacy_policy.yaml    # Default sensitivity routing policy
+│   └── rate-limits.yaml       # Tier-based rate limit config
+│
+├── test/                      # Test suite
+│   ├── milimo-*.test.js       # Unit tests
+│   └── integration/           # Integration tests
+│       ├── harness.js         # Test harness
+│       ├── blueprint-manager.test.js
+│       ├── mesh-coordinator.test.js
+│       ├── privacy-router.test.js
+│       └── evolution-cycle.test.js
+│
+├── docs/                      # NemoClaw documentation
+├── milimo-claw-docs/          # Project documentation
+├── nemoclaw/                  # NemoClaw plugin (upstream)
+├── nemoclaw-blueprint/        # NemoClaw base blueprint (upstream)
+├── .github/workflows/         # CI/CD pipelines
+├── Dockerfile                 # Sandbox image
+├── Dockerfile.tool            # CLI tool image
+└── NemoClaw-README.md         # Original NemoClaw README
+```
+MilimoClaw/
+├── milimo/                      # Milimo Claw plugin (TypeScript)
+│   ├── src/
+│   │   ├── index.ts             # Plugin entry point
+│   │   ├── cli.ts               # CLI registrar
 │   │   ├── commands/            # init, squad, blueprint, warroom, slash
 │   │   └── warroom/             # War Room TUI, approval engine, audit
 │   ├── openclaw.plugin.json     # Plugin manifest
@@ -270,10 +429,27 @@ MilimoClaw/
 │   ├── roles/                   # 5 claw role blueprints
 │   ├── policies/                # 5 per-role sandbox policies
 │   ├── templates/               # Pre-built squad templates
-│   ├── orchestrator/            # Privacy router, contracts, mesh coordinator
-│   ├── claw-schema.yaml         # Blueprint schema definition
-│   ├── mesh_config.yaml         # Inter-claw message matrix
-│   └── privacy_policy.yaml      # Default sensitivity routing policy
+│   ├── orchestrator/ # Core engine components
+│   │   ├── privacy_router.py # Sensitivity classification & routing
+│   │   ├── contracts.py # Inter-claw message contracts
+│   │   ├── mesh.py # Mesh coordinator with gateway support
+│   │   ├── gateway_adapter.py # Multi-transport gateway (Unix/WS/File)
+│   │   ├── mesh_relay.py # Relay client/server for NAT traversal
+│   │   ├── region_detector.py # Region detection via IP/latency
+│   │   ├── latency_monitor.py # Inter-region latency tracking
+│   │   ├── mesh_failover.py # Failover & split-brain resolution
+│   │   ├── health_collector.py # Health metric collection
+│   │   ├── provenance_signer.py # Ed25519 blueprint signing
+│   │   ├── provenance_verifier.py # Signature verification
+│   │   ├── chain_validator.py # Provenance chain validation
+│   │   ├── attestation_generator.py # Performance attestation generation
+│   │   ├── tool_generator.py # LLM-based tool code generation
+│   │   ├── tool_validator.py # AST security validation
+│   │   ├── tool_sandbox.py # Isolated tool execution
+│   │   └── evolution_cycle.py # Weekly self-evolution pipeline
+│   ├── schemas/ # JSON schemas
+│   │   ├── tool-spec.json # Tool specification schema
+│   │   └── performance-attestation.json # Attestation schema
 │
 ├── milimo-claw-docs/            # Project documentation
 ├── nemoclaw/                    # NemoClaw plugin (upstream)
@@ -294,7 +470,7 @@ MilimoClaw/
 npm test
 ```
 
-Runs 76 tests covering:
+Runs 76+ tests covering:
 - Plugin exports & config parsing
 - All 5 role blueprint schema validation
 - Filesystem isolation checks
@@ -304,13 +480,13 @@ Runs 76 tests covering:
 - Contract validation (valid routes, unauthorized routes, War Room access)
 - Approval requirements
 
-### Python Tests (Privacy Router, Mesh Protocol)
+### Python Tests (Privacy Router, Mesh Protocol, Evolution)
 
 ```bash
 python3 -m unittest discover -s milimo-blueprint/tests -v
 ```
 
-Runs 73 tests covering:
+Runs 73+ tests covering:
 - Data type → routing decision classification
 - Role-specific routing overrides
 - Fallback behavior for unknown data types
@@ -318,6 +494,37 @@ Runs 73 tests covering:
 - Contract validation & matrix enforcement
 - Mesh coordinator (registration, routing, health monitoring)
 - Topology persistence
+- Tool generation and validation
+
+### Integration Tests (TS ↔ Python Boundary)
+
+```bash
+node --test test/integration/*.test.js
+```
+
+Integration tests verify:
+- Blueprint manager operations
+- Mesh coordinator with gateway
+- Privacy router classification
+- Evolution cycle stages
+- Rate limiter integration
+- Multi-region mesh (region detection, latency, failover)
+- Health monitoring
+
+### CI/CD Pipeline
+
+GitHub Actions workflow runs on every push:
+
+```bash
+# View workflow
+cat .github/workflows/integration.yml
+```
+
+Pipeline includes:
+- **Lint:** ESLint (JS) + Ruff (Python)
+- **Unit Tests:** Node.js 18/20 + Python 3.11/3.12
+- **Integration Tests:** Full boundary coverage
+- **Security Scan:** npm audit + bandit
 
 ---
 
@@ -348,11 +555,58 @@ Runs 73 tests covering:
 - Cryptographic provenance verification ✅
 - Fork, merge, and inheritance protocols ✅
 
-### 🔲 Phase 3 — Production Hardening
+### ✅ Phase 3 — Production Hardening (Complete)
 
-- Multi-region mesh support
-- Real-time mesh health monitoring
-- Automated failover & recovery
+| Feature | Status |
+|---|---|
+| OpenShell Gateway Integration | ✅ |
+| Multi-transport mesh (Unix, WebSocket, File) | ✅ |
+| Tool Code Generation (LLM-based) | ✅ |
+| Tool Security Validation (AST-based) | ✅ |
+| Tool Sandbox (Isolated Execution) | ✅ |
+| Integration Test Suite | ✅ |
+| CI/CD Pipeline (GitHub Actions) | ✅ |
+| Rate Limiting (Free/Pro tiers) | ✅ |
+
+### ✅ Phase 4 — Scale & Distribution (Complete)
+
+| Feature | Status |
+|---|---|
+| Multi-Region Mesh Support | ✅ |
+| Region Detection (IP geolocation + latency) | ✅ |
+| Relay Server (NAT traversal) | ✅ |
+| Latency Monitoring (P95/P99) | ✅ |
+| Failover & Split-brain Resolution | ✅ |
+| Mobile War Room Companion | ✅ |
+| REST/WebSocket API | ✅ |
+| Push Notifications (FCM/APNs) | ✅ |
+| Biometric Authentication | ✅ |
+| Real-time Health Monitoring | ✅ |
+| Health Score Calculation | ✅ |
+| Alert Generation | ✅ |
+
+### ✅ Phase 5 — Blueprint Economy (Complete)
+
+| Feature | Status |
+|---|---|
+| Stripe Connect Integration | ✅ |
+| Connected Account Management | ✅ |
+| Checkout Session Creation | ✅ |
+| Platform Fee Processing (10%) | ✅ |
+| Seller Payout Scheduling | ✅ |
+| Invoice Generation | ✅ |
+| Webhook Handling | ✅ |
+| Ed25519 Blueprint Signing | ✅ |
+| Provenance Chain Validation | ✅ |
+| Performance Attestations | ✅ |
+| Verification Badges | ✅ |
+| Third-party Auditor Framework | ✅ |
+
+### 🔲 Phase 6 — Enterprise Tier (Planned)
+
+- University partnership features
+- White-label deployment
+- Cohort management
 
 ---
 
@@ -366,6 +620,14 @@ Runs 73 tests covering:
 | [Privacy & Security](milimo-claw-docs/PRIVACY_AND_SECURITY.md) | Data routing, isolation, and trust model |
 | [Blueprint Economy](milimo-claw-docs/BLUEPRINT_ECONOMY.md) | Versioning, marketplace, and inheritance |
 | [Squad Setup Guide](milimo-claw-docs/SQUAD_SETUP_GUIDE.md) | Step-by-step squad formation walkthrough |
+| [Phase 3 Features](milimo-claw-docs/PHASE3_FEATURES.md) | Production hardening features |
+| [Phase 4 Features](milimo-claw-docs/PHASE4_FEATURES.md) | Scale & distribution features |
+| [Multi-Region Mesh](docs/technical/multi-region-mesh.md) | Multi-region architecture documentation |
+| [War Room API](docs/technical/war-room-api.md) | REST/WebSocket API specification |
+| [Health Metrics](docs/technical/health-metrics.md) | Health scoring specification |
+| [Payment Provider](docs/technical/payment-provider-selection.md) | Stripe Connect integration decision |
+| [Provenance Scheme](docs/technical/provenance-scheme.md) | Cryptographic provenance verification |
+| [Third-party Verification](docs/technical/third-party-verification.md) | Auditor verification framework |
 | [Docker Commands](milimo-claw-docs/docker-run-commands.md) | Docker build, run, and management reference |
 | [NemoClaw README](NemoClaw-README.md) | Original upstream NemoClaw documentation |
 

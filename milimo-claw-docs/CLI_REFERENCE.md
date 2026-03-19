@@ -199,6 +199,22 @@ Actions are evaluated by the approval engine before appearing in the queue:
 | `HOLD` | Paused, requires explicit confirmation |
 | `VETO` | Blocked, requires squad-wide re-vote |
 
+### Rate Limiting
+
+Auto-approvals are subject to rate limits based on subscription tier:
+
+| Tier | Daily Limit | Burst Limit | Burst Window |
+|------|-------------|-------------|--------------|
+| **Free** | 10 | 3 | 1 hour |
+| **Pro** | Unlimited | N/A | N/A |
+
+When rate limit is reached:
+- Message remains in queue for manual review
+- Audit trail logs `RATE_LIMITED` action
+- War Room displays remaining quota
+
+Rate limit status is visible in the War Room header.
+
 ---
 
 ## `/milimo` Slash Command

@@ -1,0 +1,104 @@
+# Milimo Claw — Regions Configuration
+# Defines multi-region mesh endpoints and routing preferences
+
+regions:
+  # US East (Northern Virginia)
+  us-east-1:
+    code: use1
+    country: US
+    city: "Northern Virginia"
+    endpoint: "wss://us-east-1.mesh.milimo.dev:443"
+    relay: "wss://relay-use1.milimo.dev:443"
+    fallback_region: eu-west-1
+    coordinates:
+      latitude: 39.04
+      longitude: -77.49
+
+  # US West (Oregon)
+  us-west-2:
+    code: usw2
+    country: US
+    city: "Oregon"
+    endpoint: "wss://us-west-2.mesh.milimo.dev:443"
+    relay: "wss://relay-usw2.milimo.dev:443"
+    fallback_region: us-east-1
+    coordinates:
+      latitude: 45.52
+      longitude: -122.68
+
+  # EU West (Ireland)
+  eu-west-1:
+    code: euw1
+    country: IE
+    city: Dublin
+    endpoint: "wss://eu-west-1.mesh.milimo.dev:443"
+    relay: "wss://relay-euw1.milimo.dev:443"
+    fallback_region: us-east-1
+    coordinates:
+      latitude: 53.35
+      longitude: -6.26
+
+  # EU Central (Frankfurt)
+  eu-central-1:
+    code: euc1
+    country: DE
+    city: Frankfurt
+    endpoint: "wss://eu-central-1.mesh.milimo.dev:443"
+    relay: "wss://relay-euc1.milimo.dev:443"
+    fallback_region: eu-west-1
+    coordinates:
+      latitude: 50.11
+      longitude: 8.68
+
+  # Asia Pacific Southeast (Singapore)
+  ap-southeast-1:
+    code: apse1
+    country: SG
+    city: Singapore
+    endpoint: "wss://ap-southeast-1.mesh.milimo.dev:443"
+    relay: "wss://relay-apse1.milimo.dev:443"
+    fallback_region: ap-northeast-1
+    coordinates:
+      latitude: 1.35
+      longitude: 103.82
+
+  # Asia Pacific Northeast (Tokyo)
+  ap-northeast-1:
+    code: apne1
+    country: JP
+    city: Tokyo
+    endpoint: "wss://ap-northeast-1.mesh.milimo.dev:443"
+    relay: "wss://relay-apne1.milimo.dev:443"
+    fallback_region: ap-southeast-1
+    coordinates:
+      latitude: 35.69
+      longitude: 139.69
+
+  # South America (São Paulo)
+  sa-east-1:
+    code: sae1
+    country: BR
+    city: "São Paulo"
+    endpoint: "wss://sa-east-1.mesh.milimo.dev:443"
+    relay: "wss://relay-sae1.milimo.dev:443"
+    fallback_region: us-east-1
+    coordinates:
+      latitude: -23.55
+      longitude: -46.63
+
+# Default settings
+defaults:
+  region: auto
+  relay_mode: auto
+  heartbeat_timeout_ms: 10000
+  reconnect_attempts: 5
+  reconnect_delay_ms: 2000
+  latency_probe_interval_ms: 30000
+  max_latency_ms: 500
+
+# Relay server settings
+relay:
+  enabled: true
+  max_connections: 100
+  idle_timeout_ms: 300000
+  tls_required: true

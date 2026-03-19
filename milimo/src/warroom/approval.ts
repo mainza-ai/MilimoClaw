@@ -3,6 +3,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { parse as yamlParse } from 'yaml';
 import { AuditLogger } from './audit';
+import { RateLimiter, Tier, getTierFromString } from './rate-limiter';
 
 export type ApprovalMode = 'AUTO' | 'REVIEW' | 'HOLD' | 'VETO';
 
@@ -29,12 +30,23 @@ export class ApprovalEngine {
   private warRoomInbox: string;
   private audit: AuditLogger;
   private escalationRules: EscalationRule[] = [];
+  private rateLimiter: RateLimiter | null = null;
+  private tier: Tier = Tier.FREE;
 
-  constructor(squadId: string) {
+  constructor(squadId: string, tier: string = 'free') {
     const home = process.env.HOME || process.env.USERPROFILE || homedir() || '/tmp';
     this.meshDir = join(home, '.milimo', 'mesh');
     this.warRoomInbox = join(this.meshDir, 'inbox', 'war_room');
     this.audit = new AuditLogger(squadId);
+    this.tier = getTierFromString(tier);
+
+    // Initialize rate limiter
+    try {
+      this.rateLimiter = new RateLimiter(this.tier, join(home, '.milimo'));
+    } catch (e) {
+      console.warn('Failed to initialize rate limiter:', e);
+    }
+
     this.loadEscalationRules();
   }
 
@@ -170,8 +182,58 @@ export class ApprovalEngine {
     for (const msg of pending) {
       const evaluation = this.evaluateAction(msg);
       if (evaluation.mode === 'AUTO') {
-         this.processDecision(msg, 'APPROVED', 'auto-engine', 'Auto-approved per policy');
+        // Check rate limit before auto-approving
+        if (this.rateLimiter) {
+          const rateResult = this.rateLimiter.tryConsume();
+          if (!rateResult.allowed) {
+            console.log(
+              `Rate limit reached for auto-approval. Message ${msg.message_id} requires manual review.`
+            );
+            this.audit.logAction({
+              messageId: msg.message_id,
+              clawRole: msg.sender_role,
+              actionType: 'RATE_LIMITED',
+              decision: 'DELEGATED',
+              operatorId: 'rate-limiter',
+              reason: rateResult.reason || 'Daily auto-approval limit exceeded',
+              details: {
+                remaining: rateResult.remaining,
+                resetAt: rateResult.resetAt,
+              },
+            });
+            continue; // Skip to next message, leave this for manual review
+          }
+        }
+
+        this.processDecision(msg, 'APPROVED', 'auto-engine', 'Auto-approved per policy');
       }
     }
+  }
+
+  /**
+   * Get rate limiter status for display in War Room.
+   */
+  public getRateLimitStatus(): {
+    tier: string;
+    dailyRemaining: number;
+    dailyLimit: number;
+    burstRemaining: number;
+    burstLimit: number;
+    dailyResetAt: string;
+    burstResetAt: string;
+  } | null {
+    if (!this.rateLimiter) {
+      return null;
+    }
+    const status = this.rateLimiter.getStatus();
+    return {
+      tier: status.tier,
+      dailyRemaining: status.dailyRemaining,
+      dailyLimit: status.dailyLimit,
+      burstRemaining: status.burstRemaining,
+      burstLimit: status.burstLimit,
+      dailyResetAt: status.dailyResetAt,
+      burstResetAt: status.burstResetAt,
+    };
   }
 }

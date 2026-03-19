@@ -6,3 +6,12 @@ __pycache__/
 *.pyc
 .DS_Store
 docs/_build/
+
+# Environment files (contain secrets)
+.env
+.env.local
+.env.*.local
+*.env
+
+# Keep example files
+!.env.example

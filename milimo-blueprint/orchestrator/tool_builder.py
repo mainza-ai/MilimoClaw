@@ -37,6 +37,25 @@ from .tool_proposal import ToolProposal
 
 logger = logging.getLogger("milimo.tool_builder")
 
+# Import ToolGenerator for actual code generation
+try:
+    from .tool_generator import ToolGenerator, ToolSpec, GenerationResult
+    TOOL_GENERATOR_AVAILABLE = True
+except ImportError:
+    TOOL_GENERATOR_AVAILABLE = False
+    ToolGenerator = None
+    ToolSpec = None
+    GenerationResult = None
+
+# Import ToolSandbox for isolated testing
+try:
+    from .tool_sandbox import ToolSandbox, SandboxConfig
+    TOOL_SANDBOX_AVAILABLE = True
+except ImportError:
+    TOOL_SANDBOX_AVAILABLE = False
+    ToolSandbox = None
+    SandboxConfig = None
+
 
 # ---------------------------------------------------------------------------
 # Data classes
@@ -124,17 +143,28 @@ class ToolBuilder:
         min_improvement_percent: float = 5.0,
         backtest_window_weeks: int = 4,
         staging_dir: str | None = None,
+        blueprint_dir: str | Path | None = None,
     ) -> None:
         self.claw_role = claw_role
         self.squad_id = squad_id
         self.min_improvement_percent = min_improvement_percent
         self.backtest_window_weeks = backtest_window_weeks
+        self.blueprint_dir = Path(blueprint_dir) if blueprint_dir else None
 
         if staging_dir:
             self._staging_dir = Path(staging_dir)
         else:
             self._staging_dir = Path("/tmp") / "milimo-tool-staging" / claw_role
         self._staging_dir.mkdir(parents=True, exist_ok=True)
+
+        # Initialize tool generator if available
+        self._tool_generator = None
+        if TOOL_GENERATOR_AVAILABLE and self.blueprint_dir:
+            template_dir = self.blueprint_dir / "prompts" / "tool-generation"
+            if template_dir.exists():
+                assert ToolGenerator is not None
+                self._tool_generator = ToolGenerator(template_dir=template_dir)
+                logger.info("ToolGenerator initialized with templates from %s", template_dir)
 
     def build(
         self,
@@ -294,10 +324,53 @@ class ToolBuilder:
         """
         Generate tool code from a proposal.
 
-        In production, this calls the local NIM inference backend
-        to generate Python code. For now, generates a skeleton.
+        Uses ToolGenerator if available for actual LLM-based code generation.
+        Falls back to skeleton code if generator is not configured.
         """
-        # Skeleton code — in production, this would be inference-generated
+        # Try using ToolGenerator if available
+        if self._tool_generator is not None and ToolSpec is not None:
+            try:
+                # Cast tool_type to valid literal
+                tool_type = proposal.tool_type
+                if tool_type not in ("classifier", "predictor", "optimizer", "detector", "generator", "transformer", "aggregator"):
+                    tool_type = "classifier"  # Default fallback
+
+                spec = ToolSpec(
+                    name=proposal.tool_name,
+                    tool_type=tool_type,
+                    description=f"Generated for pattern: {proposal.trigger_pattern.pattern_type}",
+                    input_schema={"type": "object", "properties": {"action_data": {"type": "object"}}},
+                    output_schema={"type": "object", "properties": {"result": {"type": "object"}}},
+                    pattern_description=proposal.trigger_pattern.trigger_description,
+                    frequency=getattr(proposal.trigger_pattern, "frequency", 1),
+                    time_period="7 days",
+                    evolution_cycle=f"{self.squad_id}-{self.claw_role}",
+                    metadata={
+                        "metric_target": proposal.metric_target,
+                        "estimated_improvement": proposal.estimated_improvement,
+                    },
+                    test_cases=[],
+                )
+
+                result = self._tool_generator.generate(spec)
+
+                if result.success and result.code:
+                    logger.info(
+                        "Generated tool code via ToolGenerator: %d chars, validation=%s",
+                        len(result.code),
+                        result.validation_passed,
+                    )
+                    return result.code
+
+                logger.warning(
+                    "ToolGenerator failed: %s, falling back to skeleton",
+                    result.error,
+                )
+
+            except Exception as e:
+                logger.warning("ToolGenerator error: %s, falling back to skeleton", e)
+
+        # Fallback: generate skeleton code
         return (
             f"# Auto-generated tool: {proposal.tool_name}\n"
             f"# Type: {proposal.tool_type}\n"
@@ -307,7 +380,7 @@ class ToolBuilder:
             f"# Trigger: {proposal.trigger_pattern.trigger_description}\n"
             f"\n"
             f"def apply(action_data: dict) -> dict:\n"
-            f"    \"\"\"Apply {proposal.tool_name} to an action.\"\"\"\n"
+            f'    """Apply {proposal.tool_name} to an action."""\n'
             f"    # Tool logic placeholder — inference-generated in production\n"
             f"    return action_data\n"
         )
