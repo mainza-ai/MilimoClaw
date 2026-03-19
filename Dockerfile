@@ -24,18 +24,27 @@ RUN npm install -g openclaw@2026.3.11
 RUN pip3 install --break-system-packages pyyaml pytest
 
 # Create necessary directories first
-RUN mkdir -p /opt/milimo/dist \
+RUN mkdir -p /opt/nemoclaw/dist \
+    && mkdir -p /opt/milimo/dist \
     && mkdir -p /opt/milimo-blueprint \
     && mkdir -p /opt/milimo/test
 
-# Copy our plugin and blueprint into the sandbox
+# Copy NemoClaw plugin
+COPY nemoclaw/dist/ /opt/nemoclaw/dist/
+COPY nemoclaw/openclaw.plugin.json /opt/nemoclaw/
+COPY nemoclaw/package.json /opt/nemoclaw/
+
+# Copy MilimoClaw plugin and blueprint
 COPY milimo/dist/ /opt/milimo/dist/
 COPY milimo/openclaw.plugin.json /opt/milimo/
 COPY milimo/package.json /opt/milimo/
 COPY milimo-blueprint/ /opt/milimo-blueprint/
 COPY test/ /opt/milimo/test/
 
-# Install runtime dependencies only (no devDependencies, no build step)
+# Install runtime dependencies for both plugins
+WORKDIR /opt/nemoclaw
+RUN npm install --omit=dev
+
 WORKDIR /opt/milimo
 RUN npm install --omit=dev
 
@@ -73,8 +82,9 @@ path = os.path.expanduser('~/.openclaw/openclaw.json'); \
 json.dump(config, open(path, 'w'), indent=2); \
 os.chmod(path, 0o600)"
 
-# Install MilimoClaw plugin into OpenClaw
+# Install NemoClaw and MilimoClaw plugins into OpenClaw
 RUN openclaw doctor --fix > /dev/null 2>&1 || true \
+    && openclaw plugins install /opt/nemoclaw > /dev/null 2>&1 || true \
     && openclaw plugins install /opt/milimo > /dev/null 2>&1 || true
 
 # Health check
