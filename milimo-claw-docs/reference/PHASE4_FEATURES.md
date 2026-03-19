@@ -347,7 +347,9 @@ Import the pre-built dashboard from `monitoring/grafana-dashboard.json`.
 
 ## Next Steps
 
-Phase 5 (Blueprint Economy) will add:
-- Real payment processing
-- Cryptographic provenance verification
-- Performance attestation
+Phase 5 (Blueprint Economy) adds:
+- Real payment processing (Stripe Connect)
+- Cryptographic provenance verification (Ed25519)
+- Performance attestation and verification badges
+
+See [Phase 5 Features](./PHASE5_FEATURES.md) for details.

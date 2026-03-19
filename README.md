@@ -7,7 +7,7 @@
 > *"Your friend group is a startup. Your laptops are the infrastructure. Your claws do the work."*
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue)](LICENSE)
-[![Status](https://img.shields.io/badge/status-Phase_5_Complete-brightgreen)](#roadmap)
+[![Status](https://img.shields.io/badge/status-Phase_6_Complete-brightgreen)](#roadmap)
 [![Built on NemoClaw](https://img.shields.io/badge/built_on-NemoClaw-purple)](NemoClaw-README.md)
 
 **Milimo Claw** is a multi-agent autonomous hustle platform built on [NVIDIA NemoClaw](NemoClaw-README.md). It turns a squad of college students — each running a NemoClaw sandbox on their RTX laptop — into a coordinated AI-powered business operation that runs 24/7.
@@ -602,11 +602,18 @@ Pipeline includes:
 | Verification Badges | ✅ |
 | Third-party Auditor Framework | ✅ |
 
-### 🔲 Phase 6 — Enterprise Tier (Planned)
+### ✅ Phase 6 — Enterprise & University Tier (Complete)
 
-- University partnership features
-- White-label deployment
-- Cohort management
+| Feature | Status |
+|---|---|
+| Multi-Tenant Architecture | ✅ |
+| Tenant Management (CRUD) | ✅ |
+| Custom Branding (White-label) | ✅ |
+| Admin Dashboard | ✅ |
+| Usage Analytics | ✅ |
+| Cohort Templates | ✅ |
+| Batch Squad Creation | ✅ |
+| Role Assignment | ✅ |
 
 ---
 
@@ -619,23 +626,55 @@ Pipeline includes:
 | [CLI Reference](milimo-claw-docs/CLI_REFERENCE.md) | Complete command documentation |
 | [Privacy & Security](milimo-claw-docs/PRIVACY_AND_SECURITY.md) | Data routing, isolation, and trust model |
 | [Blueprint Economy](milimo-claw-docs/BLUEPRINT_ECONOMY.md) | Versioning, marketplace, and inheritance |
-| [Squad Setup Guide](milimo-claw-docs/SQUAD_SETUP_GUIDE.md) | Step-by-step squad formation walkthrough |
-| [Phase 3 Features](milimo-claw-docs/PHASE3_FEATURES.md) | Production hardening features |
-| [Phase 4 Features](milimo-claw-docs/PHASE4_FEATURES.md) | Scale & distribution features |
-| [Multi-Region Mesh](docs/technical/multi-region-mesh.md) | Multi-region architecture documentation |
+
+### Guides
+
+| Document | Description |
+|---|---|
+| [Squad Setup Guide](milimo-claw-docs/guides/SQUAD_SETUP_GUIDE.md) | Step-by-step squad formation walkthrough |
+| [Contributing](milimo-claw-docs/guides/CONTRIBUTING.md) | Contribution guidelines |
+| [Security Policy](milimo-claw-docs/guides/SECURITY.md) | Security policy and reporting |
+| [Spark Install](milimo-claw-docs/guides/spark-install.md) | Spark installation guide |
+
+### Reference
+
+| Document | Description |
+|---|---|
+| [Phase 3 Features](milimo-claw-docs/reference/PHASE3_FEATURES.md) | Production hardening features |
+| [Phase 4 Features](milimo-claw-docs/reference/PHASE4_FEATURES.md) | Scale & distribution features |
+| [Phase 5 Features](milimo-claw-docs/reference/PHASE5_FEATURES.md) | Blueprint economy features |
+| [Phase 6 Features](milimo-claw-docs/reference/PHASE6_FEATURES.md) | Enterprise tier features |
+| [Solo Founder Template](milimo-claw-docs/reference/SOLO_FOUNDER_TEMPLATE.md) | Solo founder features |
+| [NemoClaw README](milimo-claw-docs/reference/NemoClaw-README.md) | Original upstream documentation |
+
+### Technical Specs
+
+| Document | Description |
+|---|---|
+| [Multi-Region Mesh](docs/technical/multi-region-mesh.md) | Multi-region architecture |
 | [War Room API](docs/technical/war-room-api.md) | REST/WebSocket API specification |
 | [Health Metrics](docs/technical/health-metrics.md) | Health scoring specification |
-| [Payment Provider](docs/technical/payment-provider-selection.md) | Stripe Connect integration decision |
-| [Provenance Scheme](docs/technical/provenance-scheme.md) | Cryptographic provenance verification |
-| [Third-party Verification](docs/technical/third-party-verification.md) | Auditor verification framework |
-| [Docker Commands](milimo-claw-docs/docker-run-commands.md) | Docker build, run, and management reference |
-| [NemoClaw README](NemoClaw-README.md) | Original upstream NemoClaw documentation |
+| [Payment Provider](docs/technical/payment-provider-selection.md) | Stripe Connect integration |
+| [Provenance Scheme](docs/technical/provenance-scheme.md) | Cryptographic provenance |
+| [Third-party Verification](docs/technical/third-party-verification.md) | Auditor framework |
+
+### Reports
+
+| Document | Description |
+|---|---|
+| [Implementation Plan](milimo-claw-docs/reports/MILIMO_CLAW_IMPLEMENTATION_PLAN.md) | Full implementation roadmap |
+| [Audit Report](milimo-claw-docs/reports/MILIMO_CLAW_AUDIT_REPORT.md) | Project audit findings |
+| [Phase 3 Status](milimo-claw-docs/reports/PHASE3_STATUS_REPORT.md) | Phase 3 completion report |
+| [Phase 4 Status](milimo-claw-docs/reports/PHASE4_STATUS_REPORT.md) | Phase 4 completion report |
+| [Phase 5 Status](milimo-claw-docs/reports/PHASE5_STATUS_REPORT.md) | Phase 5 completion report |
+| [Phase 6 Status](milimo-claw-docs/reports/PHASE_6_STATUS.md) | Phase 6 completion report |
+| [Solo Founder Status](milimo-claw-docs/reports/SOLO_FOUNDER_STATUS.md) | Solo founder implementation report |
 
 ---
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+See [CONTRIBUTING.md](milimo-claw-docs/guides/CONTRIBUTING.md) for contribution guidelines.
 
 ---
 

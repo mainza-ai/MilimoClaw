@@ -420,9 +420,9 @@ npm run test:integration
 
 | Document | Description |
 |----------|-------------|
-| [Technical: OpenShell IPC](../docs/technical/openshell-ipc.md) | Gateway protocol specification |
-| [Implementation Plan](../MILIMO_CLAW_IMPLEMENTATION_PLAN.md) | Phase 3 implementation details |
-| [Status Report](../PHASE3_STATUS_REPORT.md) | Completion status |
+| [Technical: OpenShell IPC](../../docs/technical/openshell-ipc.md) | Gateway protocol specification |
+| [Implementation Plan](../reports/MILIMO_CLAW_IMPLEMENTATION_PLAN.md) | Phase 3 implementation details |
+| [Status Report](../reports/PHASE3_STATUS_REPORT.md) | Completion status |
 
 ---
 

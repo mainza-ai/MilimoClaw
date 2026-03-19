@@ -1,0 +1,279 @@
+# milimo-blueprint/templates/solo-founder.yaml
+# ─────────────────────────────────────────────
+# MILIMO CLAW — SOLO FOUNDER TEMPLATE
+# Run all five claws from a single machine.
+# One operator. Full company. Always on.
+# ─────────────────────────────────────────────
+
+template:
+  name: solo-founder
+  display_name: "Solo Founder"
+  category: founder
+  description: >
+    All five claws running on a single machine under a single operator.
+    Designed for solo founders who want to run a full autonomous operation
+    before scaling to a squad. The War Room surfaces every claw's actions
+    in a single unified queue — one person approves everything.
+  squad_size: 1
+  claws_active:
+    - content
+    - ops
+    - analytics
+    - finance
+    - build
+  recommended_gpu: RTX 4070 or better
+  note: >
+    Running all five claws simultaneously is GPU-intensive.
+    On an RTX 3060, disable the Build claw unless actively
+    shipping code. Re-enable it when needed.
+
+# ─────────────────────────────────────────────
+# OPERATOR POLICY
+# Single operator = you approve everything.
+# Thresholds are set higher to reduce noise —
+# you don't need four people to review a tweet.
+# ─────────────────────────────────────────────
+
+operator_policy:
+  squad_lead: mainza
+  approval_modes:
+
+    # Content Claw — trust it more, review less
+    content:
+      social_post_draft:        AUTO      # posts queue for your morning review
+      client_proposal_draft:    REVIEW    # you always see proposals before they go out
+      email_campaign_draft:     REVIEW
+      brand_asset_usage:        AUTO
+
+    # Ops Claw — client-facing actions need eyes
+    ops:
+      new_client_inquiry:       REVIEW    # you decide who to work with
+      welcome_message:          AUTO      # standard intake, let it run
+      deadline_flag:            REVIEW    # always surface deadline risks
+      scope_change:             HOLD      # never auto-handle scope changes
+      client_offboarding:       REVIEW
+
+    # Analytics Claw — trust it fully, it only reads
+    analytics:
+      weekly_report:            AUTO      # just publish it
+      anomaly_alert:            REVIEW    # surface anomalies for your call
+      opportunity_score:        AUTO
+
+    # Finance Claw — nothing moves without you
+    finance:
+      invoice_generation:       REVIEW    # you approve every invoice
+      invoice_send:             HOLD      # you explicitly send every invoice
+      payment_follow_up:        REVIEW
+      pricing_recommendation:   REVIEW
+      expense_log:              AUTO
+
+    # Build Claw — code changes need human eyes
+    build:
+      pr_open:                  REVIEW    # you review every PR
+      pr_merge:                 HOLD      # you explicitly merge
+      production_deploy:        HOLD      # you explicitly deploy
+      issue_triage:             AUTO      # let it score and sort issues
+      dependency_audit:         AUTO      # security PRs auto-drafted, you approve
+      documentation_update:     AUTO
+
+# ─────────────────────────────────────────────
+# FILESYSTEM LAYOUT
+# All five sandboxes on one machine.
+# Each claw reads only its own mount.
+# ─────────────────────────────────────────────
+
+filesystem:
+  content:  /sandbox/content    # brand assets, approved posts, style guides
+  ops:      /sandbox/clients    # client records, briefs, comms logs
+  analytics: /sandbox/analytics # performance data, reports, trend datasets
+  finance:  /sandbox/finance    # invoices, revenue records, pricing rules
+  build:    /sandbox/build      # codebase, secrets, deploy configs
+
+  shared_read:                  # all claws can read, none can write
+    - /sandbox/analytics/reports/weekly-intelligence.json
+
+# ─────────────────────────────────────────────
+# INFERENCE ROUTING
+# Solo mode — you're on Apple Silicon + RTX.
+# Route aggressively to local to save API costs
+# while you're testing. Flip to cloud when
+# you're generating real client-facing output.
+# ─────────────────────────────────────────────
+
+inference:
+  solo_mode: true               # cost-optimized routing for solo testing
+
+  routing_overrides:
+    client_facing_drafts:       cloud     # Nemotron 120B — quality matters
+    internal_ideation:          local     # save credits, stay private
+    financial_data:             local     # locked — never cloud
+    source_code:                local     # locked — never cloud
+    client_records:             local     # sensitive — stays on device
+    analytics_synthesis:        local     # proprietary operational data
+    public_docs_changelogs:     cloud     # community will read these
+
+  cost_guard:
+    daily_cloud_token_budget:   50000     # hard ceiling during testing phase
+    alert_at_percent:           80        # warn you at 80% of daily budget
+    fallback_on_exceed:         local     # never fail, always fallback
+
+# ─────────────────────────────────────────────
+# WAR ROOM — SOLO CONFIGURATION
+# Single operator view. All five claw queues
+# merged into one prioritized action feed.
+# Morning review target: under 15 minutes.
+# ─────────────────────────────────────────────
+
+war_room:
+  operator: mainza
+  mode: solo
+
+  queue_priority:
+    1: HOLD                     # show blockers first
+    2: REVIEW                   # then items needing your decision
+    3: AUTO                     # then auto-completed items for awareness
+
+  digest_schedule:
+    morning_brief:    "07:00"   # daily summary of overnight autonomous activity
+    evening_wrap:     "20:00"   # what ran today, what's queued for tomorrow
+
+  evolution_log:
+    show_on_startup:  true      # always see what your claws built this week
+    require_ack:      false     # don't block the queue on evolution updates
+
+  escalation:
+    urgent_channels:
+      - war_room_tui            # primary — always on
+      - cli_notification        # terminal ping for HOLD items
+
+# ─────────────────────────────────────────────
+# SELF-EVOLUTION — SOLO SETTINGS
+# Weekly cycle runs as normal.
+# Solo mode means richer operational logs —
+# you're approving/editing everything yourself,
+# so the signal quality is exceptionally high.
+# ─────────────────────────────────────────────
+
+evolution:
+  cycle: weekly
+  day: sunday
+  time: "02:00"                 # runs while you sleep
+
+  per_claw:
+    content:
+      enabled: true
+      min_approved_posts: 10    # needs at least 10 approved posts before first evolution
+      performance_threshold: 5  # 5% minimum improvement to deploy a tool
+
+    ops:
+      enabled: true
+      min_client_interactions: 5
+      performance_threshold: 5
+
+    analytics:
+      enabled: true
+      min_data_weeks: 3         # needs 3 weeks of data before first evolution
+      performance_threshold: 5
+
+    finance:
+      enabled: true
+      min_invoices: 3
+      performance_threshold: 5
+
+    build:
+      enabled: true
+      min_prs_merged: 5         # needs real shipping history before evolving
+      performance_threshold: 5
+
+  capacity:
+    max_tools_per_claw: 30
+    evolution_log_retention: 90  # days
+
+# ─────────────────────────────────────────────
+# NETWORK EGRESS — SOLO DEFAULTS
+# Conservative during testing.
+# Uncomment additional APIs as you activate
+# each part of your operation.
+# ─────────────────────────────────────────────
+
+network_egress:
+
+  content:
+    approved:
+      - api.twitter.com
+      - graph.facebook.com
+      - api.instagram.com
+      - api.linkedin.com
+      - api.tiktok.com
+      - unsplash.com             # stock assets
+    # - api.buffer.com           # uncomment when scheduling live
+
+  ops:
+    approved:
+      - api.gmail.com
+      - api.calendar.google.com
+      - api.notion.com
+    # - api.calendly.com         # uncomment when scheduling clients
+
+  analytics:
+    approved:
+      - api.twitter.com          # read-only analytics
+      - api.instagram.com        # read-only insights
+      - api.linkedin.com         # read-only analytics
+    # - api.google-analytics.com # uncomment when web analytics live
+
+  finance:
+    approved:
+      - api.stripe.com           # read-only — status checks and invoice generation
+    # - api.quickbooks.com       # uncomment when accounting integration needed
+
+  build:
+    approved:
+      - api.github.com
+      - api.vercel.com
+      - registry.npmjs.org
+      - pypi.org
+      - api.sentry.io
+    # - api.railway.app          # uncomment when Railway deployment active
+    # - api.cloudflare.com       # uncomment when Cloudflare integration needed
+
+# ─────────────────────────────────────────────
+# FINALS MODE — SOLO EQUIVALENT: DEEP WORK MODE
+# For solo founders, "finals" is deep work —
+# shipping sprints, conference travel, or
+# any period where you need to go heads-down.
+# ─────────────────────────────────────────────
+
+deep_work_mode:
+  alias: finals-mode            # same CLI command works: milimo squad finals-mode
+
+  on_activate:
+    content:    pause_drafts    # queue only, no publishing
+    ops:        maintenance     # auto-responses to active clients
+    analytics:  passive         # collect data, no new experiments
+    finance:    invoices_only   # sends continue, no new intake
+    build:      issues_only     # triage only, no new PRs opened
+
+  auto_response_template: >
+    Hey [name], I'm heads-down on a focused sprint until [resume_date].
+    Your project is on track — I'll be back in full swing then. 🙏
+
+  resume_on: scheduled          # milimo squad finals-mode --resume-date YYYY-MM-DD
+
+# ─────────────────────────────────────────────
+# BLUEPRINT METADATA
+# ─────────────────────────────────────────────
+
+blueprint:
+  version: "1.0.0"
+  evolved_from: null            # starter template — no parent
+  niche_tags:
+    - solo-founder
+    - AI-startup
+    - full-stack
+  business_type: tech
+  operational_months: 0         # starts at zero, evolves from your usage
+
+integrity:
+  digest: ~                     # computed on first deploy
+  provenance_chain: []

@@ -245,9 +245,9 @@ Once the mesh is live:
 
 ### Getting Help
 
-1. Check the [Architecture Guide](ARCHITECTURE.md) for how components interact
-2. Check the [CLI Reference](CLI_REFERENCE.md) for exact command syntax
-3. Review [Privacy & Security](PRIVACY_AND_SECURITY.md) for data routing questions
+1. Check the [Architecture Guide](../ARCHITECTURE.md) for how components interact
+2. Check the [CLI Reference](../CLI_REFERENCE.md) for exact command syntax
+3. Review [Privacy & Security](../PRIVACY_AND_SECURITY.md) for data routing questions
 
 ---
 

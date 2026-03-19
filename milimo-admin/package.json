@@ -1,0 +1,30 @@
+{
+  "name": "milimo-admin",
+  "version": "0.1.0",
+  "description": "Admin dashboard for Milimo Claw multi-tenant management",
+  "license": "Apache-2.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/server.js",
+    "lint": "eslint 'src/**/*.ts'",
+    "lint:fix": "eslint 'src/**/*.ts' --fix"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "recharts": "^2.12.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.26.0",
+    "eslint": "^9.22.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
