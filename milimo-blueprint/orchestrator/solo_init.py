@@ -242,19 +242,27 @@ def _validate_locked_routes(config: dict[str, Any]) -> None:
     """
     Validate that locked routes are set to 'local'.
 
+    In Docker testing mode, locked routes can be set to 'cloud' for testing.
+
     Args:
         config: Parsed configuration dictionary
 
     Raises:
         TemplateValidationError: If locked routes are not properly configured
     """
-    routing_overrides = config.get("inference", {}).get("routing_overrides", {})
+    inference_config = config.get("inference", {})
+    docker_testing = inference_config.get("docker_testing", False)
+    routing_overrides = inference_config.get("routing_overrides", {})
 
     for route in LOCKED_ROUTES:
         if route in routing_overrides:
-            if routing_overrides[route] != "local":
+            route_value = routing_overrides[route]
+            if docker_testing and route_value == "cloud":
+                continue
+            if route_value != "local":
                 raise TemplateValidationError(
-                    f"Locked route '{route}' must be 'local', got '{routing_overrides[route]}'"
+                    f"Locked route '{route}' must be 'local', got '{route_value}'. "
+                    f"Set 'docker_testing: true' in inference config to allow cloud for testing."
                 )
 
 

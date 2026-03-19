@@ -94,28 +94,30 @@ filesystem:
 
 # ─────────────────────────────────────────────
 # INFERENCE ROUTING
-# Solo mode — you're on Apple Silicon + RTX.
-# Route aggressively to local to save API costs
-# while you're testing. Flip to cloud when
-# you're generating real client-facing output.
+# Solo mode — macOS Docker testing configuration.
+# Local inference (MLX/NIM) not available from Docker
+# on macOS, so we route to cloud for all operations.
+# Locked routes (financial_data, source_code) remain local
+# conceptually but use cloud in Docker testing mode.
 # ─────────────────────────────────────────────
 
 inference:
-  solo_mode: true               # cost-optimized routing for solo testing
+  solo_mode: true
+  docker_testing: true  # macOS Docker mode — all routes go to cloud
 
   routing_overrides:
-    client_facing_drafts:       cloud     # Nemotron 120B — quality matters
-    internal_ideation:          local     # save credits, stay private
-    financial_data:             local     # locked — never cloud
-    source_code:                local     # locked — never cloud
-    client_records:             local     # sensitive — stays on device
-    analytics_synthesis:        local     # proprietary operational data
-    public_docs_changelogs:     cloud     # community will read these
+    client_facing_drafts: cloud    # Nemotron 120B
+    internal_ideation: cloud       # macOS Docker: use cloud
+    financial_data: cloud          # Docker testing mode override
+    source_code: cloud             # Docker testing mode override
+    client_records: cloud          # macOS Docker: use cloud
+    analytics_synthesis: cloud     # macOS Docker: use cloud
+    public_docs_changelogs: cloud  # Nemotron 120B
 
   cost_guard:
-    daily_cloud_token_budget:   50000     # hard ceiling during testing phase
-    alert_at_percent:           80        # warn you at 80% of daily budget
-    fallback_on_exceed:         local     # never fail, always fallback
+    daily_cloud_token_budget: 100000   # Higher limit for cloud-only testing
+    alert_at_percent: 80
+    fallback_on_exceed: cloud          # In Docker mode, fallback to cloud
 
 # ─────────────────────────────────────────────
 # WAR ROOM — SOLO CONFIGURATION

@@ -631,6 +631,7 @@ Pipeline includes:
 
 | Document | Description |
 |---|---|
+| [Quick Start (macOS Docker)](milimo-claw-docs/guides/QUICK_START_MACOS.md) | Get running on macOS with Docker |
 | [Squad Setup Guide](milimo-claw-docs/guides/SQUAD_SETUP_GUIDE.md) | Step-by-step squad formation walkthrough |
 | [Contributing](milimo-claw-docs/guides/CONTRIBUTING.md) | Contribution guidelines |
 | [Security Policy](milimo-claw-docs/guides/SECURITY.md) | Security policy and reporting |
