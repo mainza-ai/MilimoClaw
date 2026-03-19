@@ -69,23 +69,44 @@ export function clearOnboardConfig(): void {
 }
 
 export function loadNemoClawConfig(): { model: string; endpointUrl: string } | null {
+  // First, check NemoClaw's config
   const nemoclawDir = join(process.env.HOME ?? "/tmp", ".nemoclaw");
   const nemoclawPath = join(nemoclawDir, "config.json");
   
-  if (!existsSync(nemoclawPath)) {
-    return null;
+  if (existsSync(nemoclawPath)) {
+    try {
+      const raw = readFileSync(nemoclawPath, "utf-8");
+      const config = JSON.parse(raw) as { model?: string; endpointUrl?: string };
+      if (config.model && config.endpointUrl) {
+        return { model: config.model, endpointUrl: config.endpointUrl };
+      }
+    } catch {
+      // Fall through to OpenClaw config
+    }
   }
   
-  try {
-    const raw = readFileSync(nemoclawPath, "utf-8");
-    const config = JSON.parse(raw) as { model?: string; endpointUrl?: string };
-    if (config.model && config.endpointUrl) {
-      return { model: config.model, endpointUrl: config.endpointUrl };
+  // Fall back to OpenClaw config (for Docker containers with pre-configured inference)
+  const openclawPath = join(process.env.HOME ?? "/tmp", ".openclaw", "openclaw.json");
+  if (existsSync(openclawPath)) {
+    try {
+      const raw = readFileSync(openclawPath, "utf-8");
+      const config = JSON.parse(raw) as {
+        agents?: { defaults?: { model?: { primary?: string } } };
+        models?: { providers?: Record<string, { baseUrl?: string }> };
+      };
+      const primaryModel = config.agents?.defaults?.model?.primary;
+      const providerId = primaryModel?.split("/")[0];
+      const baseUrl = providerId ? config.models?.providers?.[providerId]?.baseUrl : undefined;
+      
+      if (primaryModel && baseUrl) {
+        return { model: primaryModel, endpointUrl: baseUrl };
+      }
+    } catch {
+      // Config parse error
     }
-    return null;
-  } catch {
-    return null;
   }
+  
+  return null;
 }
 
 export function isNemoClawOnboarded(): boolean {

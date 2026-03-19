@@ -1,38 +1,62 @@
-# MilimoClaw sandbox image — OpenClaw + MilimoClaw plugin inside OpenShell
-# Optimized for macOS Docker testing (cloud inference mode)
+# MilimoClaw sandbox image — OpenShell + NemoClaw + MilimoClaw
+# Based on official NemoClaw/OpenShell architecture
 
-FROM node:22-slim
+FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV HOME=/sandbox
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip python3-venv \
-    curl git ca-certificates \
-    iproute2 \
+    curl \
+    git \
+    ca-certificates \
+    python3 \
+    python3-pip \
+    python3-venv \
+    docker.io \
     && rm -rf /var/lib/apt/lists/*
 
-# Create sandbox user (matches OpenShell convention)
-RUN groupadd -r sandbox && useradd -r -g sandbox -d /sandbox -s /bin/bash sandbox \
-    && mkdir -p /sandbox/.openclaw /sandbox/.milimo \
-    && chown -R sandbox:sandbox /sandbox
+# Install Node.js 22 (required by openclaw@2026.3.11)
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install OpenShell CLI binary (from NVIDIA OpenShell releases)
+RUN ARCH=$(uname -m) && \
+    case "$ARCH" in \
+        x86_64|amd64) ASSET="openshell-x86_64-unknown-linux-musl.tar.gz" ;; \
+        aarch64|arm64) ASSET="openshell-aarch64-unknown-linux-musl.tar.gz" ;; \
+    esac && \
+    tmpdir=$(mktemp -d) && \
+    curl -fsSL "https://github.com/NVIDIA/OpenShell/releases/latest/download/$ASSET" -o "$tmpdir/$ASSET" && \
+    tar xzf "$tmpdir/$ASSET" -C "$tmpdir" && \
+    install -m 755 "$tmpdir/openshell" /usr/local/bin/openshell && \
+    rm -rf "$tmpdir"
 
 # Install OpenClaw CLI
 RUN npm install -g openclaw@2026.3.11
 
 # Install Python dependencies for orchestrator
-RUN pip3 install --break-system-packages pyyaml pytest
+RUN pip3 install pyyaml pytest
 
-# Create necessary directories first
+# Create sandbox user
+RUN groupadd -r sandbox && useradd -r -g sandbox -d /sandbox -s /bin/bash sandbox \
+    && mkdir -p /sandbox/.openclaw /sandbox/.milimo /sandbox/.nemoclaw \
+    && chown -R sandbox:sandbox /sandbox
+
+# Create plugin directories
 RUN mkdir -p /opt/nemoclaw/dist \
     && mkdir -p /opt/milimo/dist \
     && mkdir -p /opt/milimo-blueprint \
+    && mkdir -p /opt/nemoclaw-blueprint \
     && mkdir -p /opt/milimo/test
 
-# Copy NemoClaw plugin
+# Copy NemoClaw plugin and blueprint
 COPY nemoclaw/dist/ /opt/nemoclaw/dist/
 COPY nemoclaw/openclaw.plugin.json /opt/nemoclaw/
 COPY nemoclaw/package.json /opt/nemoclaw/
+COPY nemoclaw-blueprint/ /opt/nemoclaw-blueprint/
 
 # Copy MilimoClaw plugin and blueprint
 COPY milimo/dist/ /opt/milimo/dist/
@@ -48,14 +72,12 @@ RUN npm install --omit=dev
 WORKDIR /opt/milimo
 RUN npm install --omit=dev
 
-# Set up blueprint for local resolution
+# Set up blueprints for local resolution
 RUN mkdir -p /sandbox/.milimo/blueprints/0.1.0 \
     && cp -r /opt/milimo-blueprint/* /sandbox/.milimo/blueprints/0.1.0/ \
-    && chown -R sandbox:sandbox /sandbox/.milimo
-
-# Copy startup script
-COPY scripts/milimo-start.sh /usr/local/bin/milimo-start
-RUN chmod +x /usr/local/bin/milimo-start
+    && mkdir -p /sandbox/.nemoclaw/blueprints/0.1.0 \
+    && cp -r /opt/nemoclaw-blueprint/* /sandbox/.nemoclaw/blueprints/0.1.0/ \
+    && chown -R sandbox:sandbox /sandbox/.milimo /sandbox/.nemoclaw
 
 WORKDIR /sandbox
 USER sandbox
@@ -65,8 +87,6 @@ RUN mkdir -p /sandbox/.openclaw/agents/main/agent \
     && chmod 700 /sandbox/.openclaw
 
 # Write openclaw.json for cloud inference mode (macOS Docker testing)
-# Uses NVIDIA Nemotron cloud API instead of local inference
-# API key is injected at runtime via NVIDIA_API_KEY environment variable
 RUN python3 -c "\
 import json, os; \
 config = { \
@@ -89,7 +109,7 @@ RUN openclaw doctor --fix > /dev/null 2>&1 || true \
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD openclaw --version || exit 1
+    CMD openshell --version && openclaw --version || exit 1
 
 ENTRYPOINT ["/bin/bash"]
 CMD []
