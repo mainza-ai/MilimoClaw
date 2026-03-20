@@ -8,6 +8,7 @@
  */
 
 import type { PluginLogger, MilimoConfig } from "../index.js";
+import { spawnSync } from "node:child_process";
 import { loadMilimoState } from "./init.js";
 
 // ---------------------------------------------------------------------------
@@ -131,9 +132,8 @@ async function showBadgeStatus(
   logger.info("");
 
   // Fetch attestation from server/local
-  try {
-    const { execSync } = await import("node:child_process");
-    const code = `
+	try {
+		const code = `
 import json
 from pathlib import Path
 import sys
@@ -149,12 +149,16 @@ else:
     print(json.dumps({"exists": False}))
 `;
 
-    const result = execSync(
-      `python3 -c "${code}"`,
-      { encoding: "utf-8" }
-    ).trim();
+		const result = spawnSync(
+			"python3",
+			["-c", code],
+			{ encoding: "utf-8" }
+		);
+		if (result.error) throw result.error;
+		if (result.status !== 0) throw new Error(result.stderr);
+		const rawOutput = result.stdout.trim();
 
-    const data = JSON.parse(result);
+		const data = JSON.parse(rawOutput);
 
     if (!data.exists) {
       logger.info("  No performance attestation found.");
@@ -192,18 +196,18 @@ async function generatePerformanceAttestation(
   logger.info(`  Generating performance attestation for ${blueprintId}...`);
   logger.info("");
 
-  try {
-    const { execSync } = await import("node:child_process");
-    const code = `
+	try {
+		const code = `
 import json
 from datetime import datetime, timedelta, timezone
 from orchestrator.provenance_signer import ProvenanceSigner, Attestation, calculate_content_hash
 from orchestrator.blueprint_manager import BlueprintManager
 from pathlib import Path
 
-blueprint_dir = "${opts.pluginConfig.blueprintDir}"
-squad_id = "${state.squadName}"
-claw_role = "${state.clawRole}"
+blueprint_dir = ${JSON.stringify(opts.pluginConfig.blueprintDir)}
+squad_id = ${JSON.stringify(state.squadName)}
+claw_role = ${JSON.stringify(state.clawRole)}
+blueprint_id = ${JSON.stringify(blueprintId)}
 
 # Load blueprint
 mgr = BlueprintManager(squad_id, claw_role, blueprint_dir)
@@ -248,7 +252,7 @@ attestation_data = {
     "metrics": metrics,
     "verification": {
         "method": "self_attested",
-        "data_integrity": f"sha256:{'0' * 64}"  # Placeholder
+        "data_integrity": f"sha256:{'0' * 64}"
     },
     "created_at": datetime.now(timezone.utc).isoformat()
 }
@@ -271,14 +275,19 @@ attestation_file.write_text(json.dumps(attestation_data, indent=2))
 print(json.dumps({"success": True, "attestation": attestation_data}))
 `;
 
-    const result = execSync(
-      `python3 -c "import sys; sys.path.insert(0, '${opts.pluginConfig.blueprintDir}'); ${code}"`,
-      { cwd: opts.pluginConfig.blueprintDir, encoding: "utf-8" }
-    ).trim();
+		const safeCode = `import sys; sys.path.insert(0, ${JSON.stringify(opts.pluginConfig.blueprintDir)}); ${code}`;
+		const result = spawnSync(
+			"python3",
+			["-c", safeCode],
+			{ cwd: opts.pluginConfig.blueprintDir, encoding: "utf-8" }
+		);
+		if (result.error) throw result.error;
+	if (result.status !== 0) throw new Error(result.stderr);
+		const rawOutput = result.stdout.trim();
 
-    const response = JSON.parse(result);
+		const response = JSON.parse(rawOutput);
 
-    if (response.success) {
+		if (response.success) {
       const attestation = response.attestation as PerformanceAttestation;
 
 logger.info(" ✅ Performance attestation generated!");
@@ -333,23 +342,22 @@ async function requestAuditorVerification(
 // ---------------------------------------------------------------------------
 
 async function verifyAttestation(
-  opts: BadgeOptions,
-  logger: PluginLogger
+	opts: BadgeOptions,
+	logger: PluginLogger
 ): Promise<void> {
-  logger.info(`  Verifying attestation: ${opts.verify}`);
-  logger.info("");
+	logger.info(` Verifying attestation: ${opts.verify}`);
+	logger.info("");
 
-  try {
-    const { execSync } = await import("node:child_process");
-    const code = `
+	try {
+		const code = `
 import json
 from pathlib import Path
 
-attestation_file = Path("${opts.verify}")
+attestation_file = Path(${JSON.stringify(opts.verify)})
 if not attestation_file.exists():
     # Try in attestations directory
     home = Path.home()
-    attestation_file = home / ".milimo" / "attestations" / "${opts.verify}"
+    attestation_file = home / ".milimo" / "attestations" / ${JSON.stringify(opts.verify)}
 
 if attestation_file.exists():
     data = json.loads(attestation_file.read_text())
@@ -358,12 +366,16 @@ else:
     print(json.dumps({"valid": False, "error": "Attestation not found"}))
 `;
 
-    const result = execSync(
-      `python3 -c "${code}"`,
-      { encoding: "utf-8" }
-    ).trim();
+		const result = spawnSync(
+			"python3",
+			["-c", code],
+			{ encoding: "utf-8" }
+		);
+		if (result.error) throw result.error;
+		if (result.status !== 0) throw new Error(result.stderr);
+		const rawOutput = result.stdout.trim();
 
-    const response = JSON.parse(result);
+		const response = JSON.parse(rawOutput);
 
     if (!response.valid) {
       logger.error(`  ✗ ${response.error}`);
@@ -383,16 +395,15 @@ renderAttestation(attestation, opts.json ?? false, logger);
 // ---------------------------------------------------------------------------
 
 async function listAttestations(
-  opts: BadgeOptions,
-  state: ReturnType<typeof loadMilimoState>,
-  logger: PluginLogger
+	opts: BadgeOptions,
+	state: ReturnType<typeof loadMilimoState>,
+	logger: PluginLogger
 ): Promise<void> {
-  logger.info("  Available Attestations:");
-  logger.info("");
+	logger.info(" Available Attestations:");
+	logger.info("");
 
-  try {
-    const { execSync } = await import("node:child_process");
-    const code = `
+	try {
+		const code = `
 import json
 from pathlib import Path
 
@@ -415,12 +426,16 @@ else:
     print(json.dumps(attestations))
 `;
 
-    const result = execSync(
-      `python3 -c "${code}"`,
-      { encoding: "utf-8" }
-    ).trim();
+		const result = spawnSync(
+			"python3",
+			["-c", code],
+			{ encoding: "utf-8" }
+		);
+		if (result.error) throw result.error;
+		if (result.status !== 0) throw new Error(result.stderr);
+		const rawOutput = result.stdout.trim();
 
-    const attestations = JSON.parse(result) as Array<{
+		const attestations = JSON.parse(rawOutput) as Array<{
       blueprint_id: string;
       version: string;
       improvement: number;

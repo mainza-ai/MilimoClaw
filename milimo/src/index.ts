@@ -104,10 +104,11 @@ export const CLAW_ROLES: ClawRole[] = ["content", "ops", "analytics", "finance",
 
 /** Milimo plugin configuration. */
 export interface MilimoConfig {
-  squadName: string;
-  clawRole: ClawRole | "";
-  meshSecret: string;
-  blueprintDir: string;
+	squadName: string;
+	clawRole: ClawRole | "";
+	meshSecret: string;
+	blueprintDir: string;
+	serverUrl?: string;
 }
 
 const DEFAULT_PLUGIN_CONFIG: MilimoConfig = {

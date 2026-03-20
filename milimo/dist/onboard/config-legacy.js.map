@@ -1,0 +1,1 @@
+{"version":3,"file":"config-legacy.js","sourceRoot":"","sources":["../../src/onboard/config-legacy.ts"],"names":[],"mappings":";AAAA,mFAAmF;AACnF,sCAAsC;;;AAUtC,gCAEC;AAVD;;GAEG;AAEH,yCAAiC;AAEpB,QAAA,UAAU,GAAG,IAAA,gBAAI,EAAC,OAAO,CAAC,GAAG,CAAC,IAAI,IAAI,MAAM,EAAE,SAAS,CAAC,CAAC;AAEtE,SAAgB,UAAU;IACxB,OAAO,IAAA,gBAAI,EAAC,kBAAU,EAAE,aAAa,CAAC,CAAC;AACzC,CAAC"}

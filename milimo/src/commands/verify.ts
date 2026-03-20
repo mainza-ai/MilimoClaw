@@ -10,7 +10,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import type { PluginLogger, MilimoConfig } from "../index.js";
 import { loadMilimoState } from "./init.js";
 
@@ -72,8 +72,15 @@ function callPythonVerify(
   blueprintDir: string,
   code: string
 ): string {
-  const cmd = `python3 -c "import sys; sys.path.insert(0, '${blueprintDir}'); ${code}"`;
-  return execSync(cmd, { cwd: blueprintDir, encoding: "utf-8" }).trim();
+  const safeCode = `import sys; sys.path.insert(0, ${JSON.stringify(blueprintDir)}); ${code}`;
+  const result = spawnSync(
+    "python3",
+    ["-c", safeCode],
+    { cwd: blueprintDir, encoding: "utf-8" }
+  );
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(result.stderr);
+  return result.stdout.trim();
 }
 
 // ---------------------------------------------------------------------------
@@ -366,12 +373,17 @@ print(json.dumps({
 }))
 `;
 
-    const result = execSync(
-      `python3 -c "import sys; sys.path.insert(0, '${opts.pluginConfig.blueprintDir}'); ${code}"`,
-      { cwd: opts.pluginConfig.blueprintDir, encoding: "utf-8" }
-    ).trim();
+	const safeCode = `import sys; sys.path.insert(0, ${JSON.stringify(opts.pluginConfig.blueprintDir)}); ${code}`;
+	const result = spawnSync(
+		"python3",
+		["-c", safeCode],
+		{ cwd: opts.pluginConfig.blueprintDir, encoding: "utf-8" }
+	);
+	if (result.error) throw result.error;
+	if (result.status !== 0) throw new Error(result.stderr);
+	const keygenResult = result.stdout.trim();
 
-    const keyInfo = JSON.parse(result) as {
+	const keyInfo = JSON.parse(keygenResult) as {
       success: boolean;
       key_file: string;
       public_key: string;

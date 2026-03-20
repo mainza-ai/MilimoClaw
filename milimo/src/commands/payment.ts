@@ -11,6 +11,25 @@ import type { PluginLogger, MilimoConfig } from "../index.js";
 
 // ---------------------------------------------------------------------------
 
+const DEFAULT_API_BASE = "https://api.milimoclaw.com";
+
+function getApiBase(pluginConfig: MilimoConfig): string {
+	const envUrl = process.env.MILIMO_SERVER_URL;
+	const configUrl = pluginConfig.serverUrl;
+
+	if (envUrl) {
+		return envUrl;
+	}
+
+	if (configUrl) {
+		return configUrl;
+	}
+
+	return DEFAULT_API_BASE;
+}
+
+// ---------------------------------------------------------------------------
+
 interface PaymentCheckoutOptions {
   blueprintId: string;
   successUrl?: string;
@@ -52,32 +71,32 @@ interface PaymentConnectOptions {
 
 // ---------------------------------------------------------------------------
 
-const API_BASE = process.env.MILIMO_SERVER_URL || "http://localhost:3001";
-
 async function apiRequest(
-  endpoint: string,
-  options: {
-    method?: "GET" | "POST";
-    body?: Record<string, unknown>;
-    token?: string;
-  } = {}
+	endpoint: string,
+	pluginConfig: MilimoConfig,
+	options: {
+		method?: "GET" | "POST";
+		body?: Record<string, unknown>;
+		token?: string;
+	} = {}
 ): Promise<{ ok: boolean; data?: unknown; error?: string }> {
-  const { method = "GET", body, token } = options;
+	const { method = "GET", body, token } = options;
+	const apiBase = getApiBase(pluginConfig);
 
-  try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
+	try {
+		const headers: Record<string, string> = {
+			"Content-Type": "application/json",
+		};
 
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
+		if (token) {
+			headers["Authorization"] = `Bearer ${token}`;
+		}
 
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-    });
+		const response = await fetch(`${apiBase}${endpoint}`, {
+			method,
+			headers,
+			body: body ? JSON.stringify(body) : undefined,
+		});
 
     const data = await response.json();
 
@@ -117,14 +136,14 @@ export async function cliPaymentCheckout(opts: PaymentCheckoutOptions): Promise<
 
   logger.info("  Creating checkout session...");
 
-  const result = await apiRequest("/api/payments/checkout", {
-    method: "POST",
-    body: {
-      blueprintId: opts.blueprintId,
-      successUrl,
-      cancelUrl,
-    },
-  });
+	const result = await apiRequest("/api/payments/checkout", opts.pluginConfig, {
+		method: "POST",
+		body: {
+			blueprintId: opts.blueprintId,
+			successUrl,
+			cancelUrl,
+		},
+	});
 
   if (!result.ok) {
     logger.error(`  ✗ Failed to create checkout: ${result.error}`);
@@ -171,7 +190,7 @@ export async function cliPaymentStatus(opts: PaymentStatusOptions): Promise<void
     return;
   }
 
-  const result = await apiRequest(`/api/payments/session/${opts.sessionId}`);
+	const result = await apiRequest(`/api/payments/session/${opts.sessionId}`, opts.pluginConfig);
 
   if (!result.ok) {
     logger.error(`  ✗ Failed to get status: ${result.error}`);
@@ -232,7 +251,7 @@ export async function cliPaymentBalance(opts: PaymentBalanceOptions): Promise<vo
   logger.info("  └─────────────────────────────────────────────────────┘");
   logger.info("");
 
-  const result = await apiRequest("/api/payments/balance");
+	const result = await apiRequest("/api/payments/balance", opts.pluginConfig);
 
   if (!result.ok) {
     logger.error(`  ✗ Failed to get balance: ${result.error}`);
@@ -279,7 +298,7 @@ export async function cliPaymentHistory(opts: PaymentHistoryOptions): Promise<vo
   logger.info("  └─────────────────────────────────────────────────────┘");
   logger.info("");
 
-  const result = await apiRequest(`/api/payments/history?limit=${limit}`);
+	const result = await apiRequest(`/api/payments/history?limit=${limit}`, opts.pluginConfig);
 
   if (!result.ok) {
     logger.error(`  ✗ Failed to get history: ${result.error}`);
@@ -332,9 +351,10 @@ export async function cliPaymentInvoice(opts: PaymentInvoiceOptions): Promise<vo
   logger.info("  └─────────────────────────────────────────────────────┘");
   logger.info("");
 
-  const result = await apiRequest(
-    `/api/payments/invoice/${opts.sessionId}?format=${format}`
-  );
+	const result = await apiRequest(
+		`/api/payments/invoice/${opts.sessionId}?format=${format}`,
+		opts.pluginConfig
+	);
 
   if (!result.ok) {
     logger.error(`  ✗ Failed to get invoice: ${result.error}`);
@@ -370,7 +390,7 @@ export async function cliPaymentConnect(opts: PaymentConnectOptions): Promise<vo
 
   logger.info("  Creating connected account...");
 
-  const result = await apiRequest("/api/payments/connect", {
+  const result = await apiRequest("/api/payments/connect", opts.pluginConfig, {
     method: "POST",
     body: {
       displayName: opts.displayName,

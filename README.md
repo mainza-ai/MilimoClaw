@@ -123,40 +123,67 @@ Each claw has its own **network egress policy**, **inference routing rules**, **
 
 ## Quick Start
 
+> **IMPORTANT**: On macOS, use native NemoClaw onboarding first. See [docs/QUICK_START.md](docs/QUICK_START.md) for detailed setup.
+
 ### Prerequisites
 
-- **Hardware:** RTX-capable NVIDIA GPU laptop (for local inference)
-- **Software:** Docker, Node.js ≥ 20, Git
-- **NemoClaw:** [NVIDIA NemoClaw](NemoClaw-README.md) installed
+- **Platform:** macOS (Apple Silicon M1/M2/M3) or Linux
+- **Software:** Docker Desktop, Node.js ≥ 20, Git
+- **API Key:** NVIDIA API key from [build.nvidia.com](https://build.nvidia.com/)
 
-### 1. Clone & Install
+### Setup Flow
 
-```bash
-git clone https://github.com/mainza-ai/MilimoClaw.git
-cd MilimoClaw
-npm install
+MilimoClaw requires proper NemoClaw infrastructure before use:
+
+```
+HOST → Native Onboarding → Sandbox Created → Install Plugin → MilimoClaw Onboarding
 ```
 
-### 2. Build the Docker Image
+### 1. Install NemoClaw on Host
 
 ```bash
-docker build -t milimo-claw -f Dockerfile .
+cd MilimoClaw/NemoClaw-original-repo
+export NVIDIA_API_KEY="nvapi-your-key"
+./install.sh
 ```
 
-### 3. Initialize Your Squad
+### 2. Run Native Onboarding (7-Step)
 
 ```bash
-# Inside the container or via the CLI tool
-openclaw milimo init --squad my-squad --role content --template content-agency
+# This creates gateway, sandbox, and applies policies
+nemoclaw onboard
 ```
 
-### 4. Launch the War Room
+### 3. Verify Sandbox
 
 ```bash
-openclaw milimo warroom
+nemoclaw my-assistant status
+# Should show: Phase: Ready
 ```
 
-> For detailed Docker commands, see [milimo-claw-docs/docker-run-commands.md](milimo-claw-docs/docker-run-commands.md).
+### 4. Connect and Install Plugin
+
+```bash
+# Connect to sandbox
+openshell sandbox connect my-assistant
+
+# Inside sandbox, install MilimoClaw plugin
+openclaw plugins install /tmp/milimo
+
+# Run MilimoClaw onboarding
+openclaw milimo onboard
+# Select: Solo Founder → milimoquantum → Build Claw
+```
+
+### 5. Test Build Claw
+
+```bash
+# Inside sandbox
+openclaw agent --agent main --local -m "Hello" --session-id test
+openclaw tui
+```
+
+> **Full guide**: [docs/QUICK_START.md](docs/QUICK_START.md)
 
 ---
 
@@ -464,26 +491,25 @@ MilimoClaw/
 
 ## Testing
 
-### JavaScript Tests (Blueprints, CLI, Contracts)
+### TypeScript Tests (Jest)
 
 ```bash
-npm test
+cd milimo && npm test
 ```
 
-Runs 76+ tests covering:
-- Plugin exports & config parsing
-- All 5 role blueprint schema validation
-- Filesystem isolation checks
-- Inference routing enforcement
-- Inter-claw policy verification
-- Sandbox policy structure
-- Contract validation (valid routes, unauthorized routes, War Room access)
-- Approval requirements
+Runs 68 tests covering:
+- **ConfigManager** (17 tests) — load, save, migrate, clear
+- **Config Encryption** (18 tests) — encrypt/decrypt round trip, backwards compat
+- **ApprovalEngine** (19 tests) — queue handling, escalation rules, rate limiting
+- **WarRoomTUI** (22 tests) — commands, queue rendering, action handling
+- **Blueprint Commands** (24 tests) — fork, merge, publish, rollback, spawnSync safety
 
-### Python Tests (Privacy Router, Mesh Protocol, Evolution)
+All tests mock filesystem and child_process — no real disk/Python execution.
+
+### Python Tests (pytest)
 
 ```bash
-python3 -m unittest discover -s milimo-blueprint/tests -v
+cd milimo-blueprint && python3 -m pytest tests/ -v
 ```
 
 Runs 73+ tests covering:
@@ -495,6 +521,7 @@ Runs 73+ tests covering:
 - Mesh coordinator (registration, routing, health monitoring)
 - Topology persistence
 - Tool generation and validation
+- Bridge CLI command routing
 
 ### Integration Tests (TS ↔ Python Boundary)
 
@@ -510,6 +537,7 @@ Integration tests verify:
 - Rate limiter integration
 - Multi-region mesh (region detection, latency, failover)
 - Health monitoring
+- Python bridge CLI
 
 ### CI/CD Pipeline
 
@@ -615,9 +643,46 @@ Pipeline includes:
 | Batch Squad Creation | ✅ |
 | Role Assignment | ✅ |
 
+### ✅ Audit Remediation (Complete — 2026-03-20)
+
+| Issue | Priority | Status |
+|-------|----------|--------|
+| Consolidate dual configuration files | HIGH | ✅ |
+| Register missing CLI commands | HIGH | ✅ |
+| Fix shell command injection risk | HIGH | ✅ |
+| Add TypeScript unit tests | HIGH | ✅ |
+| Improve Python bridge | MEDIUM | ✅ |
+| Upgrade War Room TUI | MEDIUM | ✅ |
+| Encrypt sensitive config fields | MEDIUM | ✅ |
+| Expand slash commands | LOW | ✅ |
+| Fix payment API default URL | LOW | ✅ |
+| Fix evolution manager static data | LOW | ✅ |
+
+**Key improvements:**
+- Single `config.json` with automatic migration from `state.json`
+- All CLI commands registered: `health`, `payment`, `verify`, `badge`, `provenance-keygen`
+- Shell injection eliminated: `spawnSync` with array args throughout
+- 68 Jest tests covering core functionality
+- Structured Python bridge with JSON CLI
+- Blessed-based split-pane War Room TUI with keyboard shortcuts
+- AES-256-GCM encryption for sensitive fields (meshSecret, API keys)
+- Slash commands: `approve`, `veto`, `health`, `evolution`
+- Production default API URL with fallback chain
+
 ---
 
 ## Documentation
+
+### Getting Started
+
+| Document | Description |
+|---|---|
+| [Quick Start Guide](docs/QUICK_START.md) | **START HERE** — Proper setup flow for macOS |
+| [Setup Guide](docs/setup-guide.md) | Detailed Docker and gateway configuration |
+| [Troubleshooting](docs/troubleshooting/TROUBLESHOOTING.md) | Common issues and solutions |
+| [Native vs Plugin Onboarding](docs/troubleshooting/NATIVE_VS_PLUGIN_ONBOARDING.md) | Critical difference explained |
+
+### Core Documentation
 
 | Document | Description |
 |---|---|
@@ -627,27 +692,6 @@ Pipeline includes:
 | [Privacy & Security](milimo-claw-docs/PRIVACY_AND_SECURITY.md) | Data routing, isolation, and trust model |
 | [Blueprint Economy](milimo-claw-docs/BLUEPRINT_ECONOMY.md) | Versioning, marketplace, and inheritance |
 
-### Guides
-
-| Document | Description |
-|---|---|
-| [Quick Start (macOS Docker)](milimo-claw-docs/guides/QUICK_START_MACOS.md) | Get running on macOS with Docker |
-| [Squad Setup Guide](milimo-claw-docs/guides/SQUAD_SETUP_GUIDE.md) | Step-by-step squad formation walkthrough |
-| [Contributing](milimo-claw-docs/guides/CONTRIBUTING.md) | Contribution guidelines |
-| [Security Policy](milimo-claw-docs/guides/SECURITY.md) | Security policy and reporting |
-| [Spark Install](milimo-claw-docs/guides/spark-install.md) | Spark installation guide |
-
-### Reference
-
-| Document | Description |
-|---|---|
-| [Phase 3 Features](milimo-claw-docs/reference/PHASE3_FEATURES.md) | Production hardening features |
-| [Phase 4 Features](milimo-claw-docs/reference/PHASE4_FEATURES.md) | Scale & distribution features |
-| [Phase 5 Features](milimo-claw-docs/reference/PHASE5_FEATURES.md) | Blueprint economy features |
-| [Phase 6 Features](milimo-claw-docs/reference/PHASE6_FEATURES.md) | Enterprise tier features |
-| [Solo Founder Template](milimo-claw-docs/reference/SOLO_FOUNDER_TEMPLATE.md) | Solo founder features |
-| [NemoClaw README](milimo-claw-docs/reference/NemoClaw-README.md) | Original upstream documentation |
-
 ### Technical Specs
 
 | Document | Description |
@@ -656,20 +700,14 @@ Pipeline includes:
 | [War Room API](docs/technical/war-room-api.md) | REST/WebSocket API specification |
 | [Health Metrics](docs/technical/health-metrics.md) | Health scoring specification |
 | [Payment Provider](docs/technical/payment-provider-selection.md) | Stripe Connect integration |
-| [Provenance Scheme](docs/technical/provenance-scheme.md) | Cryptographic provenance |
-| [Third-party Verification](docs/technical/third-party-verification.md) | Auditor framework |
 
-### Reports
+### Reports & Status
 
 | Document | Description |
 |---|---|
 | [Implementation Plan](milimo-claw-docs/reports/MILIMO_CLAW_IMPLEMENTATION_PLAN.md) | Full implementation roadmap |
-| [Audit Report](milimo-claw-docs/reports/MILIMO_CLAW_AUDIT_REPORT.md) | Project audit findings |
-| [Phase 3 Status](milimo-claw-docs/reports/PHASE3_STATUS_REPORT.md) | Phase 3 completion report |
-| [Phase 4 Status](milimo-claw-docs/reports/PHASE4_STATUS_REPORT.md) | Phase 4 completion report |
-| [Phase 5 Status](milimo-claw-docs/reports/PHASE5_STATUS_REPORT.md) | Phase 5 completion report |
-| [Phase 6 Status](milimo-claw-docs/reports/PHASE_6_STATUS.md) | Phase 6 completion report |
-| [Solo Founder Status](milimo-claw-docs/reports/SOLO_FOUNDER_STATUS.md) | Solo founder implementation report |
+| [NemoClaw Comparison](milimo-claw-docs/reports/nemoclaw-comparison-insights.md) | Differences from upstream |
+| [Phase Reports](milimo-claw-docs/reports/) | Phase completion reports |
 
 ---
 

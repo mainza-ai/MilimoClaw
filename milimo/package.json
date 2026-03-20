@@ -19,19 +19,27 @@
     "format:check": "prettier --check 'src/**/*.ts'",
     "check": "npm run lint && npm run format:check && tsc --noEmit",
     "clean": "rm -rf dist/",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
     "test:e2e": "cd .. && docker build -t milimoclaw-sandbox . && docker run --rm -v ~/.openclaw:/sandbox/.openclaw milimoclaw-sandbox /opt/milimo/test/milimo-e2e.sh"
   },
   "dependencies": {
+    "blessed": "^0.1.81",
     "commander": "^13.1.0",
-    "yaml": "^2.8.2"
+    "yaml": "^2.8.2",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/blessed": "^0.1.27",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.19.37",
     "@typescript-eslint/eslint-plugin": "^8.57.0",
     "@typescript-eslint/parser": "^8.57.0",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
+    "jest": "^30.3.0",
     "prettier": "^3.8.1",
+    "ts-jest": "^29.4.6",
     "typescript": "^5.4.0"
   },
   "engines": {
