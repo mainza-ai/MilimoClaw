@@ -347,6 +347,280 @@ def handle_provenance_keygen(args: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError(f"Provenance keygen error: {e}") from e
 
 
+def handle_revenue_summary(args: dict[str, Any]) -> dict[str, Any]:
+    """Get revenue summary for War Room widget."""
+    from .solo_warroom import SoloWarRoom, RevenueSummary
+    from pathlib import Path
+
+    squad_id = args.get("squad_id", "default")
+    sandbox_dir = args.get("sandbox_dir")
+
+    try:
+        config = {"war_room": {"operator": "operator", "mode": "solo"}}
+        warroom = SoloWarRoom(config)
+
+        sandbox_path = Path(sandbox_dir) if sandbox_dir else None
+        summary = warroom.get_revenue_summary(sandbox_path)
+
+        return {
+            "week_revenue": summary.week_revenue,
+            "week_over_week_pct": summary.week_over_week_pct,
+            "invoices_paid": summary.invoices_paid,
+            "invoices_pending": summary.invoices_pending,
+            "last_updated": summary.last_updated,
+        }
+    except Exception as e:
+        logger.exception("Failed to get revenue summary")
+        raise RuntimeError(f"Revenue summary error: {e}") from e
+
+
+def handle_morning_brief(args: dict[str, Any]) -> dict[str, Any]:
+    """Generate morning brief digest."""
+    from .solo_warroom import SoloWarRoom
+
+    squad_id = args.get("squad_id", "default")
+
+    try:
+        config = {"war_room": {"operator": "operator", "mode": "solo"}}
+        warroom = SoloWarRoom(config)
+
+        stats = warroom.get_stats()
+        pending = warroom.get_pending()
+
+        return {
+            "overnight_actions": stats.get("auto_executed_today", 0),
+            "queue_summary": {
+                "hold": stats.get("hold_count", 0),
+                "review": stats.get("review_count", 0),
+                "auto": stats.get("auto_count", 0),
+            },
+            "pending_actions": [
+                {"id": a.id, "claw": a.claw, "type": a.action_type, "priority": a.priority.name}
+                for a in pending[:10]
+            ],
+        }
+    except Exception as e:
+        logger.exception("Failed to generate morning brief")
+        raise RuntimeError(f"Morning brief error: {e}") from e
+
+
+def handle_evening_wrap(args: dict[str, Any]) -> dict[str, Any]:
+    """Generate evening wrap digest."""
+    from .solo_warroom import SoloWarRoom
+
+    squad_id = args.get("squad_id", "default")
+
+    try:
+        config = {"war_room": {"operator": "operator", "mode": "solo"}}
+        warroom = SoloWarRoom(config)
+
+        stats = warroom.get_stats()
+
+        return {
+            "today_completed": stats.get("processed_today", 0),
+            "auto_executed": stats.get("auto_executed_today", 0),
+            "remaining_pending": stats.get("total_pending", 0),
+        }
+    except Exception as e:
+        logger.exception("Failed to generate evening wrap")
+        raise RuntimeError(f"Evening wrap error: {e}") from e
+
+
+def handle_activate_deep_work(args: dict[str, Any]) -> dict[str, Any]:
+    """Activate deep work mode."""
+    from .solo_deep_work import activate_deep_work_mode
+
+    resume_date = args.get("resume_date", "")
+    if not resume_date:
+        raise RuntimeError("resume_date is required")
+
+    try:
+        config = {"war_room": {"operator": "operator", "mode": "solo"}}
+        result = activate_deep_work_mode(config, resume_date, quiet=True)
+        return result
+    except ValueError as e:
+        raise RuntimeError(str(e)) from e
+    except Exception as e:
+        logger.exception("Failed to activate deep work mode")
+        raise RuntimeError(f"Activate deep work error: {e}") from e
+
+
+def handle_resume_deep_work(args: dict[str, Any]) -> dict[str, Any]:
+    """Resume from deep work mode."""
+    from .solo_deep_work import deactivate_deep_work_mode
+
+    try:
+        config = {"war_room": {"operator": "operator", "mode": "solo"}}
+        result = deactivate_deep_work_mode(config, quiet=True)
+        return result
+    except Exception as e:
+        logger.exception("Failed to resume from deep work mode")
+        raise RuntimeError(f"Resume deep work error: {e}") from e
+
+
+def handle_deep_work_status(args: dict[str, Any]) -> dict[str, Any]:
+    """Get deep work mode status."""
+    from .solo_deep_work import get_deep_work_status
+
+    try:
+        result = get_deep_work_status()
+        return result
+    except Exception as e:
+        logger.exception("Failed to get deep work status")
+        raise RuntimeError(f"Deep work status error: {e}") from e
+
+
+def handle_collect_health(args: dict[str, Any]) -> dict[str, Any]:
+    """Collect health data for all claws."""
+    squad_id = args.get("squad_id", "default")
+
+    try:
+        home = Path.home()
+        base_dir = home / ".milimo"
+
+        result: dict[str, Any] = {}
+        claw_roles = ["content", "ops", "analytics", "finance", "build"]
+
+        for role in claw_roles:
+            claw_health = _collect_claw_health(role, squad_id, base_dir)
+            result[role] = claw_health
+
+        return result
+    except Exception as e:
+        logger.exception("Failed to collect health data")
+        raise RuntimeError(f"Collect health error: {e}") from e
+
+
+def _collect_claw_health(role: str, squad_id: str, base_dir: Path) -> dict[str, Any]:
+    """Collect health for a single claw."""
+    now = datetime.now(timezone.utc).isoformat()
+
+    claw_health: dict[str, Any] = {
+        "role": role,
+        "status": "idle",
+        "tool_count": 0,
+        "last_evolution": None,
+        "last_action": None,
+        "actions_this_week": 0,
+        "sparkline": [0, 0, 0, 0, 0, 0, 0],
+    }
+
+    registry_path = base_dir / "tools" / squad_id / role / "registry.json"
+    if registry_path.exists():
+        try:
+            data = json.loads(registry_path.read_text())
+            tools = data.get("tools", {})
+            claw_health["tool_count"] = len(tools)
+
+            last_evo = data.get("last_evolution")
+            if last_evo:
+                claw_health["last_evolution"] = last_evo
+        except Exception:
+            pass
+
+    warroom_log = base_dir / "logs" / "warroom.log"
+    if warroom_log.exists():
+        try:
+            claw_health["last_action"] = _get_last_action_time(role, warroom_log)
+            claw_health["actions_this_week"] = _count_actions_this_week(role, warroom_log)
+            claw_health["sparkline"] = _calculate_sparkline(role, warroom_log)
+        except Exception:
+            pass
+
+    pending_dir = base_dir / "queue" / "pending"
+    if pending_dir.exists():
+        pending_hold = 0
+        pending_review = 0
+        for msg_file in pending_dir.glob("*.json"):
+            try:
+                msg = json.loads(msg_file.read_text())
+                if msg.get("sender_role") == role:
+                    if msg.get("priority") == "HOLD":
+                        pending_hold += 1
+                    elif msg.get("priority") == "REVIEW":
+                        pending_review += 1
+            except Exception:
+                pass
+
+        if pending_hold > 0:
+            claw_health["status"] = "processing"
+        elif claw_health["last_action"]:
+            try:
+                last_action_dt = datetime.fromisoformat(claw_health["last_action"])
+                if (datetime.now(timezone.utc) - last_action_dt).total_seconds() < 60:
+                    claw_health["status"] = "active"
+            except Exception:
+                pass
+
+    return claw_health
+
+
+def _get_last_action_time(role: str, log_file: Path) -> str | None:
+    """Get the last action timestamp for a claw from the log."""
+    try:
+        lines = log_file.read_text().splitlines()
+        for line in reversed(lines[-100:]):
+            if f"claw={role}" in line or f"from {role}" in line:
+                parts = line.split(" - ")
+                if parts:
+                    timestamp_str = parts[0]
+                    try:
+                        dt = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+                        return dt.isoformat()
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+    return None
+
+
+def _count_actions_this_week(role: str, log_file: Path) -> int:
+    """Count actions for a claw in the last 7 days."""
+    try:
+        lines = log_file.read_text().splitlines()
+        count = 0
+        week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+        for line in lines[-1000:]:
+            if f"claw={role}" in line or f"from {role}" in line:
+                parts = line.split(" - ")
+                if parts:
+                    try:
+                        dt = datetime.fromisoformat(parts[0].replace("Z", "+00:00"))
+                        if dt > week_ago:
+                            count += 1
+                    except Exception:
+                        pass
+        return count
+    except Exception:
+        return 0
+
+
+def _calculate_sparkline(role: str, log_file: Path) -> list[int]:
+    """Calculate 7-day sparkline for a claw."""
+    try:
+        lines = log_file.read_text().splitlines()
+        sparkline: list[int] = [0, 0, 0, 0, 0, 0, 0]
+        today = datetime.now(timezone.utc).date()
+
+        for line in lines[-5000:]:
+            if f"claw={role}" in line or f"from {role}" in line:
+                parts = line.split(" - ")
+                if parts:
+                    try:
+                        dt = datetime.fromisoformat(parts[0].replace("Z", "+00:00"))
+                        days_ago = (today - dt.date()).days
+                        if 0 <= days_ago < 7:
+                            sparkline[6 - days_ago] += 1
+                    except Exception:
+                        pass
+        return sparkline
+    except Exception:
+        return [0, 0, 0, 0, 0, 0, 0]
+
+
+from datetime import datetime, timezone, timedelta
+
+
 # ---------------------------------------------------------------------------
 # Command Registry
 # ---------------------------------------------------------------------------
@@ -366,6 +640,13 @@ COMMAND_HANDLERS: dict[str, Any] = {
     "health_status": handle_health_status,
     "provenance_verify": handle_provenance_verify,
     "provenance_keygen": handle_provenance_keygen,
+    "revenue_summary": handle_revenue_summary,
+    "morning_brief": handle_morning_brief,
+    "evening_wrap": handle_evening_wrap,
+    "activate_deep_work": handle_activate_deep_work,
+    "resume_deep_work": handle_resume_deep_work,
+    "deep_work_status": handle_deep_work_status,
+    "collect_health": handle_collect_health,
 }
 
 

@@ -415,12 +415,12 @@ describe("WarRoomTUI", () => {
 			expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Usage:"));
 		});
 
-		it("shows error for non-existent message ID", () => {
-			const tui = new WarRoomTUI("test-squad");
-			(tui as any).pendingQueue = [];
-			(tui as any).handleCommand("view nonexistent");
+    it("shows error for non-existent message ID", () => {
+      const tui = new WarRoomTUI("test-squad");
+      (tui as any).pendingQueue = [];
+      (tui as any).handleCommand("view nonexistent");
 
-			expect(console.log).toHaveBeenCalledWith(expect.stringContaining("not found"));
-		});
-	});
+expect(console.log).toHaveBeenCalledWith(expect.stringContaining("not found"));
+});
+});
 });

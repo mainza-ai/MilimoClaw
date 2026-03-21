@@ -52,12 +52,12 @@ describe("Mesh config loading", () => {
     assert.ok(Array.isArray(meshConfig.escalation_rules));
   });
 
-  it("defines all 6 message types", () => {
-    const expected = ["brief", "query", "response", "signal", "deliverable", "summary"];
-    for (const type of expected) {
-      assert.ok(messageTypes[type], `Missing message type: ${type}`);
-    }
-  });
+ it("defines all 7 message types", () => {
+ const expected = ["brief", "query", "response", "signal", "deliverable", "summary", "finance_summary"];
+ for (const type of expected) {
+ assert.ok(messageTypes[type], `Missing message type: ${type}`);
+ }
+ });
 });
 
 // ---------------------------------------------------------------------------
@@ -126,10 +126,11 @@ describe("Valid message contracts", () => {
     assert.ok(matrix.finance.analytics.includes("summary"));
   });
 
-  it("finance → war_room: signal + deliverable", () => {
-    assert.ok(matrix.finance.war_room.includes("signal"));
-    assert.ok(matrix.finance.war_room.includes("deliverable"));
-  });
+ it("finance → war_room: signal + deliverable + finance_summary", () => {
+ assert.ok(matrix.finance.war_room.includes("signal"));
+ assert.ok(matrix.finance.war_room.includes("deliverable"));
+ assert.ok(matrix.finance.war_room.includes("finance_summary"));
+ });
 
   // Build Claw routes
   it("build → ops: signal + deliverable", () => {
@@ -223,14 +224,18 @@ describe("Approval requirements", () => {
     assert.equal(messageTypes.signal.requires_approval, false);
   });
 
-  it("summary does not require approval", () => {
-    assert.equal(messageTypes.summary.requires_approval, false);
-  });
+ it("summary does not require approval", () => {
+ assert.equal(messageTypes.summary.requires_approval, false);
+ });
 
-  it("response does not require approval", () => {
-    assert.equal(messageTypes.response.requires_approval, false);
-  });
-});
+ it("response does not require approval", () => {
+ assert.equal(messageTypes.response.requires_approval, false);
+ });
+
+ it("finance_summary does not require approval", () => {
+ assert.equal(messageTypes.finance_summary.requires_approval, false);
+ });
+ });
 
 // ---------------------------------------------------------------------------
 // Matrix completeness — every role in the matrix is valid

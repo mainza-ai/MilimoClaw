@@ -12,6 +12,8 @@ const warroom_js_1 = require("./commands/warroom.js");
 const payment_js_1 = require("./commands/payment.js");
 const verify_js_1 = require("./commands/verify.js");
 const badge_js_1 = require("./commands/badge.js");
+const action_js_1 = require("./commands/action.js");
+const logs_js_1 = require("./commands/logs.js");
 function registerCliCommands(ctx, api) {
     const { program, logger } = ctx;
     const pluginConfig = (0, index_js_1.getPluginConfig)(api);
@@ -277,6 +279,69 @@ function registerCliCommands(ctx, api) {
         .option("--json", "Output as JSON", false)
         .action(async (opts) => {
         await (0, badge_js_1.cliBadge)({ ...opts, logger, pluginConfig });
+    });
+    // ── openclaw milimo action ────────────────────────────────────────
+    const action = milimo.command("action").description("Action queue management");
+    action
+        .command("approve <actionId>")
+        .description("Approve a pending action without opening TUI")
+        .action(async (actionId) => {
+        await (0, action_js_1.cliActionApprove)({ actionId, logger, pluginConfig });
+    });
+    action
+        .command("block <actionId>")
+        .description("Block (reject) a pending action without opening TUI")
+        .option("--reason <reason>", "Reason for blocking")
+        .action(async (actionId, opts) => {
+        await (0, action_js_1.cliActionBlock)({ actionId, reason: opts.reason, logger, pluginConfig });
+    });
+    action
+        .command("list")
+        .description("List pending actions in the queue")
+        .option("--json", "Output as JSON", false)
+        .action(async (opts) => {
+        const pending = (0, action_js_1.listPendingActions)();
+        if (opts.json) {
+            logger.info(JSON.stringify(pending, null, 2));
+        }
+        else if (pending.length === 0) {
+            logger.info("No pending actions in queue.");
+        }
+        else {
+            logger.info(`Pending actions (${pending.length}):`);
+            for (const action of pending) {
+                const priority = action.priority ?? action.needs_approval ? "REVIEW" : "AUTO";
+                logger.info(` [${priority}] ${action.message_id} - ${action.sender_role}: ${action.message_type}`);
+            }
+        }
+    });
+    // ── openclaw milimo logs ────────────────────────────────────────────
+    const logs = milimo.command("logs").description("Audit log management");
+    logs
+        .command("search")
+        .description("Search audit logs")
+        .option("--query <text>", "Search query text")
+        .option("--from <date>", "Start date (YYYY-MM-DD)")
+        .option("--to <date>", "End date (YYYY-MM-DD)")
+        .option("--claw <role>", "Filter by claw role")
+        .option("--decision <decision>", "Filter by decision (APPROVED, REJECTED, etc.)")
+        .option("--limit <n>", "Maximum results", "50")
+        .option("--json", "Output as JSON", false)
+        .option("--squad <squad>", "Squad ID")
+        .action(async (opts) => {
+        await (0, logs_js_1.cliLogsSearch)({
+            ...opts,
+            limit: opts.limit ? parseInt(opts.limit, 10) : 50,
+            logger,
+            pluginConfig,
+        });
+    });
+    logs
+        .command("list")
+        .description("List available log files")
+        .option("--squad <squad>", "Squad ID")
+        .action(async (opts) => {
+        await (0, logs_js_1.cliLogsList)({ ...opts, logger, pluginConfig });
     });
 }
 //# sourceMappingURL=cli.js.map

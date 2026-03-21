@@ -14,6 +14,7 @@ import pytest
 from orchestrator.solo_evolution import (
     schedule_evolution,
     check_claw_evolution_ready,
+    check_content_evolution_thresholds,
     get_evolution_summary,
     _calculate_next_run,
     _check_evolution_threshold,
@@ -21,6 +22,7 @@ from orchestrator.solo_evolution import (
     EvolutionStatus,
     DAYS_OF_WEEK,
     EVOLUTION_THRESHOLDS,
+    CONTENT_ADDITIONAL_THRESHOLDS,
 )
 
 
@@ -343,3 +345,171 @@ class TestConstants:
         """Test evolution thresholds mapping."""
         assert EVOLUTION_THRESHOLDS["content"] == "min_approved_posts"
         assert EVOLUTION_THRESHOLDS["build"] == "min_prs_merged"
+
+    def test_content_additional_thresholds(self) -> None:
+        """Test content additional thresholds exist."""
+        assert "rejected_drafts_min" in CONTENT_ADDITIONAL_THRESHOLDS
+        assert "performance_data_weeks_min" in CONTENT_ADDITIONAL_THRESHOLDS
+        assert CONTENT_ADDITIONAL_THRESHOLDS["rejected_drafts_min"] == 3
+        assert CONTENT_ADDITIONAL_THRESHOLDS["performance_data_weeks_min"] == 1
+
+
+class TestCheckContentEvolutionThresholds:
+    """Tests for check_content_evolution_thresholds function."""
+
+    def test_all_thresholds_met(self) -> None:
+        """Test when all thresholds are met."""
+        result = check_content_evolution_thresholds(
+            approved_count=15,
+            rejected_count=5,
+            performance_log_age_days=14,
+        )
+
+        assert result["can_evolve"] is True
+        assert len(result["reasons"]) == 0
+        assert result["thresholds_checked"]["approved_posts"]["passed"] is True
+        assert result["thresholds_checked"]["rejected_drafts"]["passed"] is True
+        assert result["thresholds_checked"]["performance_weeks"]["passed"] is True
+
+    def test_approved_posts_threshold_fails(self) -> None:
+        """Test when approved posts threshold fails."""
+        result = check_content_evolution_thresholds(
+            approved_count=5,
+            rejected_count=5,
+            performance_log_age_days=14,
+        )
+
+        assert result["can_evolve"] is False
+        assert any("approved_posts" in r for r in result["reasons"])
+        assert result["thresholds_checked"]["approved_posts"]["passed"] is False
+
+    def test_rejected_drafts_threshold_fails(self) -> None:
+        """Test when rejected drafts threshold fails."""
+        result = check_content_evolution_thresholds(
+            approved_count=15,
+            rejected_count=1,
+            performance_log_age_days=14,
+        )
+
+        assert result["can_evolve"] is False
+        assert any("rejected_drafts" in r for r in result["reasons"])
+        assert result["thresholds_checked"]["rejected_drafts"]["passed"] is False
+
+    def test_performance_weeks_threshold_fails(self) -> None:
+        """Test when performance weeks threshold fails."""
+        result = check_content_evolution_thresholds(
+            approved_count=15,
+            rejected_count=5,
+            performance_log_age_days=3,
+        )
+
+        assert result["can_evolve"] is False
+        assert any("performance" in r for r in result["reasons"])
+        assert result["thresholds_checked"]["performance_weeks"]["passed"] is False
+
+    def test_threshold_at_minimum_passes(self) -> None:
+        """Test that exactly at minimum threshold passes (boundary condition)."""
+        result = check_content_evolution_thresholds(
+            approved_count=10,
+            rejected_count=3,
+            performance_log_age_days=7,
+        )
+
+        assert result["can_evolve"] is True
+        assert result["thresholds_checked"]["approved_posts"]["actual"] == 10
+        assert result["thresholds_checked"]["rejected_drafts"]["actual"] == 3
+        assert result["thresholds_checked"]["performance_weeks"]["actual"] == 1
+
+    def test_multiple_thresholds_fail(self) -> None:
+        """Test when multiple thresholds fail."""
+        result = check_content_evolution_thresholds(
+            approved_count=2,
+            rejected_count=1,
+            performance_log_age_days=2,
+        )
+
+        assert result["can_evolve"] is False
+        assert len(result["reasons"]) == 3
+
+    def test_custom_config_thresholds(self) -> None:
+        """Test with custom config thresholds."""
+        config: dict[str, Any] = {
+            "evolution": {
+                "per_claw": {
+                    "content": {
+                        "min_approved_posts": 5,
+                    },
+                },
+            },
+        }
+
+        result = check_content_evolution_thresholds(
+            approved_count=7,
+            rejected_count=3,
+            performance_log_age_days=7,
+            config=config,
+        )
+
+        assert result["can_evolve"] is True
+        assert result["thresholds_checked"]["approved_posts"]["required"] == 5
+
+
+class TestCheckClawEvolutionReadyWithAdditionalData:
+    """Tests for check_claw_evolution_ready with Content Claw additional thresholds."""
+
+    def test_content_ready_with_all_thresholds_met(self) -> None:
+        """Test Content Claw ready when all thresholds met."""
+        ready = check_claw_evolution_ready(
+            VALID_CONFIG,
+            "content",
+            15,
+            additional_data={
+                "rejected_count": 5,
+                "performance_log_age_days": 14,
+            },
+        )
+
+        assert ready is True
+
+    def test_content_not_ready_rejected_threshold_fails(self) -> None:
+        """Test Content Claw not ready when rejected threshold fails."""
+        ready = check_claw_evolution_ready(
+            VALID_CONFIG,
+            "content",
+            15,
+            additional_data={
+                "rejected_count": 1,
+                "performance_log_age_days": 14,
+            },
+        )
+
+        assert ready is False
+
+    def test_content_not_ready_performance_threshold_fails(self) -> None:
+        """Test Content Claw not ready when performance threshold fails."""
+        ready = check_claw_evolution_ready(
+            VALID_CONFIG,
+            "content",
+            15,
+            additional_data={
+                "rejected_count": 5,
+                "performance_log_age_days": 3,
+            },
+        )
+
+        assert ready is False
+
+    def test_other_claws_ignore_additional_data(self) -> None:
+        """Test that non-content claws ignore additional_data."""
+        ready = check_claw_evolution_ready(
+            VALID_CONFIG,
+            "ops",
+            10,
+            additional_data={
+                "rejected_count": 0,
+                "performance_log_age_days": 0,
+            },
+        )
+
+        # Ops claw doesn't check content thresholds
+        assert ready is True

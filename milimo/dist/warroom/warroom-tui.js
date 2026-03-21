@@ -51,21 +51,29 @@ const blessed = __importStar(require("blessed"));
 const approval_1 = require("./approval");
 const audit_1 = require("./audit");
 const evolution_1 = require("./evolution");
+const digest_1 = require("./digest");
 class WarRoomTUI {
     screen;
     leftPanel;
     rightPanel;
     bottomBar;
     helpOverlay = null;
+    digestOverlay = null;
     engine;
     audit;
     evolution;
+    digestScheduler = null;
     pendingQueue = [];
     selectedAction = null;
     currentIndex = 0;
     finalsMode = false;
+    revenueData = null;
+    revenuePollInterval = null;
+    currentDigest = null;
+    hasNewDigest = false;
     squadId;
     operatorId;
+    blueprintDir;
     refreshInterval = null;
     isRunning = false;
     COLORS = {
@@ -79,12 +87,33 @@ class WarRoomTUI {
         dim: "#888888",
     };
     POLL_INTERVAL = 3000;
+    REVENUE_POLL_INTERVAL = 30000;
     constructor(options) {
         this.squadId = options.squadId;
         this.operatorId = options.operatorId ?? "local-operator";
+        this.blueprintDir = options.blueprintDir ?? process.cwd();
         this.engine = new approval_1.ApprovalEngine(this.squadId, options.tier ?? "free");
         this.audit = new audit_1.AuditLogger(this.squadId);
         this.evolution = new evolution_1.EvolutionManager(this.squadId);
+        if (options.digestConfig) {
+            this.digestScheduler = new digest_1.DigestScheduler({
+                config: {
+                    ...options.digestConfig,
+                    squad_id: this.squadId,
+                },
+                blueprintDir: this.blueprintDir,
+                onUpdate: (brief) => {
+                    this.currentDigest = brief;
+                    this.hasNewDigest = true;
+                    this.updateBottomBar();
+                    this.screen.render();
+                },
+                onError: (error) => {
+                    this.rightPanel.setContent(`{red-fg}Digest error: ${error.message}{/red-fg}`);
+                    this.screen.render();
+                },
+            });
+        }
         this.screen = blessed.screen({
             smartCSR: true,
             title: `Milimo War Room — ${this.squadId}`,
@@ -142,17 +171,32 @@ class WarRoomTUI {
     start() {
         this.isRunning = true;
         this.refresh();
+        this.fetchRevenueData();
         this.screen.render();
         this.refreshInterval = setInterval(() => {
             this.refresh();
             this.screen.render();
         }, this.POLL_INTERVAL);
+        this.revenuePollInterval = setInterval(() => {
+            this.fetchRevenueData();
+            this.screen.render();
+        }, this.REVENUE_POLL_INTERVAL);
+        if (this.digestScheduler) {
+            this.digestScheduler.start();
+        }
     }
     stop() {
         this.isRunning = false;
         if (this.refreshInterval) {
             clearInterval(this.refreshInterval);
             this.refreshInterval = null;
+        }
+        if (this.revenuePollInterval) {
+            clearInterval(this.revenuePollInterval);
+            this.revenuePollInterval = null;
+        }
+        if (this.digestScheduler) {
+            this.digestScheduler.stop();
         }
         this.screen.destroy();
     }
@@ -168,6 +212,7 @@ class WarRoomTUI {
             this.updateBottomBar();
             this.screen.render();
         });
+        this.screen.key(["d", "D"], () => this.toggleDigest());
         this.screen.key(["a", "A"], () => this.approveAction());
         this.screen.key(["b", "B"], () => this.blockAction());
         this.screen.key(["e", "E"], () => this.editAction());
@@ -196,34 +241,77 @@ class WarRoomTUI {
 {bold}KEYBOARD SHORTCUTS{/bold}
 
 {bold}Navigation:{/bold}
-  ↑/↓     Navigate through actions
-  Enter   Select/expand action
+↑/↓ Navigate through actions
+Enter Select/expand action
 
 {bold}Actions:{/bold}
-  A       Approve selected action
-  B       Block (reject) selected action
-  E       Edit (hold) selected action
+A Approve selected action
+B Block (reject) selected action
+E Edit (hold) selected action
 
 {bold}General:{/bold}
-  Q       Quit War Room
-  R       Refresh queue
-  H       Toggle this help overlay
-  F       Toggle Finals Mode (auto-process all)
+Q Quit War Room
+R Refresh queue
+H Toggle this help overlay
+F Toggle Finals Mode (auto-process all)
+D Toggle digest panel (morning/evening)
 
 {bold}COLOR CODING:{/bold}
-  {coral-fg}● HOLD{/coral-fg}     Requires manual approval
-  {amber-fg}● REVIEW{/amber-fg}   Recommended for review
-  {teal-fg}● AUTO{/teal-fg}      Auto-approval eligible
+{coral-fg}● HOLD{/coral-fg} Requires manual approval
+{amber-fg}● REVIEW{/amber-fg} Recommended for review
+{teal-fg}● AUTO{/teal-fg} Auto-approval eligible
 
 {bold}FINALS MODE:{/bold}
-  When enabled, all AUTO actions are
-  automatically approved without operator input.
+When enabled, all AUTO actions are
+automatically approved without operator input.
+
+{bold}DIGEST PANEL:{/bold}
+Morning brief at 07:00, Evening wrap at 20:00.
+Press D to view latest digest.
 
 Press H to close this help.
 `,
                 tags: true,
             });
             this.screen.append(this.helpOverlay);
+        }
+        this.screen.render();
+    }
+    toggleDigest() {
+        if (this.digestOverlay) {
+            this.digestOverlay.destroy();
+            this.digestOverlay = null;
+        }
+        else {
+            let content = "";
+            if (this.currentDigest && this.digestScheduler) {
+                const lines = this.digestScheduler.renderBrief(this.currentDigest);
+                content = lines.join("\n");
+            }
+            else {
+                content = "\n{bold}No digest available yet{/bold}\n\n{dim-fg}Morning brief at 07:00{/dim-fg}\n{dim-fg}Evening wrap at 20:00{/dim-fg}\n\nPress D to close.";
+            }
+            this.digestOverlay = blessed.box({
+                top: "center",
+                left: "center",
+                width: "60%",
+                height: "70%",
+                label: " DIGEST ",
+                border: { type: "line" },
+                style: {
+                    border: { fg: "cyan" },
+                    label: { fg: "cyan" },
+                },
+                content: content,
+                tags: true,
+                scrollable: true,
+                alwaysScroll: true,
+                keys: true,
+                vi: true,
+            });
+            this.screen.append(this.digestOverlay);
+            this.hasNewDigest = false;
+            this.updateBottomBar();
         }
         this.screen.render();
     }
@@ -283,26 +371,40 @@ Press H to close this help.
     renderRightPanel() {
         const lines = [];
         lines.push("");
-        lines.push("  {bold}Squad Status{/bold}");
-        lines.push(`  Squad: ${this.squadId}`);
+        lines.push(" {bold}Squad Status{/bold}");
+        lines.push(` Squad: ${this.squadId}`);
         lines.push("");
         const clawRoles = ["content", "ops", "analytics", "finance", "build"];
         for (const role of clawRoles) {
             const health = this.getClawHealth(role);
             const statusColor = health.status === "active" ? this.COLORS.teal : health.status === "error" ? this.COLORS.error : this.COLORS.dim;
             const statusIcon = health.status === "active" ? "●" : health.status === "error" ? "●" : "○";
-            lines.push(`  {${statusColor}-fg}${statusIcon}{/${statusColor}-fg} ${role.toUpperCase().padEnd(10)} ${health.tools} tools`);
+            lines.push(` {${statusColor}-fg}${statusIcon}{/${statusColor}-fg} ${role.toUpperCase().padEnd(10)} ${health.tools} tools`);
         }
         lines.push("");
-        lines.push("  {bold}Revenue This Week{/bold}");
+        lines.push(" {bold}Revenue This Week{/bold}");
+        if (this.revenueData) {
+            const wowColor = this.revenueData.week_over_week_pct >= 0 ? this.COLORS.teal : this.COLORS.coral;
+            const wowIcon = this.revenueData.week_over_week_pct >= 0 ? "↑" : "↓";
+            const revenueFormatted = this.formatCurrency(this.revenueData.week_revenue);
+            lines.push(` ${revenueFormatted}`);
+            lines.push(` {${wowColor}-fg}${wowIcon} ${this.revenueData.week_over_week_pct >= 0 ? "+" : ""}${this.revenueData.week_over_week_pct.toFixed(1)}% WoW{/${wowColor}-fg}`);
+            lines.push("");
+            lines.push(` Paid: ${this.revenueData.invoices_paid} | Pending: ${this.revenueData.invoices_pending}`);
+        }
+        else {
+            lines.push(" {dim-fg}No revenue data yet{/dim-fg}");
+        }
+        lines.push("");
+        lines.push(" {bold}Rate Limits{/bold}");
         const rateLimitStatus = this.engine.getRateLimitStatus();
         if (rateLimitStatus) {
-            lines.push(`  Tier: ${rateLimitStatus.tier}`);
-            lines.push(`  Auto-approvals: ${rateLimitStatus.dailyRemaining}/${rateLimitStatus.dailyLimit}`);
+            lines.push(` Tier: ${rateLimitStatus.tier}`);
+            lines.push(` Auto-approvals: ${rateLimitStatus.dailyRemaining}/${rateLimitStatus.dailyLimit}`);
         }
         lines.push("");
-        lines.push("  {bold}Evolution Log{/bold}");
-        lines.push("  {dim-fg}Recent tool deployments...{/dim-fg}");
+        lines.push(" {bold}Evolution Log{/bold}");
+        lines.push(" {dim-fg}Recent tool deployments...{/dim-fg}");
         this.rightPanel.setContent(lines.join("\n"));
     }
     getClawHealth(role) {
@@ -353,7 +455,8 @@ Press H to close this help.
     }
     updateBottomBar() {
         const finalsText = this.finalsMode ? "{bold}{green-fg}ON{/green-fg}{/bold}" : "{red-fg}OFF{/red-fg}";
-        this.bottomBar.setContent(`{bold}[Q]{/bold}uit  {bold}[R]{/bold}efresh  {bold}[H]{/bold}elp  {bold}[F]{/bold}inals Mode: ${finalsText}`);
+        const digestIndicator = this.hasNewDigest ? "{cyan-fg}●{/cyan-fg} " : "";
+        this.bottomBar.setContent(`{bold}[Q]{/bold}uit {bold}[R]{/bold}efresh {bold}[H]{/bold}elp {bold}[F]{/bold}inals Mode: ${finalsText} {bold}[D]{/bold}igest ${digestIndicator}`);
     }
     navigateUp() {
         if (this.currentIndex > 0) {
@@ -411,6 +514,44 @@ Press H to close this help.
             this.refresh();
             this.screen.render();
         }
+    }
+    fetchRevenueData() {
+        try {
+            const home = process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
+            const summaryPath = require("path").join(home, ".milimo", "finance", "revenue", "weekly_summary.json");
+            if (require("fs").existsSync(summaryPath)) {
+                const data = JSON.parse(require("fs").readFileSync(summaryPath, "utf-8"));
+                const currentWeek = data.current_week || {};
+                const previousWeek = data.previous_week || {};
+                const weekRevenue = parseFloat(currentWeek.total_revenue) || 0.0;
+                const previousRevenue = parseFloat(previousWeek.total_revenue) || 0.0;
+                let weekOverWeekPct = 0.0;
+                if (previousRevenue > 0) {
+                    weekOverWeekPct = ((weekRevenue - previousRevenue) / previousRevenue) * 100;
+                }
+                this.revenueData = {
+                    week_revenue: weekRevenue,
+                    week_over_week_pct: Math.round(weekOverWeekPct * 100) / 100,
+                    invoices_paid: parseInt(currentWeek.invoices_paid, 10) || 0,
+                    invoices_pending: parseInt(data.pending_invoices, 10) || 0,
+                    last_updated: data.last_updated || "",
+                };
+            }
+            else {
+                this.revenueData = null;
+            }
+        }
+        catch (error) {
+            this.revenueData = null;
+        }
+    }
+    formatCurrency(amount) {
+        return new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: "USD",
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        }).format(amount);
     }
 }
 exports.WarRoomTUI = WarRoomTUI;

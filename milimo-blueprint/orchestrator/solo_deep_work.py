@@ -91,6 +91,7 @@ def activate_deep_work_mode(
     resume_date: str,
     policy_dir: Optional[Path] = None,
     state_file: Optional[Path] = None,
+    quiet: bool = False,
 ) -> dict[str, Any]:
     """
     Activate deep work mode for solo founder.
@@ -104,6 +105,7 @@ def activate_deep_work_mode(
         resume_date: Date to resume normal operations (YYYY-MM-DD)
         policy_dir: Directory containing claw policies
         state_file: Path to store deep work state
+        quiet: If True, suppress console output
 
     Returns:
         Summary of what was changed per claw
@@ -170,7 +172,7 @@ def activate_deep_work_mode(
 
     result: dict[str, Any] = {
         "active": True,
-        "activated_at": state.activated_at.isoformat(),
+        "activated_at": state.activated_at.isoformat() if state.activated_at else None,
         "resume_date": resume_date,
         "auto_response": formatted_response,
         "policies_updated": updated_policies,
@@ -186,7 +188,8 @@ def activate_deep_work_mode(
         ],
     }
 
-    _print_confirmation_summary(result)
+    if not quiet:
+        _print_confirmation_summary(result)
 
     return result
 
@@ -195,6 +198,7 @@ def deactivate_deep_work_mode(
     config: dict[str, Any],
     policy_dir: Optional[Path] = None,
     state_file: Optional[Path] = None,
+    quiet: bool = False,
 ) -> dict[str, Any]:
     """
     Deactivate deep work mode and restore normal operations.
@@ -203,6 +207,7 @@ def deactivate_deep_work_mode(
         config: Validated solo-founder configuration
         policy_dir: Directory containing claw policies
         state_file: Path where deep work state is stored
+        quiet: If True, suppress console output
 
     Returns:
         Summary of what was restored
@@ -238,7 +243,8 @@ def deactivate_deep_work_mode(
         "message": "Normal operations resumed",
     }
 
-    _print_deactivation_summary(result)
+    if not quiet:
+        _print_deactivation_summary(result)
 
     return result
 

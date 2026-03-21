@@ -13,6 +13,11 @@ export interface MilimoConfig {
     initializedAt: string;
     blueprintVersion: string;
     serverUrl?: string;
+    deep_work?: {
+        active: boolean;
+        activated_at: string;
+        resume_date: string;
+    };
 }
 export interface LegacyState {
     squadName: string;

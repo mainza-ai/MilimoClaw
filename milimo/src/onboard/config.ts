@@ -19,18 +19,23 @@ const CONFIG_FILE = "config.json";
 const LEGACY_STATE_FILE = "state.json";
 
 export interface MilimoConfig {
-  squadName: string;
-  clawRole: ClawRole;
-  template: string;
-  solo: boolean;
-  meshMembers: string[];
-  meshSecret: string | null;
-  operatorName: string;
-  warRoomMode: "full" | "minimal" | "disabled";
-  onboardedAt: string | null;
-  initializedAt: string;
-  blueprintVersion: string;
-  serverUrl?: string;
+    squadName: string;
+    clawRole: ClawRole;
+    template: string;
+    solo: boolean;
+    meshMembers: string[];
+    meshSecret: string | null;
+    operatorName: string;
+    warRoomMode: "full" | "minimal" | "disabled";
+    onboardedAt: string | null;
+    initializedAt: string;
+    blueprintVersion: string;
+    serverUrl?: string;
+    deep_work?: {
+        active: boolean;
+        activated_at: string;
+        resume_date: string;
+    };
 }
 
 export interface LegacyState {

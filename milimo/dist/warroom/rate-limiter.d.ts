@@ -27,6 +27,13 @@ export interface RateLimitResult {
     resetAt: string;
     reason?: string;
 }
+export interface TierCacheEntry {
+    tier: Tier;
+    verifiedAt: string;
+    expiresAt: string;
+}
+export declare function getEffectiveTier(configPath?: string): Tier;
+export declare function invalidateTierCache(): void;
 export declare class RateLimiter extends EventEmitter {
     private config;
     private state;

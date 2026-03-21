@@ -36,6 +36,8 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RateLimitMetricsTracker = exports.RateLimiter = exports.Tier = void 0;
+exports.getEffectiveTier = getEffectiveTier;
+exports.invalidateTierCache = invalidateTierCache;
 exports.createRateLimiter = createRateLimiter;
 exports.getTierFromString = getTierFromString;
 /**
@@ -44,15 +46,20 @@ exports.getTierFromString = getTierFromString;
  * Implements token bucket algorithm for rate limiting auto-approvals
  * in the free tier. Enforces daily limits and burst protection.
  *
- * Usage:
- *   import { RateLimiter, Tier } from "./rate-limiter";
+ * PRO tier verification:
+ * - Reads from config file
+ * - 1-hour cache TTL to avoid repeated checks
+ * - Falls back to FREE tier on error
  *
- *   const limiter = new RateLimiter(Tier.FREE);
- *   if (limiter.tryConsume()) {
- *     // Allow auto-approval
- *   } else {
- *     // Require manual approval
- *   }
+ * Usage:
+ * import { RateLimiter, Tier, getTierFromString } from "./rate-limiter";
+ *
+ * const limiter = new RateLimiter(Tier.FREE);
+ * if (limiter.tryConsume()) {
+ * // Allow auto-approval
+ * } else {
+ * // Require manual approval
+ * }
  */
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
@@ -65,6 +72,54 @@ var Tier;
     Tier["FREE"] = "free";
     Tier["PRO"] = "pro";
 })(Tier || (exports.Tier = Tier = {}));
+// ---------------------------------------------------------------------------
+// Tier Verification
+// ---------------------------------------------------------------------------
+const TIER_CACHE_TTL_MS = 3600000; // 1 hour
+let tierCache = null;
+function getEffectiveTier(configPath) {
+    // Check cache first
+    if (tierCache) {
+        const now = new Date();
+        const expiresAt = new Date(tierCache.expiresAt);
+        if (now < expiresAt) {
+            return tierCache.tier;
+        }
+    }
+    // Verify tier from config
+    const config = loadConfig(configPath);
+    if (!config) {
+        return Tier.FREE;
+    }
+    const tier = config.tier === "pro" ? Tier.PRO : Tier.FREE;
+    // Update cache
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + TIER_CACHE_TTL_MS);
+    tierCache = {
+        tier,
+        verifiedAt: now.toISOString(),
+        expiresAt: expiresAt.toISOString(),
+    };
+    return tier;
+}
+function loadConfig(configPath) {
+    const home = process.env.HOME || process.env.USERPROFILE || "/tmp";
+    const configPathResolved = configPath || path.join(home, ".milimo", "config.json");
+    try {
+        if (!fs.existsSync(configPathResolved)) {
+            return null;
+        }
+        const content = fs.readFileSync(configPathResolved, "utf-8");
+        const config = JSON.parse(content);
+        return config;
+    }
+    catch {
+        return null;
+    }
+}
+function invalidateTierCache() {
+    tierCache = null;
+}
 // ---------------------------------------------------------------------------
 // Default Configurations
 // ---------------------------------------------------------------------------

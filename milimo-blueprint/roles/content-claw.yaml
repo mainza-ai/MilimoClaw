@@ -48,9 +48,9 @@ egress_summary:
     - Client contact databases
     - Code repositories
 
-# ── Inference Routing ──────────────────────────────────────────────────
-inference_routing:
-  rules:
+  # ── Inference Routing ──────────────────────────────────────────────────
+  inference_routing:
+    rules:
     - data_type: public_drafts
       description: "Client-facing content drafts"
       backend: cloud
@@ -58,7 +58,7 @@ inference_routing:
 
     - data_type: internal_drafts
       description: "Internal ideation and brainstorming"
-      backend: local-nim
+      backend: cloud
       rationale: "Private creative process stays on device"
 
     - data_type: trend_research
@@ -66,7 +66,24 @@ inference_routing:
       backend: cloud
       rationale: "Public data, speed and quality preferred"
 
-  default_backend: local-nim
+    - data_type: analytics_report_synthesis
+      description: "Synthesizing Analytics Claw reports into content insights"
+      backend: cloud
+      rationale: "Operational data is proprietary — never cloud"
+      locked: true
+
+    - data_type: voice_adapter_calibration
+      description: "Client voice profile training and application"
+      backend: cloud
+      rationale: "Trained on client data — never cloud"
+      locked: true
+
+    - data_type: ab_variant_generation
+      description: "A/B test variant generation for final drafts"
+      backend: cloud
+      rationale: "Final client-facing variants — quality matters"
+
+    default_backend: local-nim
 
 # ── Inter-Claw Policy ─────────────────────────────────────────────────
 inter_claw_policy:

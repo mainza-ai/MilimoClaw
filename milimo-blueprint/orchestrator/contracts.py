@@ -44,7 +44,180 @@ VALID_ROLES = {"content", "ops", "analytics", "finance", "build"}
 VALID_RECIPIENTS = VALID_ROLES | {"war_room"}
 
 # Valid message types
-VALID_MESSAGE_TYPES = {"brief", "query", "response", "signal", "deliverable", "summary"}
+VALID_MESSAGE_TYPES = {
+    "brief",
+    "query",
+    "response",
+    "signal",
+    "deliverable",
+    "summary",
+    "finance_summary",
+    # Content Claw message types
+    "draft_ready",
+    "content_performance_query",
+    "performance_signal",
+    "brief_acknowledged",
+    "deliverable_complete",
+    "client_health_signal",
+    "revision_request",
+}
+
+# Message types that require War Room approval (AUTO priority by default)
+AUTO_APPROVAL_TYPES = {"finance_summary"}
+
+# Message type schemas for validation
+MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
+    # Content → War Room: Draft ready for review
+    "draft_ready": {
+        "sender_roles": ["content"],
+        "recipient_roles": ["war_room"],
+        "required_payload": ["draft_id", "platform", "content_type"],
+        "optional_payload": [
+            "client_id",
+            "project_id",
+            "brief_id",
+            "approval_probability",
+            "variants_count",
+            "tone",
+            "scheduled_time",
+            "has_variant_b",
+        ],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Existing brief type - updated with full spec payload
+    "brief": {
+        "sender_roles": ["ops"],
+        "recipient_roles": ["content"],
+        "required_payload": [
+            "client_id",
+            "project_id",
+            "brief_text",
+            "deadline",
+            "tone_requirements",
+            "platform_targets",
+        ],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Content → Ops: Deliverable complete
+    "deliverable_complete": {
+        "sender_roles": ["content"],
+        "recipient_roles": ["ops"],
+        "required_payload": ["project_id", "published_urls"],
+        "optional_payload": ["brief_id", "client_id", "performance_baseline", "completed_at"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    # Content → Analytics: Weekly performance query
+    "content_performance_query": {
+        "sender_roles": ["content"],
+        "recipient_roles": ["analytics"],
+        "required_payload": ["query"],
+        "optional_payload": ["lookback_days", "platform"],
+        "frequency": "weekly",
+        "schedule": "monday_06:00",
+        "priority": "AUTO",
+    },
+    # Content → Analytics: Post-publish performance signal
+    "performance_signal": {
+        "sender_roles": ["content"],
+        "recipient_roles": ["analytics"],
+        "required_payload": ["post_id", "platform", "engagement_data", "publish_time", "content_type"],
+        "optional_payload": ["client_id"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    # Content → Ops: Brief acknowledgment
+    "brief_acknowledged": {
+        "sender_roles": ["content"],
+        "recipient_roles": ["ops"],
+        "required_payload": ["project_id", "estimated_first_draft_time", "acknowledged_at"],
+        "frequency": "on_event",
+        "sla_minutes": 5,
+        "priority": "REVIEW",
+    },
+    # Analytics → Content: Client health signal
+    "client_health_signal": {
+        "sender_roles": ["analytics"],
+        "recipient_roles": ["content"],
+        "required_payload": ["client_id", "health_score", "recommended_action"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Ops → Content: Revision request
+    "revision_request": {
+        "sender_roles": ["ops"],
+        "recipient_roles": ["content"],
+        "required_payload": ["project_id", "draft_id", "revision_notes", "deadline"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+}
+
+
+# ---------------------------------------------------------------------------
+# Payload Schema Validation
+# ---------------------------------------------------------------------------
+
+
+def _validate_payload_schema(message: ClawMessage) -> ValidationResult:
+    """
+    Validate message payload against MESSAGE_TYPE_SCHEMAS.
+
+    Checks:
+    1. All required_payload fields are present
+    2. Sender/recipient roles match schema requirements (if defined)
+    """
+    schema = MESSAGE_TYPE_SCHEMAS.get(message.message_type)
+    if not schema:
+        return ValidationResult(
+            valid=True,
+            reason=f"No schema defined for message type '{message.message_type}'",
+            message_id=message.message_id,
+        )
+
+    if "sender_roles" in schema:
+        if message.sender_role not in schema["sender_roles"]:
+            return ValidationResult(
+                valid=False,
+                reason=(
+                    f"Invalid sender for '{message.message_type}': "
+                    f"expected one of {schema['sender_roles']}, "
+                    f"got '{message.sender_role}'"
+                ),
+                message_id=message.message_id,
+            )
+
+    if "recipient_roles" in schema:
+        if message.recipient_role not in schema["recipient_roles"]:
+            return ValidationResult(
+                valid=False,
+                reason=(
+                    f"Invalid recipient for '{message.message_type}': "
+                    f"expected one of {schema['recipient_roles']}, "
+                    f"got '{message.recipient_role}'"
+                ),
+                message_id=message.message_id,
+            )
+
+    required_fields = schema.get("required_payload", [])
+    missing = [f for f in required_fields if f not in message.payload]
+    if missing:
+        return ValidationResult(
+            valid=False,
+            reason=(
+                f"Missing required payload fields for '{message.message_type}': "
+                f"{', '.join(missing)}"
+            ),
+            message_id=message.message_id,
+        )
+
+    return ValidationResult(
+        valid=True,
+        reason="Payload passes schema validation",
+        message_id=message.message_id,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -183,6 +356,11 @@ class ContractValidator:
                 ),
                 message_id=message.message_id,
             )
+
+        # 5. Validate payload against schema if defined
+        schema_result = _validate_payload_schema(message)
+        if not schema_result.valid:
+            return schema_result
 
         return ValidationResult(
             valid=True,

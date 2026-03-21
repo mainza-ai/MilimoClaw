@@ -6,11 +6,15 @@
 Milimo Claw — Solo Founder Template Loader
 
 Loads and validates the solo-founder.yaml template configuration.
+Handles filesystem mount automation based on available permissions.
 """
 
 from __future__ import annotations
 
 import logging
+import os
+import stat
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +42,18 @@ class InvalidFieldTypeError(TemplateValidationError):
 
 # ---------------------------------------------------------------------------
 
+@dataclass
+class FilesystemConfig:
+    """Resolved filesystem configuration for a squad."""
+
+    sandbox_base: Path
+    claw_paths: dict[str, Path]
+    using_system_sandbox: bool
+    reason: str
+
+
+# ---------------------------------------------------------------------------
+
 REQUIRED_FIELDS = {
     "template": ["name", "display_name", "category", "description", "squad_size", "claws_active"],
     "operator_policy": ["squad_lead", "approval_modes"],
@@ -52,6 +68,210 @@ REQUIRED_FIELDS = {
 CLAWS = ["content", "ops", "analytics", "finance", "build"]
 
 LOCKED_ROUTES = ["financial_data", "source_code"]
+
+SYSTEM_SANDBOX_BASE = Path("/sandbox")
+USER_SANDBOX_BASE = Path.home() / ".milimo" / "sandboxes"
+
+
+# ---------------------------------------------------------------------------
+# Filesystem Mount Automation
+# ---------------------------------------------------------------------------
+
+
+def detect_filesystem_config(squad_id: str, config: dict[str, Any] | None = None) -> FilesystemConfig:
+    """
+    Auto-detect and configure sandbox filesystem paths.
+
+    If running with sufficient permissions: uses /sandbox/{role}
+    If not: creates under ~/.milimo/sandboxes/{role}/
+
+    Args:
+        squad_id: Squad identifier
+        config: Optional template config (for custom paths)
+
+    Returns:
+        FilesystemConfig with resolved paths and reason
+    """
+    # Check if we can use system sandbox
+    can_use_system = _can_write_to_system_sandbox()
+
+    if can_use_system:
+        sandbox_base = SYSTEM_SANDBOX_BASE
+        using_system = True
+        reason = "Sufficient permissions for /sandbox"
+    else:
+        sandbox_base = USER_SANDBOX_BASE / squad_id
+        using_system = False
+        reason = f"Insufficient permissions for /sandbox, using {sandbox_base}"
+
+    # Build claw paths
+    claw_paths: dict[str, Path] = {}
+    for claw in CLAWS:
+        if using_system:
+            claw_paths[claw] = sandbox_base / claw
+        else:
+            claw_paths[claw] = sandbox_base / claw
+
+    return FilesystemConfig(
+        sandbox_base=sandbox_base,
+        claw_paths=claw_paths,
+        using_system_sandbox=using_system,
+        reason=reason,
+    )
+
+
+def _can_write_to_system_sandbox() -> bool:
+    """
+    Check if we have permission to write to /sandbox.
+
+    Returns:
+        True if we can create directories in /sandbox
+    """
+    # Check if /sandbox exists and is writable
+    if SYSTEM_SANDBOX_BASE.exists():
+        return _is_writable(SYSTEM_SANDBOX_BASE)
+
+    # Check if we can create /sandbox (requires root)
+    try:
+        # Check parent directory permissions
+        parent = SYSTEM_SANDBOX_BASE.parent
+        if parent.exists():
+            return _is_writable(parent)
+    except (OSError, PermissionError):
+        pass
+
+    return False
+
+
+def _is_writable(path: Path) -> bool:
+    """Check if a path is writable."""
+    try:
+        # Check write permission
+        if os.access(path, os.W_OK):
+            return True
+    except (OSError, PermissionError):
+        pass
+    return False
+
+
+def setup_sandbox_directories(fs_config: FilesystemConfig) -> dict[str, Path]:
+    """
+    Create sandbox directories for all claws.
+
+    Args:
+        fs_config: FilesystemConfig from detect_filesystem_config()
+
+    Returns:
+        Dictionary of created paths
+
+    Raises:
+        PermissionError: If directories cannot be created
+    """
+    created: dict[str, Path] = {}
+
+    for claw, path in fs_config.claw_paths.items():
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+
+            # Create standard subdirectories
+            (path / "tools").mkdir(exist_ok=True)
+            (path / "data").mkdir(exist_ok=True)
+            (path / "logs").mkdir(exist_ok=True)
+
+            created[claw] = path
+            logger.info("Created sandbox directory: %s", path)
+
+        except PermissionError as e:
+            logger.error("Failed to create sandbox directory %s: %s", path, e)
+            raise
+
+    return created
+
+
+def get_effective_paths(squad_id: str, config: dict[str, Any] | None = None) -> dict[str, Path]:
+    """
+    Get effective filesystem paths for all claws.
+
+    This is the main entry point for path resolution:
+    1. Check for custom paths in config
+    2. Fall back to auto-detected paths
+    3. Create directories if needed
+
+    Args:
+        squad_id: Squad identifier
+        config: Optional template config
+
+    Returns:
+        Dictionary mapping claw names to their paths
+    """
+    # Check if config has custom paths
+    if config and "filesystem" in config:
+        custom_paths = _extract_custom_paths(config)
+        if custom_paths:
+            logger.info("Using custom filesystem paths from config")
+            return custom_paths
+
+    # Auto-detect paths
+    fs_config = detect_filesystem_config(squad_id, config)
+
+    # Setup directories
+    setup_sandbox_directories(fs_config)
+
+    # Print summary
+    _print_path_summary(fs_config)
+
+    return fs_config.claw_paths
+
+
+def _extract_custom_paths(config: dict[str, Any]) -> dict[str, Path] | None:
+    """Extract custom paths from config if they exist and are accessible."""
+    filesystem = config.get("filesystem", {})
+    paths: dict[str, Path] = {}
+
+    for claw in CLAWS:
+        if claw in filesystem:
+            path = Path(filesystem[claw])
+            # Check if path is accessible
+            if path.exists() or _can_create_path(path):
+                paths[claw] = path
+            else:
+                logger.warning(
+                    "Custom path %s for %s not accessible, using auto-detection",
+                    path,
+                    claw,
+                )
+                return None
+
+    return paths if paths else None
+
+
+def _can_create_path(path: Path) -> bool:
+    """Check if we can create a path."""
+    try:
+        # Check if parent is writable
+        parent = path.parent
+        while not parent.exists():
+            parent = parent.parent
+        return _is_writable(parent)
+    except (OSError, PermissionError):
+        return False
+
+
+def _print_path_summary(fs_config: FilesystemConfig) -> None:
+    """Print a summary of filesystem configuration."""
+    print("\n" + "=" * 60)
+    print("FILESYSTEM CONFIGURATION")
+    print("=" * 60)
+    print()
+    print(f"  Sandbox base: {fs_config.sandbox_base}")
+    print(f"  Mode: {'System' if fs_config.using_system_sandbox else 'User'} sandbox")
+    print(f"  Reason: {fs_config.reason}")
+    print()
+    print("  Claw paths:")
+    for claw, path in fs_config.claw_paths.items():
+        print(f"    {claw.upper().ljust(10)} {path}")
+    print()
+    print("=" * 60 + "\n")
 
 
 # ---------------------------------------------------------------------------

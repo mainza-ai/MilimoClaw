@@ -39,6 +39,12 @@ EVOLUTION_THRESHOLDS = {
     "build": "min_prs_merged",
 }
 
+# Additional thresholds for Content Claw
+CONTENT_ADDITIONAL_THRESHOLDS = {
+    "rejected_drafts_min": 3,
+    "performance_data_weeks_min": 1,
+}
+
 
 # ---------------------------------------------------------------------------
 
@@ -300,6 +306,7 @@ def check_claw_evolution_ready(
     config: dict[str, Any],
     claw: str,
     current_activity: int,
+    additional_data: dict[str, Any] | None = None,
 ) -> bool:
     """
     Check if a specific claw is ready for evolution.
@@ -308,6 +315,9 @@ def check_claw_evolution_ready(
         config: Validated solo-founder configuration
         claw: Claw name
         current_activity: Current activity count
+        additional_data: Optional dict with claw-specific data:
+            - rejected_count: Number of rejected drafts (Content Claw)
+            - performance_log_age_days: Days of performance data (Content Claw)
 
     Returns:
         True if ready for evolution
@@ -320,9 +330,107 @@ def check_claw_evolution_ready(
 
     result = _check_evolution_threshold(claw, evolution_config, current_activity)
 
-    logger.info(f"{claw} evolution check: {result['reason']}")
+    if not result["can_evolve"]:
+        logger.info(f"{claw} evolution check: {result['reason']}")
+        return False
 
-    return result["can_evolve"]
+    # Content Claw specific additional thresholds
+    if claw == "content" and additional_data:
+        rejected_count = additional_data.get("rejected_count", 0)
+        rejected_min = CONTENT_ADDITIONAL_THRESHOLDS["rejected_drafts_min"]
+
+        if rejected_count < rejected_min:
+            logger.info(
+                f"content evolution skipped — insufficient rejected_drafts data "
+                f"(have {rejected_count}, need {rejected_min})"
+            )
+            return False
+
+        performance_weeks = additional_data.get("performance_log_age_days", 0) // 7
+        weeks_min = CONTENT_ADDITIONAL_THRESHOLDS["performance_data_weeks_min"]
+
+        if performance_weeks < weeks_min:
+            logger.info(
+                f"content evolution skipped — insufficient performance data "
+                f"(have {performance_weeks} weeks, need {weeks_min} week)"
+            )
+            return False
+
+    logger.info(f"{claw} evolution check: {result['reason']}")
+    return True
+
+
+def check_content_evolution_thresholds(
+    approved_count: int,
+    rejected_count: int,
+    performance_log_age_days: int,
+    config: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Check all Content Claw evolution thresholds.
+
+    This function checks:
+    - min_approved_posts (default: 10)
+    - rejected_drafts_min (default: 3)
+    - performance_data_weeks_min (default: 1)
+
+    Args:
+        approved_count: Number of approved posts
+        rejected_count: Number of rejected drafts
+        performance_log_age_days: Age of performance data in days
+        config: Optional config to read threshold values
+
+    Returns:
+        Dict with 'can_evolve', 'reasons', 'thresholds_checked'
+    """
+    if config:
+        evolution_config = config.get("evolution", {}).get("per_claw", {}).get("content", {})
+    else:
+        evolution_config = {}
+
+    min_approved = evolution_config.get("min_approved_posts", 10)
+    rejected_min = CONTENT_ADDITIONAL_THRESHOLDS["rejected_drafts_min"]
+    weeks_min = CONTENT_ADDITIONAL_THRESHOLDS["performance_data_weeks_min"]
+
+    results = {
+        "can_evolve": True,
+        "reasons": [],
+        "thresholds_checked": {
+            "approved_posts": {"required": min_approved, "actual": approved_count, "passed": True},
+            "rejected_drafts": {"required": rejected_min, "actual": rejected_count, "passed": True},
+            "performance_weeks": {"required": weeks_min, "actual": performance_log_age_days // 7, "passed": True},
+        },
+    }
+
+    # Check approved posts
+    if approved_count < min_approved:
+        results["can_evolve"] = False
+        results["reasons"].append(
+            f"insufficient approved_posts data (have {approved_count}, need {min_approved})"
+        )
+        results["thresholds_checked"]["approved_posts"]["passed"] = False
+
+    # Check rejected drafts
+    if rejected_count < rejected_min:
+        results["can_evolve"] = False
+        results["reasons"].append(
+            f"insufficient rejected_drafts data (have {rejected_count}, need {rejected_min})"
+        )
+        results["thresholds_checked"]["rejected_drafts"]["passed"] = False
+
+    # Check performance data age
+    performance_weeks = performance_log_age_days // 7
+    if performance_weeks < weeks_min:
+        results["can_evolve"] = False
+        results["reasons"].append(
+            f"insufficient performance data (have {performance_weeks} weeks, need {weeks_min} week)"
+        )
+        results["thresholds_checked"]["performance_weeks"]["passed"] = False
+
+    if not results["can_evolve"]:
+        logger.info(f"content evolution skipped — {'; '.join(results['reasons'])}")
+
+    return results
 
 
 def get_evolution_summary(config: dict[str, Any]) -> str:

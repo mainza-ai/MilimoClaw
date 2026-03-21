@@ -26,6 +26,7 @@
   "dependencies": {
     "blessed": "^0.1.81",
     "commander": "^13.1.0",
+    "ws": "^8.19.0",
     "yaml": "^2.8.2",
     "zod": "^4.3.6"
   },
@@ -33,6 +34,7 @@
     "@types/blessed": "^0.1.27",
     "@types/jest": "^30.0.0",
     "@types/node": "^20.19.37",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.57.0",
     "@typescript-eslint/parser": "^8.57.0",
     "eslint": "^9.39.4",

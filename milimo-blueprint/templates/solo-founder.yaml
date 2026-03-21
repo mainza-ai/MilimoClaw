@@ -38,12 +38,15 @@ operator_policy:
   squad_lead: mainza
   approval_modes:
 
-    # Content Claw — trust it more, review less
-    content:
-      social_post_draft:        AUTO      # posts queue for your morning review
-      client_proposal_draft:    REVIEW    # you always see proposals before they go out
-      email_campaign_draft:     REVIEW
-      brand_asset_usage:        AUTO
+  # Content Claw — trust it more, review less
+  content:
+    social_post_draft: AUTO # posts queue for your morning review
+    client_proposal_draft: REVIEW # you always see proposals before they go out
+    email_campaign_draft: REVIEW
+    brand_asset_usage: AUTO
+    content_calendar_update: AUTO # calendar changes logged, can override anytime
+    ab_test_variant: REVIEW # both variants shown side-by-side for selection
+    trend_reactive_post: REVIEW # flagged as trend-triggered — you confirm relevance
 
     # Ops Claw — client-facing actions need eyes
     ops:
