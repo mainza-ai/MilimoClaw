@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, renameSync, unlinkSync } from 'fs';
+import { readdirSync, readFileSync, renameSync, unlinkSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { parse as yamlParse } from 'yaml';
@@ -50,25 +50,28 @@ export class ApprovalEngine {
     this.loadEscalationRules();
   }
 
-  private loadEscalationRules() {
-    try {
-      const configPath = join(process.cwd(), 'milimo-blueprint', 'mesh_config.yaml');
-      const content = readFileSync(configPath, 'utf8');
-      const config = yamlParse(content);
-      if (config && config.escalation_rules) {
-        this.escalationRules = config.escalation_rules.map((rule: any) => ({
-          trigger: rule.trigger,
-          action: rule.action.toUpperCase() as ApprovalMode,
-          description: rule.description,
-        }));
-      }
-    } catch (e) {
-      console.warn('Failed to load escalation rules from mesh_config.yaml. Using defaults.');
-      this.escalationRules = [
-        { trigger: 'invoice_over_500', action: 'VETO', description: 'Any invoice >$500 requires squad-wide approval' }
-      ];
-    }
-  }
+        private loadEscalationRules() {
+                try {
+                        const configPath = join(process.cwd(), 'milimo-blueprint', 'mesh_config.yaml');
+                        if (!existsSync(configPath)) {
+                                throw new Error('Config not found');
+                        }
+                        const content = readFileSync(configPath, 'utf8');
+                        const config = yamlParse(content);
+                        if (config && config.escalation_rules) {
+                                this.escalationRules = config.escalation_rules.map((rule: any) => ({
+                                        trigger: rule.trigger,
+                                        action: rule.action.toUpperCase() as ApprovalMode,
+                                        description: rule.description,
+                                }));
+                        }
+                } catch (e) {
+                        console.warn('Failed to load escalation rules from mesh_config.yaml. Using defaults.');
+                        this.escalationRules = [
+                                { trigger: 'invoice_over_500', action: 'VETO', description: 'Any invoice >$500 requires squad-wide approval' }
+                        ];
+                }
+        }
 
   public getPendingMessages(): PendingMessage[] {
     try {

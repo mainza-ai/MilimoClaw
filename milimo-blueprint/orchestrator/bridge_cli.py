@@ -70,13 +70,20 @@ def handle_evolution_status(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_blueprint_info(args: dict[str, Any]) -> dict[str, Any]:
     """Get blueprint information."""
-    from .blueprint_manager import BlueprintManager
+    from pathlib import Path
 
     squad_id = args.get("squad_id", "default")
     claw_role = args.get("claw_role", "content")
     blueprint_dir = args.get("blueprint_dir", ".")
 
+    # Check if blueprint_dir exists
+    blueprint_path = Path(blueprint_dir)
+    if not blueprint_path.exists():
+        raise RuntimeError(f"Blueprint directory does not exist: {blueprint_dir}")
+
     try:
+        from .blueprint_manager import BlueprintManager
+
         mgr = BlueprintManager(squad_id, claw_role, blueprint_dir)
         current_version = mgr.current_version()
         snapshot = mgr._load_snapshot(current_version)

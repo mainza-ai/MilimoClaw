@@ -60,6 +60,25 @@ VALID_MESSAGE_TYPES = {
     "deliverable_complete",
     "client_health_signal",
     "revision_request",
+    # Build Claw message types
+    "feature_brief",
+    "deploy_complete",
+    "shipping_summary",
+    "behavior_query",
+    # Analytics Claw message types
+    "performance_intel",
+    "retention_signals",
+    "revenue_anomaly",
+    # Finance Claw message types
+    "pricing_query",
+    "pricing_response",
+    "invoice_ready",
+    "overdue_alert",
+    "project_complete",
+    # Ops Claw message types
+    "project_brief",
+    # Tool proposal
+    "tool_proposal",
 }
 
 # Message types that require War Room approval (AUTO priority by default)
@@ -152,6 +171,123 @@ MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
         "required_payload": ["project_id", "draft_id", "revision_notes", "deadline"],
         "frequency": "on_event",
         "priority": "REVIEW",
+    },
+    # Finance → War Room: Revenue summary for widget
+    "finance_summary": {
+        "sender_roles": ["finance"],
+        "recipient_roles": ["war_room"],
+        "required_payload": ["week_revenue"],
+        "optional_payload": ["week_over_week_pct", "invoices_paid", "invoices_pending", "last_updated"],
+        "frequency": "on_change",
+        "priority": "AUTO",
+    },
+    # Build → Ops: Deploy complete
+    "deploy_complete": {
+        "sender_roles": ["build"],
+        "recipient_roles": ["ops"],
+        "required_payload": ["deploy_id", "project_id"],
+        "optional_payload": ["version", "deployed_at", "environment"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    # Build → Content: Shipping summary (for devlog)
+    "shipping_summary": {
+        "sender_roles": ["build"],
+        "recipient_roles": ["content"],
+        "required_payload": ["summary"],
+        "optional_payload": ["features", "fixes", "week_end"],
+        "frequency": "weekly",
+        "priority": "AUTO",
+    },
+    # Analytics → Content: Performance intelligence
+    "performance_intel": {
+        "sender_roles": ["analytics"],
+        "recipient_roles": ["content"],
+        "required_payload": ["report_id"],
+        "optional_payload": ["top_performers", "recommendations", "week_end"],
+        "frequency": "weekly",
+        "priority": "AUTO",
+    },
+    # Analytics → Build: Retention signals
+    "retention_signals": {
+        "sender_roles": ["analytics"],
+        "recipient_roles": ["build"],
+        "required_payload": ["signal_type"],
+        "optional_payload": ["feature_id", "correlation", "recommendation"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    # Analytics → Ops: Client health signal
+    "client_health_signal": {
+        "sender_roles": ["analytics"],
+        "recipient_roles": ["ops"],
+        "required_payload": ["client_id", "health_score"],
+        "optional_payload": ["recommended_action", "signals"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Analytics → Finance: Revenue anomaly
+    "revenue_anomaly": {
+        "sender_roles": ["analytics"],
+        "recipient_roles": ["finance"],
+        "required_payload": ["anomaly_type", "detected_at"],
+        "optional_payload": ["severity", "details"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Finance → Ops: Pricing response
+    "pricing_response": {
+        "sender_roles": ["finance"],
+        "recipient_roles": ["ops"],
+        "required_payload": ["query_id", "floor", "ceiling"],
+        "optional_payload": ["notes", "valid_until"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    # Finance → Ops: Invoice ready
+    "invoice_ready": {
+        "sender_roles": ["finance"],
+        "recipient_roles": ["ops"],
+        "required_payload": ["invoice_id", "client_id", "amount"],
+        "optional_payload": ["due_date", "items"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Finance → War Room: Overdue alert
+    "overdue_alert": {
+        "sender_roles": ["finance"],
+        "recipient_roles": ["war_room"],
+        "required_payload": ["invoice_id", "client_id", "days_overdue"],
+        "optional_payload": ["amount", "last_contact"],
+        "frequency": "on_event",
+        "priority": "HOLD",
+    },
+    # Ops → Build: Feature brief
+    "feature_brief": {
+        "sender_roles": ["ops"],
+        "recipient_roles": ["build"],
+        "required_payload": ["project_id", "feature_name", "description"],
+        "optional_payload": ["priority", "deadline", "client_id"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Ops → Finance: Project complete
+    "project_complete": {
+        "sender_roles": ["ops"],
+        "recipient_roles": ["finance"],
+        "required_payload": ["project_id", "client_id"],
+        "optional_payload": ["completed_at", "final_amount"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    # Build → Analytics: Behavior query
+    "behavior_query": {
+        "sender_roles": ["build"],
+        "recipient_roles": ["analytics"],
+        "required_payload": ["query"],
+        "optional_payload": ["feature_id", "time_range"],
+        "frequency": "on_event",
+        "priority": "AUTO",
     },
 }
 

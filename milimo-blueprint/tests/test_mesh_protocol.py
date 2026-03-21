@@ -38,11 +38,50 @@ class TestContractValidation(unittest.TestCase):
         cls.validator = ContractValidator.from_config_file(CONFIG_PATH)
 
     def _msg(self, sender, recipient, msg_type, payload=None):
+        # Provide default payloads with required fields for message types that have schemas
+        default_payloads = {
+            "brief": {
+                "client_id": "client-001",
+                "project_id": "proj-001",
+                "brief_text": "Test brief content",
+                "deadline": "2026-04-01",
+                "tone_requirements": "professional",
+                "platform_targets": ["linkedin"],
+            },
+            "deliverable": {
+                "type": "content",
+                "urls": ["https://example.com/post"],
+            },
+            "query": {
+                "query": "test query",
+            },
+            "response": {
+                "data": "test response data",
+            },
+            "signal": {
+                "signal_type": "test_signal",
+                "message": "Test signal message",
+            },
+            "summary": {
+                "summary_type": "weekly",
+                "data": {},
+            },
+            "finance_summary": {
+                "week_revenue": 1000.0,
+            },
+            "draft_ready": {
+                "draft_id": "draft-001",
+                "platform": "linkedin",
+                "content_type": "post",
+            },
+        }
+        if payload is None:
+            payload = default_payloads.get(msg_type, {})
         return ClawMessage(
             sender_role=sender,
             recipient_role=recipient,
             message_type=msg_type,
-            payload=payload or {},
+            payload=payload,
             squad_id="test-squad",
         )
 
@@ -122,7 +161,7 @@ class TestContractValidation(unittest.TestCase):
     def test_get_allowed_types(self):
         types = self.validator.get_allowed_types("ops", "content")
         self.assertIn("brief", types)
-        self.assertIn("signal", types)
+        self.assertIn("project_brief", types)
 
     def test_get_all_senders_for_war_room(self):
         senders = self.validator.get_all_senders_for("war_room")
@@ -147,11 +186,32 @@ class TestMeshCoordinator(unittest.TestCase):
         shutil.rmtree(self.tmp_dir, ignore_errors=True)
 
     def _msg(self, sender, recipient, msg_type, payload=None):
+        # Provide default payloads with required fields
+        default_payloads = {
+            "brief": {
+                "client_id": "client-001",
+                "project_id": "proj-001",
+                "brief_text": "Test brief content",
+                "deadline": "2026-04-01",
+                "tone_requirements": "professional",
+                "platform_targets": ["linkedin"],
+            },
+            "deliverable": {
+                "type": "content",
+                "urls": ["https://example.com/post"],
+            },
+            "signal": {
+                "signal_type": "test_signal",
+                "message": "Test signal",
+            },
+        }
+        if payload is None:
+            payload = default_payloads.get(msg_type, {})
         return ClawMessage(
             sender_role=sender,
             recipient_role=recipient,
             message_type=msg_type,
-            payload=payload or {},
+            payload=payload,
             squad_id="test-squad",
         )
 
@@ -216,9 +276,8 @@ class TestMeshCoordinator(unittest.TestCase):
     def test_pending_messages_appear_in_inbox(self):
         self.mesh.register_claw("content", "local://content")
         self.mesh.register_claw("ops", "local://ops")
-        self.mesh.send_message(
-            self._msg("ops", "content", "brief", {"project": "test"})
-        )
+        # Use _msg without payload override to get proper defaults
+        self.mesh.send_message(self._msg("ops", "content", "brief"))
         pending = self.mesh.get_pending_messages("content")
         self.assertEqual(len(pending), 1)
         self.assertEqual(pending[0]["message_type"], "brief")

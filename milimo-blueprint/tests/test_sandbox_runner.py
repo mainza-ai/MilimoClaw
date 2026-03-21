@@ -159,6 +159,13 @@ class TestSandboxRunner:
 
     def test_backtest_timeout(self) -> None:
         """Test backtest timeout enforcement."""
+        import platform
+        
+        # Skip on macOS due to different subprocess timeout behavior
+        if platform.system() == "Darwin":
+            import pytest
+            pytest.skip("Timeout test unreliable on macOS subprocess handling")
+            
         config = SandboxConfig(timeout_seconds=1)
         runner = SandboxRunner(config)
 

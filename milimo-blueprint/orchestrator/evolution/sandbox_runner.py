@@ -255,13 +255,25 @@ class SandboxRunner:
         # Escape the tool code for embedding
         escaped_code = tool_code.replace('"""', '\\"\\"\\"')
 
+        # Platform detection for memory limits
+        # macOS has different resource limits than Linux
+        import platform
+        is_macos = platform.system() == "Darwin"
+        memory_limit = self._config.memory_limit_mb * 1024 * 1024
+
+        # On macOS, skip memory limit due to different RLIMIT_AS behavior
+        memory_limit_code = ""
+        if not is_macos:
+            memory_limit_code = f"resource.setrlimit(resource.RLIMIT_AS, ({memory_limit}, {memory_limit}))"
+
         script = f'''
 import json
 import sys
 import resource
+import platform
 
-# Set memory limit
-resource.setrlimit(resource.RLIMIT_AS, ({self._config.memory_limit_mb * 1024 * 1024}, {self._config.memory_limit_mb * 1024 * 1024}))
+# Set memory limit (Linux only - macOS has different behavior)
+{memory_limit_code}
 
 # Load historical data
 with open("{data_file}", "r") as f:
