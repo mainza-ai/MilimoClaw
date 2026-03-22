@@ -59,6 +59,7 @@ VALID_MESSAGE_TYPES = {
     "brief_acknowledged",
     "deliverable_complete",
     "client_health_signal",
+    "client_health_signal_ops",
     "revision_request",
     # Build Claw message types
     "feature_brief",
@@ -77,6 +78,7 @@ VALID_MESSAGE_TYPES = {
     "project_complete",
     # Ops Claw message types
     "project_brief",
+    "client_onboarded",
     # Tool proposal
     "tool_proposal",
 }
@@ -156,11 +158,12 @@ MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
         "sla_minutes": 5,
         "priority": "REVIEW",
     },
-    # Analytics → Content: Client health signal
+    # Ops/Analytics → Content: Client health signal
     "client_health_signal": {
-        "sender_roles": ["analytics"],
+        "sender_roles": ["ops", "analytics"],
         "recipient_roles": ["content"],
         "required_payload": ["client_id", "health_score", "recommended_action"],
+        "optional_payload": ["health_factors", "signals"],
         "frequency": "on_event",
         "priority": "REVIEW",
     },
@@ -217,8 +220,8 @@ MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
         "frequency": "on_event",
         "priority": "AUTO",
     },
-    # Analytics → Ops: Client health signal
-    "client_health_signal": {
+    # Ops/Analytics → Ops: Client health signal (Ops receives from Analytics)
+    "client_health_signal_ops": {
         "sender_roles": ["analytics"],
         "recipient_roles": ["ops"],
         "required_payload": ["client_id", "health_score"],
@@ -277,6 +280,34 @@ MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
         "recipient_roles": ["finance"],
         "required_payload": ["project_id", "client_id"],
         "optional_payload": ["completed_at", "final_amount"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    # Ops → Finance: Pricing query
+    "pricing_query": {
+        "sender_roles": ["ops"],
+        "recipient_roles": ["finance"],
+        "required_payload": [
+            "project_id",
+            "scope_description",
+            "complexity_estimate",
+            "deadline",
+        ],
+        "optional_payload": ["client_id", "urgency"],
+        "frequency": "on_event",
+        "sla_minutes": 10,
+        "priority": "AUTO",
+    },
+    # Ops → Analytics: Client onboarded
+    "client_onboarded": {
+        "sender_roles": ["ops"],
+        "recipient_roles": ["analytics"],
+        "required_payload": [
+            "client_id",
+            "niche",
+            "project_type",
+            "estimated_value",
+        ],
         "frequency": "on_event",
         "priority": "AUTO",
     },

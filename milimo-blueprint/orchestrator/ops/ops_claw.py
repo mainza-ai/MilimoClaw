@@ -1,0 +1,421 @@
+#!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""
+Ops Claw — Main Entry Point
+
+Main entry point for the Ops Claw.
+Initializes all components, wires them together, starts the scheduler.
+Called by the NemoClaw blueprint orchestrator on sandbox startup.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable
+
+from .ops_init import (
+    OpsFilesystemInit,
+    OpsOperationalLog,
+    OpsCommsLog,
+    OpsLogEntry,
+    BASE,
+)
+from .signal_dispatcher import OpsSignalDispatcher, MeshGateway
+from .approval_handler import OpsApprovalHandler
+from .intake_manager import IntakeManager
+from .health_scorer import ClientHealthScorer
+from .project_manager import ProjectManager
+from .scope_monitor import ScopeMonitor
+from .comms_manager import CommsManager
+from .ops_scheduler import OpsScheduler
+
+logger = logging.getLogger("milimo.ops")
+
+
+class MockMeshGateway:
+    """Mock mesh gateway for testing."""
+
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    def send(self, message: dict[str, Any]) -> bool:
+        self.calls.append(message)
+        return True
+
+
+class OpsClaw:
+    """
+    Main entry point for the Ops Claw.
+
+    Initializes all components, wires them together, starts the scheduler.
+    Called by the NemoClaw blueprint orchestrator on sandbox startup.
+    """
+
+    def __init__(
+        self,
+        squad_id: str,
+        inference_client: Any,
+        mesh_gateway: MeshGateway | None = None,
+        base_path: Path | None = None,
+    ):
+        self._squad_id = squad_id
+        self._inference_client = inference_client
+        self._base_path = base_path or BASE
+        self._mesh_gateway = mesh_gateway or MockMeshGateway()
+
+        self._fs: OpsFilesystemInit | None = None
+        self._operational_log: OpsOperationalLog | None = None
+        self._comms_log: OpsCommsLog | None = None
+        self._dispatcher: OpsSignalDispatcher | None = None
+        self._approval_handler: OpsApprovalHandler | None = None
+        self._intake_manager: IntakeManager | None = None
+        self._health_scorer: ClientHealthScorer | None = None
+        self._project_manager: ProjectManager | None = None
+        self._scope_monitor: ScopeMonitor | None = None
+        self._comms_manager: CommsManager | None = None
+        self._scheduler: OpsScheduler | None = None
+
+        self._inbound_handlers: dict[str, Callable[[dict[str, Any]], None]] = {}
+        self._approval_handlers: dict[str, Callable[[str, dict[str, Any]], None]] = {}
+
+        self._running = False
+
+    def startup(self) -> None:
+        logger.info("Starting Ops Claw for squad: %s", self._squad_id)
+
+        self._fs = OpsFilesystemInit(self._base_path)
+        init_result = self._fs.initialize()
+
+        if not init_result.success:
+            logger.error("Filesystem initialization failed: %s", init_result.failed)
+            for path, error in init_result.failed:
+                logger.error("  - %s: %s", path, error)
+        else:
+            logger.info(
+                "Filesystem initialized: %d dirs, %d files, %d already existed",
+                len(init_result.created_dirs),
+                len(init_result.created_files),
+                len(init_result.already_existed),
+            )
+
+        validation = self._fs.validate()
+        if not validation.valid:
+            logger.warning("Filesystem validation issues: %s", validation.missing_dirs + validation.missing_files)
+
+        log_path = self._base_path / "logs" / "operational.log"
+        self._operational_log = OpsOperationalLog(log_path)
+
+        comms_log_path = self._base_path / "logs" / "comms.log"
+        self._comms_log = OpsCommsLog(comms_log_path)
+
+        self._operational_log.append(
+            OpsLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="claw_startup",
+                entity_id=self._squad_id,
+                outcome="started",
+                details={},
+            )
+        )
+
+        self._dispatcher = OpsSignalDispatcher(
+            gateway=self._mesh_gateway,
+            operational_log=self._operational_log,
+            squad_id=self._squad_id,
+            pricing_confirmed_dir=self._base_path / "pricing_confirmed",
+        )
+
+        self._approval_handler = OpsApprovalHandler(
+            fs_base=self._base_path,
+            decisions_log_path=self._base_path / "logs" / "decisions.log",
+        )
+
+        self._intake_manager = IntakeManager(
+            fs=self._fs,
+            inference_client=self._inference_client,
+            dispatcher=self._dispatcher,
+            approval_handler=self._approval_handler,
+            operational_log=self._operational_log,
+        )
+
+        self._project_manager = ProjectManager(
+            fs=self._fs,
+            dispatcher=self._dispatcher,
+            approval_handler=self._approval_handler,
+            operational_log=self._operational_log,
+            inference_client=self._inference_client,
+        )
+
+        self._scope_monitor = ScopeMonitor(
+            fs=self._fs,
+            inference_client=self._inference_client,
+            approval_handler=self._approval_handler,
+            dispatcher=self._dispatcher,
+            operational_log=self._operational_log,
+        )
+
+        self._comms_manager = CommsManager(
+            fs=self._fs,
+            inference_client=self._inference_client,
+            approval_handler=self._approval_handler,
+            operational_log=self._operational_log,
+            comms_log=self._comms_log,
+            dispatcher=self._dispatcher,
+            scope_monitor=self._scope_monitor,
+        )
+
+        self._health_scorer = ClientHealthScorer(
+            fs=self._fs,
+            inference_client=self._inference_client,
+            dispatcher=self._dispatcher,
+            approval_handler=self._approval_handler,
+            operational_log=self._operational_log,
+            comms_log=self._comms_log,
+        )
+
+        self._register_inbound_handlers()
+        self._register_approval_handlers()
+
+        self._scheduler = OpsScheduler(
+            project_manager=self._project_manager,
+            intake_manager=self._intake_manager,
+            health_scorer=self._health_scorer,
+            comms_manager=self._comms_manager,
+            operational_log=self._operational_log,
+            fs=self._fs,
+        )
+
+        self._scheduler.start()
+
+        self._running = True
+
+        self._operational_log.append(
+            OpsLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="claw_started",
+                entity_id=self._squad_id,
+                outcome="success",
+                details={},
+            )
+        )
+
+        logger.info("Ops Claw started successfully")
+
+    def shutdown(self) -> None:
+        logger.info("Shutting down Ops Claw")
+
+        if self._scheduler:
+            self._scheduler.stop()
+
+        if self._operational_log:
+            self._operational_log.append(
+                OpsLogEntry(
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    action_type="claw_stopped",
+                    entity_id=self._squad_id,
+                    outcome="success",
+                    details={},
+                )
+            )
+
+        self._running = False
+        logger.info("Ops Claw shutdown complete")
+
+    def handle_inbound(self, raw_message: dict[str, Any]) -> None:
+        message_type = raw_message.get("message_type")
+        if not message_type:
+            logger.warning("Received message without message_type")
+            return
+
+        handler = self._inbound_handlers.get(message_type)
+        if not handler:
+            logger.warning("No handler for message type: %s", message_type)
+            return
+
+        try:
+            handler(raw_message)
+        except Exception as e:
+            logger.error("Error handling message %s: %s", message_type, e)
+
+            if self._operational_log:
+                self._operational_log.append(
+                    OpsLogEntry(
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        action_type="message_handler_error",
+                        entity_id=raw_message.get("project_id", "unknown"),
+                        outcome="failed",
+                        details={"error": str(e), "message_type": message_type},
+                    )
+                )
+
+    def _register_inbound_handlers(self) -> None:
+        self._inbound_handlers["deliverable_complete"] = self._handle_deliverable_complete
+        self._inbound_handlers["deploy_complete"] = self._handle_deploy_complete
+        self._inbound_handlers["pricing_response"] = self._handle_pricing_response
+        self._inbound_handlers["invoice_ready"] = self._handle_invoice_ready
+        self._inbound_handlers["payment_overdue"] = self._handle_payment_overdue
+        self._inbound_handlers["brief_acknowledged"] = self._handle_brief_acknowledged
+
+    def _register_approval_handlers(self) -> None:
+        pass
+
+    def _handle_deliverable_complete(self, message: dict[str, Any]) -> None:
+        if self._project_manager:
+            self._project_manager.handle_deliverable_complete(message)
+
+    def _handle_deploy_complete(self, message: dict[str, Any]) -> None:
+        if self._project_manager:
+            self._project_manager.handle_deploy_complete(message)
+
+    def _handle_pricing_response(self, message: dict[str, Any]) -> None:
+        project_id = message.get("project_id") or message.get("query_id", "").replace("query_", "project_")
+        floor_price = float(message.get("floor", message.get("floor_price", 0)))
+        ceiling_price = float(message.get("ceiling", message.get("ceiling_price", 0)))
+        scope_notes = message.get("notes", message.get("scope_notes", ""))
+
+        if self._intake_manager:
+            self._intake_manager.handle_pricing_response(
+                project_id=project_id,
+                floor_price=floor_price,
+                ceiling_price=ceiling_price,
+                scope_notes=scope_notes,
+            )
+
+        if self._project_manager:
+            self._project_manager.handle_pricing_response(
+                project_id=project_id,
+                floor_price=floor_price,
+                ceiling_price=ceiling_price,
+            )
+
+    def _handle_invoice_ready(self, message: dict[str, Any]) -> None:
+        invoice_id = message.get("invoice_id")
+        client_id = message.get("client_id")
+        amount = message.get("amount")
+
+        if self._approval_handler:
+            self._approval_handler.log_auto(
+                action_type="invoice_received",
+                entity_id=invoice_id or "unknown",
+                content_preview=f"Invoice {invoice_id} for ${amount} ready for client {client_id}",
+            )
+
+    def _handle_payment_overdue(self, message: dict[str, Any]) -> None:
+        invoice_id = message.get("invoice_id")
+        client_id = message.get("client_id")
+        days_overdue = message.get("days_overdue", 0)
+        amount = message.get("amount", 0)
+
+        if self._approval_handler:
+            self._approval_handler.queue_review(
+                action_type="payment_overdue",
+                entity_id=invoice_id or client_id or "unknown",
+                content=f"Payment overdue: Invoice {invoice_id} for client {client_id}\n\n"
+                f"Days overdue: {days_overdue}\n"
+                f"Amount: ${amount}\n\n"
+                f"Recommended: Send follow-up message to client.",
+                context={
+                    "invoice_id": invoice_id,
+                    "client_id": client_id,
+                    "days_overdue": days_overdue,
+                    "amount": amount,
+                },
+            )
+
+    def _handle_brief_acknowledged(self, message: dict[str, Any]) -> None:
+        project_id = message.get("project_id")
+        estimated_time = message.get("estimated_first_draft_time")
+
+        if self._operational_log:
+            self._operational_log.append(
+                OpsLogEntry(
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    action_type="brief_acknowledged",
+                    entity_id=project_id or "unknown",
+                    outcome="success",
+                    details={"estimated_time": estimated_time},
+                )
+            )
+
+    def handle_approval_decision(
+        self, action_id: str, decision: str, edited_content: str | None = None
+    ) -> bool:
+        if not self._approval_handler:
+            logger.warning("Approval handler not initialized")
+            return False
+
+        action = self._approval_handler.get_action(action_id)
+        if not action:
+            logger.warning("Action %s not found for approval decision", action_id)
+            return False
+
+        if decision == "approved":
+            send_fn = self._create_send_fn(action)
+            return self._approval_handler.handle_approve(action_id, send_fn)
+
+        elif decision == "edited" and edited_content:
+            send_fn = self._create_send_fn(action)
+            return self._approval_handler.handle_edit(action_id, edited_content, send_fn)
+
+        elif decision == "blocked":
+            return self._approval_handler.handle_block(action_id, "operator_blocked")
+
+        elif decision == "released":
+            execute_fn = self._create_execute_fn(action)
+            return self._approval_handler.handle_hold_release(action_id, execute_fn)
+
+        else:
+            logger.warning("Unknown approval decision: %s", decision)
+            return False
+
+    def _create_send_fn(self, action: Any) -> Callable[[], None]:
+        def send() -> None:
+            if action.action_type in ("welcome_message", "client_response", "delivery_message"):
+                if self._comms_manager:
+                    self._comms_manager.send_auto_response(
+                        client_id=action.context.get("client_id", "unknown"),
+                        message_text=action.content,
+                    )
+
+            elif action.action_type == "proposal":
+                pass
+
+        return send
+
+    def _create_execute_fn(self, action: Any) -> Callable[[], None]:
+        def execute() -> None:
+            if action.action_type == "scope_change_order":
+                pass
+            elif action.action_type == "deadline_critical":
+                pass
+
+        return execute
+
+    @property
+    def is_running(self) -> bool:
+        return self._running
+
+    @property
+    def intake_manager(self) -> IntakeManager | None:
+        return self._intake_manager
+
+    @property
+    def project_manager(self) -> ProjectManager | None:
+        return self._project_manager
+
+    @property
+    def health_scorer(self) -> ClientHealthScorer | None:
+        return self._health_scorer
+
+    @property
+    def approval_handler(self) -> OpsApprovalHandler | None:
+        return self._approval_handler
+
+    @property
+    def dispatcher(self) -> OpsSignalDispatcher | None:
+        return self._dispatcher
