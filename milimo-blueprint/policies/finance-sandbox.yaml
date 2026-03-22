@@ -11,17 +11,18 @@ version: 1
 filesystem_policy:
   include_workdir: true
   read_only:
-    - /usr
-    - /lib
-    - /proc
-    - /dev/urandom
-    - /app
-    - /etc
-    - /var/log
+  - /usr
+  - /lib
+  - /proc
+  - /dev/urandom
+  - /app
+  - /etc
+  - /var/log
+  - /sandbox/analytics/reports # Cross-mount: Analytics weekly reports
   read_write:
-    - /sandbox/finance             # Primary mount — financial records
-    - /tmp
-    - /dev/null
+  - /sandbox/finance # Primary mount — financial records
+  - /tmp
+  - /dev/null
   # NOTE: /sandbox/finance is the most restricted store.
   # No other claw has ANY filesystem access to this directory.
 
