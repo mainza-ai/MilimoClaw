@@ -66,6 +66,7 @@ class FinanceScheduler:
         self._schedule_daily_payment_check()
         self._schedule_weekly_summary()
         self._schedule_quarterly_tax_prep()
+        self._schedule_hold_staleness_check()
 
         self._check_missed_jobs()
 
@@ -266,6 +267,8 @@ class FinanceScheduler:
         If in HOLD > 48 hours: add urgency flag to War Room card.
         If in HOLD > 7 days: escalate urgency flag.
         """
+        from finance.invoice_manager import Invoice
+
         approved_dir = self.fs_path / "invoices" / "approved"
 
         if not approved_dir.exists():
@@ -286,6 +289,8 @@ class FinanceScheduler:
                 )
                 hours_in_hold = (today - approved_time).total_seconds() / 3600
 
+                invoice = Invoice.from_dict(data)
+
                 if hours_in_hold > 168:
                     entry = FinanceLogEntry(
                         timestamp=today.isoformat(),
@@ -297,6 +302,9 @@ class FinanceScheduler:
                     )
                     self.operational_log.append(entry)
 
+                    if self.approval_handler:
+                        self.approval_handler.queue_invoice_hold(invoice)
+
                 elif hours_in_hold > 48:
                     entry = FinanceLogEntry(
                         timestamp=today.isoformat(),
@@ -307,6 +315,9 @@ class FinanceScheduler:
                         details={"hours_in_hold": hours_in_hold},
                     )
                     self.operational_log.append(entry)
+
+                    if self.approval_handler:
+                        self.approval_handler.queue_invoice_hold(invoice)
 
             except (json.JSONDecodeError, KeyError, ValueError):
                 continue
@@ -421,6 +432,20 @@ class FinanceScheduler:
         """Check if today is a quarter start (Jan 1, Apr 1, Jul 1, Oct 1)."""
         today = datetime.now(timezone.utc)
         return today.month in [1, 4, 7, 10] and today.day == 1
+
+    def _schedule_hold_staleness_check(self) -> None:
+        """Schedule the next hold staleness check at 10:00 daily."""
+        delay = self._seconds_until(10, 0)
+
+        def check_staleness():
+            self._check_hold_staleness()
+            if self._running:
+                self._schedule_hold_staleness_check()
+
+        timer = threading.Timer(delay, check_staleness)
+        timer.daemon = True
+        timer.start()
+        self._timers.append(timer)
 
     def _log_recovered_job(self, job_name: str, delay: float) -> None:
         """Log a recovered job."""

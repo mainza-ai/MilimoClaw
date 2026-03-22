@@ -191,6 +191,8 @@ class ExpenseTracker:
         Update category summary files.
         Log: action_type="expense_recategorized"
         """
+        import fcntl
+
         log_path = self.fs_path / "expenses" / "log.jsonl"
 
         if not log_path.exists():
@@ -201,23 +203,31 @@ class ExpenseTracker:
         expense_amount = 0.0
 
         with open(log_path) as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    data = json.loads(line)
-                    if data.get("expense_id") == expense_id:
-                        old_category = data.get("tax_category", "")
-                        expense_amount = data.get("amount", 0)
-                        data["tax_category"] = new_category
-                        line = json.dumps(data)
-                    lines.append(line)
-                except json.JSONDecodeError:
-                    lines.append(line)
+            fcntl.flock(f.fileno(), fcntl.LOCK_SH)
+            try:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                        if data.get("expense_id") == expense_id:
+                            old_category = data.get("tax_category", "")
+                            expense_amount = data.get("amount", 0)
+                            data["tax_category"] = new_category
+                            line = json.dumps(data)
+                        lines.append(line)
+                    except json.JSONDecodeError:
+                        lines.append(line)
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
         with open(log_path, "w") as f:
-            f.write("\n".join(lines) + "\n")
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            try:
+                f.write("\n".join(lines) + "\n")
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
         if old_category:
             self._decrement_category_summary(old_category, expense_amount)
@@ -314,12 +324,18 @@ Return only the category name."""
         return "uncategorized"
 
     def _append_expense(self, expense: ExpenseEntry) -> None:
-        """Append expense to log.jsonl."""
+        """Append expense to log.jsonl with file locking."""
+        import fcntl
+
         log_path = self.fs_path / "expenses" / "log.jsonl"
         log_path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(log_path, "a") as f:
-            f.write(json.dumps(expense.to_dict()) + "\n")
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            try:
+                f.write(json.dumps(expense.to_dict()) + "\n")
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
     def _update_category_summary(self, expense: ExpenseEntry) -> None:
         """Update category summary file."""

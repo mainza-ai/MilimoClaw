@@ -359,11 +359,17 @@ class FinanceApprovalHandler:
         return action_id
 
     def _log_decision(self, decision: dict) -> None:
-        """Log decision to decisions.log."""
+        """Log decision to decisions.log with file locking."""
+        import fcntl
+
         self.decisions_path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(self.decisions_path, "a") as f:
-            f.write(json.dumps(decision) + "\n")
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            try:
+                f.write(json.dumps(decision) + "\n")
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
         entry = FinanceLogEntry(
             timestamp=decision["timestamp"],

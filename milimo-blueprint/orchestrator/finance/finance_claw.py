@@ -160,10 +160,17 @@ class FinanceClaw:
             operational_log=operational_log,
         )
 
+        approval_handler = FinanceApprovalHandler(
+            invoice_manager=invoice_manager,
+            operational_log=operational_log,
+            decisions_path=self.base_path / "logs" / "decisions.log",
+        )
+
         revenue_tracker = RevenueTracker(
             fs=fs,
             inference_client=self.inference_client,
             dispatcher=dispatcher,
+            approval_handler=approval_handler,
             operational_log=operational_log,
         )
 
@@ -173,17 +180,12 @@ class FinanceClaw:
             operational_log=operational_log,
         )
 
-        approval_handler = FinanceApprovalHandler(
-            invoice_manager=invoice_manager,
-            operational_log=operational_log,
-            decisions_path=self.base_path / "logs" / "decisions.log",
-        )
-
         payment_monitor = PaymentMonitor(
             fs=fs,
             stripe_client=self.stripe_client,
             dispatcher=dispatcher,
             revenue_tracker=revenue_tracker,
+            approval_handler=approval_handler,
             operational_log=operational_log,
             payment_events_log=payment_events_log,
         )

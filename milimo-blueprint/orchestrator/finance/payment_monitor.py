@@ -84,6 +84,7 @@ class PaymentMonitor:
         stripe_client: StripeClient,
         dispatcher: FinanceSignalDispatcher,
         revenue_tracker: Any,
+        approval_handler: Any,
         operational_log: FinanceOperationalLog,
         payment_events_log: PaymentEventsLog,
     ):
@@ -91,6 +92,7 @@ class PaymentMonitor:
         self.stripe_client = stripe_client
         self.dispatcher = dispatcher
         self.revenue_tracker = revenue_tracker
+        self.approval_handler = approval_handler
         self.operational_log = operational_log
         self.payment_events_log = payment_events_log
 
@@ -308,6 +310,19 @@ class PaymentMonitor:
         )
         self.payment_events_log.append(payment_event)
 
+        if self.approval_handler:
+            if overdue_count >= 1:
+                self.approval_handler.queue_overdue_hold(
+                    invoice=invoice,
+                    days_overdue=days_overdue,
+                    overdue_count=overdue_count + 1,
+                )
+            else:
+                self.approval_handler.queue_overdue_review(
+                    invoice=invoice,
+                    days_overdue=days_overdue,
+                )
+
         entry = FinanceLogEntry(
             timestamp=datetime.now(timezone.utc).isoformat(),
             action_type="payment_overdue",
@@ -377,6 +392,9 @@ class PaymentMonitor:
                 details={"elapsed_hours": elapsed_hours},
             )
             self.operational_log.append(entry)
+
+            if self.approval_handler:
+                self.approval_handler.queue_overdue_review(invoice, int(elapsed_hours))
             return False
 
         payment_event = PaymentEvent(
@@ -389,7 +407,49 @@ class PaymentMonitor:
         )
         self.payment_events_log.append(payment_event)
 
-        return False
+        try:
+            from finance.invoice_manager import InvoiceManager
+
+            sent_invoice = self._attempt_stripe_send(invoice)
+            return True
+        except Exception as e:
+            retry_entry = FinanceLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="stripe_retry_failed",
+                entity_id=invoice.invoice_id,
+                amount=invoice.total,
+                outcome="failed",
+                details={"error": str(e), "attempt_hours": elapsed_hours},
+            )
+            self.operational_log.append(retry_entry)
+            return False
+
+    def _attempt_stripe_send(self, invoice: Invoice) -> Invoice:
+        """Attempt to send invoice via Stripe."""
+        stripe_result = self.stripe_client.create_invoice(
+            customer_id=invoice.client_id,
+            amount=invoice.total,
+            currency=invoice.currency,
+            description=f"Invoice {invoice.invoice_id} - {invoice.project_id}",
+            due_date=invoice.due_date,
+        )
+        stripe_invoice_id = stripe_result.get("id", "")
+
+        self.stripe_client.send_invoice(stripe_invoice_id)
+
+        invoice.status = "sent"
+        invoice.sent_at = datetime.now(timezone.utc).isoformat()
+        invoice.stripe_invoice_id = stripe_invoice_id
+
+        sent_path = self.fs.get_invoice_path("sent", invoice.invoice_id)
+        sent_path.parent.mkdir(parents=True, exist_ok=True)
+        sent_path.write_text(json.dumps(invoice.to_dict(), indent=2))
+
+        approved_path = self.fs.get_invoice_path("approved", invoice.invoice_id)
+        if approved_path.exists():
+            approved_path.unlink()
+
+        return invoice
 
     def _is_overdue(self, invoice: Invoice, today: date) -> bool:
         """Check if invoice is overdue."""

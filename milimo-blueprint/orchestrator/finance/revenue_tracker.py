@@ -60,11 +60,13 @@ class RevenueTracker:
         fs: FinanceFilesystemInit,
         inference_client: InferenceClient,
         dispatcher: FinanceSignalDispatcher,
+        approval_handler: Any,
         operational_log: FinanceOperationalLog,
     ):
         self.fs = fs
         self.inference_client = inference_client
         self.dispatcher = dispatcher
+        self.approval_handler = approval_handler
         self.operational_log = operational_log
 
     def record_payment(self, invoice: Invoice) -> None:
@@ -225,6 +227,25 @@ class RevenueTracker:
         target_margin = 30.0
         margin_gap = target_margin - margin_pct
 
+        try:
+            prompt = f"""Analyze business margin health.
+
+Revenue: ${revenue:.2f}
+Expenses: ${expenses:.2f}
+Current Margin: {margin_pct:.1f}%
+Target Margin: {target_margin:.1f}%
+Gap: {margin_gap:.1f}%
+
+Provide a brief analysis and any recommendations."""
+
+            self.inference_client.complete(
+                prompt=prompt,
+                data_type="margin_analysis",
+                max_tokens=400,
+            )
+        except Exception:
+            pass
+
         result = {
             "revenue": revenue,
             "expenses": expenses,
@@ -243,6 +264,13 @@ class RevenueTracker:
                 details=result,
             )
             self.operational_log.append(entry)
+
+            if self.approval_handler:
+                self.approval_handler.queue_margin_alert(
+                    project_id="margin_analysis",
+                    expected_margin_pct=target_margin,
+                    actual_margin_pct=margin_pct,
+                )
 
         entry = FinanceLogEntry(
             timestamp=today.isoformat(),
@@ -271,11 +299,50 @@ class RevenueTracker:
         pricing_data = self._load_json(pricing_path, {"default_hourly_rate": 100})
         current_rate = pricing_data.get("default_hourly_rate", 100)
 
+        recommendation = "No change needed"
+        suggested_rate = current_rate
+        undercharging = False
+
+        try:
+            prompt = f"""Analyze current hourly rate for optimization.
+
+Current Rate: ${current_rate}/hour
+
+Market benchmark rates for similar services range from $80-$200/hour.
+
+Should the rate be adjusted? Provide:
+1. Recommendation: "increase", "decrease", or "maintain"
+2. Suggested rate (if change recommended)
+3. Brief reasoning"""
+
+            output = self.inference_client.complete(
+                prompt=prompt,
+                data_type="rate_benchmarking_narrative",
+                max_tokens=400,
+            )
+
+            if "increase" in output.lower():
+                undercharging = True
+                import re
+                rate_match = re.search(r"\$(\d+)", output)
+                if rate_match:
+                    suggested_rate = float(rate_match.group(1))
+                    recommendation = f"Increase rate to ${suggested_rate}/hour"
+        except Exception:
+            pass
+
         result = {
             "current_rate": current_rate,
-            "recommendation": "No change needed",
-            "suggested_rate": current_rate,
+            "recommendation": recommendation,
+            "suggested_rate": suggested_rate,
         }
+
+        if undercharging and self.approval_handler:
+            self.approval_handler.queue_rate_recommendation(
+                recommendation=recommendation,
+                suggested_rate=suggested_rate,
+                current_rate=current_rate,
+            )
 
         entry = FinanceLogEntry(
             timestamp=today.isoformat(),
