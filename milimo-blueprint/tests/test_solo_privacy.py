@@ -18,6 +18,7 @@ from orchestrator.solo_privacy import (
     RoutingDecision,
     CostGuard,
     Route,
+    FallbackStrategy,
     PrivacyPolicyViolationError,
     LOCKED_ROUTES,
 )
@@ -207,12 +208,12 @@ class TestCostGuard:
         guard = CostGuard(
             daily_budget=100000,
             alert_percent=75.0,
-            fallback_route=Route.LOCAL,
+            fallback_strategy=FallbackStrategy.LOCAL,
         )
 
         assert guard.daily_budget == 100000
         assert guard.alert_percent == 75.0
-        assert guard.fallback_route == Route.LOCAL
+        assert guard.fallback_strategy == FallbackStrategy.LOCAL
 
     def test_check_budget_allowed(self) -> None:
         """Test budget check when under limit."""

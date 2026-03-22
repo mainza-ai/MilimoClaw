@@ -39,6 +39,24 @@ EVOLUTION_THRESHOLDS = {
     "build": "min_prs_merged",
 }
 
+DEFAULT_EVOLUTION_SCHEDULE = {
+    "analytics_baseline": "01:00",
+    "analytics_report": "02:00",
+    "content": "02:05",
+    "ops": "02:15",
+    "analytics_evolution": "02:25",
+    "build": "02:35",
+    "finance": "03:00",
+}
+
+CLAW_SCHEDULE_KEYS = {
+    "content": "content",
+    "ops": "ops",
+    "analytics": "analytics_evolution",
+    "finance": "finance",
+    "build": "build",
+}
+
 # Additional thresholds for Content Claw
 CONTENT_ADDITIONAL_THRESHOLDS = {
     "rejected_drafts_min": 3,
@@ -74,6 +92,110 @@ class EvolutionStatus:
 
 # ---------------------------------------------------------------------------
 
+def parse_evolution_schedule(evolution_config: dict[str, Any]) -> dict[str, str]:
+    """
+    Parse per-claw evolution schedule from solo-founder.yaml.
+
+    Args:
+        evolution_config: Evolution section from config
+
+    Returns:
+        Dict mapping claw role to scheduled time string.
+        Falls back to legacy single-time format if schedule key missing.
+    """
+    schedule = evolution_config.get("schedule", {})
+
+    if schedule:
+        return {
+            "content": schedule.get("content", DEFAULT_EVOLUTION_SCHEDULE["content"]),
+            "ops": schedule.get("ops", DEFAULT_EVOLUTION_SCHEDULE["ops"]),
+            "analytics_evolution": schedule.get(
+                "analytics_evolution", DEFAULT_EVOLUTION_SCHEDULE["analytics_evolution"]
+            ),
+            "build": schedule.get("build", DEFAULT_EVOLUTION_SCHEDULE["build"]),
+            "finance": schedule.get("finance", DEFAULT_EVOLUTION_SCHEDULE["finance"]),
+        }
+    else:
+        legacy_time = evolution_config.get("time", "02:00")
+        return {role: legacy_time for role in CLAW_SCHEDULE_KEYS.keys()}
+
+
+def get_claw_schedule_time(
+    evolution_config: dict[str, Any], claw: str
+) -> str:
+    """
+    Get the scheduled time for a specific claw.
+
+    Args:
+        evolution_config: Evolution section from config
+        claw: Claw name
+
+    Returns:
+        Time string (HH:MM) for that claw's evolution cycle
+    """
+    schedule = parse_evolution_schedule(evolution_config)
+    return schedule.get(claw, "02:00")
+
+
+def _init_evolution_timers(
+    evolution_config: dict[str, Any],
+    claw_schedulers: dict[str, Any],
+    schedule_fn: Any,
+    log_fn: Any,
+) -> dict[str, Any]:
+    """
+    Initialize per-claw evolution timers from staggered schedule.
+
+    This function creates one timer per active claw based on the
+    per-claw schedule defined in solo-founder.yaml.
+
+    Args:
+        evolution_config: Evolution section from config
+        claw_schedulers: Dict mapping role name to that claw's scheduler instance.
+            Each scheduler must expose a run_evolution_cycle() method.
+        schedule_fn: Function to schedule a weekly job.
+            Signature: (job_name, job_fn, target_hour, target_minute, target_weekday)
+        log_fn: Function to log messages.
+
+    Returns:
+        Dict with 'scheduled' (list of claw names) and 'skipped' (list of claw names)
+    """
+    schedule = parse_evolution_schedule(evolution_config)
+    result = {"scheduled": [], "skipped": []}
+
+    for role, time_str in schedule.items():
+        if role not in claw_schedulers or claw_schedulers[role] is None:
+            log_fn(f"Skipping {role} — not active in current template")
+            result["skipped"].append(role)
+            continue
+
+        hour, minute = map(int, time_str.split(":"))
+        scheduler = claw_schedulers[role]
+
+        if not hasattr(scheduler, "run_evolution_cycle"):
+            log_fn(f"Skipping {role} — scheduler missing run_evolution_cycle method")
+            result["skipped"].append(role)
+            continue
+
+        job_name = f"{role}_evolution"
+
+        schedule_fn(
+            job_name=job_name,
+            job_fn=scheduler.run_evolution_cycle,
+            target_hour=hour,
+            target_minute=minute,
+            target_weekday=6,
+        )
+
+        log_fn(f"Evolution scheduled for {role} at {time_str} on Sunday")
+        result["scheduled"].append(role)
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+
+
 def schedule_evolution(
     config: dict[str, Any],
     current_activity: Optional[dict[str, int]] = None,
@@ -90,12 +212,11 @@ def schedule_evolution(
     """
     evolution_config = config.get("evolution", {})
 
-    cycle = evolution_config.get("cycle", "weekly")
-    day = evolution_config.get("day", "sunday")
-    time_str = evolution_config.get("time", "02:00")
-
+    cycle_day = evolution_config.get("cycle_day", "sunday")
     per_claw = evolution_config.get("per_claw", {})
     capacity = evolution_config.get("capacity", {})
+
+    claw_schedule = parse_evolution_schedule(evolution_config)
 
     if current_activity is None:
         current_activity = {}
@@ -110,15 +231,17 @@ def schedule_evolution(
         threshold_value = claw_config.get(threshold_field, 0) if threshold_field else 0
         performance_threshold = claw_config.get("performance_threshold", 5)
 
+        claw_time = claw_schedule.get(claw, "02:00")
+
         schedule = EvolutionSchedule(
             claw=claw,
             enabled=enabled,
-            day=day,
-            time=time_str,
+            day=cycle_day,
+            time=claw_time,
             threshold_field=threshold_field,
             threshold_value=threshold_value,
             performance_threshold=performance_threshold,
-            next_run=_calculate_next_run(day, time_str) if enabled else None,
+            next_run=_calculate_next_run(cycle_day, claw_time) if enabled else None,
         )
         schedules[claw] = schedule
 
@@ -137,20 +260,20 @@ def schedule_evolution(
         logger.info(
             f"Evolution schedule for {claw}: enabled={enabled}, "
             f"threshold={threshold_value} ({threshold_field}), "
-            f"next_run={schedule.next_run}"
+            f"time={claw_time}, next_run={schedule.next_run}"
         )
 
     result: dict[str, Any] = {
-        "cycle": cycle,
-        "day": day,
-        "time": time_str,
+        "cycle": "weekly",
+        "day": cycle_day,
+        "schedule": claw_schedule,
         "capacity": capacity,
         "schedules": {k: _schedule_to_dict(v) for k, v in schedules.items()},
         "statuses": {k: _status_to_dict(v) for k, v in statuses.items()},
         "next_evolution": _get_next_evolution_time(schedules),
     }
 
-    _log_evolution_schedule(result)
+    _log_evolution_schedule_v2(result)
 
     return result
 
@@ -268,36 +391,82 @@ def _status_to_dict(status: EvolutionStatus) -> dict[str, Any]:
 def _log_evolution_schedule(result: dict[str, Any]) -> None:
     """Log the evolution schedule to War Room."""
     print("\n" + "=" * 60)
-    print("🔄  EVOLUTION SCHEDULE")
+    print("EVOLUTION SCHEDULE")
     print("=" * 60)
     print()
 
-    print(f"Cycle: {result['cycle'].capitalize()}")
-    print(f"Day: {result['day'].capitalize()}")
-    print(f"Time: {result['time']} UTC")
+    print(f"Day: {result.get('day', 'sunday').capitalize()}")
+    if "schedule" in result:
+        print("Per-claw times:")
+        for claw, time_str in result["schedule"].items():
+            print(f"  {claw}: {time_str} UTC")
+    else:
+        print(f"Time: {result.get('time', '02:00')} UTC")
     print()
 
     print("Claw Evolution Status:")
-    for claw, status in result["statuses"].items():
-        emoji = "✅" if status["can_evolve"] else "⏳"
-        print(f"   {emoji} {claw.capitalize()}: {status['reason']}")
+    for claw, status in result.get("statuses", {}).items():
+        emoji = "" if status["can_evolve"] else ""
+        print(f" {emoji} {claw.capitalize()}: {status['reason']}")
     print()
 
-    if result["next_evolution"]:
+    if result.get("next_evolution"):
         next_ev = result["next_evolution"]
         if isinstance(next_ev, datetime):
             next_run = next_ev
         else:
             next_run = datetime.fromisoformat(next_ev.replace("Z", "+00:00"))
         print(f"Next evolution: {next_run.strftime('%Y-%m-%d %H:%M')} UTC")
-    print()
+        print()
 
     capacity = result.get("capacity", {})
     if capacity:
         print("Capacity:")
-        print(f"   Max tools per claw: {capacity.get('max_tools_per_claw', 30)}")
-        print(f"   Log retention: {capacity.get('evolution_log_retention', 90)} days")
+        print(f" Max tools per claw: {capacity.get('max_tools_per_claw', 30)}")
+        print(f" Log retention: {capacity.get('evolution_log_retention', 90)} days")
+        print()
+
+    print("=" * 60 + "\n")
+
+
+def _log_evolution_schedule_v2(result: dict[str, Any]) -> None:
+    """Log the evolution schedule to War Room (v2 format with per-claw times)."""
+    print("\n" + "=" * 60)
+    print("EVOLUTION SCHEDULE")
+    print("=" * 60)
     print()
+
+    print(f"Day: {result.get('day', 'sunday').capitalize()}")
+
+    schedule = result.get("schedule", {})
+    if schedule:
+        print()
+        print("Per-claw schedule (staggered):")
+        for claw, time_str in schedule.items():
+            print(f"  {claw}: {time_str} UTC")
+    print()
+
+    print("Claw Evolution Status:")
+    for claw, status in result.get("statuses", {}).items():
+        emoji = "" if status["can_evolve"] else ""
+        print(f" {emoji} {claw.capitalize()}: {status['reason']}")
+    print()
+
+    if result.get("next_evolution"):
+        next_ev = result["next_evolution"]
+        if isinstance(next_ev, datetime):
+            next_run = next_ev
+        else:
+            next_run = datetime.fromisoformat(next_ev.replace("Z", "+00:00"))
+        print(f"Next evolution: {next_run.strftime('%Y-%m-%d %H:%M')} UTC")
+        print()
+
+    capacity = result.get("capacity", {})
+    if capacity:
+        print("Capacity:")
+        print(f" Max tools per claw: {capacity.get('max_tools_per_claw', 30)}")
+        print(f" Log retention: {capacity.get('evolution_log_retention', 90)} days")
+        print()
 
     print("=" * 60 + "\n")
 

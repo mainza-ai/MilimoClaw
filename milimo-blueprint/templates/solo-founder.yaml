@@ -38,46 +38,47 @@ operator_policy:
   squad_lead: mainza
   approval_modes:
 
-  # Content Claw — trust it more, review less
-  content:
-    social_post_draft: AUTO # posts queue for your morning review
-    client_proposal_draft: REVIEW # you always see proposals before they go out
-    email_campaign_draft: REVIEW
-    brand_asset_usage: AUTO
-    content_calendar_update: AUTO # calendar changes logged, can override anytime
-    ab_test_variant: REVIEW # both variants shown side-by-side for selection
-    trend_reactive_post: REVIEW # flagged as trend-triggered — you confirm relevance
+    # Content Claw — trust it more, review less
+    content:
+      social_post_draft: AUTO # posts queue for your morning review
+      client_proposal_draft: REVIEW # you always see proposals before they go out
+      email_campaign_draft: REVIEW
+      brand_asset_usage: AUTO
+      content_calendar_update: AUTO # calendar changes logged, can override anytime
+      ab_test_variant: REVIEW # both variants shown side-by-side for selection
+      trend_reactive_post: REVIEW # flagged as trend-triggered — you confirm relevance
 
     # Ops Claw — client-facing actions need eyes
     ops:
-      new_client_inquiry:       REVIEW    # you decide who to work with
-      welcome_message:          AUTO      # standard intake, let it run
-      deadline_flag:            REVIEW    # always surface deadline risks
-      scope_change:             HOLD      # never auto-handle scope changes
-      client_offboarding:       REVIEW
+      new_client_inquiry: REVIEW # you decide who to work with
+      welcome_message: AUTO # standard intake, let it run
+      deadline_risk: REVIEW # 5+ days out — elevated risk, surface for review
+      deadline_critical: HOLD # 24 hours — explicit action required
+      scope_change: HOLD # never auto-handle scope changes
+      client_offboarding: REVIEW
 
     # Analytics Claw — trust it fully, it only reads
     analytics:
-      weekly_report:            AUTO      # just publish it
-      anomaly_alert:            REVIEW    # surface anomalies for your call
-      opportunity_score:        AUTO
+      weekly_report: AUTO # just publish it
+      anomaly_alert: REVIEW # surface anomalies for your call
+      opportunity_score: AUTO
 
     # Finance Claw — nothing moves without you
     finance:
-      invoice_generation:       REVIEW    # you approve every invoice
-      invoice_send:             HOLD      # you explicitly send every invoice
-      payment_follow_up:        REVIEW
-      pricing_recommendation:   REVIEW
-      expense_log:              AUTO
+      invoice_generation: REVIEW # you approve every invoice
+      invoice_send: HOLD # you explicitly send every invoice
+      payment_follow_up: REVIEW
+      pricing_recommendation: REVIEW
+      expense_log: AUTO
 
     # Build Claw — code changes need human eyes
     build:
-      pr_open:                  REVIEW    # you review every PR
-      pr_merge:                 HOLD      # you explicitly merge
-      production_deploy:        HOLD      # you explicitly deploy
-      issue_triage:             AUTO      # let it score and sort issues
-      dependency_audit:         AUTO      # security PRs auto-drafted, you approve
-      documentation_update:     AUTO
+      pr_open: REVIEW # you review every PR
+      pr_merge: HOLD # you explicitly merge
+      production_deploy: HOLD # you explicitly deploy
+      issue_triage: AUTO # let it score and sort issues
+      dependency_audit: AUTO # security PRs auto-drafted, you approve
+      documentation_update: AUTO
 
 # ─────────────────────────────────────────────
 # FILESYSTEM LAYOUT
@@ -118,9 +119,10 @@ inference:
     public_docs_changelogs: cloud  # Nemotron 120B
 
   cost_guard:
-    daily_cloud_token_budget: 100000   # Higher limit for cloud-only testing
+    daily_cloud_token_budget: 50000 # Solo spec requirement
     alert_at_percent: 80
-    fallback_on_exceed: cloud          # In Docker mode, fallback to cloud
+    fallback_on_exceed: lighter_prompt # Reduced context strategy when budget exceeded
+    never_block_claw_action: true # always fallback, never fail
 
 # ─────────────────────────────────────────────
 # WAR ROOM — SOLO CONFIGURATION
@@ -160,9 +162,38 @@ war_room:
 # ─────────────────────────────────────────────
 
 evolution:
-  cycle: weekly
-  day: sunday
-  time: "02:00"                 # runs while you sleep
+  cycle_day: sunday
+  schedule:
+    analytics_baseline: "01:00"
+    analytics_report: "02:00"
+    content: "02:05"
+    ops: "02:15"
+    analytics_evolution: "02:25"
+    build: "02:35"
+    finance: "03:00"
+
+  min_thresholds:
+    content:
+      approved_posts: 10
+      rejected_drafts: 3
+      performance_weeks: 1
+    ops:
+      client_interactions: 5
+      projects: 3
+      comms_weeks: 2
+    analytics:
+      signal_weeks: 3
+      revenue_summaries: 1
+      health_signals: 1
+    finance:
+      invoices: 3
+      completed_projects: 2
+      expense_weeks: 4
+    build:
+      merged_prs: 5
+      sprints: 3
+      deploys: 2
+      cost_weeks: 4
 
   per_claw:
     content:

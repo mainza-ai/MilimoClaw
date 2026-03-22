@@ -508,3 +508,155 @@ class SoloWarRoom:
 
         except Exception as e:
             logger.warning("Failed to emit action event: %s", e)
+
+    def get_health_panel(self) -> dict[str, Any]:
+        """
+        Get health panel data for all five claws.
+
+        Returns dict with claw names as keys and health data as values.
+        """
+        return self.get_stats()
+
+    def get_digest_schedule(self) -> dict[str, str]:
+        """
+        Get the digest schedule as a dict with time strings.
+
+        Returns:
+            Dict with 'morning_brief' and 'evening_wrap' keys.
+        """
+        return {
+            "morning_brief": f"{self.digest_schedule.morning_brief.hour:02d}:{self.digest_schedule.morning_brief.minute:02d}",
+            "evening_wrap": f"{self.digest_schedule.evening_wrap.hour:02d}:{self.digest_schedule.evening_wrap.minute:02d}",
+        }
+
+    def get_pending_queue(self) -> list[dict[str, Any]]:
+        """
+        Get pending queue as list of dicts.
+
+        Returns:
+            List of action dicts with action_id, mode, claw_role, summary, etc.
+        """
+        pending = self.get_pending()
+        return [
+            {
+                "action_id": a.id,
+                "mode": a.priority.name,
+                "claw_role": a.claw,
+                "action_type": a.action_type,
+                "summary": a.payload.get("summary", ""),
+                "context": a.payload.get("context", {}),
+                "created_at": a.created_at.isoformat(),
+            }
+            for a in pending
+        ]
+
+    def get_auto_log(self) -> list[dict[str, Any]]:
+        """
+        Get auto-executed actions log for morning digest.
+
+        Returns:
+            List of action dicts that were auto-executed.
+        """
+        return [
+            {
+                "action_id": a.id,
+                "claw_role": a.claw,
+                "action_type": a.action_type,
+                "summary": a.payload.get("summary", ""),
+                "decided_at": a.decided_at.isoformat() if a.decided_at else None,
+            }
+            for a in self._auto_executed
+        ]
+
+    def handle_approve(
+        self, action_id: str, execute_fn: Any = None
+    ) -> Optional[WarRoomAction]:
+        """
+        Approve an action with optional execute callback.
+
+        Args:
+            action_id: ID of the action to approve
+            execute_fn: Optional callback to execute when approved
+
+        Returns:
+            The approved action, or None if not found
+        """
+        action = self.approve(action_id)
+        if action and execute_fn:
+            try:
+                execute_fn()
+            except Exception as e:
+                logger.error(f"Execute fn failed for {action_id}: {e}")
+        return action
+
+    def handle_hold_release(
+        self, action_id: str, execute_fn: Any = None
+    ) -> Optional[WarRoomAction]:
+        """
+        Release a HOLD action with optional execute callback.
+
+        This is an alias for handle_approve for semantic clarity.
+
+        Args:
+            action_id: ID of the HOLD action to release
+            execute_fn: Optional callback to execute when released
+
+        Returns:
+            The released action, or None if not found
+        """
+        return self.handle_approve(action_id, execute_fn)
+
+    def get_registered_shortcuts(self) -> dict[str, str]:
+        """
+        Get registered keyboard shortcuts for War Room TUI.
+
+        Returns:
+            Dict mapping key to action name.
+        """
+        return {
+            "A": "approve",
+            "B": "block",
+            "E": "edit",
+            "R": "release",
+            "D": "digest",
+            "F": "deep_work",
+            "Q": "quit",
+        }
+
+
+def queue_action(
+    war_room: SoloWarRoom,
+    claw_role: str,
+    mode: str,
+    action_type: str,
+    entity_id: str,
+    summary: str,
+    context: dict[str, Any],
+) -> str:
+    """
+    Queue an action to the War Room.
+
+    This is a module-level function for compatibility with test expectations.
+
+    Args:
+        war_room: SoloWarRoom instance
+        claw_role: Claw submitting the action
+        mode: "REVIEW", "HOLD", or "AUTO"
+        action_type: Type of action
+        entity_id: Entity identifier
+        summary: Human-readable summary
+        context: Additional context dict
+
+    Returns:
+        The action ID
+    """
+    action = war_room.queue_action(
+        claw=claw_role,
+        action_type=action_type,
+        payload={
+            "entity_id": entity_id,
+            "summary": summary,
+            "context": context,
+        },
+    )
+    return action.id

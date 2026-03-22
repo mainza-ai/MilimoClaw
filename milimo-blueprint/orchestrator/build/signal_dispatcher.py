@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -170,7 +171,17 @@ class BuildSignalDispatcher:
         return message_id
 
     def handle_feature_brief(self, message: dict) -> None:
+        """
+        Receives feature_brief from Ops Claw.
+        Validates schema, routes to issue_manager for GitHub issue creation.
+        MUST send feature_brief_acknowledged within 10 minutes.
+
+        Per spec Rule 6: Build Claw must acknowledge within 10 minutes.
+        """
         self._validate_message(message, "feature_brief")
+
+        project_id = message.get("payload", {}).get("project_id", "unknown")
+        feature_description = message.get("payload", {}).get("feature_description", "")
 
         self._log.append(
             self._create_log_entry(
@@ -178,24 +189,67 @@ class BuildSignalDispatcher:
                 entity_id=message.get("message_id", "unknown"),
                 outcome="success",
                 details={
-                    "project_id": message.get("payload", {}).get("project_id"),
+                    "project_id": project_id,
                     "feature_name": message.get("payload", {}).get("feature_name"),
                 },
             )
         )
 
-        for handler in self._feature_brief_handlers:
-            try:
-                handler(message)
-            except Exception as e:
-                logger.error("Feature brief handler failed: %s", e)
+        ack_timer = threading.Timer(
+            600,
+            self._send_overdue_ack_warning,
+            args=[project_id],
+        )
+        ack_timer.start()
+
+        try:
+            for handler in self._feature_brief_handlers:
+                try:
+                    handler(message)
+                except Exception as e:
+                    logger.error("Feature brief handler failed: %s", e)
+        finally:
+            ack_timer.cancel()
+
+    def _send_overdue_ack_warning(self, project_id: str) -> None:
+        """
+        Called if feature_brief processing exceeds 10 minutes.
+        Sends a preliminary acknowledgment to prevent Ops Claw timeout.
+        """
+        self.send_feature_brief_acknowledged(
+            project_id=project_id,
+            estimated_start="TBD",
+            clarity_score="low",
+        )
+        self._log.append(
+            self._create_log_entry(
+                action_type="feature_brief_ack_delayed",
+                entity_id=project_id,
+                outcome="preliminary_ack_sent",
+                details={"reason": "processing exceeded 10-minute SLA"},
+            )
+        )
 
     def send_feature_brief_acknowledged(
         self,
         project_id: str,
         estimated_start: str,
         clarity_score: str,
+        missing_elements: list[str] | None = None,
+        deadline_risk: str | None = None,
     ) -> None:
+        """
+        Send feature_brief_acknowledged to Ops Claw.
+
+        Per spec Rule 6: Must be sent within 10 minutes of feature_brief receipt.
+
+        Args:
+            project_id: Project identifier
+            estimated_start: ISO timestamp or "TBD" if unknown
+            clarity_score: "clear" or "low"
+            missing_elements: Optional list of missing elements if clarity is low
+            deadline_risk: Optional deadline risk assessment
+        """
         if clarity_score not in ("clear", "low"):
             raise ValueError(f"Invalid clarity_score: {clarity_score}. Must be 'clear' or 'low'")
 
@@ -203,15 +257,23 @@ class BuildSignalDispatcher:
             "project_id": project_id,
             "estimated_start": estimated_start,
             "clarity_score": clarity_score,
-            "acknowledged_at": datetime.now(timezone.utc).isoformat(),
         }
-        self._send("brief_acknowledged", "ops", payload)
+
+        if missing_elements:
+            payload["missing_elements"] = missing_elements
+        if deadline_risk:
+            payload["deadline_risk"] = deadline_risk
+
+        self._send("feature_brief_acknowledged", "ops", payload)
         self._log.append(
             self._create_log_entry(
-                action_type="feature_brief_acknowledged",
+                action_type="feature_brief_acknowledged_sent",
                 entity_id=project_id,
                 outcome="success",
-                details={"clarity_score": clarity_score},
+                details={
+                    "clarity_score": clarity_score,
+                    "recipient": "ops",
+                },
             )
         )
 

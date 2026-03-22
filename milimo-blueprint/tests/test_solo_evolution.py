@@ -8,6 +8,7 @@ Tests for solo_evolution.py - Evolution Scheduler
 
 from datetime import datetime, timezone, timedelta
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -16,6 +17,8 @@ from orchestrator.solo_evolution import (
     check_claw_evolution_ready,
     check_content_evolution_thresholds,
     get_evolution_summary,
+    get_claw_schedule_time,
+    parse_evolution_schedule,
     _calculate_next_run,
     _check_evolution_threshold,
     EvolutionSchedule,
@@ -23,6 +26,7 @@ from orchestrator.solo_evolution import (
     DAYS_OF_WEEK,
     EVOLUTION_THRESHOLDS,
     CONTENT_ADDITIONAL_THRESHOLDS,
+    DEFAULT_EVOLUTION_SCHEDULE,
 )
 
 
@@ -79,7 +83,7 @@ class TestScheduleEvolution:
 
         assert result["cycle"] == "weekly"
         assert result["day"] == "sunday"
-        assert result["time"] == "02:00"
+        assert "schedule" in result
 
     def test_all_claws_have_schedules(self) -> None:
         """Test that all claws have schedules."""
@@ -511,5 +515,384 @@ class TestCheckClawEvolutionReadyWithAdditionalData:
             },
         )
 
-        # Ops claw doesn't check content thresholds
         assert ready is True
+
+
+class TestParseEvolutionSchedule:
+    """Tests for parse_evolution_schedule function."""
+
+    def test_with_full_schedule(self) -> None:
+        """Test with full schedule key returns correct per-claw times."""
+        evolution_config = {
+            "schedule": {
+                "analytics_baseline": "01:00",
+                "analytics_report": "02:00",
+                "content": "02:05",
+                "ops": "02:15",
+                "analytics_evolution": "02:25",
+                "build": "02:35",
+                "finance": "03:00",
+            }
+        }
+
+        result = parse_evolution_schedule(evolution_config)
+
+        assert result["content"] == "02:05"
+        assert result["ops"] == "02:15"
+        assert result["analytics_evolution"] == "02:25"
+        assert result["build"] == "02:35"
+        assert result["finance"] == "03:00"
+
+    def test_with_legacy_time_key(self) -> None:
+        """Test with legacy 'time' key falls back correctly."""
+        evolution_config = {"time": "02:00"}
+
+        result = parse_evolution_schedule(evolution_config)
+
+        assert result["content"] == "02:00"
+        assert result["ops"] == "02:00"
+        assert result["finance"] == "02:00"
+
+    def test_with_empty_config(self) -> None:
+        """Test with empty config falls back to legacy default (02:00)."""
+        result = parse_evolution_schedule({})
+
+        assert result["content"] == "02:00"
+        assert result["finance"] == "02:00"
+        assert result["ops"] == "02:00"
+        assert result["build"] == "02:00"
+
+    def test_partial_schedule_uses_defaults(self) -> None:
+        """Test partial schedule uses defaults for missing claws."""
+        evolution_config = {
+            "schedule": {
+                "content": "02:05",
+            }
+        }
+
+        result = parse_evolution_schedule(evolution_config)
+
+        assert result["content"] == "02:05"
+        assert result["finance"] == DEFAULT_EVOLUTION_SCHEDULE["finance"]
+
+
+class TestGetClawScheduleTime:
+    """Tests for get_claw_schedule_time function."""
+
+    def test_returns_correct_time_for_claw(self) -> None:
+        """Test returns correct time for each claw."""
+        evolution_config = {
+            "schedule": {
+                "content": "02:05",
+                "ops": "02:15",
+                "analytics_evolution": "02:25",
+                "build": "02:35",
+                "finance": "03:00",
+            }
+        }
+
+        assert get_claw_schedule_time(evolution_config, "content") == "02:05"
+        assert get_claw_schedule_time(evolution_config, "finance") == "03:00"
+
+    def test_returns_default_for_unknown_claw(self) -> None:
+        """Test returns default for unknown claw."""
+        evolution_config = {}
+        result = get_claw_schedule_time(evolution_config, "unknown")
+
+        assert result == "02:00"
+
+
+class TestInitEvolutionTimers:
+    """Tests for _init_evolution_timers function."""
+
+    def test_schedules_one_timer_per_active_claw(self):
+        """_init_evolution_timers schedules one timer per active claw."""
+        from orchestrator.solo_evolution import _init_evolution_timers
+
+        evolution_config = {
+            "schedule": {
+                "content": "02:05",
+                "ops": "02:15",
+                "analytics_evolution": "02:25",
+                "build": "02:35",
+                "finance": "03:00",
+            }
+        }
+
+        mock_scheduler = MagicMock()
+        mock_scheduler.run_evolution_cycle = MagicMock()
+
+        claw_schedulers = {
+            "content": mock_scheduler,
+            "ops": mock_scheduler,
+            "analytics_evolution": mock_scheduler,
+            "build": mock_scheduler,
+            "finance": mock_scheduler,
+        }
+
+        schedule_calls = []
+
+        def mock_schedule_fn(job_name, job_fn, target_hour, target_minute, target_weekday):
+            schedule_calls.append({
+                "job_name": job_name,
+                "hour": target_hour,
+                "minute": target_minute,
+                "weekday": target_weekday,
+            })
+
+        log_calls = []
+
+        def mock_log_fn(msg):
+            log_calls.append(msg)
+
+        result = _init_evolution_timers(
+            evolution_config=evolution_config,
+            claw_schedulers=claw_schedulers,
+            schedule_fn=mock_schedule_fn,
+            log_fn=mock_log_fn,
+        )
+
+        assert len(result["scheduled"]) == 5
+        assert len(result["skipped"]) == 0
+        assert len(schedule_calls) == 5
+
+    def test_skips_inactive_claw(self):
+        """_init_evolution_timers skips claws not in claw_schedulers."""
+        from orchestrator.solo_evolution import _init_evolution_timers
+
+        evolution_config = {
+            "schedule": {
+                "content": "02:05",
+                "ops": "02:15",
+                "analytics_evolution": "02:25",
+                "build": "02:35",
+                "finance": "03:00",
+            }
+        }
+
+        mock_scheduler = MagicMock()
+        mock_scheduler.run_evolution_cycle = MagicMock()
+
+        claw_schedulers = {
+            "content": mock_scheduler,
+            "ops": mock_scheduler,
+            "finance": mock_scheduler,
+        }
+
+        schedule_calls = []
+
+        def mock_schedule_fn(job_name, job_fn, target_hour, target_minute, target_weekday):
+            schedule_calls.append({"job_name": job_name})
+
+        log_calls = []
+
+        def mock_log_fn(msg):
+            log_calls.append(msg)
+
+        result = _init_evolution_timers(
+            evolution_config=evolution_config,
+            claw_schedulers=claw_schedulers,
+            schedule_fn=mock_schedule_fn,
+            log_fn=mock_log_fn,
+        )
+
+        assert len(result["scheduled"]) == 3
+        assert len(result["skipped"]) == 2
+
+    def test_finance_timer_at_03_00(self):
+        """Finance timer scheduled at 03:00."""
+        from orchestrator.solo_evolution import _init_evolution_timers
+
+        evolution_config = {
+            "schedule": {
+                "content": "02:05",
+                "ops": "02:15",
+                "analytics_evolution": "02:25",
+                "build": "02:35",
+                "finance": "03:00",
+            }
+        }
+
+        mock_scheduler = MagicMock()
+        mock_scheduler.run_evolution_cycle = MagicMock()
+
+        claw_schedulers = {"finance": mock_scheduler}
+
+        schedule_calls = []
+
+        def mock_schedule_fn(job_name, job_fn, target_hour, target_minute, target_weekday):
+            schedule_calls.append({
+                "job_name": job_name,
+                "hour": target_hour,
+                "minute": target_minute,
+            })
+
+        log_calls = []
+
+        def mock_log_fn(msg):
+            log_calls.append(msg)
+
+        _init_evolution_timers(
+            evolution_config=evolution_config,
+            claw_schedulers=claw_schedulers,
+            schedule_fn=mock_schedule_fn,
+            log_fn=mock_log_fn,
+        )
+
+        finance_call = next((c for c in schedule_calls if "finance" in c["job_name"]), None)
+        assert finance_call is not None
+        assert finance_call["hour"] == 3
+        assert finance_call["minute"] == 0
+
+    def test_content_timer_at_02_05(self):
+        """Content timer scheduled at 02:05."""
+        from orchestrator.solo_evolution import _init_evolution_timers
+
+        evolution_config = {
+            "schedule": {
+                "content": "02:05",
+                "ops": "02:15",
+                "analytics_evolution": "02:25",
+                "build": "02:35",
+                "finance": "03:00",
+            }
+        }
+
+        mock_scheduler = MagicMock()
+        mock_scheduler.run_evolution_cycle = MagicMock()
+
+        claw_schedulers = {"content": mock_scheduler}
+
+        schedule_calls = []
+
+        def mock_schedule_fn(job_name, job_fn, target_hour, target_minute, target_weekday):
+            schedule_calls.append({
+                "job_name": job_name,
+                "hour": target_hour,
+                "minute": target_minute,
+            })
+
+        log_calls = []
+
+        def mock_log_fn(msg):
+            log_calls.append(msg)
+
+        _init_evolution_timers(
+            evolution_config=evolution_config,
+            claw_schedulers=claw_schedulers,
+            schedule_fn=mock_schedule_fn,
+            log_fn=mock_log_fn,
+        )
+
+        content_call = next((c for c in schedule_calls if "content" in c["job_name"]), None)
+        assert content_call is not None
+        assert content_call["hour"] == 2
+        assert content_call["minute"] == 5
+
+    def test_schedules_on_sunday_weekday_6(self):
+        """All timers scheduled for Sunday (weekday 6)."""
+        from orchestrator.solo_evolution import _init_evolution_timers
+
+        evolution_config = {"schedule": {"content": "02:05"}}
+
+        mock_scheduler = MagicMock()
+        mock_scheduler.run_evolution_cycle = MagicMock()
+
+        claw_schedulers = {"content": mock_scheduler}
+
+        schedule_calls = []
+
+        def mock_schedule_fn(job_name, job_fn, target_hour, target_minute, target_weekday):
+            schedule_calls.append({"weekday": target_weekday})
+
+        log_calls = []
+
+        def mock_log_fn(msg):
+            log_calls.append(msg)
+
+        _init_evolution_timers(
+            evolution_config=evolution_config,
+            claw_schedulers=claw_schedulers,
+            schedule_fn=mock_schedule_fn,
+            log_fn=mock_log_fn,
+        )
+
+        assert len(schedule_calls) == 1
+        assert schedule_calls[0]["weekday"] == 6
+
+
+class TestStaggeredEvolutionSchedule:
+    """Tests for staggered per-claw evolution schedule."""
+
+    def test_schedule_with_per_claw_times(self) -> None:
+        """Test that schedule_evolution uses per-claw times from config."""
+        config: dict[str, Any] = {
+            "evolution": {
+                "cycle_day": "sunday",
+                "schedule": {
+                    "analytics_baseline": "01:00",
+                    "analytics_report": "02:00",
+                    "content": "02:05",
+                    "ops": "02:15",
+                    "analytics_evolution": "02:25",
+                    "build": "02:35",
+                    "finance": "03:00",
+                },
+                "per_claw": {
+                    "content": {"enabled": True, "min_approved_posts": 10},
+                    "ops": {"enabled": True, "min_client_interactions": 5},
+                    "analytics": {"enabled": True, "min_data_weeks": 3},
+                    "finance": {"enabled": True, "min_invoices": 3},
+                    "build": {"enabled": True, "min_prs_merged": 5},
+                },
+            }
+        }
+
+        result = schedule_evolution(config)
+
+        assert "schedule" in result
+        assert result["schedule"]["content"] == "02:05"
+        assert result["schedule"]["finance"] == "03:00"
+
+    def test_schedule_includes_schedule_dict(self) -> None:
+        """Test that result includes the schedule dict."""
+        config: dict[str, Any] = {
+            "evolution": {
+                "cycle_day": "sunday",
+                "schedule": {
+                    "content": "02:05",
+                    "finance": "03:00",
+                },
+                "per_claw": {
+                    "content": {"enabled": True, "min_approved_posts": 10},
+                    "finance": {"enabled": True, "min_invoices": 3},
+                },
+            }
+        }
+
+        result = schedule_evolution(config)
+
+        assert "schedule" in result
+        assert result["schedule"]["content"] == "02:05"
+
+    def test_finance_at_03_00(self) -> None:
+        """Test Finance timer scheduled at 03:00."""
+        evolution_config = {
+            "schedule": {
+                "finance": "03:00",
+            }
+        }
+
+        time_str = get_claw_schedule_time(evolution_config, "finance")
+        assert time_str == "03:00"
+
+    def test_content_at_02_05(self) -> None:
+        """Test Content timer scheduled at 02:05."""
+        evolution_config = {
+            "schedule": {
+                "content": "02:05",
+            }
+        }
+
+        time_str = get_claw_schedule_time(evolution_config, "content")
+        assert time_str == "02:05"

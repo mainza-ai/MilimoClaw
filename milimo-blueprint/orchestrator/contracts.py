@@ -63,6 +63,7 @@ VALID_MESSAGE_TYPES = {
     "revision_request",
     # Build Claw message types
     "feature_brief",
+    "feature_brief_acknowledged",
     "deploy_complete",
     "shipping_summary",
     "behavior_query",
@@ -318,6 +319,20 @@ MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
         "required_payload": ["query"],
         "optional_payload": ["feature_id", "time_range"],
         "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    # Build → Ops: Feature brief acknowledgment (within 10 min of receipt)
+    "feature_brief_acknowledged": {
+        "sender_roles": ["build"],
+        "recipient_roles": ["ops"],
+        "required_payload": [
+            "project_id",
+            "estimated_start",
+            "clarity_score",
+        ],
+        "optional_payload": ["missing_elements", "deadline_risk"],
+        "frequency": "on_event",
+        "sla_minutes": 10,
         "priority": "AUTO",
     },
 }

@@ -281,3 +281,83 @@ def create_mount_directories(config: dict[str, Any], dry_run: bool = True) -> li
             logger.info(f"Created: {path}")
 
     return commands
+
+
+POLICY_DIR = Path(__file__).parent.parent / "policies"
+
+
+def load_sandbox_policy(claw_role: str) -> dict[str, Any]:
+    """
+    Load and return the parsed sandbox policy YAML for a given claw role.
+
+    Reads from milimo-blueprint/policies/{role}-sandbox.yaml.
+    Maps role names: "ops" → "ops-sandbox.yaml", "clients" → "ops-sandbox.yaml"
+
+    Args:
+        claw_role: The claw role name (content, ops, analytics, finance, build)
+
+    Returns:
+        Parsed sandbox policy as dict
+
+    Raises:
+        FileNotFoundError: If the policy file doesn't exist
+    """
+    role_to_file = {
+        "content": "content-sandbox.yaml",
+        "ops": "ops-sandbox.yaml",
+        "clients": "ops-sandbox.yaml",
+        "analytics": "analytics-sandbox.yaml",
+        "finance": "finance-sandbox.yaml",
+        "build": "build-sandbox.yaml",
+    }
+
+    filename = role_to_file.get(claw_role, f"{claw_role}-sandbox.yaml")
+    policy_path = POLICY_DIR / filename
+
+    if not policy_path.exists():
+        raise FileNotFoundError(f"Policy file not found: {policy_path}")
+
+    with policy_path.open("r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def get_read_only_mounts(policy: dict[str, Any]) -> list[Path]:
+    """
+    Extract all read_only mount paths from a parsed sandbox policy dict.
+
+    Args:
+        policy: Parsed sandbox policy dict
+
+    Returns:
+        List of Path objects for read-only mounts
+    """
+    fs_policy = policy.get("filesystem_policy", {})
+    read_only = fs_policy.get("read_only", [])
+
+    if isinstance(read_only, list):
+        return [Path(p) if isinstance(p, str) else Path(str(p)) for p in read_only]
+    return []
+
+
+def get_all_accessible_mounts(policy: dict[str, Any]) -> list[Path]:
+    """
+    Extract ALL accessible paths (read_only + read_write) from policy.
+
+    Args:
+        policy: Parsed sandbox policy dict
+
+    Returns:
+        List of Path objects for all accessible mounts
+    """
+    fs_policy = policy.get("filesystem_policy", {})
+    all_mounts: list[Path] = []
+
+    read_only = fs_policy.get("read_only", [])
+    if isinstance(read_only, list):
+        all_mounts.extend([Path(p) for p in read_only if isinstance(p, str)])
+
+    read_write = fs_policy.get("read_write", [])
+    if isinstance(read_write, list):
+        all_mounts.extend([Path(p) for p in read_write if isinstance(p, str)])
+
+    return all_mounts

@@ -71,9 +71,12 @@ class QueryHandler:
     SLA: 2-minute maximum response time — enforced by timeout wrapper.
     Never returns without a response. If data unavailable, returns
     data_quality="insufficient" with days_collected and days_needed.
+
+    Logs SLA violations to both operational.log and signals.log.
     """
 
     RESPONSE_TIMEOUT_SECONDS = 110
+    SLA_VIOLATION_THRESHOLD_MS = 120000  # 2 minutes in milliseconds
     MIN_DAYS_FOR_COMPLETE = 7
 
     def __init__(
@@ -88,6 +91,11 @@ class QueryHandler:
         if not self._queries_log_path.exists():
             self._queries_log_path.touch()
 
+        self._signals_log_path = fs.get_log_path("signals.log")
+        self._signals_log_path.parent.mkdir(parents=True, exist_ok=True)
+        if not self._signals_log_path.exists():
+            self._signals_log_path.touch()
+
     def _log_to_queries_log(self, entry: dict[str, Any]) -> None:
         """Write entry to queries.log."""
         try:
@@ -96,6 +104,64 @@ class QueryHandler:
                 f.flush()
         except Exception as e:
             logger.warning("Failed to write to queries.log: %s", e)
+
+    def _log_to_signals_log(self, entry: dict[str, Any]) -> None:
+        """Write entry to signals.log for SLA violations."""
+        try:
+            with open(self._signals_log_path, "a") as f:
+                f.write(json.dumps(entry) + "\n")
+                f.flush()
+        except Exception as e:
+            logger.warning("Failed to write to signals.log: %s", e)
+
+    def _log_sla_violation(
+        self,
+        query_id: str,
+        message_type: str,
+        requesting_claw: str,
+        elapsed_ms: int,
+    ) -> None:
+        """
+        Log SLA violation to both operational.log and signals.log.
+
+        Called when query processing exceeds SLA_VIOLATION_THRESHOLD_MS.
+        Does NOT prevent response from being sent.
+        """
+        violation_entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "query_id": query_id,
+            "query_type": message_type,
+            "requesting_claw": requesting_claw,
+            "event": "sla_violation",
+            "elapsed_ms": elapsed_ms,
+            "sla_threshold_ms": self.SLA_VIOLATION_THRESHOLD_MS,
+            "overage_ms": elapsed_ms - self.SLA_VIOLATION_THRESHOLD_MS,
+        }
+
+        self._log_to_signals_log(violation_entry)
+
+        self.operational_log.append(
+            AnalyticsLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="query_sla_violation",
+                entity_id=query_id,
+                source_claw=requesting_claw,
+                outcome="sla_exceeded",
+                details={
+                    "message_type": message_type,
+                    "elapsed_ms": elapsed_ms,
+                    "sla_threshold_ms": self.SLA_VIOLATION_THRESHOLD_MS,
+                    "overage_ms": elapsed_ms - self.SLA_VIOLATION_THRESHOLD_MS,
+                },
+            )
+        )
+
+        logger.warning(
+            "Query SLA violation: %s took %dms (SLA: %dms)",
+            query_id,
+            elapsed_ms,
+            self.SLA_VIOLATION_THRESHOLD_MS,
+        )
 
     def _timeout_handler(self, signum, frame):
         """Signal handler for timeout."""
@@ -194,6 +260,16 @@ class QueryHandler:
 
         response.processing_time_ms = int((time.monotonic() - start_time) * 1000)
 
+        sla_exceeded = response.processing_time_ms > self.SLA_VIOLATION_THRESHOLD_MS
+
+        if sla_exceeded:
+            self._log_sla_violation(
+                query_id=query_id,
+                message_type=message_type,
+                requesting_claw=requesting_claw,
+                elapsed_ms=response.processing_time_ms,
+            )
+
         response_entry = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "query_id": query_id,
@@ -202,6 +278,7 @@ class QueryHandler:
             "status": "responded",
             "data_quality": response.data_quality,
             "processing_time_ms": response.processing_time_ms,
+            "sla_exceeded": sla_exceeded,
         }
         self._log_to_queries_log(response_entry)
 
