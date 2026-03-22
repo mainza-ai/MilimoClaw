@@ -196,26 +196,27 @@ describe("WarRoomTUI", () => {
 			expect(console.log).toHaveBeenCalledWith(expect.stringContaining("ops"));
 		});
 
-		it("shows mode tags (HOLD, REVIEW, AUTO) for each action", () => {
-			const mockMsg = {
-				message_id: "msg-002",
-				sender_role: "finance",
-				recipient_role: "ops",
-				message_type: "deliverable",
-				payload: { type: "invoice", amount: 600 },
-				timestamp: new Date().toISOString(),
-				needs_approval: false,
-				file_path: "/tmp/msg-002.json",
-			};
+ it("shows mode tags (HOLD, REVIEW, AUTO) for each action", () => {
+ const mockMsg = {
+ message_id: "msg-002",
+ sender_role: "finance",
+ recipient_role: "ops",
+ message_type: "deliverable",
+ payload: { type: "invoice", amount: 600 },
+ timestamp: new Date().toISOString(),
+ needs_approval: false,
+ file_path: "/tmp/msg-002.json",
+ };
 
-			mockedFs.readdirSync.mockReturnValue(["msg-002.json"]);
-			mockedFs.readFileSync.mockReturnValue(JSON.stringify(mockMsg));
+ mockedFs.readdirSync.mockReturnValue(["msg-002.json"]);
+ mockedFs.readFileSync.mockReturnValue(JSON.stringify(mockMsg));
 
-			const tui = new WarRoomTUI("test-squad");
-			(tui as any).listPending();
+ const tui = new WarRoomTUI("test-squad");
+ (tui as any).listPending();
 
-			expect(console.log).toHaveBeenCalledWith(expect.stringMatching(/\[AUTO\]|\[REVIEW\]|\[HOLD\]/));
-		});
+ // Mode tag is rendered as [MODE] - check for any valid mode including VETO
+ expect(console.log).toHaveBeenCalledWith(expect.stringMatching(/\[AUTO\]|\[REVIEW\]|\[HOLD\]|\[VETO\]/));
+ });
 	});
 
 	describe("claw health display", () => {

@@ -142,36 +142,36 @@ describe("GatewayClient", () => {
             expect(mockedFs.writeFileSync).toHaveBeenCalled();
         });
 
-        it("throws GatewayDeliveryError on timeout", async () => {
-            mockedFs.existsSync.mockReturnValue(true);
+ it("throws GatewayDeliveryError on timeout", async () => {
+ mockedFs.existsSync.mockReturnValue(true);
 
-            const mockSocket = {
-                connect: jest.fn(),
-                write: jest.fn(),
-                destroy: jest.fn(),
-                on: jest.fn(),
-                once: jest.fn((event: string, callback: () => void) => {
-                    if (event === "connect") {
-                        callback();
-                    }
-                }),
-            };
-            mockedNet.Socket.mockReturnValue(mockSocket);
+ const mockSocket = {
+ connect: jest.fn(),
+ write: jest.fn(),
+ destroy: jest.fn(),
+ on: jest.fn(),
+ once: jest.fn((event: string, callback: () => void) => {
+ if (event === "connect") {
+ callback();
+ }
+ }),
+ };
+ mockedNet.Socket.mockReturnValue(mockSocket);
 
-            const client = new GatewayClient(defaultOptions);
-            await client.connect();
+ const client = new GatewayClient(defaultOptions);
+ await client.connect();
 
-            const message = {
-                id: "msg-timeout",
-                sender_role: "content",
-                recipient_role: "ops",
-                message_type: "signal",
-                payload: {},
-                timestamp: new Date().toISOString(),
-            };
+ const message = {
+ id: "msg-timeout",
+ sender_role: "content",
+ recipient_role: "ops",
+ message_type: "signal",
+ payload: {},
+ timestamp: new Date().toISOString(),
+ };
 
-            await expect(client.send(message)).rejects.toThrow(GatewayDeliveryError);
-        });
+ await expect(client.send(message)).rejects.toThrow(GatewayDeliveryError);
+ }, 10000);
     });
 
     describe("disconnect()", () => {

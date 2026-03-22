@@ -32,6 +32,9 @@ class ApprovalEngine {
     loadEscalationRules() {
         try {
             const configPath = (0, path_1.join)(process.cwd(), 'milimo-blueprint', 'mesh_config.yaml');
+            if (!(0, fs_1.existsSync)(configPath)) {
+                throw new Error('Config not found');
+            }
             const content = (0, fs_1.readFileSync)(configPath, 'utf8');
             const config = (0, yaml_1.parse)(content);
             if (config && config.escalation_rules) {

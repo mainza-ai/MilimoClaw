@@ -36,15 +36,16 @@ const mockedSpawnSync = jest.requireMock("node:child_process").spawnSync as jest
 const mockedInit = jest.requireMock("../commands/init");
 
 import {
-	cliBlueprintList,
-	cliBlueprintFork,
-	cliBlueprintDiff,
-	cliBlueprintPublish,
-	cliBlueprintRollback,
-	cliBlueprintSearch,
-	cliBlueprintMerge,
-	cliBlueprintInfo,
+  cliBlueprintList,
+  cliBlueprintFork,
+  cliBlueprintDiff,
+  cliBlueprintPublish,
+  cliBlueprintRollback,
+  cliBlueprintSearch,
+  cliBlueprintMerge,
+  cliBlueprintInfo,
 } from "../commands/blueprint";
+import type { MilimoConfig } from "../index";
 
 const createMockLogger = () => ({
 	info: jest.fn(),
@@ -53,20 +54,12 @@ const createMockLogger = () => ({
 	warn: jest.fn(),
 });
 
-const createMockConfig = (overrides = {}) => ({
-	blueprintDir: "/home/test/milimo-blueprint",
-	squadName: "test-squad",
-	clawRole: "build",
-	template: "solo-founder",
-	solo: true,
-	meshMembers: ["build"],
-	meshSecret: null,
-	operatorName: "TestOperator",
-	warRoomMode: "full" as const,
-	onboardedAt: "2026-03-20T00:00:00.000Z",
-	initializedAt: "2026-03-20T00:00:00.000Z",
-	blueprintVersion: "0.1.0",
-	...overrides,
+const createMockConfig = (overrides: Record<string, unknown> = {}): MilimoConfig => ({
+  squadName: "test-squad",
+  clawRole: "build",
+  meshSecret: "",
+  blueprintDir: "/home/test/milimo-blueprint",
+  ...overrides,
 });
 
 describe("Blueprint Commands", () => {
@@ -639,14 +632,14 @@ describe("Blueprint Commands", () => {
 				stdout: JSON.stringify({ version: "0.1.0", tools: {} }),
 				stderr: "",
 			});
-			mockedFs.readdirSync.mockReturnValue([]);
+mockedFs.readdirSync.mockReturnValue([]);
 
-			const logger = createMockLogger();
-			await cliBlueprintList({
-				json: true,
-				logger,
-				pluginConfig: { blueprintDir: dangerousPath },
-			});
+ const logger = createMockLogger();
+ await cliBlueprintList({
+ json: true,
+ logger,
+ pluginConfig: { ...createMockConfig(), blueprintDir: dangerousPath },
+ });
 
 			const pythonArgs = mockedSpawnSync.mock.calls[0][1] as string[];
 			const codeArg = pythonArgs.find((arg) => arg.includes("sys.path.insert"));

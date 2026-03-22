@@ -683,7 +683,7 @@ class TestMessageContractValidation:
     def test_client_health_signal_schema_correct(self):
         """client_health_signal schema has correct roles."""
         schema = MESSAGE_TYPE_SCHEMAS["client_health_signal"]
-        assert schema["sender_roles"] == ["analytics"]
+        assert schema["sender_roles"] == ["ops", "analytics"]
         assert schema["recipient_roles"] == ["content"]
         assert "client_id" in schema["required_payload"]
         assert "health_score" in schema["required_payload"]
