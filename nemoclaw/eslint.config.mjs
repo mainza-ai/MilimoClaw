@@ -9,7 +9,9 @@ export default [
     languageOptions: {
       parser: tsparser,
       parserOptions: {
-        projectService: true,
+        projectService: {
+          allowDefaultProject: ["src/*.test.ts", "src/*/*.test.ts"],
+        },
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -26,6 +28,15 @@ export default [
       "@typescript-eslint/no-floating-promises": "error",
       "@typescript-eslint/no-require-imports": "error",
       "@typescript-eslint/consistent-type-imports": "error",
+    },
+  },
+  {
+    files: ["src/**/*.test.ts"],
+    rules: {
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
+      "@typescript-eslint/unbound-method": "off",
     },
   },
   prettier,
