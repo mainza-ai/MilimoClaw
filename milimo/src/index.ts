@@ -96,10 +96,10 @@ export interface OpenClawPluginApi {
 // Milimo-specific config (read from pluginConfig in openclaw.plugin.json)
 // ---------------------------------------------------------------------------
 
-/** Valid claw role identifiers. */
-export type ClawRole = "content" | "ops" | "analytics" | "finance" | "build";
+/** Valid claw role identifiers. "solo" indicates all claws run on one machine. */
+export type ClawRole = "content" | "ops" | "analytics" | "finance" | "build" | "solo";
 
-/** All valid claw roles. */
+/** All valid claw roles (excluding "solo" which is a mode indicator). */
 export const CLAW_ROLES: ClawRole[] = ["content", "ops", "analytics", "finance", "build"];
 
 /** Milimo plugin configuration. */
@@ -137,7 +137,7 @@ export function getPluginConfig(api: OpenClawPluginApi): MilimoConfig {
 }
 
 function isValidClawRole(value: string): value is ClawRole | "" {
-  return value === "" || CLAW_ROLES.includes(value as ClawRole);
+  return value === "" || CLAW_ROLES.includes(value as ClawRole) || value === "solo";
 }
 
 // ---------------------------------------------------------------------------

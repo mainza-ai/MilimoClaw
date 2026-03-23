@@ -29,6 +29,7 @@ import { cliVerify, cliProvenanceKeygen } from "./commands/verify.js";
 import { cliBadge } from "./commands/badge.js";
 import { cliActionApprove, cliActionBlock, listPendingActions } from "./commands/action.js";
 import { cliLogsSearch, cliLogsList } from "./commands/logs.js";
+import { assistantSetup, assistantVerify, assistantStart } from "./commands/assistant.js";
 
 export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginApi): void {
   const { program, logger } = ctx;
@@ -69,7 +70,20 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
     .option("--role <role>", "Claw role: content, ops, analytics, finance, build")
     .option("--template <template>", "Squad template to use (e.g., content-agency, design-studio)")
     .option("--solo", "Initialize as a solo operator (no mesh)", false)
-    .action(async (opts: { squad?: string; role?: string; template?: string; solo: boolean }) => {
+    .option("--assistant-name <name>", "Assistant name", "Nova")
+    .option("--assistant-creature <creature>", "Assistant creature", "a claw")
+    .option("--assistant-vibe <vibe>", "Assistant vibe", "sharp and unhurried")
+    .option("--assistant-emoji <emoji>", "Assistant emoji", "🦀")
+    .action(async (opts: {
+      squad?: string;
+      role?: string;
+      template?: string;
+      solo: boolean;
+      assistantName?: string;
+      assistantCreature?: string;
+      assistantVibe?: string;
+      assistantEmoji?: string;
+    }) => {
       await cliInit({ ...opts, logger, pluginConfig });
     });
 
@@ -436,5 +450,29 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
     .option("--squad <squad>", "Squad ID")
     .action(async (opts: { squad?: string }) => {
       await cliLogsList({ ...opts, logger, pluginConfig });
+    });
+
+  // ── openclaw milimo assistant ────────────────────────────────────────
+  const assistant = milimo.command("assistant").description("Squad assistant management");
+
+  assistant
+    .command("setup")
+    .description("Render and install the assistant system prompt")
+    .action(async () => {
+      await assistantSetup();
+    });
+
+  assistant
+    .command("verify")
+    .description("Verify assistant setup is complete")
+    .action(async () => {
+      await assistantVerify();
+    });
+
+  assistant
+    .command("start")
+    .description("Start the assistant in NemoClaw terminal")
+    .action(async () => {
+      await assistantStart();
     });
 }

@@ -72,9 +72,9 @@ export interface OpenClawPluginApi {
     resolvePath: (input: string) => string;
     on: (hookName: string, handler: (...args: unknown[]) => void) => void;
 }
-/** Valid claw role identifiers. */
-export type ClawRole = "content" | "ops" | "analytics" | "finance" | "build";
-/** All valid claw roles. */
+/** Valid claw role identifiers. "solo" indicates all claws run on one machine. */
+export type ClawRole = "content" | "ops" | "analytics" | "finance" | "build" | "solo";
+/** All valid claw roles (excluding "solo" which is a mode indicator). */
 export declare const CLAW_ROLES: ClawRole[];
 /** Milimo plugin configuration. */
 export interface MilimoConfig {

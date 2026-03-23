@@ -498,6 +498,42 @@ def handle_collect_health(args: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError(f"Collect health error: {e}") from e
 
 
+MILIMO_CONFIG_PATH = Path.home() / ".milimo" / "config.json"
+
+
+def handle_squad_config(args: dict[str, Any]) -> dict[str, Any]:
+    """Get squad configuration (credentials stripped)."""
+    try:
+        if not MILIMO_CONFIG_PATH.exists():
+            return {"error": "config not found", "data_quality": "missing"}
+
+        config = json.loads(MILIMO_CONFIG_PATH.read_text(encoding="utf-8"))
+
+        # Strip credential fields
+        STRIP_KEYS = {
+            "stripe_key",
+            "github_token",
+            "api_key",
+            "secret",
+            "credentials",
+            "meshSecret",
+        }
+        safe_config = {k: v for k, v in config.items() if k not in STRIP_KEYS}
+
+        assistant = config.get("assistant", {})
+
+        return {
+            "config": safe_config,
+            "assistant_name": assistant.get("name", "unknown"),
+            "assistant_emoji": assistant.get("emoji", "🦀"),
+            "active_claws": config.get("activeClaws", []),
+            "data_quality": "complete",
+        }
+    except Exception as e:
+        logger.exception("Failed to get squad config")
+        raise RuntimeError(f"Squad config error: {e}") from e
+
+
 def _collect_claw_health(role: str, squad_id: str, base_dir: Path) -> dict[str, Any]:
     """Collect health for a single claw."""
     now = datetime.now(timezone.utc).isoformat()
@@ -654,6 +690,7 @@ COMMAND_HANDLERS: dict[str, Any] = {
     "resume_deep_work": handle_resume_deep_work,
     "deep_work_status": handle_deep_work_status,
     "collect_health": handle_collect_health,
+    "squad_config": handle_squad_config,
 }
 
 

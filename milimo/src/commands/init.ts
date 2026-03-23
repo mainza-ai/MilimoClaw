@@ -13,13 +13,18 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { PluginLogger, MilimoConfig, ClawRole } from "../index.js";
 import { CLAW_ROLES } from "../index.js";
-import { ConfigManager, type MilimoConfig as FullMilimoConfig } from "../onboard/config.js";
+import { ConfigManager, type MilimoConfig as FullMilimoConfig, getActiveClawsForTemplate } from "../onboard/config.js";
+import { assistantSetup } from "./assistant.js";
 
 interface InitOptions {
   squad?: string;
   role?: string;
   template?: string;
   solo: boolean;
+  assistantName?: string;
+  assistantCreature?: string;
+  assistantVibe?: string;
+  assistantEmoji?: string;
   logger: PluginLogger;
   pluginConfig: MilimoConfig;
 }
@@ -132,6 +137,13 @@ export async function cliInit(opts: InitOptions): Promise<void> {
     onboardedAt: null,
     initializedAt: new Date().toISOString(),
     blueprintVersion: "0.1.0",
+    assistant: {
+      name: opts.assistantName || "Nova",
+      creature: opts.assistantCreature || "a claw",
+      vibe: opts.assistantVibe || "sharp and unhurried",
+      emoji: opts.assistantEmoji || "🦀",
+    },
+    activeClaws: getActiveClawsForTemplate(template),
   };
 
   ConfigManager.save(config);
@@ -140,6 +152,14 @@ export async function cliInit(opts: InitOptions): Promise<void> {
   logger.info(" ✓ Blueprint directories initialized");
   logger.info(" ✓ Claw configuration saved");
   logger.info("");
+
+  // Run assistant setup automatically
+  logger.info("Configuring squad assistant...");
+  try {
+    await assistantSetup();
+  } catch (err) {
+    logger.warn("Assistant setup skipped — run 'milimo assistant setup' manually.");
+  }
 
   if (opts.solo) {
     logger.info(" Solo mode: claw is ready. No mesh formation needed.");
@@ -163,6 +183,7 @@ function getRoleDescription(role: ClawRole): string {
     analytics: "Intelligence layer — performance, trends, opportunities",
     finance: "Financial ops — invoicing, pricing, margin tracking",
     build: "Engineering — code, PRs, deploys, monitoring (tech squads)",
+    solo: "All claws active on this machine (solo mode)",
   };
   return descriptions[role];
 }

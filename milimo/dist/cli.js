@@ -14,6 +14,7 @@ const verify_js_1 = require("./commands/verify.js");
 const badge_js_1 = require("./commands/badge.js");
 const action_js_1 = require("./commands/action.js");
 const logs_js_1 = require("./commands/logs.js");
+const assistant_js_1 = require("./commands/assistant.js");
 function registerCliCommands(ctx, api) {
     const { program, logger } = ctx;
     const pluginConfig = (0, index_js_1.getPluginConfig)(api);
@@ -39,6 +40,10 @@ function registerCliCommands(ctx, api) {
         .option("--role <role>", "Claw role: content, ops, analytics, finance, build")
         .option("--template <template>", "Squad template to use (e.g., content-agency, design-studio)")
         .option("--solo", "Initialize as a solo operator (no mesh)", false)
+        .option("--assistant-name <name>", "Assistant name", "Nova")
+        .option("--assistant-creature <creature>", "Assistant creature", "a claw")
+        .option("--assistant-vibe <vibe>", "Assistant vibe", "sharp and unhurried")
+        .option("--assistant-emoji <emoji>", "Assistant emoji", "🦀")
         .action(async (opts) => {
         await (0, init_js_1.cliInit)({ ...opts, logger, pluginConfig });
     });
@@ -342,6 +347,26 @@ function registerCliCommands(ctx, api) {
         .option("--squad <squad>", "Squad ID")
         .action(async (opts) => {
         await (0, logs_js_1.cliLogsList)({ ...opts, logger, pluginConfig });
+    });
+    // ── openclaw milimo assistant ────────────────────────────────────────
+    const assistant = milimo.command("assistant").description("Squad assistant management");
+    assistant
+        .command("setup")
+        .description("Render and install the assistant system prompt")
+        .action(async () => {
+        await (0, assistant_js_1.assistantSetup)();
+    });
+    assistant
+        .command("verify")
+        .description("Verify assistant setup is complete")
+        .action(async () => {
+        await (0, assistant_js_1.assistantVerify)();
+    });
+    assistant
+        .command("start")
+        .description("Start the assistant in NemoClaw terminal")
+        .action(async () => {
+        await (0, assistant_js_1.assistantStart)();
     });
 }
 //# sourceMappingURL=cli.js.map

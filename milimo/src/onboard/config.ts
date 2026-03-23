@@ -18,24 +18,33 @@ export const CONFIG_DIR = join(process.env.HOME ?? "/tmp", ".milimo");
 const CONFIG_FILE = "config.json";
 const LEGACY_STATE_FILE = "state.json";
 
+export interface AssistantPersona {
+  name: string;
+  creature: string;
+  vibe: string;
+  emoji: string;
+}
+
 export interface MilimoConfig {
-    squadName: string;
-    clawRole: ClawRole;
-    template: string;
-    solo: boolean;
-    meshMembers: string[];
-    meshSecret: string | null;
-    operatorName: string;
-    warRoomMode: "full" | "minimal" | "disabled";
-    onboardedAt: string | null;
-    initializedAt: string;
-    blueprintVersion: string;
-    serverUrl?: string;
-    deep_work?: {
-        active: boolean;
-        activated_at: string;
-        resume_date: string;
-    };
+  squadName: string;
+  clawRole: ClawRole;
+  template: string;
+  solo: boolean;
+  meshMembers: string[];
+  meshSecret: string | null;
+  operatorName: string;
+  warRoomMode: "full" | "minimal" | "disabled";
+  onboardedAt: string | null;
+  initializedAt: string;
+  blueprintVersion: string;
+  serverUrl?: string;
+  deep_work?: {
+    active: boolean;
+    activated_at: string;
+    resume_date: string;
+  };
+  assistant: AssistantPersona;
+  activeClaws: string[];
 }
 
 export interface LegacyState {
@@ -60,6 +69,13 @@ const DEFAULT_CONFIG: MilimoConfig = {
   onboardedAt: null,
   initializedAt: new Date().toISOString(),
   blueprintVersion: "0.1.0",
+  assistant: {
+    name: "Nova",
+    creature: "a claw",
+    vibe: "sharp and unhurried",
+    emoji: "🦀",
+  },
+  activeClaws: ["content", "ops", "analytics", "finance", "build"],
 };
 
 let configCache: MilimoConfig | null = null;
@@ -175,6 +191,14 @@ function loadLegacyConfig(): Partial<MilimoConfig> | null {
       merged.onboardedAt = legacyState.initializedAt;
     }
 
+    // Add assistant defaults to legacy configs that lack them
+    if (!merged.assistant) {
+      merged.assistant = DEFAULT_CONFIG.assistant;
+    }
+    if (!merged.activeClaws || merged.activeClaws.length === 0) {
+      merged.activeClaws = DEFAULT_CONFIG.activeClaws;
+    }
+
     ConfigManager.save(merged);
 
     if (existsSync(statePath)) {
@@ -274,3 +298,17 @@ export function isNemoClawOnboarded(): boolean {
 }
 
 export { MilimoConfig as MilimoOnboardConfig };
+
+export const TEMPLATE_CLAW_MAP: Record<string, string[]> = {
+  "solo-founder": ["content", "ops", "analytics", "finance", "build"],
+  "content-agency": ["content", "ops", "analytics"],
+  "design-studio": ["content", "ops", "finance"],
+  "event-promotion": ["content", "ops", "analytics"],
+  "freelance-collective": ["ops", "analytics", "finance"],
+  "ai-micro-saas": ["build", "ops", "analytics", "finance"],
+  "campus-ai-tool": ["build", "content", "ops"],
+};
+
+export function getActiveClawsForTemplate(templateName: string): string[] {
+  return TEMPLATE_CLAW_MAP[templateName] ?? ["content", "ops", "analytics", "finance", "build"];
+}

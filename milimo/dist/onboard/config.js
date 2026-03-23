@@ -2,13 +2,14 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.configPath = exports.ConfigManager = exports.CONFIG_DIR = void 0;
+exports.TEMPLATE_CLAW_MAP = exports.configPath = exports.ConfigManager = exports.CONFIG_DIR = void 0;
 exports.clearCache = clearCache;
 exports.loadOnboardConfig = loadOnboardConfig;
 exports.saveOnboardConfig = saveOnboardConfig;
 exports.clearOnboardConfig = clearOnboardConfig;
 exports.loadNemoClawConfig = loadNemoClawConfig;
 exports.isNemoClawOnboarded = isNemoClawOnboarded;
+exports.getActiveClawsForTemplate = getActiveClawsForTemplate;
 /**
  * MilimoClaw Configuration Manager
  *
@@ -34,6 +35,13 @@ const DEFAULT_CONFIG = {
     onboardedAt: null,
     initializedAt: new Date().toISOString(),
     blueprintVersion: "0.1.0",
+    assistant: {
+        name: "Nova",
+        creature: "a claw",
+        vibe: "sharp and unhurried",
+        emoji: "🦀",
+    },
+    activeClaws: ["content", "ops", "analytics", "finance", "build"],
 };
 let configCache = null;
 function clearCache() {
@@ -130,6 +138,13 @@ class ConfigManager {
         if (legacyState && !legacyConfig?.onboardedAt) {
             merged.onboardedAt = legacyState.initializedAt;
         }
+        // Add assistant defaults to legacy configs that lack them
+        if (!merged.assistant) {
+            merged.assistant = DEFAULT_CONFIG.assistant;
+        }
+        if (!merged.activeClaws || merged.activeClaws.length === 0) {
+            merged.activeClaws = DEFAULT_CONFIG.activeClaws;
+        }
         ConfigManager.save(merged);
         if ((0, node_fs_1.existsSync)(statePath)) {
             (0, node_fs_1.unlinkSync)(statePath);
@@ -211,5 +226,17 @@ function loadNemoClawConfig() {
 }
 function isNemoClawOnboarded() {
     return loadNemoClawConfig() !== null;
+}
+exports.TEMPLATE_CLAW_MAP = {
+    "solo-founder": ["content", "ops", "analytics", "finance", "build"],
+    "content-agency": ["content", "ops", "analytics"],
+    "design-studio": ["content", "ops", "finance"],
+    "event-promotion": ["content", "ops", "analytics"],
+    "freelance-collective": ["ops", "analytics", "finance"],
+    "ai-micro-saas": ["build", "ops", "analytics", "finance"],
+    "campus-ai-tool": ["build", "content", "ops"],
+};
+function getActiveClawsForTemplate(templateName) {
+    return exports.TEMPLATE_CLAW_MAP[templateName] ?? ["content", "ops", "analytics", "finance", "build"];
 }
 //# sourceMappingURL=config.js.map

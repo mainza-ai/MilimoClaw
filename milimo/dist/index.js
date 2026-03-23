@@ -9,7 +9,7 @@ const cli_js_1 = require("./cli.js");
 const slash_js_1 = require("./commands/slash.js");
 const squad_js_1 = require("./commands/squad.js");
 const config_js_1 = require("./onboard/config.js");
-/** All valid claw roles. */
+/** All valid claw roles (excluding "solo" which is a mode indicator). */
 exports.CLAW_ROLES = ["content", "ops", "analytics", "finance", "build"];
 const DEFAULT_PLUGIN_CONFIG = {
     squadName: "",
@@ -31,7 +31,7 @@ function getPluginConfig(api) {
     };
 }
 function isValidClawRole(value) {
-    return value === "" || exports.CLAW_ROLES.includes(value);
+    return value === "" || exports.CLAW_ROLES.includes(value) || value === "solo";
 }
 // ---------------------------------------------------------------------------
 // Plugin entry point

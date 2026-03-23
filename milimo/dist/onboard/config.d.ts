@@ -1,5 +1,11 @@
 import type { ClawRole } from "../index.js";
 export declare const CONFIG_DIR: string;
+export interface AssistantPersona {
+    name: string;
+    creature: string;
+    vibe: string;
+    emoji: string;
+}
 export interface MilimoConfig {
     squadName: string;
     clawRole: ClawRole;
@@ -18,6 +24,8 @@ export interface MilimoConfig {
         activated_at: string;
         resume_date: string;
     };
+    assistant: AssistantPersona;
+    activeClaws: string[];
 }
 export interface LegacyState {
     squadName: string;
@@ -51,4 +59,6 @@ export declare function loadNemoClawConfig(): {
 } | null;
 export declare function isNemoClawOnboarded(): boolean;
 export { MilimoConfig as MilimoOnboardConfig };
+export declare const TEMPLATE_CLAW_MAP: Record<string, string[]>;
+export declare function getActiveClawsForTemplate(templateName: string): string[];
 //# sourceMappingURL=config.d.ts.map

@@ -49,6 +49,7 @@ const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const index_js_1 = require("../index.js");
 const config_js_1 = require("../onboard/config.js");
+const assistant_js_1 = require("./assistant.js");
 function listTemplates(blueprintDir) {
     const templatesDir = path.join(blueprintDir, "templates");
     if (!fs.existsSync(templatesDir)) {
@@ -139,12 +140,27 @@ async function cliInit(opts) {
         onboardedAt: null,
         initializedAt: new Date().toISOString(),
         blueprintVersion: "0.1.0",
+        assistant: {
+            name: opts.assistantName || "Nova",
+            creature: opts.assistantCreature || "a claw",
+            vibe: opts.assistantVibe || "sharp and unhurried",
+            emoji: opts.assistantEmoji || "🦀",
+        },
+        activeClaws: (0, config_js_1.getActiveClawsForTemplate)(template),
     };
     config_js_1.ConfigManager.save(config);
     logger.info(" ✓ State directory created (~/.milimo/)");
     logger.info(" ✓ Blueprint directories initialized");
     logger.info(" ✓ Claw configuration saved");
     logger.info("");
+    // Run assistant setup automatically
+    logger.info("Configuring squad assistant...");
+    try {
+        await (0, assistant_js_1.assistantSetup)();
+    }
+    catch (err) {
+        logger.warn("Assistant setup skipped — run 'milimo assistant setup' manually.");
+    }
     if (opts.solo) {
         logger.info(" Solo mode: claw is ready. No mesh formation needed.");
     }
@@ -166,6 +182,7 @@ function getRoleDescription(role) {
         analytics: "Intelligence layer — performance, trends, opportunities",
         finance: "Financial ops — invoicing, pricing, margin tracking",
         build: "Engineering — code, PRs, deploys, monitoring (tech squads)",
+        solo: "All claws active on this machine (solo mode)",
     };
     return descriptions[role];
 }

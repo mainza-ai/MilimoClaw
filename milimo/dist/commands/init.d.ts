@@ -5,6 +5,10 @@ interface InitOptions {
     role?: string;
     template?: string;
     solo: boolean;
+    assistantName?: string;
+    assistantCreature?: string;
+    assistantVibe?: string;
+    assistantEmoji?: string;
     logger: PluginLogger;
     pluginConfig: MilimoConfig;
 }

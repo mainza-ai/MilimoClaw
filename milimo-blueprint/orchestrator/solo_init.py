@@ -78,7 +78,11 @@ USER_SANDBOX_BASE = Path.home() / ".milimo" / "sandboxes"
 # ---------------------------------------------------------------------------
 
 
-def detect_filesystem_config(squad_id: str, config: dict[str, Any] | None = None) -> FilesystemConfig:
+def detect_filesystem_config(
+    squad_id: str,
+    config: dict[str, Any] | None = None,
+    claws_to_init: list[str] | None = None,
+) -> FilesystemConfig:
     """
     Auto-detect and configure sandbox filesystem paths.
 
@@ -88,10 +92,15 @@ def detect_filesystem_config(squad_id: str, config: dict[str, Any] | None = None
     Args:
         squad_id: Squad identifier
         config: Optional template config (for custom paths)
+        claws_to_init: Optional list of claws to create paths for.
+                       If not provided, uses all CLAWS.
 
     Returns:
         FilesystemConfig with resolved paths and reason
     """
+    # Determine which claws to create paths for
+    target_claws = claws_to_init if claws_to_init is not None else CLAWS
+
     # Check if we can use system sandbox
     can_use_system = _can_write_to_system_sandbox()
 
@@ -104,9 +113,9 @@ def detect_filesystem_config(squad_id: str, config: dict[str, Any] | None = None
         using_system = False
         reason = f"Insufficient permissions for /sandbox, using {sandbox_base}"
 
-    # Build claw paths
+    # Build claw paths only for requested claws
     claw_paths: dict[str, Path] = {}
-    for claw in CLAWS:
+    for claw in target_claws:
         if using_system:
             claw_paths[claw] = sandbox_base / claw
         else:
@@ -188,7 +197,11 @@ def setup_sandbox_directories(fs_config: FilesystemConfig) -> dict[str, Path]:
     return created
 
 
-def get_effective_paths(squad_id: str, config: dict[str, Any] | None = None) -> dict[str, Path]:
+def get_effective_paths(
+    squad_id: str,
+    config: dict[str, Any] | None = None,
+    claws_to_init: list[str] | None = None,
+) -> dict[str, Path]:
     """
     Get effective filesystem paths for all claws.
 
@@ -200,19 +213,24 @@ def get_effective_paths(squad_id: str, config: dict[str, Any] | None = None) -> 
     Args:
         squad_id: Squad identifier
         config: Optional template config
+        claws_to_init: Optional list of claws to initialize.
+                       If not provided, uses all CLAWS.
 
     Returns:
         Dictionary mapping claw names to their paths
     """
+    # Determine which claws to initialize
+    target_claws = claws_to_init if claws_to_init is not None else CLAWS
+
     # Check if config has custom paths
     if config and "filesystem" in config:
-        custom_paths = _extract_custom_paths(config)
+        custom_paths = _extract_custom_paths(config, target_claws)
         if custom_paths:
             logger.info("Using custom filesystem paths from config")
             return custom_paths
 
     # Auto-detect paths
-    fs_config = detect_filesystem_config(squad_id, config)
+    fs_config = detect_filesystem_config(squad_id, config, target_claws)
 
     # Setup directories
     setup_sandbox_directories(fs_config)
@@ -223,12 +241,16 @@ def get_effective_paths(squad_id: str, config: dict[str, Any] | None = None) -> 
     return fs_config.claw_paths
 
 
-def _extract_custom_paths(config: dict[str, Any]) -> dict[str, Path] | None:
+def _extract_custom_paths(
+    config: dict[str, Any],
+    target_claws: list[str] | None = None,
+) -> dict[str, Path] | None:
     """Extract custom paths from config if they exist and are accessible."""
     filesystem = config.get("filesystem", {})
     paths: dict[str, Path] = {}
+    claws_to_check = target_claws if target_claws is not None else CLAWS
 
-    for claw in CLAWS:
+    for claw in claws_to_check:
         if claw in filesystem:
             path = Path(filesystem[claw])
             # Check if path is accessible
@@ -504,6 +526,44 @@ def get_claw_paths(config: dict[str, Any]) -> dict[str, Path]:
             paths[claw] = Path(filesystem[claw])
 
     return paths
+
+
+def get_claws_to_initialize(config: dict[str, Any]) -> list[str]:
+    """
+    Returns the list of claw roles whose sandboxes should be initialized.
+
+    Solo mode (clawRole == "solo"):
+        Returns all active claws from the template.
+        All five sandboxes are created on this machine.
+
+    Mesh mode (clawRole is a specific claw name):
+        Returns only the one claw this operator runs.
+        Other sandboxes are on other machines.
+
+    Args:
+        config: Configuration dictionary with clawRole and activeClaws keys
+
+    Returns:
+        List of claw role names to initialize
+
+    Raises:
+        ValueError: If clawRole is not in activeClaws (mesh mode mismatch)
+    """
+    claw_role: str = config.get("clawRole", "solo")
+    active_claws: list[str] = config.get(
+        "activeClaws", ["content", "ops", "analytics", "finance", "build"]
+    )
+
+    if claw_role == "solo":
+        return active_claws
+    else:
+        # Mesh mode — verify the role is actually in the active claws list
+        if claw_role not in active_claws:
+            raise ValueError(
+                f"clawRole '{claw_role}' is not in activeClaws {active_claws}. "
+                f"Check config.json."
+            )
+        return [claw_role]
 
 
 def get_claw_network_policy(config: dict[str, Any], claw: str) -> dict[str, Any]:

@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.formatRoleDisplay = formatRoleDisplay;
 exports.cliOnboard = cliOnboard;
 exports.cliOnboardStatus = cliOnboardStatus;
 /**
@@ -50,9 +51,17 @@ const config_js_1 = require("../onboard/config.js");
 const prompt_js_1 = require("../onboard/prompt.js");
 const validate_js_1 = require("../onboard/validate.js");
 const template_js_1 = require("../onboard/template.js");
+const assistant_js_1 = require("./assistant.js");
+function formatRoleDisplay(config) {
+    if (config.clawRole === "solo") {
+        const claws = config.activeClaws?.join(", ") ?? "all claws";
+        return `Solo (${claws})`;
+    }
+    return config.clawRole;
+}
 function showConfig(config, logger) {
     logger.info(` Squad: ${config.squadName}`);
-    logger.info(` Role: ${config.clawRole}`);
+    logger.info(` Role: ${formatRoleDisplay(config)}`);
     logger.info(` Template: ${config.template}`);
     logger.info(` Mode: ${config.solo ? "Solo" : "Mesh"}`);
     logger.info(` War Room: ${config.warRoomMode}`);
@@ -95,7 +104,7 @@ async function cliOnboard(opts) {
         logger.warn("NemoClaw is not onboarded. Inference configuration is missing.");
         logger.info("");
         logger.info("Please run NemoClaw onboarding first:");
-        logger.info("  openclaw nemoclaw onboard");
+        logger.info(" openclaw nemoclaw onboard");
         logger.info("");
         if (!nonInteractive) {
             const proceed = await (0, prompt_js_1.promptConfirm)("Continue anyway? (Inference will use defaults)", false);
@@ -154,8 +163,8 @@ async function cliOnboard(opts) {
         if (!soloConfirm) {
             logger.info("");
             logger.info("Mesh mode selected. Each squad member will need to:");
-            logger.info("  1. Run: openclaw milimo onboard --squad <name> --role <role>");
-            logger.info("  2. Share the mesh secret for authentication");
+            logger.info(" 1. Run: openclaw milimo onboard --squad <name> --role <role>");
+            logger.info(" 2. Share the mesh secret for authentication");
             logger.info("");
         }
     }
@@ -180,26 +189,53 @@ async function cliOnboard(opts) {
             logger.error(validation.error || "Invalid squad name");
         }
     }
-    // Step 5: Role Assignment
+    // Step 5: Role Assignment — conditional on operating mode
     let clawRole;
-    if (opts.role) {
-        if (!index_js_1.CLAW_ROLES.includes(opts.role)) {
-            logger.error(`Invalid role "${opts.role}". Must be one of: ${index_js_1.CLAW_ROLES.join(", ")}`);
-            return;
-        }
-        clawRole = opts.role;
+    if (solo) {
+        // Solo mode: all claws run on this machine.
+        // Role selection is meaningless — skip it entirely.
+        clawRole = "solo";
+        const templateClaws = selectedTemplate?.clawsActive || (0, config_js_1.getActiveClawsForTemplate)(template);
+        const activeClawsDisplay = templateClaws.join(" · ");
+        logger.info("");
+        logger.info(`✓ Solo mode — all claws will run on this machine:`);
+        logger.info(`    ${activeClawsDisplay}`);
+        logger.info("");
     }
     else {
-        const roleOptions = index_js_1.CLAW_ROLES.map((role) => ({
-            label: role,
-            value: role,
-            hint: (0, template_js_1.getRoleDescription)(role),
-        }));
-        const defaultIndex = selectedTemplate?.clawsActive?.[0]
-            ? index_js_1.CLAW_ROLES.indexOf(selectedTemplate.clawsActive[0])
-            : 0;
-        const selectedRole = await (0, prompt_js_1.promptSelect)("Your claw role:", roleOptions, defaultIndex);
-        clawRole = selectedRole;
+        // Mesh mode: operator runs exactly one claw on this machine.
+        // Role selection is correct and necessary here.
+        if (opts.role) {
+            if (!index_js_1.CLAW_ROLES.includes(opts.role)) {
+                logger.error(`Invalid role "${opts.role}". Must be one of: ${index_js_1.CLAW_ROLES.join(", ")}`);
+                return;
+            }
+            clawRole = opts.role;
+        }
+        else {
+            logger.info("");
+            logger.info("Mesh mode — which claw are you running on this machine?");
+            logger.info("");
+            // Only offer roles that are active in the selected template
+            const templateActiveClaws = selectedTemplate?.clawsActive || (0, config_js_1.getActiveClawsForTemplate)(template);
+            const roleOptions = index_js_1.CLAW_ROLES
+                .filter((role) => templateActiveClaws.includes(role))
+                .map((role) => ({
+                label: role,
+                value: role,
+                hint: (0, template_js_1.getRoleDescription)(role),
+            }));
+            const defaultIndex = 0;
+            const selectedRole = await (0, prompt_js_1.promptSelect)("Your claw role:", roleOptions, defaultIndex);
+            clawRole = selectedRole;
+            const others = templateActiveClaws.filter((c) => c !== clawRole).join(", ");
+            logger.info("");
+            logger.info(`✓ You are running the ${clawRole} claw on this machine.`);
+            if (others) {
+                logger.info(`    Other squad members will run: ${others}`);
+            }
+            logger.info("");
+        }
     }
     // Step 6: Operator Name
     let operatorName;
@@ -222,6 +258,39 @@ async function cliOnboard(opts) {
             operatorName = input.trim();
         }
     }
+    // Step 6a: Assistant Persona
+    let assistant;
+    if (!nonInteractive) {
+        logger.info("");
+        logger.info("── Assistant Persona ─────────────────────────────────");
+        logger.info("Your squad assistant is your conversational interface to");
+        logger.info("all your claws. Give it a name, a creature, and a vibe.");
+        logger.info("");
+        logger.info("Examples:");
+        logger.info('  Name: Nova · Creature: a hawk · Vibe: fast and precise · 🦅');
+        logger.info('  Name: Rex · Creature: a wolf · Vibe: direct and loyal · 🐺');
+        logger.info('  Name: Sage · Creature: an owl · Vibe: measured and wise · 🦉');
+        logger.info('  Name: Moyo · Creature: a claw · Vibe: sharp and unhurried · 🦀');
+        logger.info("");
+        const nameInput = await (0, prompt_js_1.promptInput)("Assistant name", "Nova");
+        const creatureInput = await (0, prompt_js_1.promptInput)("Creature (e.g. a claw, a hawk, an owl)", "a claw");
+        const vibeInput = await (0, prompt_js_1.promptInput)("Vibe (e.g. sharp and unhurried, warm and direct)", "sharp and unhurried");
+        const emojiInput = await (0, prompt_js_1.promptInput)("Signature emoji", "🦀");
+        assistant = {
+            name: nameInput || "Nova",
+            creature: creatureInput || "a claw",
+            vibe: vibeInput || "sharp and unhurried",
+            emoji: emojiInput || "🦀",
+        };
+    }
+    else {
+        assistant = {
+            name: "Nova",
+            creature: "a claw",
+            vibe: "sharp and unhurried",
+            emoji: "🦀",
+        };
+    }
     // Step 7: War Room Mode
     let warRoomMode;
     if (opts.warRoomMode) {
@@ -240,7 +309,8 @@ async function cliOnboard(opts) {
     let meshSecret = null;
     let meshMembers = [];
     if (solo) {
-        meshMembers = [clawRole];
+        // In solo mode, meshMembers contains all active claws
+        meshMembers = selectedTemplate?.clawsActive || (0, config_js_1.getActiveClawsForTemplate)(template);
     }
     else {
         if (!nonInteractive) {
@@ -249,7 +319,7 @@ async function cliOnboard(opts) {
                 meshSecret = (0, validate_js_1.generateMeshSecret)();
                 logger.info("");
                 logger.info("Generated mesh secret (share with squad members):");
-                logger.info(`  ${meshSecret}`);
+                logger.info(` ${meshSecret}`);
                 logger.info("");
             }
             else {
@@ -274,13 +344,15 @@ async function cliOnboard(opts) {
         }
     }
     // Step 10: Confirmation
+    const activeClaws = (0, config_js_1.getActiveClawsForTemplate)(template);
+    const clawsDisplay = activeClaws.join(", ");
     logger.info("");
     logger.info("Configuration summary:");
     logger.info(` Squad: ${squadName}`);
-    logger.info(` Role: ${clawRole} — ${(0, template_js_1.getRoleDescription)(clawRole)}`);
-    logger.info(` Template: ${template}`);
+    logger.info(` Template: ${template} (${clawsDisplay})`);
     logger.info(` Mode: ${solo ? "Solo" : "Mesh"}`);
     logger.info(` Operator: ${operatorName}`);
+    logger.info(` Assistant: ${assistant.name} (${assistant.creature} · ${assistant.vibe} · ${assistant.emoji})`);
     logger.info(` War Room: ${warRoomMode}`);
     if (!solo && meshSecret) {
         logger.info(` Mesh Secret: ${meshSecret.slice(0, 8)}...`);
@@ -312,28 +384,44 @@ async function cliOnboard(opts) {
         onboardedAt: new Date().toISOString(),
         initializedAt: new Date().toISOString(),
         blueprintVersion: "0.1.0",
+        assistant,
+        activeClaws,
     };
     (0, config_js_1.saveOnboardConfig)(config);
     logger.info(" ✓ Saved configuration to ~/.milimo/config.json");
+    // Run assistant setup automatically
+    logger.info("");
+    logger.info("Configuring squad assistant...");
+    try {
+        await (0, assistant_js_1.assistantSetup)();
+    }
+    catch (err) {
+        logger.warn("Assistant setup skipped — run 'milimo assistant setup' manually.");
+        logger.warn(err instanceof Error ? err.message : String(err));
+    }
     // Step 12: Success
+    const { name, emoji } = assistant;
     logger.info("");
     logger.info("╔═══════════════════════════════════════════════════════╗");
-    logger.info("║ 🎉 Onboarding Complete! 🎉 ║");
+    logger.info(`║ ${emoji} Onboarding Complete! ${emoji} ║`);
     logger.info("╚═══════════════════════════════════════════════════════╝");
     logger.info("");
     logger.info(` Squad: ${squadName}`);
-    logger.info(` Role: ${clawRole}`);
     logger.info(` Template: ${template}`);
+    logger.info(` Assistant: ${name} ${emoji}`);
     logger.info("");
     logger.info("Next steps:");
-    logger.info("  openclaw milimo squad status     # View squad configuration");
-    logger.info("  openclaw milimo warroom          # Launch the War Room dashboard");
+    logger.info(`    milimo assistant start    # Talk to ${name}`);
+    logger.info("    milimo warroom            # Open the War Room");
+    logger.info("    milimo squad status       # View squad configuration");
     if (!solo) {
         logger.info("");
         logger.info("For mesh setup:");
-        logger.info("  Share the mesh secret with squad members");
-        logger.info("  Each member runs: openclaw milimo onboard --squad " + squadName);
+        logger.info("    Share the mesh secret with squad members");
+        logger.info(`    Each member runs: milimo onboard --squad ${squadName}`);
     }
+    logger.info("");
+    logger.info("The milimo never stops. Work. Without working.");
     logger.info("");
 }
 async function cliOnboardStatus(logger) {
@@ -343,28 +431,33 @@ async function cliOnboardStatus(logger) {
         logger.info("No Milimo configuration found.");
         logger.info("");
         logger.info("Run the onboard command to set up:");
-        logger.info("  openclaw milimo onboard");
+        logger.info("    milimo onboard");
         logger.info("");
         return;
     }
+    const assistant = config.assistant;
+    const assistantLine = assistant
+        ? `${assistant.name} ${assistant.emoji} (${assistant.creature} · ${assistant.vibe})`
+        : "Not configured";
     logger.info("");
     logger.info("Milimo Configuration:");
-    logger.info(` Squad: ${config.squadName}`);
-    logger.info(` Role: ${config.clawRole}`);
-    logger.info(` Template: ${config.template}`);
-    logger.info(` Mode: ${config.solo ? "Solo" : "Mesh"}`);
-    logger.info(` Operator: ${config.operatorName}`);
-    logger.info(` War Room: ${config.warRoomMode}`);
-    logger.info(` Onboarded: ${config.onboardedAt}`);
+    logger.info(`    Squad: ${config.squadName}`);
+    logger.info(`    Template: ${config.template}`);
+    logger.info(`    Active claws: ${(config.activeClaws || []).join(", ")}`);
+    logger.info(`    Mode: ${config.solo ? "Solo" : "Mesh"}`);
+    logger.info(`    Operator: ${config.operatorName}`);
+    logger.info(`    Assistant: ${assistantLine}`);
+    logger.info(`    War Room: ${config.warRoomMode}`);
+    logger.info(`    Onboarded: ${config.onboardedAt}`);
     logger.info("");
     if (!config.solo) {
         logger.info("Mesh Members:");
         for (const member of config.meshMembers) {
-            logger.info(`  - ${member}`);
+            logger.info(`    - ${member}`);
         }
         logger.info("");
     }
-    logger.info("To reconfigure, run: openclaw milimo onboard");
+    logger.info("To reconfigure, run: milimo onboard");
     logger.info("");
 }
 //# sourceMappingURL=onboard.js.map

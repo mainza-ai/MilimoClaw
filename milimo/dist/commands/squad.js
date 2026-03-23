@@ -93,17 +93,25 @@ async function cliSquadStatus(opts) {
     const state = (0, init_js_1.loadMilimoState)();
     if (!state) {
         logger.info("No Milimo Claw configuration found.");
-        logger.info('Run "openclaw milimo init" to set up your claw.');
+        logger.info('Run "milimo init" to set up your claw.');
         return;
     }
     const finalsMode = loadFinalsMode();
+    const assistant = state.assistant;
+    const assistantLine = assistant
+        ? `${assistant.name} ${assistant.emoji} (${assistant.creature} · ${assistant.vibe})`
+        : "Not configured";
+    const activeClawsDisplay = (state.activeClaws || []).join(", ");
     if (opts.json) {
         const output = {
             squad: state.squadName,
             role: state.clawRole,
             template: state.template,
+            activeClaws: state.activeClaws || [],
             solo: state.solo,
             meshMembers: state.meshMembers,
+            operator: state.operatorName,
+            assistant: state.assistant,
             initializedAt: state.initializedAt,
             blueprintVersion: state.blueprintVersion,
             finalsMode: finalsMode?.active ?? false,
@@ -113,18 +121,21 @@ async function cliSquadStatus(opts) {
     }
     logger.info("");
     logger.info(" ┌─────────────────────────────────────────────────────┐");
-    logger.info(" │ 🦀 SQUAD STATUS 🦀                                   │");
+    logger.info(" │ 🦀 SQUAD STATUS 🦀 │");
     logger.info(" └─────────────────────────────────────────────────────┘");
     logger.info("");
     logger.info(` Squad: ${state.squadName}`);
-    logger.info(` Role: ${state.clawRole}`);
     logger.info(` Template: ${state.template}`);
+    logger.info(` Active claws: ${activeClawsDisplay}`);
     logger.info(` Mode: ${state.solo ? "Solo" : "Mesh"}`);
+    logger.info(` Operator: ${state.operatorName}`);
+    logger.info(` Assistant: ${assistantLine}`);
+    logger.info(` War Room: ${state.warRoomMode}`);
     logger.info(` Blueprint: v${state.blueprintVersion}`);
-    logger.info(` Initialized: ${state.initializedAt}`);
+    logger.info(` Initialized: ${state.initializedAt?.split("T")[0] ?? "N/A"}`);
     if (finalsMode?.active) {
         logger.info("");
-        logger.info(" ⚠️  FINALS MODE ACTIVE");
+        logger.info(" ⚠️ FINALS MODE ACTIVE");
         logger.info(` Since: ${finalsMode.activatedAt}`);
         logger.info(` Duration: ${finalsMode.duration}`);
         if (finalsMode.resumeDate) {

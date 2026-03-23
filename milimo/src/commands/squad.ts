@@ -82,63 +82,74 @@ export function checkFinalsModeAutoResume(logger: PluginLogger): void {
 }
 
 export async function cliSquadStatus(opts: SquadStatusOptions): Promise<void> {
-    const { logger } = opts;
-    const state = loadMilimoState();
+  const { logger } = opts;
+  const state = loadMilimoState();
 
-    if (!state) {
-        logger.info("No Milimo Claw configuration found.");
-        logger.info('Run "openclaw milimo init" to set up your claw.');
-        return;
-    }
+  if (!state) {
+    logger.info("No Milimo Claw configuration found.");
+    logger.info('Run "milimo init" to set up your claw.');
+    return;
+  }
 
-    const finalsMode = loadFinalsMode();
+  const finalsMode = loadFinalsMode();
+  const assistant = state.assistant;
+  const assistantLine = assistant
+    ? `${assistant.name} ${assistant.emoji} (${assistant.creature} · ${assistant.vibe})`
+    : "Not configured";
+  const activeClawsDisplay = (state.activeClaws || []).join(", ");
 
-    if (opts.json) {
-        const output = {
-            squad: state.squadName,
-            role: state.clawRole,
-            template: state.template,
-            solo: state.solo,
-            meshMembers: state.meshMembers,
-            initializedAt: state.initializedAt,
-            blueprintVersion: state.blueprintVersion,
-            finalsMode: finalsMode?.active ?? false,
-        };
-        logger.info(JSON.stringify(output, null, 2));
-        return;
-    }
+  if (opts.json) {
+    const output = {
+      squad: state.squadName,
+      role: state.clawRole,
+      template: state.template,
+      activeClaws: state.activeClaws || [],
+      solo: state.solo,
+      meshMembers: state.meshMembers,
+      operator: state.operatorName,
+      assistant: state.assistant,
+      initializedAt: state.initializedAt,
+      blueprintVersion: state.blueprintVersion,
+      finalsMode: finalsMode?.active ?? false,
+    };
+    logger.info(JSON.stringify(output, null, 2));
+    return;
+  }
 
+  logger.info("");
+  logger.info(" ┌─────────────────────────────────────────────────────┐");
+  logger.info(" │ 🦀 SQUAD STATUS 🦀 │");
+  logger.info(" └─────────────────────────────────────────────────────┘");
+  logger.info("");
+  logger.info(` Squad: ${state.squadName}`);
+  logger.info(` Template: ${state.template}`);
+  logger.info(` Active claws: ${activeClawsDisplay}`);
+  logger.info(` Mode: ${state.solo ? "Solo" : "Mesh"}`);
+  logger.info(` Operator: ${state.operatorName}`);
+  logger.info(` Assistant: ${assistantLine}`);
+  logger.info(` War Room: ${state.warRoomMode}`);
+  logger.info(` Blueprint: v${state.blueprintVersion}`);
+  logger.info(` Initialized: ${state.initializedAt?.split("T")[0] ?? "N/A"}`);
+
+  if (finalsMode?.active) {
     logger.info("");
-    logger.info(" ┌─────────────────────────────────────────────────────┐");
-    logger.info(" │ 🦀 SQUAD STATUS 🦀                                   │");
-    logger.info(" └─────────────────────────────────────────────────────┘");
-    logger.info("");
-    logger.info(` Squad: ${state.squadName}`);
-    logger.info(` Role: ${state.clawRole}`);
-    logger.info(` Template: ${state.template}`);
-    logger.info(` Mode: ${state.solo ? "Solo" : "Mesh"}`);
-    logger.info(` Blueprint: v${state.blueprintVersion}`);
-    logger.info(` Initialized: ${state.initializedAt}`);
-
-    if (finalsMode?.active) {
-        logger.info("");
-        logger.info(" ⚠️  FINALS MODE ACTIVE");
-        logger.info(` Since: ${finalsMode.activatedAt}`);
-        logger.info(` Duration: ${finalsMode.duration}`);
-        if (finalsMode.resumeDate) {
-            logger.info(` Resumes: ${finalsMode.resumeDate}`);
-        }
+    logger.info(" ⚠️ FINALS MODE ACTIVE");
+    logger.info(` Since: ${finalsMode.activatedAt}`);
+    logger.info(` Duration: ${finalsMode.duration}`);
+    if (finalsMode.resumeDate) {
+      logger.info(` Resumes: ${finalsMode.resumeDate}`);
     }
+  }
 
-    if (!state.solo && state.meshMembers.length > 0) {
-        logger.info("");
-        logger.info(" Mesh Members:");
-        for (const member of state.meshMembers) {
-            logger.info(` • ${member}`);
-        }
-    }
-
+  if (!state.solo && state.meshMembers.length > 0) {
     logger.info("");
+    logger.info(" Mesh Members:");
+    for (const member of state.meshMembers) {
+      logger.info(` • ${member}`);
+    }
+  }
+
+logger.info("");
 }
 
 export async function cliSquadFinalsMode(opts: FinalsModeOptions): Promise<void> {

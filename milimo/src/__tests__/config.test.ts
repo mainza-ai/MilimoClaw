@@ -38,6 +38,13 @@ describe("ConfigManager", () => {
     onboardedAt: "2026-03-20T00:00:00.000Z",
     initializedAt: "2026-03-20T00:00:00.000Z",
     blueprintVersion: "0.1.0",
+    assistant: {
+      name: "Nova",
+      creature: "a claw",
+      vibe: "sharp and unhurried",
+      emoji: "🦀",
+    },
+    activeClaws: ["content", "ops", "analytics", "finance", "build"],
   };
 
   beforeEach(() => {
@@ -217,7 +224,7 @@ describe("loadOnboardConfig (legacy export)", () => {
 describe("saveOnboardConfig (legacy export)", () => {
   it("delegates to ConfigManager.save", () => {
     mockedFs.existsSync.mockReturnValue(true);
-    
+
     saveOnboardConfig({
       squadName: "test",
       clawRole: "build",
@@ -230,8 +237,15 @@ describe("saveOnboardConfig (legacy export)", () => {
       onboardedAt: null,
       initializedAt: new Date().toISOString(),
       blueprintVersion: "0.1.0",
+      assistant: {
+        name: "Nova",
+        creature: "a claw",
+        vibe: "sharp and unhurried",
+        emoji: "🦀",
+      },
+      activeClaws: ["content", "ops", "analytics", "finance", "build"],
     });
-    
+
     expect(mockedFs.writeFileSync).toHaveBeenCalled();
   });
 });
