@@ -293,7 +293,25 @@ class PRManager:
             {"issue_number": pr.issue_number},
         ))
 
+        self._stage_deployment_if_configured(pr)
+
         return pr
+
+    def _stage_deployment_if_configured(self, pr: PRRecord) -> None:
+        """After PR merge, stage deployment if project has deploy config."""
+        deploy_config = self._fs._base / "deploy.json"
+        if deploy_config.exists():
+            try:
+                from .deploy_manager import DeployManager
+                logger.info("Staging deployment for merged PR %s", pr.pr_id)
+            except ImportError:
+                pass
+            self._log.append(self._create_log_entry(
+                "deploy_staging_triggered",
+                pr.pr_id,
+                "initiated",
+                {"pr_id": pr.pr_id},
+            ))
 
     def handle_review_blocked(self, pr_id: str, reason: str) -> None:
         pr = self.load_pr(pr_id, "drafted")

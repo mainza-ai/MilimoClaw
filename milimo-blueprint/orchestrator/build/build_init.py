@@ -66,6 +66,7 @@ REQUIRED_FILES: dict[str, Any] = {
         "drift_pct": 0.0,
         "last_updated": None,
     },
+    "context/costs/inference-history.jsonl": None,
     "docs/changelog.md": "# Changelog\n\nAll notable changes documented here.\n",
     "logs/operational.log": None,
     "logs/pr-activity.log": None,

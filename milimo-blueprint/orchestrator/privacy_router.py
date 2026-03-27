@@ -157,6 +157,13 @@ class PrivacyRouter:
         if role_override is not None:
             # Force backend override (e.g., Finance → always local-nim)
             if role_override.force_backend is not None:
+                logger.info(
+                    "Privacy routing: role=%s data_type=%s backend=%s reason=%s",
+                    role,
+                    data_type,
+                    role_override.force_backend.value,
+                    f"role_override_force",
+                )
                 return RoutingDecision(
                     backend=role_override.force_backend,
                     reason=f"Role override: {role} forces {role_override.force_backend.value}",
@@ -166,6 +173,13 @@ class PrivacyRouter:
 
             # Force local for specific data types (e.g., Build → source_code)
             if data_type in role_override.force_local_types:
+                logger.info(
+                    "Privacy routing: role=%s data_type=%s backend=%s reason=%s",
+                    role,
+                    data_type,
+                    InferenceBackend.LOCAL_NIM.value,
+                    f"role_override_local_type",
+                )
                 return RoutingDecision(
                     backend=InferenceBackend.LOCAL_NIM,
                     reason=f"Role override: {role} forces local for {data_type}",
@@ -177,6 +191,13 @@ class PrivacyRouter:
             if not role_override.cloud_allowed:
                 rule = self._route_index.get(data_type)
                 if rule and rule.backend == InferenceBackend.CLOUD:
+                    logger.info(
+                        "Privacy routing: role=%s data_type=%s backend=%s reason=%s",
+                        role,
+                        data_type,
+                        InferenceBackend.LOCAL_NIM.value,
+                        f"role_cloud_block",
+                    )
                     return RoutingDecision(
                         backend=InferenceBackend.LOCAL_NIM,
                         reason=f"Role {role}: cloud not allowed, downgraded to local-nim",
@@ -187,6 +208,13 @@ class PrivacyRouter:
         # 2. Check data type routing rules (first match wins)
         rule = self._route_index.get(data_type)
         if rule is not None:
+            logger.info(
+                "Privacy routing: role=%s data_type=%s backend=%s reason=%s",
+                role,
+                data_type,
+                rule.backend.value,
+                f"policy_rule",
+            )
             return RoutingDecision(
                 backend=rule.backend,
                 reason=f"Policy rule: {rule.description}",
@@ -202,6 +230,14 @@ class PrivacyRouter:
                 role,
                 self._policy.default_backend.value,
             )
+
+        logger.info(
+            "Privacy routing: role=%s data_type=%s backend=%s reason=%s",
+            role,
+            data_type,
+            self._policy.default_backend.value,
+            f"unclassified_fallback",
+        )
 
         return RoutingDecision(
             backend=self._policy.default_backend,

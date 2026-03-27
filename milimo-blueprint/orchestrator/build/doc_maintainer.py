@@ -155,11 +155,10 @@ Output documentation in Markdown format:
         docs_path.parent.mkdir(parents=True, exist_ok=True)
         docs_path.write_text(docs)
 
-        self._approval.queue_security_pr_review(
-            vuln_id=f"api-docs-{merged_pr.pr_id}",
-            package="documentation",
-            severity="info",
-            fix_description=f"API documentation update for {merged_pr.title}",
+        self._approval.log_auto(
+            f"api_docs_updated_{merged_pr.pr_id}",
+            "api_documentation",
+            {"docs_file": docs_filename, "pr_id": merged_pr.pr_id},
         )
 
         self._log.append(self._create_log_entry(

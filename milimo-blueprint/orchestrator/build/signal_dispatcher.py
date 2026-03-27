@@ -144,7 +144,7 @@ class BuildSignalDispatcher:
         message_id = uuid.uuid4().hex[:12]
         payload = {
             "query": query,
-            "time_range": f"{lookback_days}d",
+            "lookback_days": lookback_days,
             "feature_id": feature_ids[0] if feature_ids else None,
         }
         if feature_ids and len(feature_ids) > 1:

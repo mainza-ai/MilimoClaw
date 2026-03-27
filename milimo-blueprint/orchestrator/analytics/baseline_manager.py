@@ -19,9 +19,9 @@ import statistics
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from .analytics_init import AnalyticsFilesystemInit
+from .analytics_init import AnalyticsFilesystemInit, AnalyticsLogEntry, AnalyticsOperationalLog
 
 logger = logging.getLogger("milimo.baseline_manager")
 
@@ -131,7 +131,7 @@ class BaselineManager:
     def __init__(
         self,
         fs: AnalyticsFilesystemInit,
-        operational_log: Any = None,
+        operational_log: AnalyticsOperationalLog | None = None,
     ) -> None:
         self.fs = fs
         self.operational_log = operational_log
@@ -168,6 +168,22 @@ class BaselineManager:
             len(revenue_baselines),
             len(delivery_baselines),
         )
+
+        if self.operational_log:
+            self.operational_log.append(
+                AnalyticsLogEntry(
+                    timestamp=results["calculated_at"],
+                    action_type="baseline_recalculation_complete",
+                    entity_id="all_metrics",
+                    source_claw=None,
+                    outcome="success",
+                    details={
+                        "content_baselines": len(content_baselines),
+                        "revenue_baselines": len(revenue_baselines),
+                        "delivery_baselines": len(delivery_baselines),
+                    },
+                )
+            )
 
         return results
 
@@ -467,7 +483,7 @@ class BaselineManager:
 
         return True, ""
 
-    def _count_samples(self, data_type: str) -> int:
+    def _count_samples(self, data_type: Literal["content-performance", "client-health", "revenue", "delivery-velocity"]) -> int:
         """Count total samples in a data directory."""
         count = 0
         data_dir = self.fs.get_data_path(data_type)

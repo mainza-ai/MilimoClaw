@@ -396,6 +396,35 @@ class MeshCoordinator:
                 logger.warning("Could not read message: %s", msg_file)
         return messages
 
+    def ack_message(self, role: str, message_id: str) -> bool:
+        """
+        Acknowledge and remove a processed message.
+
+        Moves the message from inbox to delivered directory.
+
+        Args:
+            role: The claw role that processed the message
+            message_id: The message_id to acknowledge
+
+        Returns:
+            True if message was found and moved, False otherwise
+        """
+        inbox = self._mesh_dir / "inbox" / role
+        delivered = self._mesh_dir / "delivered"
+
+        for msg_file in inbox.glob(f"*{message_id}*.json"):
+            try:
+                target = delivered / msg_file.name
+                msg_file.rename(target)
+                logger.debug("Message %s acknowledged, moved to %s", message_id, target)
+                return True
+            except OSError as e:
+                logger.warning("Failed to ack message %s: %s", message_id, e)
+                return False
+
+        logger.warning("Message %s not found in inbox for %s", message_id, role)
+        return False
+
     # ── Health Monitoring ─────────────────────────────────────────────
 
     def heartbeat(self, role: str) -> bool:

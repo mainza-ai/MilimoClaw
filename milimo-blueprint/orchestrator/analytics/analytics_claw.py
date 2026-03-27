@@ -106,6 +106,7 @@ class AnalyticsClaw:
         self.signal_processor = SignalProcessor(
             fs=self.fs,
             operational_log=self.operational_log,
+            alert_dispatcher=self._dispatch_alert_from_processor,
         )
 
         self.query_handler = QueryHandler(
@@ -259,17 +260,20 @@ class AnalyticsClaw:
 
     def _handle_client_health_signal(self, message: dict[str, Any]) -> None:
         """Handle client_health_signal from Ops Claw."""
+        payload = message.get("payload", {})
+        client_id = payload.get("client_id", "")
+        health_score = payload.get("health_score", 10)
+
         if self.signal_processor:
             self.signal_processor.handle_client_health_signal(message)
 
-            health_score = message.get("health_score", 10)
-            if health_score < 6.0 and self.signal_dispatcher:
-                self.signal_dispatcher.send_client_health_alert(
-                    client_id=message.get("client_id", ""),
-                    health_score=health_score,
-                    risk_factors=message.get("risk_factors", []),
-                    recommended_action=message.get("recommended_action", "Schedule client check-in"),
-                )
+        if health_score < 6.0 and self.signal_dispatcher:
+            self.signal_dispatcher.send_client_health_alert(
+                client_id=client_id,
+                health_score=health_score,
+                risk_factors=payload.get("health_factors", []),
+                recommended_action=payload.get("recommended_action", "Schedule client check-in"),
+            )
 
     def _handle_client_onboarded(self, message: dict[str, Any]) -> None:
         """Handle client_onboarded from Ops Claw."""
@@ -321,6 +325,11 @@ class AnalyticsClaw:
                     requesting_claw=message.get("sender_role", ""),
                     response_data=response.data if response.data else {},
                 )
+
+    def _dispatch_alert_from_processor(self, message_type: str, target_claw: str, payload: dict) -> None:
+        """Dispatch alert from signal processor (e.g., client_health_alert when score < 6.0)."""
+        if self.signal_dispatcher:
+            self.signal_dispatcher._send(message_type, target_claw, payload)
 
     def _dispatch_anomaly_alert(self, message_type: str, target_claw: str, payload: dict) -> None:
         """Dispatch anomaly alert via signal dispatcher."""

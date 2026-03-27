@@ -49,6 +49,7 @@ REQUIRED_FILES = [
     "logs/queries.log",
     "logs/signals.log",
     "reports/opportunity-scores.json",
+    "reports/monthly-summary.json",
 ]
 
 
@@ -128,7 +129,7 @@ class AnalyticsOperationalLog:
         self, days: int = 7, action_type: str | None = None,
     ) -> list[AnalyticsLogEntry]:
         """Read recent log entries, optionally filtered by action_type.
-        
+
         Returns entries from the last N days plus today (N+1 days total).
         So days=3 returns entries from today and the past 3 days.
         """

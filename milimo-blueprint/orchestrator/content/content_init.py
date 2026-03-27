@@ -171,6 +171,10 @@ class ContentFilesystemInit:
         "logs/performance.log",
     ]
 
+    REQUIRED_INTEL_FILES = [
+        "intelligence/analytics-feed/weekly-intelligence.json",
+    ]
+
     def __init__(self, base_path: Path | None = None, squad_id: str | None = None):
         """
         Initialize filesystem manager.
@@ -240,6 +244,23 @@ class ContentFilesystemInit:
                 result.errors.append(f"Failed to create {full_path}: {e}")
                 result.success = False
                 logger.error("Failed to create log file %s: %s", full_path, e)
+
+        # Create all required intelligence files (empty JSON if not exists)
+        for intel_file in self.REQUIRED_INTEL_FILES:
+            full_path = self.BASE / intel_file
+            try:
+                if full_path.exists():
+                    result.already_existed.append(str(full_path))
+                else:
+                    full_path.parent.mkdir(parents=True, exist_ok=True)
+                    full_path.write_text("{}")
+                    result.created.append(str(full_path))
+                    logger.debug("Created intel file: %s", full_path)
+            except OSError as e:
+                result.failed.append(str(full_path))
+                result.errors.append(f"Failed to create {full_path}: {e}")
+                result.success = False
+                logger.error("Failed to create intel file %s: %s", full_path, e)
 
         logger.info(
             "Filesystem init complete: %d created, %d existed, %d failed",
