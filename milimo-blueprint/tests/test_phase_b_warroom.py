@@ -66,7 +66,7 @@ class TestWarRoomInitialization:
         Each claw appears in the right panel with: name, status dot,
         tool count, last evolution timestamp, this-week activity count.
         """
-        from milimo_blueprint.orchestrator.solo_warroom import SoloWarRoom
+        from orchestrator.solo_warroom import SoloWarRoom
 
         config = _make_test_config()
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -85,7 +85,7 @@ class TestWarRoomInitialization:
         Morning brief is scheduled for 07:00 daily.
         Evening wrap is scheduled for 20:00 daily.
         """
-        from milimo_blueprint.orchestrator.solo_warroom import SoloWarRoom
+        from orchestrator.solo_warroom import SoloWarRoom
 
         config = _make_test_config()
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -107,7 +107,7 @@ class TestQueuePriorityOrdering:
         Injecting a mock REVIEW action produces a queued entry
         with correct mode, claw source, and summary.
         """
-        from milimo_blueprint.orchestrator.solo_warroom import SoloWarRoom
+        from orchestrator.solo_warroom import SoloWarRoom
 
         config = _make_test_config()
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -137,7 +137,7 @@ class TestQueuePriorityOrdering:
         HOLD actions must always appear above REVIEW actions in the queue
         regardless of insertion order.
         """
-        from milimo_blueprint.orchestrator.solo_warroom import (
+        from orchestrator.solo_warroom import (
             ActionPriority,
             SoloWarRoom,
         )
@@ -179,7 +179,7 @@ class TestApprovalMechanics:
         2. Removes item from pending queue
         3. Adds item to processed list
         """
-        from milimo_blueprint.orchestrator.solo_warroom import (
+        from orchestrator.solo_warroom import (
             ActionStatus,
             SoloWarRoom,
         )
@@ -216,7 +216,7 @@ class TestApprovalMechanics:
         A HOLD action queued after existing REVIEW items appears
         at the top of the queue (above all REVIEW items).
         """
-        from milimo_blueprint.orchestrator.solo_warroom import (
+        from orchestrator.solo_warroom import (
             ActionPriority,
             SoloWarRoom,
         )
@@ -254,7 +254,7 @@ class TestApprovalMechanics:
         1. Calls approve() which marks the action approved
         2. Removes item from HOLD queue
         """
-        from milimo_blueprint.orchestrator.solo_warroom import (
+        from orchestrator.solo_warroom import (
             ActionStatus,
             SoloWarRoom,
         )
@@ -287,7 +287,7 @@ class TestApprovalMechanics:
         War Room TUI has keyboard shortcuts registered:
         A=approve, B=block, E=edit, R=release, D=digest, F=deep_work, Q=quit
         """
-        from milimo_blueprint.orchestrator.solo_warroom import SoloWarRoom
+        from orchestrator.solo_warroom import SoloWarRoom
 
         config = _make_test_config()
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -307,7 +307,7 @@ class TestAutoExecution:
         """
         AUTO priority actions execute immediately upon queueing.
         """
-        from milimo_blueprint.orchestrator.solo_warroom import (
+        from orchestrator.solo_warroom import (
             ActionStatus,
             SoloWarRoom,
         )
@@ -342,7 +342,7 @@ class TestBlockMechanics:
         2. Removes from pending queue
         3. Adds to processed list
         """
-        from milimo_blueprint.orchestrator.solo_warroom import (
+        from orchestrator.solo_warroom import (
             ActionStatus,
             SoloWarRoom,
         )

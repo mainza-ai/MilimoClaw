@@ -18,7 +18,7 @@ from typing import Any
 
 import pytest
 
-from milimo_blueprint.orchestrator.analytics.analytics_init import (
+from orchestrator.analytics.analytics_init import (
     AnalyticsFilesystemInit,
     AnalyticsLogEntry,
     AnalyticsOperationalLog,

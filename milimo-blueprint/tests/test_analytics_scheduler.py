@@ -17,11 +17,11 @@ from typing import Any
 
 import pytest
 
-from milimo_blueprint.orchestrator.analytics.analytics_init import (
+from orchestrator.analytics.analytics_init import (
     AnalyticsFilesystemInit,
     AnalyticsOperationalLog,
 )
-from milimo_blueprint.orchestrator.analytics.analytics_scheduler import AnalyticsScheduler
+from orchestrator.analytics.analytics_scheduler import AnalyticsScheduler
 
 
 @pytest.fixture

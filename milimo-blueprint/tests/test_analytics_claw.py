@@ -17,8 +17,8 @@ from typing import Any
 
 import pytest
 
-from milimo_blueprint.orchestrator.analytics.analytics_claw import AnalyticsClaw
-from milimo_blueprint.orchestrator.analytics.analytics_init import AnalyticsFilesystemInit
+from orchestrator.analytics.analytics_claw import AnalyticsClaw
+from orchestrator.analytics.analytics_init import AnalyticsFilesystemInit
 
 
 @pytest.fixture

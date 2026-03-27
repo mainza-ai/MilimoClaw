@@ -16,11 +16,11 @@ from pathlib import Path
 
 import pytest
 
-from milimo_blueprint.orchestrator.analytics.analytics_init import (
+from orchestrator.analytics.analytics_init import (
     AnalyticsFilesystemInit,
     AnalyticsOperationalLog,
 )
-from milimo_blueprint.orchestrator.analytics.query_handler import (
+from orchestrator.analytics.query_handler import (
     QueryHandler,
     QueryResponse,
 )

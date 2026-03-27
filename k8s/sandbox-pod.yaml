@@ -1,0 +1,93 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Milimo Claw Sandbox Pod Template
+# Uses Kubernetes init container pattern for secure config generation
+#
+# Security Architecture:
+# 1. Init container runs as root, generates config, locks as root:root 444
+# 2. Main container runs as sandbox user (1000), inherits read-only config
+# 3. Volume mount is readOnly at pod level — double lock
+# 4. Tokens generated fresh on every pod start — never in image layers
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: milimo-sandbox
+  namespace: openshell
+  labels:
+    app: milimo
+    component: sandbox
+spec:
+  # Init container runs first, as root, to generate and lock config
+  initContainers:
+    - name: config-init
+      image: openshell/milimo-init:latest
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+      env:
+        - name: NEMOCLAW_MODEL
+          value: "nvidia/nemotron-3-super-120b-a12b"
+        - name: CHAT_UI_URL
+          value: "http://127.0.0.1:18789"
+        - name: NVIDIA_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: milimo-secrets
+              key: nvidia-api-key
+              optional: true
+      volumeMounts:
+        - name: openclaw-config
+          mountPath: /sandbox/.openclaw
+
+  # Main container runs as sandbox user, inherits locked read-only config
+  containers:
+    - name: milimo
+      image: openshell/sandbox-from:latest
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: false
+        capabilities:
+          add:
+            - SYS_ADMIN
+            - NET_ADMIN
+            - SYS_PTRACE
+            - SYSLOG
+      env:
+        - name: HOME
+          value: /sandbox
+        - name: NVIDIA_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: milimo-secrets
+              key: nvidia-api-key
+              optional: true
+        - name: CHAT_UI_URL
+          value: "http://127.0.0.1:18789"
+        - name: OPENSHELL_ENDPOINT
+          value: "https://openshell.openshell.svc.cluster.local:8080"
+      volumeMounts:
+        - name: openclaw-config
+          mountPath: /sandbox/.openclaw
+          readOnly: true
+        - name: sandbox-data
+          mountPath: /sandbox
+        - name: sandbox-tmp
+          mountPath: /tmp
+      ports:
+        - containerPort: 18789
+          name: gateway
+          protocol: TCP
+
+  volumes:
+    - name: openclaw-config
+      emptyDir: {}
+    - name: sandbox-data
+      emptyDir: {}
+    - name: sandbox-tmp
+      emptyDir: {}
+
+  restartPolicy: Never

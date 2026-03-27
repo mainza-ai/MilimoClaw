@@ -123,67 +123,47 @@ Each claw has its own **network egress policy**, **inference routing rules**, **
 
 ## Quick Start
 
-> **IMPORTANT**: On macOS, use native NemoClaw onboarding first. See [docs/QUICK_START.md](docs/QUICK_START.md) for detailed setup.
+> **IMPORTANT**: On macOS and Linux, you must use native NemoClaw onboarding first. See [docs/QUICK_START.md](docs/QUICK_START.md) for the definitive setup guide.
 
-### Prerequisites
+### The 4-Phase Installation Flow
 
-- **Platform:** macOS (Apple Silicon M1/M2/M3) or Linux
-- **Software:** Docker Desktop, Node.js ≥ 20, Git
-- **API Key:** NVIDIA API key from [build.nvidia.com](https://build.nvidia.com/)
-
-### Setup Flow
-
-MilimoClaw requires proper NemoClaw infrastructure before use:
+MilimoClaw requires proper NemoClaw infrastructure before use. The setup must occur in this exact order:
 
 ```
-HOST → Native Onboarding → Sandbox Created → Install Plugin → MilimoClaw Onboarding
+HOST MACHINE                         SANDBOX (Inside k3s)
+    │                                   │
+    ▼                                   │
+┌─────────────────┐                     │
+│ 1. Clean Slate  │                     │
+│    (Optional)   │                     │
+└────────┬────────┘                     │
+         ▼                              │
+┌─────────────────┐                     │
+│ 2. Run Native   │                     │
+│    NemoClaw     │                     │
+│    Onboarding   │                     │
+└────────┬────────┘                     │
+         │                              │
+         │  Creates:                    │
+         │  ├─ Gateway container        │
+         │  ├─ k3s cluster              │
+         │  └─ Sandbox pod ────────────▶│
+         │                              │
+         │                              ▼
+         │                     ┌─────────────────┐
+         │                     │ 3. Build &      │
+         │                     │    Install      │
+         │                     │    MilimoClaw   │
+         │                     └────────┬────────┘
+         │                              │
+         │                              ▼
+         │                     ┌─────────────────┐
+         │                     │ 4. Run Milimo   │
+         │                     │    Onboarding   │
+         └─────────────────────┴─────────────────┘
 ```
 
-### 1. Install NemoClaw on Host
-
-```bash
-cd MilimoClaw/NemoClaw-original-repo
-export NVIDIA_API_KEY="nvapi-your-key"
-./install.sh
-```
-
-### 2. Run Native Onboarding (7-Step)
-
-```bash
-# This creates gateway, sandbox, and applies policies
-nemoclaw onboard
-```
-
-### 3. Verify Sandbox
-
-```bash
-nemoclaw my-assistant status
-# Should show: Phase: Ready
-```
-
-### 4. Connect and Install Plugin
-
-```bash
-# Connect to sandbox
-openshell sandbox connect my-assistant
-
-# Inside sandbox, install MilimoClaw plugin
-openclaw plugins install /tmp/milimo
-
-# Run MilimoClaw onboarding
-openclaw milimo onboard
-# Select: Solo Founder → milimoquantum → Build Claw
-```
-
-### 5. Test Build Claw
-
-```bash
-# Inside sandbox
-openclaw agent --agent main --local -m "Hello" --session-id test
-openclaw tui
-```
-
-> **Full guide**: [docs/QUICK_START.md](docs/QUICK_START.md)
+> **Full definitive guide**: [docs/QUICK_START.md](docs/QUICK_START.md)
 
 ---
 

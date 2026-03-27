@@ -16,8 +16,8 @@ from pathlib import Path
 
 import pytest
 
-from milimo_blueprint.orchestrator.analytics.analytics_init import AnalyticsFilesystemInit
-from milimo_blueprint.orchestrator.analytics.forward_projector import (
+from orchestrator.analytics.analytics_init import AnalyticsFilesystemInit
+from orchestrator.analytics.forward_projector import (
     ForwardProjector,
     ForwardProjection,
 )

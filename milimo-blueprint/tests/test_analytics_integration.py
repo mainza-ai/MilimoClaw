@@ -21,15 +21,15 @@ from typing import Any
 
 import pytest
 
-from milimo_blueprint.orchestrator.analytics.analytics_claw import AnalyticsClaw
-from milimo_blueprint.orchestrator.analytics.analytics_init import (
+from orchestrator.analytics.analytics_claw import AnalyticsClaw
+from orchestrator.analytics.analytics_init import (
     AnalyticsFilesystemInit,
     AnalyticsOperationalLog,
 )
-from milimo_blueprint.orchestrator.analytics.signal_processor import SignalProcessor
-from milimo_blueprint.orchestrator.analytics.query_handler import QueryHandler
-from milimo_blueprint.orchestrator.analytics.report_generator import ReportGenerator
-from milimo_blueprint.orchestrator.analytics.signal_dispatcher import SignalDispatcher
+from orchestrator.analytics.signal_processor import SignalProcessor
+from orchestrator.analytics.query_handler import QueryHandler
+from orchestrator.analytics.report_generator import ReportGenerator
+from orchestrator.analytics.signal_dispatcher import SignalDispatcher
 
 
 @pytest.fixture
@@ -59,7 +59,7 @@ class TestMVRSequence:
 
     def test_mvr_step_01_performance_signal_stored(self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog):
         """Step 01: Inject mock performance_signal — confirm stored in data/."""
-        from milimo_blueprint.orchestrator.analytics.signal_processor import InboundSignal
+        from orchestrator.analytics.signal_processor import InboundSignal
 
         dispatcher = SignalDispatcher(operational_log, fs)
         processor = SignalProcessor(fs, operational_log)
@@ -102,7 +102,7 @@ class TestMVRSequence:
 
     def test_mvr_step_02_data_written_to_correct_path(self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog):
         """Step 02: Confirm JSONL written to data/content-performance/{platform}/."""
-        from milimo_blueprint.orchestrator.analytics.signal_processor import InboundSignal
+        from orchestrator.analytics.signal_processor import InboundSignal
 
         dispatcher = SignalDispatcher(operational_log, fs)
         processor = SignalProcessor(fs, operational_log, dispatcher)
@@ -155,7 +155,7 @@ class TestMVRSequence:
 
     def test_mvr_step_04_query_response_within_sla(self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog):
         """Step 04: Confirm response dispatched within 2 minutes (120 seconds)."""
-        from milimo_blueprint.orchestrator.analytics.signal_processor import InboundSignal
+        from orchestrator.analytics.signal_processor import InboundSignal
 
         dispatcher = SignalDispatcher(operational_log, fs)
         processor = SignalProcessor(fs, operational_log, dispatcher)
@@ -197,7 +197,7 @@ class TestMVRSequence:
 
     def test_mvr_step_05_seven_days_of_signals(self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog):
         """Step 05: Inject 7 days of mock signals — all stored correctly."""
-        from milimo_blueprint.orchestrator.analytics.signal_processor import InboundSignal
+        from orchestrator.analytics.signal_processor import InboundSignal
 
         dispatcher = SignalDispatcher(operational_log, fs)
         processor = SignalProcessor(fs, operational_log, dispatcher)
@@ -290,7 +290,7 @@ class TestMVRSequence:
 
     def test_mvr_step_10_health_signal_below_threshold(self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog):
         """Step 10: Inject client_health_signal with score 5.0."""
-        from milimo_blueprint.orchestrator.analytics.signal_processor import InboundSignal
+        from orchestrator.analytics.signal_processor import InboundSignal
 
         dispatched_alerts: list[dict] = []
 

@@ -17,17 +17,17 @@ from typing import Any
 
 import pytest
 
-from milimo_blueprint.orchestrator.analytics.analytics_init import (
+from orchestrator.analytics.analytics_init import (
     AnalyticsFilesystemInit,
     AnalyticsOperationalLog,
 )
-from milimo_blueprint.orchestrator.analytics.signal_processor import (
+from orchestrator.analytics.signal_processor import (
     SignalProcessor,
     SignalValidationError,
     InboundSignal,
     SIGNAL_SCHEMAS,
 )
-from milimo_blueprint.orchestrator.analytics.signal_dispatcher import SignalDispatcher
+from orchestrator.analytics.signal_dispatcher import SignalDispatcher
 
 
 @pytest.fixture

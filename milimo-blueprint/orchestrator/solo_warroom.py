@@ -620,6 +620,7 @@ class SoloWarRoom:
             "R": "release",
             "D": "digest",
             "F": "deep_work",
+            "H": "help",
             "Q": "quit",
         }
 

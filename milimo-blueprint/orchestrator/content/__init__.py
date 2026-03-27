@@ -78,6 +78,8 @@ from .brand_voice import (
 
 from .content_scheduler import ContentScheduler
 
+from .content_claw import ContentClaw
+
 __all__ = [
     "ContentFilesystemInit",
     "InitResult",
@@ -117,4 +119,5 @@ __all__ = [
     "BrandVoiceManager",
     "VoiceProfile",
     "ContentScheduler",
+    "ContentClaw",
 ]

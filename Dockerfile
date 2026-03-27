@@ -23,6 +23,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python3-venv \
     docker.io \
+    iproute2 \
+    jq \
+    sudo \
     && rm -rf /var/lib/apt/lists/*
 
 # Install OpenShell CLI binary (from NVIDIA OpenShell releases)
@@ -75,7 +78,7 @@ RUN mkdir -p /sandbox/.openclaw-data/agents/main/agent \
 RUN npm install -g openclaw@2026.3.11
 
 # Install Python dependencies for orchestrators/evolvers
-RUN pip3 install pyyaml pytest
+RUN pip3 install --break-system-packages pyyaml pytest
 
 # Create plugin directories
 RUN mkdir -p /opt/nemoclaw/dist \
@@ -118,6 +121,9 @@ ARG NEMOCLAW_BUILD_ID=default
 
 ENV NEMOCLAW_MODEL=${NEMOCLAW_MODEL} \
     CHAT_UI_URL=${CHAT_UI_URL}
+
+COPY scripts/nemoclaw-start.sh /usr/local/bin/nemoclaw-start
+RUN chmod +x /usr/local/bin/nemoclaw-start
 
 WORKDIR /sandbox
 USER sandbox

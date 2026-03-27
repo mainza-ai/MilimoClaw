@@ -423,7 +423,7 @@ async function startGateway(gpu) {
   // Destroy old gateway
   run("openshell gateway destroy -g nemoclaw 2>/dev/null || true", { ignoreError: true });
 
-  const gwArgs = ["--name", "nemoclaw", "--gateway-host", "host.docker.internal"];
+  const gwArgs = ["--name", "nemoclaw"];
   if (gpu && gpu.nimCapable) gwArgs.push("--gpu");
 
   // On DGX Spark (and most GPU hosts), inference is
@@ -521,7 +521,14 @@ async function createSandbox(gpu) {
   run(`cp -r "${path.join(ROOT, "nemoclaw")}" "${buildCtx}/nemoclaw"`);
   run(`cp -r "${path.join(ROOT, "nemoclaw-blueprint")}" "${buildCtx}/nemoclaw-blueprint"`);
   run(`cp -r "${path.join(ROOT, "scripts")}" "${buildCtx}/scripts"`);
+  run(`cp -r "${path.join(ROOT, "milimo")}" "${buildCtx}/milimo" || true`);
+  run(`cp -r "${path.join(ROOT, "milimo-blueprint")}" "${buildCtx}/milimo-blueprint" || true`);
+  run(`cp -r "${path.join(ROOT, "test")}" "${buildCtx}/test" || true`);
   run(`rm -rf "${buildCtx}/nemoclaw/node_modules"`, { ignoreError: true });
+  run(`rm -rf "${buildCtx}/milimo/node_modules"`, { ignoreError: true });
+  run(`rm -rf "${buildCtx}/milimo-blueprint/.venv"`, { ignoreError: true });
+  run(`rm -rf "${buildCtx}/nemoclaw-blueprint/.venv"`, { ignoreError: true });
+  run(`find "${buildCtx}" -name "__pycache__" -exec rm -rf {} +`, { ignoreError: true });
 
   // Create sandbox (use -- echo to avoid dropping into interactive shell)
   // Pass the base policy so sandbox starts in proxy mode (required for policy updates later)

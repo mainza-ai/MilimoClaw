@@ -71,15 +71,20 @@ VALID_MESSAGE_TYPES = {
     "performance_intel",
     "retention_signals",
     "revenue_anomaly",
+    "client_health_alert",
+    "content_performance_response",
+    "behavior_query_response",
     # Finance Claw message types
     "pricing_query",
     "pricing_response",
     "invoice_ready",
-    "overdue_alert",
+    "payment_overdue",
     "project_complete",
     # Ops Claw message types
     "project_brief",
     "client_onboarded",
+    # Finance → Analytics
+    "revenue_summary",
     # Tool proposal
     "tool_proposal",
 }
@@ -230,6 +235,35 @@ MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
         "frequency": "on_event",
         "priority": "REVIEW",
     },
+    # Analytics → Ops: Client health alert (IMMEDIATE when score < 6.0)
+    "client_health_alert": {
+        "sender_roles": ["analytics"],
+        "recipient_roles": ["ops"],
+        "required_payload": ["client_id", "health_score", "alert_type"],
+        "optional_payload": ["recommended_action", "signals", "triggered_at"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Analytics → Content: Content performance response (2-min SLA)
+    "content_performance_response": {
+        "sender_roles": ["analytics"],
+        "recipient_roles": ["content"],
+        "required_payload": ["query_id", "results"],
+        "optional_payload": ["top_performers", "recommendations", "response_time_ms"],
+        "frequency": "on_event",
+        "sla_minutes": 2,
+        "priority": "AUTO",
+    },
+    # Analytics → Build: Behavior query response (2-min SLA)
+    "behavior_query_response": {
+        "sender_roles": ["analytics"],
+        "recipient_roles": ["build"],
+        "required_payload": ["query_id", "results"],
+        "optional_payload": ["feature_metrics", "user_behavior", "response_time_ms"],
+        "frequency": "on_event",
+        "sla_minutes": 2,
+        "priority": "AUTO",
+    },
     # Analytics → Finance: Revenue anomaly
     "revenue_anomaly": {
         "sender_roles": ["analytics"],
@@ -257,14 +291,14 @@ MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
         "frequency": "on_event",
         "priority": "REVIEW",
     },
-    # Finance → War Room: Overdue alert
-    "overdue_alert": {
+    # Finance → Ops: Payment overdue (fires IMMEDIATELY on detection)
+    "payment_overdue": {
         "sender_roles": ["finance"],
-        "recipient_roles": ["war_room"],
+        "recipient_roles": ["ops"],
         "required_payload": ["invoice_id", "client_id", "days_overdue"],
         "optional_payload": ["amount", "last_contact"],
         "frequency": "on_event",
-        "priority": "HOLD",
+        "priority": "REVIEW",
     },
     # Ops → Build: Feature brief
     "feature_brief": {
@@ -274,6 +308,24 @@ MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
         "optional_payload": ["priority", "deadline", "client_id"],
         "frequency": "on_event",
         "priority": "REVIEW",
+    },
+    # Ops → Content/Build: Project brief (after pricing confirmed)
+    "project_brief": {
+        "sender_roles": ["ops"],
+        "recipient_roles": ["content", "build"],
+        "required_payload": ["project_id", "client_id", "scope", "deadline"],
+        "optional_payload": ["tone_requirements", "platform_targets", "budget", "brief_text"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Finance → Analytics: Revenue summary (totals only — no line items)
+    "revenue_summary": {
+        "sender_roles": ["finance"],
+        "recipient_roles": ["analytics"],
+        "required_payload": ["week_total", "invoices_paid", "invoices_pending"],
+        "optional_payload": ["week_over_week_pct", "period_start", "period_end"],
+        "frequency": "weekly",
+        "priority": "AUTO",
     },
     # Ops → Finance: Project complete
     "project_complete": {
