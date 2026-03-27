@@ -28,11 +28,32 @@ from pathlib import Path
 import yaml
 
 
-TEMPLATE_PATH = Path("milimo-claw-docs/reference/MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md")
+# Template search paths — tried in order
+_TEMPLATE_CANDIDATES = [
+    # 1. Relative to CWD (development on host)
+    Path("milimo-claw-docs/reference/MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md"),
+    # 2. Relative to this script's directory (plugin bundled copy)
+    Path(__file__).resolve().parent.parent / "docs" / "MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md",
+    # 3. Home-relative (sandbox deployment)
+    Path.home() / ".milimo" / "MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md",
+]
 MILIMO_CONFIG_PATH = Path.home() / ".milimo" / "config.json"
-OPENCLAW_AGENTS_DIR = Path(".openclaw") / "agents" / "main"
+# Use home-relative path so it works for both root and sandbox users
+OPENCLAW_AGENTS_DIR = Path.home() / ".openclaw" / "agents" / "main"
 SYSTEM_PROMPT_DEST = OPENCLAW_AGENTS_DIR / "system.md"
 AGENT_CONFIG_DEST = OPENCLAW_AGENTS_DIR / "config.yaml"
+
+
+def find_template() -> Path:
+    """Find the assistant system prompt template from multiple candidate paths."""
+    for candidate in _TEMPLATE_CANDIDATES:
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(
+        f"System prompt template not found. Searched:\n"
+        + "\n".join(f"  - {p}" for p in _TEMPLATE_CANDIDATES)
+        + "\nCopy MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md to ~/.milimo/"
+    )
 
 
 @dataclass
@@ -103,14 +124,8 @@ def render_template(config: AssistantConfig) -> str:
 
     Uses simple str.replace() — no third-party templating required.
     """
-    if not TEMPLATE_PATH.exists():
-        raise FileNotFoundError(
-            f"System prompt template not found at {TEMPLATE_PATH}\n"
-            "Ensure MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md is "
-            "in milimo-claw-docs/reference/"
-        )
-
-    template = TEMPLATE_PATH.read_text(encoding="utf-8")
+    template_path = find_template()
+    template = template_path.read_text(encoding="utf-8")
 
     substitutions = {
         "{{assistant_name}}": config.name,
@@ -210,11 +225,16 @@ def verify_setup() -> dict[str, bool]:
         config_loaded = False
         config_has_name = False
 
+    try:
+        template_found = find_template().exists()
+    except FileNotFoundError:
+        template_found = False
+
     return {
         "milimo_config_exists": MILIMO_CONFIG_PATH.exists(),
         "assistant_config_loaded": config_loaded,
         "assistant_has_name": config_has_name,
-        "template_exists": TEMPLATE_PATH.exists(),
+        "template_exists": template_found,
         "system_prompt_installed": SYSTEM_PROMPT_DEST.exists(),
         "agent_config_exists": AGENT_CONFIG_DEST.exists(),
         "bridge_cli_exists": Path("milimo-blueprint/orchestrator/bridge_cli.py").exists(),

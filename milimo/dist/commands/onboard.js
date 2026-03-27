@@ -157,14 +157,26 @@ async function cliOnboard(opts) {
     const selectedTemplate = (0, template_js_1.getBuiltInTemplates)().find((t) => t.id === template) ||
         (0, template_js_1.discoverTemplates)(pluginConfig.blueprintDir).find((t) => t.id === template);
     // Step 3: Solo vs Mesh Mode
-    const solo = opts.solo ?? selectedTemplate?.solo ?? true;
-    if (!opts.solo && !nonInteractive) {
+    // If the template declares solo: true, skip the confirmation entirely.
+    // Asking "Operating solo?" for a template named "Solo Founder" is redundant
+    // and causes readline race conditions with sequential prompts.
+    let solo = opts.solo ?? selectedTemplate?.solo ?? true;
+    if (selectedTemplate?.solo) {
+        // Template is definitively solo — no confirmation needed
+        if (!nonInteractive) {
+            logger.info("");
+            logger.info(`Template "${selectedTemplate.displayName}" runs all claws on one machine.`);
+            logger.info("");
+        }
+    }
+    else if (!opts.solo && !nonInteractive) {
         const soloConfirm = await (0, prompt_js_1.promptConfirm)("Operating solo (no mesh coordination)?", true);
         if (!soloConfirm) {
+            solo = false;
             logger.info("");
             logger.info("Mesh mode selected. Each squad member will need to:");
-            logger.info(" 1. Run: openclaw milimo onboard --squad <name> --role <role>");
-            logger.info(" 2. Share the mesh secret for authentication");
+            logger.info("  1. Run: openclaw milimo onboard --squad <name> --role <role>");
+            logger.info("  2. Share the mesh secret for authentication");
             logger.info("");
         }
     }

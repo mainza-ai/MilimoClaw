@@ -8,7 +8,7 @@ export interface AssistantPersona {
 }
 export interface MilimoConfig {
     squadName: string;
-    clawRole: ClawRole;
+    clawRole: ClawRole | "";
     template: string;
     solo: boolean;
     meshMembers: string[];
