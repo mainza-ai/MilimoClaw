@@ -298,7 +298,7 @@ class TestMVRSequence:
             dispatched_alerts.append(message)
 
         dispatcher = SignalDispatcher(operational_log, fs, mesh_sender=mock_sender)
-        
+
         def alert_callback(message_type: str, target_claw: str, payload: dict) -> None:
             dispatcher.send_client_health_alert(
                 client_id=payload.get("client_id", ""),
@@ -306,7 +306,7 @@ class TestMVRSequence:
                 risk_factors=payload.get("risk_factors", []),
                 recommended_action=payload.get("recommended_action", ""),
             )
-        
+
         processor = SignalProcessor(fs, operational_log, alert_dispatcher=alert_callback)
 
         signal = InboundSignal(

@@ -86,7 +86,7 @@ def signal_processor(
             "target_claw": target_claw,
             "payload": payload,
         })
-    
+
     return SignalProcessor(fs, operational_log, alert_dispatcher=alert_callback)
 
 
