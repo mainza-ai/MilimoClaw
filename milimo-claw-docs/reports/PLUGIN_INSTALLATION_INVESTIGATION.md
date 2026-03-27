@@ -256,13 +256,13 @@ RUN openclaw plugins install /opt/milimo
    ```bash
    # Enter sandbox namespace
    docker exec openshell-cluster-nemoclaw nsenter -t 6373 -a -- bash
-   
+
    # Create extension directory
    mkdir -p /sandbox/.openclaw-data/extensions/milimo
-   
+
    # Copy plugin files (from host container perspective)
    # Files copied to: /var/lib/rancher/k3s/agent/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/90/fs/sandbox/.openclaw-data/extensions/milimo/
-   
+
    # Install plugin
    openclaw plugins install /sandbox/.openclaw-data/extensions/milimo
    ```
