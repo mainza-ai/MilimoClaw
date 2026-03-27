@@ -27,6 +27,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -55,6 +56,25 @@ except ImportError:
     TOOL_SANDBOX_AVAILABLE = False
     ToolSandbox = None
     SandboxConfig = None
+
+# Import PrivacyRouter for inference routing
+try:
+    from .privacy_router import PrivacyRouter, InferenceBackend
+    PRIVACY_ROUTER_AVAILABLE = True
+except ImportError:
+    PRIVACY_ROUTER_AVAILABLE = False
+    PrivacyRouter = None
+    InferenceBackend = None
+
+# Import SandboxRunner for isolated backtesting
+try:
+    from .evolution.sandbox_runner import SandboxRunner, BacktestResult as SandboxBacktestResult, _meets_threshold
+    SANDBOX_RUNNER_AVAILABLE = True
+except ImportError:
+    SANDBOX_RUNNER_AVAILABLE = False
+    SandboxRunner = None
+    SandboxBacktestResult = None
+    _meets_threshold = None
 
 
 # ---------------------------------------------------------------------------
@@ -322,22 +342,37 @@ class ToolBuilder:
 
     def _generate_tool_code(self, proposal: ToolProposal) -> str:
         """
-        Generate tool code from a proposal.
+        Generate tool code from a proposal using inference.
 
-        Uses ToolGenerator if available for actual LLM-based code generation.
-        Falls back to skeleton code if generator is not configured.
+        Routes to local/cloud NIM via privacy router (data_type="source_code").
+        Falls back to skeleton code if inference fails.
+
+        Args:
+            proposal: The tool proposal
+
+        Returns:
+            Generated Python code for the tool
         """
-        # Try using ToolGenerator if available
+        # Try using ToolGenerator with privacy router integration
         if self._tool_generator is not None and ToolSpec is not None:
             try:
                 # Cast tool_type to valid literal
                 tool_type = proposal.tool_type
-                if tool_type not in ("classifier", "predictor", "optimizer", "detector", "generator", "transformer", "aggregator"):
+                valid_types = ("classifier", "predictor", "optimizer", "detector", "generator", "transformer", "aggregator")
+                if tool_type not in valid_types:
                     tool_type = "classifier"  # Default fallback
+
+                # Build metadata with operational context
+                metadata = {
+                    "metric_target": proposal.metric_target,
+                    "estimated_improvement": proposal.estimated_improvement,
+                    "claw_role": proposal.claw_role,
+                    "trigger_pattern": proposal.trigger_pattern.pattern_type,
+                }
 
                 spec = ToolSpec(
                     name=proposal.tool_name,
-                    tool_type=tool_type,
+                    tool_type=tool_type,  # type: ignore[arg-type]
                     description=f"Generated for pattern: {proposal.trigger_pattern.pattern_type}",
                     input_schema={"type": "object", "properties": {"action_data": {"type": "object"}}},
                     output_schema={"type": "object", "properties": {"result": {"type": "object"}}},
@@ -345,22 +380,24 @@ class ToolBuilder:
                     frequency=getattr(proposal.trigger_pattern, "frequency", 1),
                     time_period="7 days",
                     evolution_cycle=f"{self.squad_id}-{self.claw_role}",
-                    metadata={
-                        "metric_target": proposal.metric_target,
-                        "estimated_improvement": proposal.estimated_improvement,
-                    },
+                    metadata=metadata,
                     test_cases=[],
                 )
 
+                # Use ToolGenerator which routes through privacy router
                 result = self._tool_generator.generate(spec)
 
                 if result.success and result.code:
-                    logger.info(
-                        "Generated tool code via ToolGenerator: %d chars, validation=%s",
-                        len(result.code),
-                        result.validation_passed,
-                    )
-                    return result.code
+                    # Validate Python syntax before returning
+                    if self._validate_syntax(result.code):
+                        logger.info(
+                            "Generated tool code via inference: %d chars, validation=%s",
+                            len(result.code),
+                            result.validation_passed,
+                        )
+                        return result.code
+                    else:
+                        logger.warning("Generated code failed syntax validation")
 
                 logger.warning(
                     "ToolGenerator failed: %s, falling back to skeleton",
@@ -370,7 +407,332 @@ class ToolBuilder:
             except Exception as e:
                 logger.warning("ToolGenerator error: %s, falling back to skeleton", e)
 
-        # Fallback: generate skeleton code
+        # Fallback: inference-based code generation via privacy router
+        if PRIVACY_ROUTER_AVAILABLE and self.blueprint_dir:
+            try:
+                code = self._generate_via_inference(proposal)
+                if code and self._validate_syntax(code):
+                    logger.info("Generated tool code via privacy router inference")
+                    return code
+            except Exception as e:
+                logger.warning("Privacy router inference failed: %s, falling back to skeleton", e)
+
+        # Final fallback: generate skeleton code
+        return self._generate_skeleton_code(proposal)
+
+    def _generate_via_inference(self, proposal: ToolProposal) -> str | None:
+        """
+        Generate tool code through privacy router inference.
+
+        Routes data_type="source_code" which requires local NIM.
+        Builds a structured prompt and extracts code from response.
+
+        Args:
+            proposal: The tool proposal
+
+        Returns:
+            Generated code or None if inference fails
+        """
+        if not PRIVACY_ROUTER_AVAILABLE or PrivacyRouter is None or InferenceBackend is None:
+            return None
+
+        if self.blueprint_dir is None:
+            return None
+
+        # Local variable with guaranteed non-None type
+        blueprint_dir = self.blueprint_dir
+
+        try:
+            # Load privacy policy
+            policy_path = blueprint_dir / "privacy_policy.yaml"
+            if not policy_path.exists():
+                logger.debug("No privacy policy found at %s", policy_path)
+                return None
+
+            router = PrivacyRouter.from_policy_file(policy_path)
+
+            # Route inference - source_code must use local NIM
+            decision = router.route(
+                role=self.claw_role,
+                data_type="source_code",
+            )
+
+            logger.debug(
+                "Inference routed to %s for source_code: %s",
+                decision.backend.value,
+                decision.reason,
+            )
+
+            # Ensure local backend for source code
+            if decision.backend != InferenceBackend.LOCAL_NIM:
+                logger.warning(
+                    "source_code routed to non-local backend %s, enforcing local",
+                    decision.backend.value,
+                )
+
+            # Build structured prompt for inference
+            prompt = self._build_inference_prompt(proposal)
+
+            # Call local NIM inference endpoint
+            code = self._call_nim_inference(prompt, proposal)
+            
+            if code and self._validate_syntax(code):
+                logger.info("Generated tool code via NIM inference (%d chars)", len(code))
+                return code
+
+            return None
+
+        except Exception as e:
+            logger.warning("Privacy router inference error: %s", e)
+            return None
+
+    def _call_nim_inference(self, prompt: str, proposal: ToolProposal) -> str | None:
+        """
+        Call local NIM inference endpoint to generate tool code.
+
+        Supports multiple backends:
+        1. NeMo Microservice (nemo-ms) on localhost:8000
+        2. Local NIM container on localhost:8000
+        3. OpenShell gateway sandbox
+
+        Args:
+            prompt: The inference prompt
+            proposal: The tool proposal for context
+
+        Returns:
+            Generated Python code or None on failure
+        """
+        import json
+        import os
+        import urllib.request
+        import urllib.error
+
+        # Check for NIM endpoint configuration
+        nim_endpoint = os.environ.get("NIM_ENDPOINT", "http://localhost:8000")
+        nim_model = os.environ.get("NIM_MODEL", "nvidia/nemotron-4-340b-instruct")
+
+        # Check if NIM is available
+        try:
+            health_url = f"{nim_endpoint}/v1/health"
+            req = urllib.request.Request(health_url, method="GET")
+            urllib.request.urlopen(req, timeout=2)
+            logger.info("NIM endpoint healthy at %s", nim_endpoint)
+        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as e:
+            logger.debug("NIM endpoint not available at %s: %s", nim_endpoint, e)
+            # Try OpenShell gateway as fallback
+            return self._call_gateway_inference(prompt, proposal)
+
+        # Build OpenAI-compatible request
+        request_body = {
+            "model": nim_model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a Python code generator. Generate only valid Python code with no explanations or markdown. Include proper type hints and docstrings. The code should implement an 'apply' function that takes action_data: dict and returns a result dict."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "temperature": 0.3,
+            "max_tokens": 2048,
+            "stop": ["```", "---", "Explanation:", "Note:"]
+        }
+
+        try:
+            url = f"{nim_endpoint}/v1/chat/completions"
+            data = json.dumps(request_body).encode("utf-8")
+            req = urllib.request.Request(
+                url,
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+
+            with urllib.request.urlopen(req, timeout=60) as response:
+                result = json.loads(response.read().decode("utf-8"))
+
+            # Extract code from response
+            if "choices" in result and len(result["choices"]) > 0:
+                content = result["choices"][0].get("message", {}).get("content", "")
+                # Clean up code - remove markdown blocks if present
+                code = self._extract_code_from_response(content)
+                return code
+
+            return None
+
+        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as e:
+            logger.warning("NIM inference call failed: %s", e)
+            return None
+
+    def _call_gateway_inference(self, prompt: str, proposal: ToolProposal) -> str | None:
+        """
+        Call OpenShell gateway for inference as fallback.
+
+        Args:
+            prompt: The inference prompt
+            proposal: The tool proposal
+
+        Returns:
+            Generated code or None
+        """
+        import os
+        import time
+
+        try:
+            # Use file-based gateway for inference request
+            home = os.environ.get("HOME", "/tmp")
+            gateway_dir = Path(home) / ".milimo" / "inference"
+            gateway_dir.mkdir(parents=True, exist_ok=True)
+
+            # Write inference request
+            request_file = gateway_dir / f"request_{proposal.tool_name}.json"
+            request_data = {
+                "type": "inference_request",
+                "model": "nemotron",
+                "prompt": prompt,
+                "parameters": {
+                    "temperature": 0.3,
+                    "max_tokens": 2048,
+                },
+                "tool_name": proposal.tool_name,
+                "tool_type": proposal.tool_type,
+                "claw_role": proposal.claw_role,
+            }
+
+            with request_file.open("w") as f:
+                json.dump(request_data, f)
+
+            # Check for response (would be written by gateway handler)
+            response_file = gateway_dir / f"response_{proposal.tool_name}.json"
+
+            # Wait briefly for response (non-blocking in production)
+            for _ in range(10):  # Wait up to 10 seconds
+                if response_file.exists():
+                    with response_file.open() as f:
+                        response = json.load(f)
+                    code = response.get("code")
+                    if code and self._validate_syntax(code):
+                        return code
+                    break
+                time.sleep(1)
+
+            logger.debug("No gateway inference response received")
+            return None
+
+        except Exception as e:
+            logger.debug("Gateway inference fallback failed: %s", e)
+            return None
+
+    def _extract_code_from_response(self, content: str) -> str | None:
+        """
+        Extract Python code from LLM response.
+
+        Handles various formats:
+        - Raw code
+        - Markdown code blocks
+        - Code with explanations
+
+        Args:
+            content: Raw LLM response content
+
+        Returns:
+            Clean Python code or None
+        """
+        import re
+
+        # Try to extract code from markdown blocks
+        code_block_pattern = r"```(?:python)?\s*\n(.*?)\n```"
+        matches = re.findall(code_block_pattern, content, re.DOTALL)
+
+        if matches:
+            # Use the longest code block
+            code = max(matches, key=len).strip()
+        else:
+            # No code blocks, use content directly
+            code = content.strip()
+
+        # Clean up common artifacts
+        lines = code.split("\n")
+        cleaned_lines = []
+        in_code = False
+
+        for line in lines:
+            # Skip explanation lines
+            stripped = line.strip()
+            if stripped.startswith("# ") and not in_code:
+                # Check if this is a docstring or explanation
+                if any(word in stripped.lower() for word in ["here", "this code", "the following", "example"]):
+                    continue
+
+            # Start capturing after we see function/class definitions
+            if stripped.startswith(("def ", "class ", "import ", "from ")) or in_code:
+                in_code = True
+                cleaned_lines.append(line)
+
+        code = "\n".join(cleaned_lines).strip()
+
+        # Validate syntax
+        if self._validate_syntax(code):
+            return code
+
+        return None
+
+    def _build_inference_prompt(self, proposal: ToolProposal) -> str:
+        """
+        Build structured prompt for inference-based tool generation.
+
+        Args:
+            proposal: The tool proposal
+
+        Returns:
+            Formatted prompt string
+        """
+        prompt_parts = [
+            "# Tool Generation Request",
+            "",
+            f"## Tool Purpose",
+            f"Name: {proposal.tool_name}",
+            f"Type: {proposal.tool_type}",
+            f"Role: {proposal.claw_role}",
+            "",
+            f"## Target Metric",
+            f"Metric: {proposal.metric_target}",
+            f"Expected Improvement: {proposal.estimated_improvement}%",
+            "",
+            f"## Trigger Pattern",
+            f"Type: {proposal.trigger_pattern.pattern_type}",
+            f"Description: {proposal.trigger_pattern.trigger_description}",
+            f"Confidence: {proposal.trigger_pattern.confidence}",
+            "",
+            "## Requirements",
+            "- Accept standard ToolInput interface (action_data: dict)",
+            "- Return standard ToolOutput interface (result: dict)",
+            "- Include error handling for edge cases",
+            "- Be importable as Python module",
+            "- Pass syntax validation",
+            "",
+            "## Data Sources",
+            "- Historical action logs",
+            "- Claw configuration",
+            "- Squad policies",
+            "",
+            "Generate the Python implementation:",
+        ]
+
+        return "\n".join(prompt_parts)
+
+    def _generate_skeleton_code(self, proposal: ToolProposal) -> str:
+        """
+        Generate skeleton code as final fallback.
+
+        Args:
+            proposal: The tool proposal
+
+        Returns:
+            Skeleton Python code
+        """
         return (
             f"# Auto-generated tool: {proposal.tool_name}\n"
             f"# Type: {proposal.tool_type}\n"
@@ -384,6 +746,23 @@ class ToolBuilder:
             f"    # Tool logic placeholder — inference-generated in production\n"
             f"    return action_data\n"
         )
+
+    @staticmethod
+    def _validate_syntax(code: str) -> bool:
+        """
+        Validate Python syntax of generated code.
+
+        Args:
+            code: Python code to validate
+
+        Returns:
+            True if syntax is valid
+        """
+        try:
+            compile(code, "<generated>", "exec")
+            return True
+        except SyntaxError:
+            return False
 
     def _compute_baseline(
         self, metric_target: str, actions: list[ActionRecord]

@@ -10,17 +10,18 @@ version: 1
 filesystem_policy:
   include_workdir: true
   read_only:
-    - /usr
-    - /lib
-    - /proc
-    - /dev/urandom
-    - /app
-    - /etc
-    - /var/log
+  - /usr
+  - /lib
+  - /proc
+  - /dev/urandom
+  - /app
+  - /etc
+  - /var/log
+  - /sandbox/analytics/reports # Cross-mount: Analytics weekly reports
   read_write:
-    - /sandbox/clients             # Primary mount — client records
-    - /tmp
-    - /dev/null
+  - /sandbox/clients # Primary mount — client records
+  - /tmp
+  - /dev/null
 
 landlock:
   compatibility: best_effort

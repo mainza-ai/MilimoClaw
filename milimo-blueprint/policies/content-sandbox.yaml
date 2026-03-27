@@ -112,10 +112,61 @@ network_policies:
   pexels_api:
     name: pexels_api
     endpoints:
-      - host: api.pexels.com
-        port: 443
-        protocol: rest
-        enforcement: enforce
-        tls: terminate
-        rules:
-          - allow: { method: GET, path: "/**" }
+    - host: api.pexels.com
+      port: 443
+      protocol: rest
+      enforcement: enforce
+      tls: terminate
+    rules:
+    - allow: { method: GET, path: "/**" }
+
+  # ── Facebook Publishing API ────────────────────────────────────────
+  facebook_api:
+    name: facebook_api
+    endpoints:
+    - host: graph.facebook.com
+      port: 443
+      protocol: rest
+      enforcement: enforce
+      tls: terminate
+    rules:
+    - allow: { method: POST, path: "/**/feed" }
+    - allow: { method: POST, path: "/**/photos" }
+    - allow: { method: GET, path: "/**/insights" }
+
+  # ── Trend & Research APIs (read-only) ───────────────────────────────
+  google_trends_api:
+    name: google_trends_api
+    endpoints:
+    - host: trends.google.com
+      port: 443
+      protocol: rest
+      enforcement: enforce
+      tls: terminate
+    rules:
+    - allow: { method: GET, path: "/**" }
+
+  buzzsumo_api:
+    name: buzzsumo_api
+    endpoints:
+    - host: api.buzzsumo.com
+      port: 443
+      protocol: rest
+      enforcement: enforce
+      tls: terminate
+    rules:
+    - allow: { method: GET, path: "/**" }
+
+  # ── Optional: Buffer Scheduling API ─────────────────────────────────
+  # Uncomment to enable Buffer integration for scheduled publishing
+  # buffer_api:
+  #   name: buffer_api
+  #   endpoints:
+  #   - host: api.buffer.com
+  #     port: 443
+  #     protocol: rest
+  #     enforcement: enforce
+  #     tls: terminate
+  #   rules:
+  #   - allow: { method: POST, path: "/1/updates/**" }
+  #   - allow: { method: GET, path: "/1/**" }

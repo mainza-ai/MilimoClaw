@@ -44,7 +44,414 @@ VALID_ROLES = {"content", "ops", "analytics", "finance", "build"}
 VALID_RECIPIENTS = VALID_ROLES | {"war_room"}
 
 # Valid message types
-VALID_MESSAGE_TYPES = {"brief", "query", "response", "signal", "deliverable", "summary"}
+VALID_MESSAGE_TYPES = {
+    "brief",
+    "query",
+    "response",
+    "signal",
+    "deliverable",
+    "summary",
+    "finance_summary",
+    # Content Claw message types
+    "draft_ready",
+    "content_performance_query",
+    "performance_signal",
+    "brief_acknowledged",
+    "deliverable_complete",
+    "client_health_signal",
+    "client_health_signal_ops",
+    "revision_request",
+    # Build Claw message types
+    "feature_brief",
+    "feature_brief_acknowledged",
+    "deploy_complete",
+    "shipping_summary",
+    "behavior_query",
+    # Analytics Claw message types
+    "performance_intel",
+    "retention_signals",
+    "revenue_anomaly",
+    "client_health_alert",
+    "content_performance_response",
+    "behavior_query_response",
+    # Finance Claw message types
+    "pricing_query",
+    "pricing_response",
+    "invoice_ready",
+    "payment_overdue",
+    "project_complete",
+    # Ops Claw message types
+    "project_brief",
+    "client_onboarded",
+    # Finance → Analytics
+    "revenue_summary",
+    # Tool proposal
+    "tool_proposal",
+}
+
+# Message types that require War Room approval (AUTO priority by default)
+AUTO_APPROVAL_TYPES = {"finance_summary"}
+
+# Message type schemas for validation
+MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
+    # Content → War Room: Draft ready for review
+    "draft_ready": {
+        "sender_roles": ["content"],
+        "recipient_roles": ["war_room"],
+        "required_payload": ["draft_id", "platform", "content_type"],
+        "optional_payload": [
+            "client_id",
+            "project_id",
+            "brief_id",
+            "approval_probability",
+            "variants_count",
+            "tone",
+            "scheduled_time",
+            "has_variant_b",
+        ],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Existing brief type - updated with full spec payload
+    "brief": {
+        "sender_roles": ["ops"],
+        "recipient_roles": ["content"],
+        "required_payload": [
+            "client_id",
+            "project_id",
+            "brief_text",
+            "deadline",
+            "tone_requirements",
+            "platform_targets",
+        ],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Content → Ops: Deliverable complete
+    "deliverable_complete": {
+        "sender_roles": ["content"],
+        "recipient_roles": ["ops"],
+        "required_payload": ["project_id", "published_urls"],
+        "optional_payload": ["brief_id", "client_id", "performance_baseline", "completed_at"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    # Content → Analytics: Weekly performance query
+    "content_performance_query": {
+        "sender_roles": ["content"],
+        "recipient_roles": ["analytics"],
+        "required_payload": ["query"],
+        "optional_payload": ["lookback_days", "platform"],
+        "frequency": "weekly",
+        "schedule": "monday_06:00",
+        "priority": "AUTO",
+    },
+    # Content → Analytics: Post-publish performance signal
+    "performance_signal": {
+        "sender_roles": ["content"],
+        "recipient_roles": ["analytics"],
+        "required_payload": ["post_id", "platform", "engagement_data", "publish_time", "content_type"],
+        "optional_payload": ["client_id"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    # Content → Ops: Brief acknowledgment
+    "brief_acknowledged": {
+        "sender_roles": ["content"],
+        "recipient_roles": ["ops"],
+        "required_payload": ["project_id", "estimated_first_draft_time", "acknowledged_at"],
+        "frequency": "on_event",
+        "sla_minutes": 5,
+        "priority": "REVIEW",
+    },
+    # Ops/Analytics → Content: Client health signal
+    "client_health_signal": {
+        "sender_roles": ["ops", "analytics"],
+        "recipient_roles": ["content"],
+        "required_payload": ["client_id", "health_score", "recommended_action"],
+        "optional_payload": ["health_factors", "signals"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Ops → Content: Revision request
+    "revision_request": {
+        "sender_roles": ["ops"],
+        "recipient_roles": ["content"],
+        "required_payload": ["project_id", "draft_id", "revision_notes", "deadline"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Finance → War Room: Revenue summary for widget
+    "finance_summary": {
+        "sender_roles": ["finance"],
+        "recipient_roles": ["war_room"],
+        "required_payload": ["week_revenue"],
+        "optional_payload": ["week_over_week_pct", "invoices_paid", "invoices_pending", "last_updated"],
+        "frequency": "on_change",
+        "priority": "AUTO",
+    },
+    # Build → Ops: Deploy complete
+    "deploy_complete": {
+        "sender_roles": ["build"],
+        "recipient_roles": ["ops"],
+        "required_payload": ["deploy_id", "project_id"],
+        "optional_payload": ["version", "deployed_at", "environment"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    # Build → Content: Shipping summary (for devlog)
+    "shipping_summary": {
+        "sender_roles": ["build"],
+        "recipient_roles": ["content"],
+        "required_payload": ["summary"],
+        "optional_payload": ["features", "fixes", "week_end"],
+        "frequency": "weekly",
+        "priority": "AUTO",
+    },
+    # Analytics → Content: Performance intelligence
+    "performance_intel": {
+        "sender_roles": ["analytics"],
+        "recipient_roles": ["content"],
+        "required_payload": ["report_id"],
+        "optional_payload": ["top_performers", "recommendations", "week_end"],
+        "frequency": "weekly",
+        "priority": "AUTO",
+    },
+    # Analytics → Build: Retention signals
+    "retention_signals": {
+        "sender_roles": ["analytics"],
+        "recipient_roles": ["build"],
+        "required_payload": ["signal_type"],
+        "optional_payload": ["feature_id", "correlation", "recommendation"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    # Ops/Analytics → Ops: Client health signal (Ops receives from Analytics)
+    "client_health_signal_ops": {
+        "sender_roles": ["analytics"],
+        "recipient_roles": ["ops"],
+        "required_payload": ["client_id", "health_score"],
+        "optional_payload": ["recommended_action", "signals"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Analytics → Ops: Client health alert (IMMEDIATE when score < 6.0)
+    "client_health_alert": {
+        "sender_roles": ["analytics"],
+        "recipient_roles": ["ops"],
+        "required_payload": ["client_id", "health_score", "alert_type"],
+        "optional_payload": ["recommended_action", "signals", "triggered_at"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Analytics → Content: Content performance response (2-min SLA)
+    "content_performance_response": {
+        "sender_roles": ["analytics"],
+        "recipient_roles": ["content"],
+        "required_payload": ["query_id", "results"],
+        "optional_payload": ["top_performers", "recommendations", "response_time_ms"],
+        "frequency": "on_event",
+        "sla_minutes": 2,
+        "priority": "AUTO",
+    },
+    # Analytics → Build: Behavior query response (2-min SLA)
+    "behavior_query_response": {
+        "sender_roles": ["analytics"],
+        "recipient_roles": ["build"],
+        "required_payload": ["query_id", "results"],
+        "optional_payload": ["feature_metrics", "user_behavior", "response_time_ms"],
+        "frequency": "on_event",
+        "sla_minutes": 2,
+        "priority": "AUTO",
+    },
+    # Analytics → Finance: Revenue anomaly
+    "revenue_anomaly": {
+        "sender_roles": ["analytics"],
+        "recipient_roles": ["finance"],
+        "required_payload": ["anomaly_type", "detected_at"],
+        "optional_payload": ["severity", "details"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Finance → Ops: Pricing response
+    "pricing_response": {
+        "sender_roles": ["finance"],
+        "recipient_roles": ["ops"],
+        "required_payload": ["query_id", "floor", "ceiling"],
+        "optional_payload": ["notes", "valid_until"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    # Finance → Ops: Invoice ready
+    "invoice_ready": {
+        "sender_roles": ["finance"],
+        "recipient_roles": ["ops"],
+        "required_payload": ["invoice_id", "client_id", "amount"],
+        "optional_payload": ["due_date", "items"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Finance → Ops: Payment overdue (fires IMMEDIATELY on detection)
+    "payment_overdue": {
+        "sender_roles": ["finance"],
+        "recipient_roles": ["ops"],
+        "required_payload": ["invoice_id", "client_id", "days_overdue"],
+        "optional_payload": ["amount", "last_contact"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Ops → Build: Feature brief
+    "feature_brief": {
+        "sender_roles": ["ops"],
+        "recipient_roles": ["build"],
+        "required_payload": ["project_id", "feature_name", "description"],
+        "optional_payload": ["priority", "deadline", "client_id"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Ops → Content/Build: Project brief (after pricing confirmed)
+    "project_brief": {
+        "sender_roles": ["ops"],
+        "recipient_roles": ["content", "build"],
+        "required_payload": ["project_id", "client_id", "scope", "deadline"],
+        "optional_payload": ["tone_requirements", "platform_targets", "budget", "brief_text"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Finance → Analytics: Revenue summary (totals only — no line items)
+    "revenue_summary": {
+        "sender_roles": ["finance"],
+        "recipient_roles": ["analytics"],
+        "required_payload": ["week_total", "invoices_paid", "invoices_pending"],
+        "optional_payload": ["week_over_week_pct", "period_start", "period_end"],
+        "frequency": "weekly",
+        "priority": "AUTO",
+    },
+    # Ops → Finance: Project complete
+    "project_complete": {
+        "sender_roles": ["ops"],
+        "recipient_roles": ["finance"],
+        "required_payload": ["project_id", "client_id"],
+        "optional_payload": ["completed_at", "final_amount"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    # Ops → Finance: Pricing query
+    "pricing_query": {
+        "sender_roles": ["ops"],
+        "recipient_roles": ["finance"],
+        "required_payload": [
+            "project_id",
+            "scope_description",
+            "complexity_estimate",
+            "deadline",
+        ],
+        "optional_payload": ["client_id", "urgency"],
+        "frequency": "on_event",
+        "sla_minutes": 10,
+        "priority": "AUTO",
+    },
+    # Ops → Analytics: Client onboarded
+    "client_onboarded": {
+        "sender_roles": ["ops"],
+        "recipient_roles": ["analytics"],
+        "required_payload": [
+            "client_id",
+            "niche",
+            "project_type",
+            "estimated_value",
+        ],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    # Build → Analytics: Behavior query
+    "behavior_query": {
+        "sender_roles": ["build"],
+        "recipient_roles": ["analytics"],
+        "required_payload": ["query"],
+        "optional_payload": ["feature_id", "time_range"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    # Build → Ops: Feature brief acknowledgment (within 10 min of receipt)
+    "feature_brief_acknowledged": {
+        "sender_roles": ["build"],
+        "recipient_roles": ["ops"],
+        "required_payload": [
+            "project_id",
+            "estimated_start",
+            "clarity_score",
+        ],
+        "optional_payload": ["missing_elements", "deadline_risk"],
+        "frequency": "on_event",
+        "sla_minutes": 10,
+        "priority": "AUTO",
+    },
+}
+
+
+# ---------------------------------------------------------------------------
+# Payload Schema Validation
+# ---------------------------------------------------------------------------
+
+
+def _validate_payload_schema(message: ClawMessage) -> ValidationResult:
+    """
+    Validate message payload against MESSAGE_TYPE_SCHEMAS.
+
+    Checks:
+    1. All required_payload fields are present
+    2. Sender/recipient roles match schema requirements (if defined)
+    """
+    schema = MESSAGE_TYPE_SCHEMAS.get(message.message_type)
+    if not schema:
+        return ValidationResult(
+            valid=True,
+            reason=f"No schema defined for message type '{message.message_type}'",
+            message_id=message.message_id,
+        )
+
+    if "sender_roles" in schema:
+        if message.sender_role not in schema["sender_roles"]:
+            return ValidationResult(
+                valid=False,
+                reason=(
+                    f"Invalid sender for '{message.message_type}': "
+                    f"expected one of {schema['sender_roles']}, "
+                    f"got '{message.sender_role}'"
+                ),
+                message_id=message.message_id,
+            )
+
+    if "recipient_roles" in schema:
+        if message.recipient_role not in schema["recipient_roles"]:
+            return ValidationResult(
+                valid=False,
+                reason=(
+                    f"Invalid recipient for '{message.message_type}': "
+                    f"expected one of {schema['recipient_roles']}, "
+                    f"got '{message.recipient_role}'"
+                ),
+                message_id=message.message_id,
+            )
+
+    required_fields = schema.get("required_payload", [])
+    missing = [f for f in required_fields if f not in message.payload]
+    if missing:
+        return ValidationResult(
+            valid=False,
+            reason=(
+                f"Missing required payload fields for '{message.message_type}': "
+                f"{', '.join(missing)}"
+            ),
+            message_id=message.message_id,
+        )
+
+    return ValidationResult(
+        valid=True,
+        reason="Payload passes schema validation",
+        message_id=message.message_id,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -183,6 +590,11 @@ class ContractValidator:
                 ),
                 message_id=message.message_id,
             )
+
+        # 5. Validate payload against schema if defined
+        schema_result = _validate_payload_schema(message)
+        if not schema_result.valid:
+            return schema_result
 
         return ValidationResult(
             valid=True,

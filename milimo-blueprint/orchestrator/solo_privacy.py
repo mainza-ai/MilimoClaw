@@ -29,6 +29,14 @@ class Route(Enum):
     VLLM = "vllm"
 
 
+class FallbackStrategy(Enum):
+    """Fallback strategy when budget is exceeded."""
+    LOCAL = "local"
+    VLLM = "vllm"
+    CLOUD = "cloud"
+    LIGHTER_PROMPT = "lighter_prompt"
+
+
 class PrivacyPolicyViolationError(Exception):
     """Raised when attempting to override a locked route."""
     pass
@@ -68,7 +76,8 @@ class CostGuard:
     """Daily cloud token budget management."""
     daily_budget: int = 50000
     alert_percent: float = 80.0
-    fallback_route: Route = Route.LOCAL
+    fallback_strategy: FallbackStrategy = FallbackStrategy.LOCAL
+    never_block: bool = True
 
     _used_today: int = 0
     _last_reset: date = field(default_factory=date.today)
@@ -113,6 +122,50 @@ class CostGuard:
             self._last_reset = today
             logger.info(f"Cost guard reset for {today}")
 
+    def apply_lighter_prompt_strategy(
+        self,
+        prompt: str,
+        max_tokens: int,
+    ) -> tuple[str, int]:
+        """
+        Reduce prompt complexity when daily token budget is exceeded.
+        Called automatically when cost_guard triggers fallback.
+
+        Args:
+            prompt: Original prompt
+            max_tokens: Original max_tokens
+
+        Returns:
+            Tuple of (trimmed_prompt, reduced_max_tokens)
+        """
+        reduced_max_tokens = max_tokens // 2
+
+        TRIM_MARKERS = [
+            "CODEBASE CONTEXT:",
+            "COMMUNICATION HISTORY:",
+            "HISTORICAL CALIBRATION DATA:",
+            "SIMILAR PAST PROJECTS:",
+        ]
+
+        trimmed = prompt
+        for marker in TRIM_MARKERS:
+            if marker in trimmed:
+                idx = trimmed.index(marker)
+                next_section = trimmed.find("\n\n", idx + len(marker) + 200)
+                if next_section != -1:
+                    trimmed = (
+                        trimmed[:idx + len(marker) + 200] +
+                        "\n[context trimmed — cost guard active]\n\n" +
+                        trimmed[next_section:]
+                    )
+
+        logger.info(
+            f"action_type=cost_guard_fallback_active "
+            f"original_tokens={max_tokens} reduced_tokens={reduced_max_tokens}"
+        )
+
+        return trimmed, reduced_max_tokens
+
 
 # ---------------------------------------------------------------------------
 
@@ -146,7 +199,8 @@ class SoloPrivacyRouter:
         self.cost_guard = CostGuard(
             daily_budget=cost_guard_config.get("daily_cloud_token_budget", 50000),
             alert_percent=cost_guard_config.get("alert_at_percent", 80.0),
-            fallback_route=Route(cost_guard_config.get("fallback_on_exceed", "local")),
+            fallback_strategy=FallbackStrategy(cost_guard_config.get("fallback_on_exceed", "local")),
+            never_block=cost_guard_config.get("never_block_claw_action", True),
         )
 
         if log_dir is None:
@@ -215,15 +269,16 @@ class SoloPrivacyRouter:
             allowed, is_alert = self.cost_guard.check_budget()
 
             if not allowed:
+                fallback_route = self._get_fallback_route()
                 decision = RoutingDecision(
                     data_type=data_type,
-                    route=self.cost_guard.fallback_route,
-                    reason=f"Budget exceeded — falling back to {self.cost_guard.fallback_route.value}",
+                    route=fallback_route,
+                    reason=f"Budget exceeded — falling back to {fallback_route.value}",
                     budget_exceeded=True,
                 )
                 logger.warning(
                     f"Cloud budget exceeded for {data_type}. "
-                    f"Falling back to {self.cost_guard.fallback_route.value}"
+                    f"Falling back to {fallback_route.value}"
                 )
             elif is_alert:
                 self.cost_guard.record_usage(estimated_tokens)
@@ -262,6 +317,26 @@ class SoloPrivacyRouter:
             f"({decision.reason})"
         )
 
+    def _get_fallback_route(self) -> Route:
+        """
+        Get the fallback route based on the fallback strategy.
+
+        For LIGHTER_PROMPT strategy, returns Route.LOCAL but the caller
+        should also apply the lighter prompt transformation.
+
+        Returns:
+            Route to use when budget is exceeded.
+        """
+        strategy = self.cost_guard.fallback_strategy
+        if strategy == FallbackStrategy.LIGHTER_PROMPT:
+            return Route.LOCAL
+        elif strategy == FallbackStrategy.CLOUD:
+            return Route.CLOUD
+        elif strategy == FallbackStrategy.VLLM:
+            return Route.VLLM
+        else:
+            return Route.LOCAL
+
     def get_routing_log(self) -> list[RoutingDecision]:
         """Get all routing decisions."""
         return self._routing_log.copy()
@@ -274,7 +349,7 @@ class SoloPrivacyRouter:
             "remaining": self.cost_guard.get_remaining(),
             "usage_percent": self.cost_guard.get_usage_percent(),
             "alert_threshold": self.cost_guard.alert_percent,
-            "fallback_route": self.cost_guard.fallback_route.value,
+            "fallback_strategy": self.cost_guard.fallback_strategy.value,
         }
 
     def is_locked_route(self, data_type: str) -> bool:

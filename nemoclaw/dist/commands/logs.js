@@ -35,7 +35,9 @@ async function cliLogs(opts) {
     args.push("/tmp/nemoclaw.log", "/tmp/openclaw.log");
     const proc = (0, node_child_process_1.spawn)("openshell", args, { stdio: ["ignore", "inherit", "inherit"] });
     await new Promise((resolve) => {
-        proc.on("close", () => resolve());
+        proc.on("close", () => {
+            resolve();
+        });
         proc.on("error", (err) => {
             logger.error(`Failed to stream logs: ${err.message}`);
             resolve();

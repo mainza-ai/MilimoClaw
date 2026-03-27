@@ -343,3 +343,215 @@ class TestActionStatus:
         assert ActionStatus.APPROVED.value == "approved"
         assert ActionStatus.BLOCKED.value == "blocked"
         assert ActionStatus.AUTO_EXECUTED.value == "auto_executed"
+
+
+class TestRevenueSummary:
+    """Tests for revenue summary functionality."""
+
+    def test_get_revenue_summary_normal_data(self, tmp_path: Path) -> None:
+        """Test getting revenue summary with valid data."""
+        from orchestrator.solo_warroom import RevenueSummary
+
+        finance_dir = tmp_path / "finance" / "revenue"
+        finance_dir.mkdir(parents=True)
+
+        summary_data = {
+            "current_week": {
+                "total_revenue": 5000.0,
+                "invoices_paid": 3,
+            },
+            "previous_week": {
+                "total_revenue": 4000.0,
+            },
+            "pending_invoices": 2,
+            "last_updated": "2026-03-20T10:00:00Z",
+        }
+
+        summary_file = finance_dir / "weekly_summary.json"
+        with summary_file.open("w") as f:
+            json.dump(summary_data, f)
+
+        warroom = SoloWarRoom(VALID_CONFIG, log_dir=tmp_path)
+        summary = warroom.get_revenue_summary(sandbox_dir=tmp_path)
+
+        assert summary.week_revenue == 5000.0
+        assert summary.week_over_week_pct == 25.0
+        assert summary.invoices_paid == 3
+        assert summary.invoices_pending == 2
+        assert summary.last_updated == "2026-03-20T10:00:00Z"
+
+    def test_get_revenue_summary_missing_file(self, tmp_path: Path) -> None:
+        """Test getting revenue summary when file does not exist."""
+        warroom = SoloWarRoom(VALID_CONFIG, log_dir=tmp_path)
+        summary = warroom.get_revenue_summary(sandbox_dir=tmp_path)
+
+        assert summary.week_revenue == 0.0
+        assert summary.week_over_week_pct == 0.0
+        assert summary.invoices_paid == 0
+        assert summary.invoices_pending == 0
+        assert summary.last_updated == ""
+
+    def test_get_revenue_summary_zero_values(self, tmp_path: Path) -> None:
+        """Test getting revenue summary with zero values."""
+        finance_dir = tmp_path / "finance" / "revenue"
+        finance_dir.mkdir(parents=True)
+
+        summary_data = {
+            "current_week": {
+                "total_revenue": 0.0,
+                "invoices_paid": 0,
+            },
+            "previous_week": {
+                "total_revenue": 0.0,
+            },
+            "pending_invoices": 0,
+            "last_updated": "",
+        }
+
+        summary_file = finance_dir / "weekly_summary.json"
+        with summary_file.open("w") as f:
+            json.dump(summary_data, f)
+
+        warroom = SoloWarRoom(VALID_CONFIG, log_dir=tmp_path)
+        summary = warroom.get_revenue_summary(sandbox_dir=tmp_path)
+
+        assert summary.week_revenue == 0.0
+        assert summary.week_over_week_pct == 0.0
+        assert summary.invoices_paid == 0
+        assert summary.invoices_pending == 0
+
+    def test_get_revenue_summary_week_boundary(self, tmp_path: Path) -> None:
+        """Test week-over-week calculation at week boundary."""
+        finance_dir = tmp_path / "finance" / "revenue"
+        finance_dir.mkdir(parents=True)
+
+        summary_data = {
+            "current_week": {
+                "total_revenue": 3000.0,
+                "invoices_paid": 1,
+            },
+            "previous_week": {
+                "total_revenue": 6000.0,
+            },
+            "pending_invoices": 5,
+            "last_updated": "2026-03-20T10:00:00Z",
+        }
+
+        summary_file = finance_dir / "weekly_summary.json"
+        with summary_file.open("w") as f:
+            json.dump(summary_data, f)
+
+        warroom = SoloWarRoom(VALID_CONFIG, log_dir=tmp_path)
+        summary = warroom.get_revenue_summary(sandbox_dir=tmp_path)
+
+        assert summary.week_revenue == 3000.0
+        assert summary.week_over_week_pct == -50.0
+
+    def test_get_revenue_summary_invalid_json(self, tmp_path: Path) -> None:
+        """Test handling invalid JSON in revenue summary file."""
+        finance_dir = tmp_path / "finance" / "revenue"
+        finance_dir.mkdir(parents=True)
+
+        summary_file = finance_dir / "weekly_summary.json"
+        with summary_file.open("w") as f:
+            f.write("not valid json")
+
+        warroom = SoloWarRoom(VALID_CONFIG, log_dir=tmp_path)
+        summary = warroom.get_revenue_summary(sandbox_dir=tmp_path)
+
+        assert summary.week_revenue == 0.0
+        assert summary.week_over_week_pct == 0.0
+
+    def test_get_revenue_summary_negative_wow(self, tmp_path: Path) -> None:
+        """Test negative week-over-week percentage."""
+        finance_dir = tmp_path / "finance" / "revenue"
+        finance_dir.mkdir(parents=True)
+
+        summary_data = {
+            "current_week": {
+                "total_revenue": 2000.0,
+                "invoices_paid": 1,
+            },
+            "previous_week": {
+                "total_revenue": 4000.0,
+            },
+            "pending_invoices": 3,
+            "last_updated": "2026-03-20T10:00:00Z",
+        }
+
+        summary_file = finance_dir / "weekly_summary.json"
+        with summary_file.open("w") as f:
+            json.dump(summary_data, f)
+
+        warroom = SoloWarRoom(VALID_CONFIG, log_dir=tmp_path)
+        summary = warroom.get_revenue_summary(sandbox_dir=tmp_path)
+
+        assert summary.week_over_week_pct == -50.0
+
+    def test_revenue_summary_dataclass(self) -> None:
+        """Test RevenueSummary dataclass creation."""
+        from orchestrator.solo_warroom import RevenueSummary
+
+        summary = RevenueSummary(
+            week_revenue=10000.0,
+            week_over_week_pct=15.5,
+            invoices_paid=5,
+            invoices_pending=2,
+            last_updated="2026-03-20T10:00:00Z",
+        )
+
+        assert summary.week_revenue == 10000.0
+        assert summary.week_over_week_pct == 15.5
+        assert summary.invoices_paid == 5
+        assert summary.invoices_pending == 2
+
+
+class TestActionEventEmission:
+    """Tests for action event emission."""
+
+    def test_emit_action_event_creates_file(self, tmp_path: Path) -> None:
+        """Test that emitting action event creates event file."""
+        warroom = SoloWarRoom(VALID_CONFIG, log_dir=tmp_path)
+
+        action = warroom.queue_action(
+            claw="content",
+            action_type="social_post_draft",
+            payload={"text": "Test post"},
+        )
+
+        events_dir = tmp_path.parent / "events"
+        event_file = events_dir / f"action_{action.id}.json"
+
+        assert events_dir.exists()
+        assert event_file.exists()
+
+        with event_file.open("r") as f:
+            event = json.load(f)
+
+        assert event["type"] == "action_queued"
+        assert event["data"]["action_id"] == action.id
+        assert event["data"]["claw"] == "content"
+
+    def test_emit_action_event_handles_error(self, tmp_path: Path) -> None:
+        """Test that event emission errors are handled gracefully."""
+        warroom = SoloWarRoom(VALID_CONFIG, log_dir=tmp_path)
+
+        events_dir = tmp_path.parent / "events"
+        events_dir.mkdir(parents=True, exist_ok=True)
+        event_file = events_dir / "action_test.json"
+        event_file.write_text("read-only")
+
+        import os
+        import stat
+        os.chmod(events_dir, stat.S_IRUSR | stat.S_IXUSR)
+
+        try:
+            action = warroom.queue_action(
+                claw="content",
+                action_type="social_post_draft",
+                payload={"text": "Test"},
+            )
+
+            assert action is not None
+        finally:
+            os.chmod(events_dir, stat.S_IRWXU)

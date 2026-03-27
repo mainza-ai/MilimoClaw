@@ -7,15 +7,20 @@
  * Implements token bucket algorithm for rate limiting auto-approvals
  * in the free tier. Enforces daily limits and burst protection.
  *
- * Usage:
- *   import { RateLimiter, Tier } from "./rate-limiter";
+ * PRO tier verification:
+ * - Reads from config file
+ * - 1-hour cache TTL to avoid repeated checks
+ * - Falls back to FREE tier on error
  *
- *   const limiter = new RateLimiter(Tier.FREE);
- *   if (limiter.tryConsume()) {
- *     // Allow auto-approval
- *   } else {
- *     // Require manual approval
- *   }
+ * Usage:
+ * import { RateLimiter, Tier, getTierFromString } from "./rate-limiter";
+ *
+ * const limiter = new RateLimiter(Tier.FREE);
+ * if (limiter.tryConsume()) {
+ * // Allow auto-approval
+ * } else {
+ * // Require manual approval
+ * }
  */
 
 import * as fs from "node:fs";
@@ -57,6 +62,81 @@ export interface RateLimitResult {
   remaining: number;
   resetAt: string;
   reason?: string;
+}
+
+export interface TierCacheEntry {
+  tier: Tier;
+  verifiedAt: string;
+  expiresAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Tier Verification
+// ---------------------------------------------------------------------------
+
+const TIER_CACHE_TTL_MS = 3600000; // 1 hour
+
+let tierCache: TierCacheEntry | null = null;
+
+export function getEffectiveTier(configPath?: string): Tier {
+  // Check cache first
+  if (tierCache) {
+    const now = new Date();
+    const expiresAt = new Date(tierCache.expiresAt);
+    if (now < expiresAt) {
+      return tierCache.tier;
+    }
+  }
+
+  // Verify tier from config
+  const config = loadConfig(configPath);
+  if (!config) {
+    return Tier.FREE;
+  }
+
+  const tier = config.tier === "pro" ? Tier.PRO : Tier.FREE;
+
+  // Update cache
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + TIER_CACHE_TTL_MS);
+
+  tierCache = {
+    tier,
+    verifiedAt: now.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+  };
+
+  return tier;
+}
+
+interface MilimoConfig {
+  tier?: string;
+  serverUrl?: string;
+  squadName?: string;
+  clawRole?: string;
+  meshSecret?: string;
+}
+
+function loadConfig(configPath?: string): MilimoConfig | null {
+  const home = process.env.HOME || process.env.USERPROFILE || "/tmp";
+  const configPathResolved = configPath || path.join(home, ".milimo", "config.json");
+
+  try {
+    if (!fs.existsSync(configPathResolved)) {
+      return null;
+    }
+
+    const content = fs.readFileSync(configPathResolved, "utf-8");
+    const config = JSON.parse(content) as MilimoConfig;
+
+    return config;
+  } catch {
+    return null;
+  }
+}
+
+export function invalidateTierCache(): void {
+  tierCache = null;
 }
 
 // ---------------------------------------------------------------------------

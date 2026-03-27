@@ -1,13 +1,3 @@
-/**
- * NemoClaw — OpenClaw Plugin for OpenShell
- *
- * Uses the real OpenClaw plugin API. Types defined locally are minimal stubs
- * that match the OpenClaw SDK interfaces available at runtime via
- * `openclaw/plugin-sdk`. We define them here because the SDK package is only
- * available inside the OpenClaw host process and cannot be imported at build
- * time.
- */
-import type { Command } from "commander";
 /** Subset of OpenClawConfig that we actually read. */
 export interface OpenClawConfig {
     [key: string]: unknown;
@@ -45,15 +35,6 @@ export interface PluginCommandDefinition {
     requireAuth?: boolean;
     handler: (ctx: PluginCommandContext) => PluginCommandResult | Promise<PluginCommandResult>;
 }
-/** Context passed to the CLI registrar callback. */
-export interface PluginCliContext {
-    program: Command;
-    config: OpenClawConfig;
-    workspaceDir?: string;
-    logger: PluginLogger;
-}
-/** CLI registrar callback type. */
-export type PluginCliRegistrar = (ctx: PluginCliContext) => void | Promise<void>;
 /** Auth method for a provider plugin. */
 export interface ProviderAuthMethod {
     type: string;
@@ -107,9 +88,6 @@ export interface OpenClawPluginApi {
     pluginConfig?: Record<string, unknown>;
     logger: PluginLogger;
     registerCommand: (command: PluginCommandDefinition) => void;
-    registerCli: (registrar: PluginCliRegistrar, opts?: {
-        commands?: string[];
-    }) => void;
     registerProvider: (provider: ProviderPlugin) => void;
     registerService: (service: PluginService) => void;
     resolvePath: (input: string) => string;

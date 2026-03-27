@@ -1,53 +1,40 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# ═══════════════════════════════════════════════════════════════════════
-#  Milimo Claw — Default Mesh Configuration
-# ═══════════════════════════════════════════════════════════════════════
-# Defines the inter-claw message types matrix, default escalation rules,
-# and approval thresholds for the squad mesh protocol.
-
 mesh_version: "0.1.0"
-
-# ── Inter-Claw Message Types Matrix ───────────────────────────────────
-# Defines which message types each role can send and receive.
-# Format: sender → recipient → allowed message types
-# Messages not in this matrix are dropped and logged.
 
 message_matrix:
   content:
-    ops:       [deliverable]
-    analytics: [query]
-    war_room:  [deliverable]
-
+    ops: [deliverable, deliverable_complete]
+    analytics: [query, content_performance_query, performance_signal]
+    war_room: [draft_ready]
   ops:
-    content:   [brief, signal]
-    finance:   [query, signal]
-    build:     [brief]
-    war_room:  [signal, deliverable]
-
+    content: [brief, project_brief, revision_request]
+    finance: [query, pricing_query, project_complete]
+    build: [brief, feature_brief]
+    war_room: [signal, deliverable]
   analytics:
-    content:   [response, summary]
-    ops:       [signal]
-    finance:   [summary]
-    build:     [response, signal]
-    war_room:  [signal, summary]
-
+    content: [response, summary, performance_intel]
+    ops: [signal, client_health_signal]
+    finance: [summary, revenue_anomaly]
+    build: [response, signal, retention_signals]
+    war_room: [signal, summary]
   finance:
-    ops:       [response, signal]
+    ops: [response, signal, pricing_response, invoice_ready]
     analytics: [summary]
-    war_room:  [signal, deliverable]
-
+    war_room: [signal, deliverable, finance_summary, overdue_alert]
   build:
-    ops:       [signal, deliverable]
-    analytics: [query]
-    content:   [summary]
-    war_room:  [signal, deliverable]
+    ops: [signal, deliverable, deploy_complete]
+    analytics: [query, behavior_query]
+    content: [summary, shipping_summary]
+    war_room: [signal, deliverable, tool_proposal]
 
-# ── Valid Message Types ────────────────────────────────────────────────
 message_types:
   brief:
     description: "Project or creative brief"
+    requires_approval: false
+  project_brief:
+    description: "Project brief from Ops to Content"
     requires_approval: false
   query:
     description: "Data request"
@@ -64,35 +51,87 @@ message_types:
   summary:
     description: "Periodic report — weekly intelligence, revenue, shipping"
     requires_approval: false
+  finance_summary:
+    description: "Revenue summary for War Room widget"
+    requires_approval: false
+  draft_ready:
+    description: "Content draft ready for War Room review"
+    requires_approval: true
+  performance_intel:
+    description: "Weekly performance intelligence from Analytics"
+    requires_approval: false
+  retention_signals:
+    description: "Feature retention signals from Analytics to Build"
+    requires_approval: false
+  client_health_signal:
+    description: "Client satisfaction alert from Analytics to Ops"
+    requires_approval: false
+  revenue_anomaly:
+    description: "Revenue anomaly detected by Analytics"
+    requires_approval: false
+  pricing_query:
+    description: "Pricing request from Ops to Finance"
+    requires_approval: false
+  pricing_response:
+    description: "Pricing bounds from Finance to Ops"
+    requires_approval: false
+  invoice_ready:
+    description: "Invoice ready for War Room approval"
+    requires_approval: true
+  overdue_alert:
+    description: "Payment overdue alert to War Room"
+    requires_approval: false
+  feature_brief:
+    description: "Feature request from Ops to Build"
+    requires_approval: false
+  deploy_complete:
+    description: "Deployment completion signal from Build"
+    requires_approval: false
+  shipping_summary:
+    description: "Weekly shipping summary for devlog"
+    requires_approval: false
+  behavior_query:
+    description: "User behavior query from Build to Analytics"
+    requires_approval: false
+  tool_proposal:
+    description: "Evolution-generated tool proposal"
+    requires_approval: true
+  revision_request:
+    description: "Content revision request"
+    requires_approval: false
+  content_performance_query:
+    description: "Content performance query to Analytics"
+    requires_approval: false
+  performance_signal:
+    description: "Post-publish performance signal"
+    requires_approval: false
+  deliverable_complete:
+    description: "Deliverable completion signal to Ops"
+    requires_approval: false
+  project_complete:
+    description: "Project completion signal to Finance"
+    requires_approval: false
 
-# ── Escalation Rules ──────────────────────────────────────────────────
-# Default escalation rules for the squad.
 escalation_rules:
   - trigger: "invoice_over_500"
     action: veto
     description: "Any invoice >$500 requires squad-wide approval"
-
   - trigger: "client_offboarding"
     action: hold
     description: "Client offboarding requires explicit squad confirmation"
-
   - trigger: "brand_voice_change"
     action: hold
     description: "Brand voice modifications require explicit confirmation"
-
   - trigger: "payment_execution"
     action: veto
     description: "Any payment execution requires squad-wide approval"
-
   - trigger: "rate_change"
     action: veto
     description: "Pricing rate changes require squad-wide approval"
-
   - trigger: "external_data_sharing"
     action: veto
     description: "Sharing squad data externally requires squad-wide approval"
 
-# ── Health Check Configuration ─────────────────────────────────────────
 health_check:
   interval_seconds: 30
   timeout_seconds: 10

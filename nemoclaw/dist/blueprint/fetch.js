@@ -28,23 +28,21 @@ function fetchBlueprint(registry, version) {
  * Resolve a "latest" version tag to a concrete version string by querying
  * the registry's tag list or release API.
  */
-async function resolveLatestVersion(registry) {
-    // Future: query OCI tag list or GitHub releases API
+function resolveLatestVersion(registry) {
     void registry;
-    throw new Error("Latest version resolution not yet implemented.");
+    return Promise.reject(new Error("Latest version resolution not yet implemented."));
 }
 /**
  * Download and extract a blueprint tarball into the local cache directory.
  * Returns the local path where the blueprint was extracted.
  */
-async function downloadAndCache(registry, version) {
-    // Future: HTTP fetch + tar extract + manifest parse
+function downloadAndCache(registry, version) {
     void registry;
     const localPath = (0, resolve_js_1.getCachedBlueprintPath)(version);
     const manifest = (0, resolve_js_1.readCachedManifest)(version);
     if (!manifest) {
-        throw new Error(`Failed to read manifest after download for version ${version}`);
+        return Promise.reject(new Error(`Failed to read manifest after download for version ${version}`));
     }
-    return { localPath, manifest };
+    return Promise.resolve({ localPath, manifest });
 }
 //# sourceMappingURL=fetch.js.map

@@ -63,6 +63,16 @@ class DigestSchedule:
     evening_wrap: time_type = time_type(20, 0)
 
 
+@dataclass
+class RevenueSummary:
+    """Revenue summary for War Room widget."""
+    week_revenue: float = 0.0
+    week_over_week_pct: float = 0.0
+    invoices_paid: int = 0
+    invoices_pending: int = 0
+    last_updated: str = ""
+
+
 # ---------------------------------------------------------------------------
 
 class SoloWarRoom:
@@ -146,10 +156,7 @@ class SoloWarRoom:
         return priority_map.get(mode, ActionPriority.REVIEW)
 
     def queue_action(
-        self,
-        claw: str,
-        action_type: str,
-        payload: dict[str, Any],
+        self, claw: str, action_type: str, payload: dict[str, Any],
     ) -> WarRoomAction:
         """
         Add an action to the queue.
@@ -178,6 +185,8 @@ class SoloWarRoom:
             f"Queued action: {action.id} from {claw} "
             f"type={action_type} priority={priority.name}"
         )
+
+        self._emit_action_event(action)
 
         if priority == ActionPriority.AUTO:
             self.auto_execute(action.id)
@@ -405,3 +414,250 @@ class SoloWarRoom:
             json.dump(log_data, f, indent=2)
 
         logger.info(f"Log exported to {output_path}")
+
+    def get_revenue_summary(self, sandbox_dir: Optional[Path] = None) -> RevenueSummary:
+        """
+        Get revenue summary for the War Room widget.
+
+        Reads from /sandbox/finance/revenue/weekly_summary.json or
+        falls back to ~/.milimo/finance/weekly_summary.json
+
+        Args:
+            sandbox_dir: Optional override for sandbox directory
+
+        Returns:
+            RevenueSummary with week revenue, WoW %, invoice counts
+        """
+        if sandbox_dir is None:
+            sandbox_dir = Path.home() / ".milimo"
+
+        summary_file = sandbox_dir / "finance" / "revenue" / "weekly_summary.json"
+
+        if not summary_file.exists():
+            logger.debug("Revenue summary file not found at %s", summary_file)
+            return RevenueSummary(
+                week_revenue=0.0,
+                week_over_week_pct=0.0,
+                invoices_paid=0,
+                invoices_pending=0,
+                last_updated="",
+            )
+
+        try:
+            with summary_file.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            current_week = data.get("current_week", {})
+            previous_week = data.get("previous_week", {})
+
+            week_revenue = float(current_week.get("total_revenue", 0.0))
+            previous_revenue = float(previous_week.get("total_revenue", 0.0))
+
+            if previous_revenue > 0:
+                week_over_week_pct = ((week_revenue - previous_revenue) / previous_revenue) * 100
+            else:
+                week_over_week_pct = 0.0
+
+            return RevenueSummary(
+                week_revenue=week_revenue,
+                week_over_week_pct=round(week_over_week_pct, 2),
+                invoices_paid=int(current_week.get("invoices_paid", 0)),
+                invoices_pending=int(data.get("pending_invoices", 0)),
+                last_updated=data.get("last_updated", ""),
+            )
+
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            logger.warning("Failed to parse revenue summary: %s", e)
+            return RevenueSummary(
+                week_revenue=0.0,
+                week_over_week_pct=0.0,
+                invoices_paid=0,
+                invoices_pending=0,
+                last_updated="",
+            )
+
+    def _emit_action_event(self, action: WarRoomAction) -> None:
+        """
+        Emit WebSocket event for new action.
+
+        Writes event to ~/.milimo/events/ for the realtime bridge to pick up.
+
+        Args:
+            action: The action that was queued
+        """
+        try:
+            events_dir = self.log_dir.parent / "events"
+            events_dir.mkdir(parents=True, exist_ok=True)
+
+            event = {
+                "type": "action_queued",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "data": {
+                    "action_id": action.id,
+                    "claw": action.claw,
+                    "action_type": action.action_type,
+                    "priority": action.priority.name,
+                    "message_type": action.action_type,
+                    "payload": action.payload,
+                },
+            }
+
+            event_file = events_dir / f"action_{action.id}.json"
+            with event_file.open("w", encoding="utf-8") as f:
+                json.dump(event, f)
+
+        except Exception as e:
+            logger.warning("Failed to emit action event: %s", e)
+
+    def get_health_panel(self) -> dict[str, Any]:
+        """
+        Get health panel data for all five claws.
+
+        Returns dict with claw names as keys and health data as values.
+        """
+        return self.get_stats()
+
+    def get_digest_schedule(self) -> dict[str, str]:
+        """
+        Get the digest schedule as a dict with time strings.
+
+        Returns:
+            Dict with 'morning_brief' and 'evening_wrap' keys.
+        """
+        return {
+            "morning_brief": f"{self.digest_schedule.morning_brief.hour:02d}:{self.digest_schedule.morning_brief.minute:02d}",
+            "evening_wrap": f"{self.digest_schedule.evening_wrap.hour:02d}:{self.digest_schedule.evening_wrap.minute:02d}",
+        }
+
+    def get_pending_queue(self) -> list[dict[str, Any]]:
+        """
+        Get pending queue as list of dicts.
+
+        Returns:
+            List of action dicts with action_id, mode, claw_role, summary, etc.
+        """
+        pending = self.get_pending()
+        return [
+            {
+                "action_id": a.id,
+                "mode": a.priority.name,
+                "claw_role": a.claw,
+                "action_type": a.action_type,
+                "summary": a.payload.get("summary", ""),
+                "context": a.payload.get("context", {}),
+                "created_at": a.created_at.isoformat(),
+            }
+            for a in pending
+        ]
+
+    def get_auto_log(self) -> list[dict[str, Any]]:
+        """
+        Get auto-executed actions log for morning digest.
+
+        Returns:
+            List of action dicts that were auto-executed.
+        """
+        return [
+            {
+                "action_id": a.id,
+                "claw_role": a.claw,
+                "action_type": a.action_type,
+                "summary": a.payload.get("summary", ""),
+                "decided_at": a.decided_at.isoformat() if a.decided_at else None,
+            }
+            for a in self._auto_executed
+        ]
+
+    def handle_approve(
+        self, action_id: str, execute_fn: Any = None
+    ) -> Optional[WarRoomAction]:
+        """
+        Approve an action with optional execute callback.
+
+        Args:
+            action_id: ID of the action to approve
+            execute_fn: Optional callback to execute when approved
+
+        Returns:
+            The approved action, or None if not found
+        """
+        action = self.approve(action_id)
+        if action and execute_fn:
+            try:
+                execute_fn()
+            except Exception as e:
+                logger.error(f"Execute fn failed for {action_id}: {e}")
+        return action
+
+    def handle_hold_release(
+        self, action_id: str, execute_fn: Any = None
+    ) -> Optional[WarRoomAction]:
+        """
+        Release a HOLD action with optional execute callback.
+
+        This is an alias for handle_approve for semantic clarity.
+
+        Args:
+            action_id: ID of the HOLD action to release
+            execute_fn: Optional callback to execute when released
+
+        Returns:
+            The released action, or None if not found
+        """
+        return self.handle_approve(action_id, execute_fn)
+
+    def get_registered_shortcuts(self) -> dict[str, str]:
+        """
+        Get registered keyboard shortcuts for War Room TUI.
+
+        Returns:
+            Dict mapping key to action name.
+        """
+        return {
+            "A": "approve",
+            "B": "block",
+            "E": "edit",
+            "R": "release",
+            "D": "digest",
+            "F": "deep_work",
+            "H": "help",
+            "Q": "quit",
+        }
+
+
+def queue_action(
+    war_room: SoloWarRoom,
+    claw_role: str,
+    mode: str,
+    action_type: str,
+    entity_id: str,
+    summary: str,
+    context: dict[str, Any],
+) -> str:
+    """
+    Queue an action to the War Room.
+
+    This is a module-level function for compatibility with test expectations.
+
+    Args:
+        war_room: SoloWarRoom instance
+        claw_role: Claw submitting the action
+        mode: "REVIEW", "HOLD", or "AUTO"
+        action_type: Type of action
+        entity_id: Entity identifier
+        summary: Human-readable summary
+        context: Additional context dict
+
+    Returns:
+        The action ID
+    """
+    action = war_room.queue_action(
+        claw=claw_role,
+        action_type=action_type,
+        payload={
+            "entity_id": entity_id,
+            "summary": summary,
+            "context": context,
+        },
+    )
+    return action.id
