@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Init container for OpenClaw config generation
+# Runs as root to lock the config file before main container starts
+
+FROM python:3.11-slim
+
+# Install iproute2 for network namespace operations (needed by OpenShell)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    iproute2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the config generation script
+COPY scripts/generate_openclaw_config.py /generate_openclaw_config.py
+
+# Init container runs as root — this is intentional for file locking
+USER root
+
+ENTRYPOINT ["python3", "/generate_openclaw_config.py"]

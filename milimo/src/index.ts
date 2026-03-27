@@ -105,7 +105,7 @@ export const CLAW_ROLES: ClawRole[] = ["content", "ops", "analytics", "finance",
 /** Milimo plugin configuration. */
 export interface MilimoConfig {
   squadName: string;
-  clawRole: ClawRole | "";
+  clawRole: ClawRole | "all" | "";
   meshSecret: string;
   blueprintDir: string;
 }
@@ -135,8 +135,8 @@ export function getPluginConfig(api: OpenClawPluginApi): MilimoConfig {
   };
 }
 
-function isValidClawRole(value: string): value is ClawRole | "" {
-  return value === "" || CLAW_ROLES.includes(value as ClawRole);
+function isValidClawRole(value: string): value is ClawRole | "all" | "" {
+  return value === "" || value === "all" || CLAW_ROLES.includes(value as ClawRole);
 }
 
 // ---------------------------------------------------------------------------

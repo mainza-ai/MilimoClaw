@@ -187,8 +187,11 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
   }
 
   // Step 5: Role Assignment
-  let clawRole: ClawRole;
-  if (opts.role) {
+  let clawRole: ClawRole | "all";
+  if (solo) {
+    clawRole = "all";
+    logger.info("Your claw role: all (Solo Founder — all claws active)");
+  } else if (opts.role) {
     if (!CLAW_ROLES.includes(opts.role as ClawRole)) {
       logger.error(`Invalid role "${opts.role}". Must be one of: ${CLAW_ROLES.join(", ")}`);
       return;
@@ -248,7 +251,7 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
   let meshMembers: string[] = [];
 
   if (solo) {
-    meshMembers = [clawRole];
+    meshMembers = selectedTemplate?.clawsActive || CLAW_ROLES.slice();
   } else {
     if (!nonInteractive) {
       const generate = await promptConfirm("Generate a new mesh secret?", true);
@@ -284,7 +287,13 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
   logger.info("");
   logger.info("Configuration summary:");
   logger.info(` Squad: ${squadName}`);
-  logger.info(` Role: ${clawRole} — ${getRoleDescription(clawRole)}`);
+  logger.info(
+    ` Role: ${
+      clawRole === "all"
+        ? "all (Solo Founder — all claws active)"
+        : `${clawRole} — ${getRoleDescription(clawRole as ClawRole)}`
+    }`
+  );
   logger.info(` Template: ${template}`);
   logger.info(` Mode: ${solo ? "Solo" : "Mesh"}`);
   logger.info(` Operator: ${operatorName}`);
@@ -335,7 +344,7 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
   logger.info("╚═══════════════════════════════════════════════════════╝");
   logger.info("");
   logger.info(` Squad: ${squadName}`);
-  logger.info(` Role: ${clawRole}`);
+  logger.info(` Role: ${clawRole === "all" ? "all (Solo Founder — all claws active)" : clawRole}`);
   logger.info(` Template: ${template}`);
   logger.info("");
   logger.info("Next steps:");
@@ -366,7 +375,7 @@ export async function cliOnboardStatus(logger: PluginLogger): Promise<void> {
   logger.info("");
   logger.info("Milimo Configuration:");
   logger.info(` Squad: ${config.squadName}`);
-  logger.info(` Role: ${config.clawRole}`);
+  logger.info(` Role: ${config.clawRole === "all" ? "all (Solo Founder — all claws active)" : config.clawRole}`);
   logger.info(` Template: ${config.template}`);
   logger.info(` Mode: ${config.solo ? "Solo" : "Mesh"}`);
   logger.info(` Operator: ${config.operatorName}`);

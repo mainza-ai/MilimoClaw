@@ -16,7 +16,7 @@ export const CONFIG_DIR = join(process.env.HOME ?? "/tmp", ".milimo");
 
 export interface MilimoOnboardConfig {
   squadName: string;
-  clawRole: ClawRole;
+  clawRole: ClawRole | "all";
   template: string;
   solo: boolean;
   meshMembers: string[];

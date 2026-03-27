@@ -243,9 +243,176 @@ openclaw milimo blueprint rollback [--to <version>] [--reason <reason>]
 
 ---
 
+## `milimo health`
+
+Display health status of squad claws.
+
+```bash
+openclaw milimo health [--json]
+```
+
+| Option | Description |
+|---|---|
+| `--json` | Output as machine-readable JSON |
+
+**Output includes:**
+- Per-claw status (active/idle/error)
+- Tool count per claw
+- Last evolution cycle timestamp
+
+---
+
+## `milimo payment`
+
+Payment and marketplace operations.
+
+### `milimo payment checkout`
+
+Create a checkout session for a blueprint purchase.
+
+```bash
+openclaw milimo payment checkout --blueprint <id> [--success-url <url>] [--cancel-url <url>]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--blueprint <id>` | Blueprint ID to purchase | Required |
+| `--success-url <url>` | Redirect URL on success | `milimo://checkout/success` |
+| `--cancel-url <url>` | Redirect URL on cancel | `milimo://checkout/cancel` |
+
+### `milimo payment status`
+
+Check payment session status.
+
+```bash
+openclaw milimo payment status --session <id>
+```
+
+### `milimo payment balance`
+
+Show seller balance.
+
+```bash
+openclaw milimo payment balance
+```
+
+### `milimo payment history`
+
+Show transaction history.
+
+```bash
+openclaw milimo payment history [--limit <n>]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--limit <n>` | Number of transactions | 10 |
+
+### `milimo payment invoice`
+
+Generate invoice for a session.
+
+```bash
+openclaw milimo payment invoice --session <id> [--format <format>]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--session <id>` | Session ID | Required |
+| `--format <format>` | Output format: `text`, `json`, `html` | `text` |
+
+### `milimo payment connect`
+
+Connect a Stripe account for receiving payments.
+
+```bash
+openclaw milimo payment connect --display-name <name> --email <email>
+```
+
+| Option | Description |
+|---|---|
+| `--display-name <name>` | Display name for the account (Required) |
+| `--email <email>` | Email address (Required) |
+
+---
+
+## `milimo verify`
+
+Verify blueprint provenance and integrity.
+
+```bash
+openclaw milimo verify [options]
+```
+
+| Option | Description |
+|---|---|
+| `--blueprint <id>` | Blueprint ID to verify |
+| `--version <version>` | Specific version (default: current) |
+| `--chain` | Validate entire provenance chain |
+| `--strict` | Enable strict verification mode |
+| `--json` | Output as JSON |
+
+**Verification checks:**
+- Signature validity (Ed25519)
+- Content hash integrity (SHA-256)
+- Timestamp validity
+- Provenance chain continuity (with `--chain`)
+
+---
+
+## `milimo badge`
+
+Performance verification badges.
+
+```bash
+openclaw milimo badge [options]
+```
+
+| Option | Description |
+|---|---|
+| `--blueprint <id>` | Blueprint ID |
+| `--performance` | Generate performance attestation |
+| `--verify <file>` | Verify an attestation file |
+| `--list` | List all attestations |
+| `--auditor <email>` | Request auditor verification |
+| `--json` | Output as JSON |
+
+**Badge levels:**
+
+| Level | Threshold | Icon |
+|-------|-----------|------|
+| Verified | 0% | ✅ |
+| Bronze | 5% | 🥉 |
+| Silver | 10% | 🥈 |
+| Gold | 15% | 🥇 |
+| Platinum | 25% | 💎 |
+| Elite | 40% | 👑 |
+
+---
+
+## `milimo provenance-keygen`
+
+Generate Ed25519 key pair for blueprint signing.
+
+```bash
+openclaw milimo provenance-keygen --squad <name> [--force]
+```
+
+| Option | Description |
+|---|---|
+| `--squad <name>` | Squad name for key identification (Required) |
+| `--force` | Overwrite existing key |
+
+**Output:**
+- Key file path: `~/.milimo/keys/<squad>.json`
+- Public key (hex)
+- Key ID (first 8 bytes)
+
+---
+
 ## `milimo warroom`
 
-Launch the War Room interactive operator dashboard.
+Launch the War Room interactive operator dashboard with split-pane TUI.
 
 ```bash
 openclaw milimo warroom [-o <operator>]
@@ -255,20 +422,61 @@ openclaw milimo warroom [-o <operator>]
 |---|---|---|
 | `-o, --operator <name>` | Override operator ID | `local-operator` |
 
-### War Room Commands
+### War Room TUI Layout
 
-Once inside the TUI:
+The War Room now features a modern split-pane interface:
 
-| Command | Description |
-|---|---|
-| `ls` | List all pending actions in queue |
-| `view <id>` | View full details of a pending action (timestamp, route, payload) |
-| `approve <id>` | Approve — routes the action to its intended recipient |
-| `veto <id>` | Reject — moves the action to rejected queue |
-| `hold <id>` | Defer — leaves the action in queue for later review |
-| `feed` | View the last 10 entries in the audit trail |
-| `help` | Show command help |
-| `exit` / `quit` | Leave the War Room (claws continue operating) |
+```
+┌─ WAR ROOM ─────────────────┬─ CLAW HEALTH ──────────────┐
+│                            │ CONTENT ● active 11 tools  │
+│ 🔴 HOLD BUILD CLAW         │ OPS ● active 8 tools       │
+│ PR #52 ready to merge      │ ANALYTICS ● active 9 tools │
+│ [A]pprove [B]lock          │ FINANCE ● active 7 tools   │
+│                            │ BUILD ● active 12 tools    │
+│ 🟡 REVIEW OPS CLAW         ├────────────────────────────┤
+│ Proposal for @ArcLight     │ Revenue this week          │
+│ $3,200                     │ $4,240 ↑18%                │
+│ [A]pprove [E]dit [B]lock   │ 3 paid · 1 pending         │
+│                            ├────────────────────────────┤
+│ ✓ AUTO CONTENT CLAW        │ Evolution Log              │
+│ post_047 published ✓       │ BUILD: PR enforcer built   │
+│                            │ 5 days ago · +12% approval │
+└────────────────────────────┴────────────────────────────┘
+[Q]uit [R]efresh [H]elp [F]inals Mode
+```
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `↑`/`↓` | Navigate through actions |
+| `Enter` | Select/expand action |
+| `A` | Approve selected action |
+| `B` | Block (reject) selected action |
+| `E` | Edit (hold) selected action |
+| `Q` | Quit War Room |
+| `R` | Refresh queue |
+| `H` | Toggle help overlay |
+| `F` | Toggle Finals Mode |
+
+### Color Coding
+
+| Color | Mode | Description |
+|-------|------|-------------|
+| 🔴 Coral | `HOLD` / `VETO` | Requires manual approval |
+| 🟡 Amber | `REVIEW` | Recommended for review |
+| 🟢 Teal | `AUTO` | Auto-approval eligible |
+
+### Polling Interval
+
+The War Room refreshes every **3 seconds** (reduced from 5s for faster response).
+
+### Finals Mode
+
+When Finals Mode is enabled (press `F`):
+- All `AUTO` actions are automatically approved
+- No operator input required for auto-eligible actions
+- Actions are processed immediately and logged
 
 ### Approval Modes
 
@@ -295,7 +503,7 @@ When rate limit is reached:
 - Audit trail logs `RATE_LIMITED` action
 - War Room displays remaining quota
 
-Rate limit status is visible in the War Room header.
+Rate limit status is visible in the right panel.
 
 ---
 
@@ -307,8 +515,12 @@ Available from chat interfaces (Telegram bridge, TUI):
 |---|---|
 | `/milimo` | Show help |
 | `/milimo status` | Squad status summary |
-| `/milimo roles` | List available claw roles |
-| `/milimo mesh` | Show mesh topology |
+| `/milimo role` | Show your claw role details |
+| `/milimo finals` | Show Finals Mode status |
+| `/milimo approve <id>` | Approve a pending War Room action |
+| `/milimo veto <id>` | Block a pending action |
+| `/milimo health` | One-line health summary per claw |
+| `/milimo evolution` | Last tool built by each claw with performance delta |
 | `/milimo help` | Full command list |
 
 ---
@@ -337,7 +549,7 @@ Available from chat interfaces (Telegram bridge, TUI):
 
 ### State File (`~/.milimo/config.json`)
 
-Created by `milimo onboard`. Contains:
+Created by `milimo onboard`. Single source of truth for all configuration (previously split between `state.json` and `config.json`).
 
 ```json
 {
@@ -346,12 +558,13 @@ Created by `milimo onboard`. Contains:
   "template": "solo-founder",
   "solo": true,
   "meshMembers": ["content"],
-  "meshSecret": null,
+  "meshSecret": "enc:v1:...",
   "operatorName": "operator",
   "warRoomMode": "full",
   "onboardedAt": "2026-03-19T12:00:00.000Z",
   "initializedAt": "2026-03-19T12:00:00.000Z",
-  "blueprintVersion": "0.1.0"
+  "blueprintVersion": "0.1.0",
+  "serverUrl": "https://api.milimoclaw.com"
 }
 ```
 
@@ -362,14 +575,54 @@ Created by `milimo onboard`. Contains:
 | `template` | string | Template ID (e.g., `solo-founder`) |
 | `solo` | boolean | Solo mode flag |
 | `meshMembers` | string[] | Array of claw roles in mesh |
-| `meshSecret` | string \| null | Shared secret for mesh auth |
+| `meshSecret` | string \| null | Encrypted shared secret for mesh auth (prefix `enc:v1:`) |
 | `operatorName` | string | Human operator name |
 | `warRoomMode` | string | `full`, `minimal`, or `disabled` |
 | `onboardedAt` | string | ISO timestamp of onboarding |
+| `initializedAt` | string | ISO timestamp of initialization |
+| `blueprintVersion` | string | Current blueprint version |
+| `serverUrl` | string \| null | Payment API server URL |
 
-### Legacy State File (`~/.milimo/state.json`)
+### Configuration Encryption
 
-Created by `milimo init` (legacy). Contains squad configuration, role assignment, template selection, and initialization timestamp.
+Sensitive fields are automatically encrypted using AES-256-GCM:
+
+**Encrypted fields:**
+- `meshSecret`
+- `apiKey`
+- `apiToken`
+- `accessToken`
+- `refreshToken`
+
+**Encryption characteristics:**
+- Encrypted values prefixed with `enc:v1:`
+- Key derived from machine ID (Linux: `/etc/machine-id`, macOS: hardware UUID)
+- Backwards compatible: plaintext values are read as-is
+- Automatic encryption on save, transparent decryption on load
+
+**Legacy State File (`~/.milimo/state.json`):**
+
+Previously created by `milimo init`. Automatically migrated to `config.json` on first load. The legacy file is removed after successful migration.
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `MILIMO_SERVER_URL` | Payment API server URL | `https://api.milimoclaw.com` |
+| `MILIMO_BLUEPRINT_DIR` | Blueprint directory path | `/opt/milimo-blueprint` |
+
+### Server URL Configuration
+
+The payment API URL is resolved in this order:
+
+1. `MILIMO_SERVER_URL` environment variable
+2. `serverUrl` in `config.json`
+3. Default: `https://api.milimoclaw.com`
+
+For local development, set:
+```bash
+export MILIMO_SERVER_URL=http://localhost:3001
+```
 
 ### Audit Trail (`~/.milimo/audit/<squadId>/audit.jsonl`)
 
