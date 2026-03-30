@@ -211,7 +211,7 @@ def setup_workspace_files(config: AssistantConfig) -> None:
     identity_content = f"""# IDENTITY.md - Who Am I?
 
 - **Name:** {config.name}
-- **Creature:** {config.creature.title()}
+- **Creature:** {config.creature}
 - **Vibe:** {config.vibe}
 - **Emoji:** {config.emoji}
 
