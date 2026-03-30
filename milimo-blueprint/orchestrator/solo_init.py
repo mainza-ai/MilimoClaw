@@ -60,7 +60,7 @@ REQUIRED_FIELDS = {
     "filesystem": ["content", "ops", "analytics", "finance", "build"],
     "inference": ["routing_overrides", "cost_guard"],
     "war_room": ["operator", "mode", "queue_priority", "digest_schedule"],
-    "evolution": ["cycle", "day", "time", "per_claw"],
+    "evolution": ["cycle_day", "schedule", "per_claw"],
     "network_egress": ["content", "ops", "analytics", "finance", "build"],
     "deep_work_mode": ["alias", "on_activate", "auto_response_template"],
 }
@@ -460,12 +460,10 @@ def _validate_field_types(config: dict[str, Any]) -> None:
 
     # evolution section
     evolution = config.get("evolution", {})
-    if not isinstance(evolution.get("cycle"), str):
-        errors.append("evolution.cycle must be a string")
-    if not isinstance(evolution.get("day"), str):
-        errors.append("evolution.day must be a string")
-    if not isinstance(evolution.get("time"), str):
-        errors.append("evolution.time must be a string")
+    if not isinstance(evolution.get("cycle_day"), str):
+        errors.append("evolution.cycle_day must be a string")
+    if not isinstance(evolution.get("schedule"), dict):
+        errors.append("evolution.schedule must be a dict")
 
     # deep_work_mode section
     deep_work = config.get("deep_work_mode", {})

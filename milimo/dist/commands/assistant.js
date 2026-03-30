@@ -55,11 +55,11 @@ async function assistantVerify() {
             if (code === 0) {
                 const name = assistant?.name ?? "your assistant";
                 console.log(`\n${name} setup is complete.`);
-                console.log("Start with: milimo assistant start");
+                console.log("Start with: openclaw milimo assistant start");
                 resolve();
             }
             else {
-                console.error("\nAssistant setup incomplete. Run: milimo assistant setup");
+                console.error("\nAssistant setup incomplete. Run: openclaw milimo assistant setup");
                 reject(new Error("Assistant setup verification failed"));
             }
         });
@@ -68,7 +68,7 @@ async function assistantVerify() {
 async function assistantStart() {
     const agentConfig = ".openclaw/agents/main/config.yaml";
     if (!(0, node_fs_1.existsSync)(agentConfig)) {
-        console.error("Assistant not set up. Run: milimo assistant setup");
+        console.error("Assistant not set up. Run: openclaw milimo assistant setup");
         process.exit(1);
     }
     const assistant = getAssistantConfig();

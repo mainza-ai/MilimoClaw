@@ -440,7 +440,7 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
   try {
     await assistantSetup();
   } catch (err) {
-    logger.warn("Assistant setup skipped — run 'milimo assistant setup' manually.");
+    logger.warn("Assistant setup skipped — run 'openclaw milimo assistant setup' manually.");
     logger.warn(err instanceof Error ? err.message : String(err));
   }
 
@@ -457,14 +457,14 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
   logger.info(` Assistant: ${name} ${emoji}`);
   logger.info("");
   logger.info("Next steps:");
-  logger.info(`    milimo assistant start    # Talk to ${name}`);
-  logger.info("    milimo warroom            # Open the War Room");
-  logger.info("    milimo squad status       # View squad configuration");
+  logger.info(`    openclaw milimo assistant start    # Talk to ${name}`);
+  logger.info("    openclaw milimo warroom            # Open the War Room");
+  logger.info("    openclaw milimo squad status       # View squad configuration");
   if (!solo) {
     logger.info("");
     logger.info("For mesh setup:");
     logger.info("    Share the mesh secret with squad members");
-    logger.info(`    Each member runs: milimo onboard --squad ${squadName}`);
+    logger.info(`    Each member runs: openclaw milimo onboard --squad ${squadName}`);
   }
   logger.info("");
   logger.info("The milimo never stops. Work. Without working.");
