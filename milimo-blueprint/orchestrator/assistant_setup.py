@@ -42,6 +42,11 @@ MILIMO_CONFIG_PATH = Path.home() / ".milimo" / "config.json"
 OPENCLAW_AGENTS_DIR = Path.home() / ".openclaw" / "agents" / "main"
 SYSTEM_PROMPT_DEST = OPENCLAW_AGENTS_DIR / "system.md"
 AGENT_CONFIG_DEST = OPENCLAW_AGENTS_DIR / "config.yaml"
+# OpenClaw workspace paths (these are actually used by the gateway)
+WORKSPACE_DIR = Path.home() / ".openclaw" / "workspace"
+BOOTSTRAP_FILE = WORKSPACE_DIR / "BOOTSTRAP.md"
+IDENTITY_FILE = WORKSPACE_DIR / "IDENTITY.md"
+USER_FILE = WORKSPACE_DIR / "USER.md"
 
 
 def find_template() -> Path:
@@ -185,9 +190,61 @@ def build_agent_config(config: AssistantConfig) -> dict:
     }
 
 
+def setup_workspace_files(config: AssistantConfig) -> None:
+    """
+    Update OpenClaw workspace files with assistant identity.
+
+    OpenClaw uses workspace files (IDENTITY.md, USER.md) for identity,
+    NOT the agents/main/system.md file. This function ensures the
+    workspace is properly configured.
+
+    - Deletes BOOTSTRAP.md (signals "I know who I am")
+    - Updates IDENTITY.md with assistant details
+    - Updates USER.md with operator info
+    """
+    # Delete BOOTSTRAP.md to signal identity is known
+    if BOOTSTRAP_FILE.exists():
+        BOOTSTRAP_FILE.unlink()
+        print(f"✓ Removed bootstrap file (identity is configured)")
+
+    # Write IDENTITY.md
+    identity_content = f"""# IDENTITY.md - Who Am I?
+
+- **Name:** {config.name}
+- **Creature:** {config.creature.title()}
+- **Vibe:** {config.vibe}
+- **Emoji:** {config.emoji}
+
+## Squad Context
+
+- **Squad:** {config.squad_name}
+- **Template:** {config.template_name}
+- **Active Claws:** {', '.join(config.active_claws)}
+"""
+    IDENTITY_FILE.write_text(identity_content, encoding="utf-8")
+    print(f"✓ Identity file updated: {IDENTITY_FILE}")
+
+    # Write USER.md
+    user_content = f"""# USER.md - About Your Human
+
+- **Name:** {config.operator_name}
+- **What to call them:** {config.operator_name}
+
+## Context
+
+_{config.operator_name} runs the {config.squad_name} squad using the {config.template_name} template._
+_The squad has {len(config.active_claws)} active claws: {', '.join(config.active_claws)}._
+"""
+    USER_FILE.write_text(user_content, encoding="utf-8")
+    print(f"✓ User file updated: {USER_FILE}")
+
+
 def setup_assistant() -> None:
     """
     Render the system prompt template and install into NemoClaw runtime.
+
+    Also updates workspace files (IDENTITY.md, USER.md) which are actually
+    used by OpenClaw for identity management.
 
     Safe to run multiple times — overwrites cleanly.
     """
@@ -206,11 +263,15 @@ def setup_assistant() -> None:
         yaml.dump(agent_config, f, default_flow_style=False, allow_unicode=True)
     print(f"✓ Agent config written: {AGENT_CONFIG_DEST}")
 
+    # Update workspace files (actually used by OpenClaw)
+    WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
+    setup_workspace_files(config)
+
     print()
     print(f"{config.name} is ready. Start with:")
-    print("    openclaw agent --agent main")
-    print("    — or —")
-    print("    milimo assistant start")
+    print("  openclaw agent --agent main")
+    print("  — or —")
+    print("  milimo assistant start")
     print()
     print(f"The milimo never stops. {config.emoji}")
 
@@ -238,6 +299,9 @@ def verify_setup() -> dict[str, bool]:
         "system_prompt_installed": SYSTEM_PROMPT_DEST.exists(),
         "agent_config_exists": AGENT_CONFIG_DEST.exists(),
         "bridge_cli_exists": Path("milimo-blueprint/orchestrator/bridge_cli.py").exists(),
+        "workspace_identity_exists": IDENTITY_FILE.exists(),
+        "workspace_user_exists": USER_FILE.exists(),
+        "bootstrap_removed": not BOOTSTRAP_FILE.exists(),
     }
 
 
