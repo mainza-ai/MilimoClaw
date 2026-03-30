@@ -166,27 +166,41 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
     discoverTemplates(pluginConfig.blueprintDir).find((t) => t.id === template);
 
   // Step 3: Solo vs Mesh Mode
-  // If the template declares solo: true, skip the confirmation entirely.
-  // Asking "Operating solo?" for a template named "Solo Founder" is redundant
-  // and causes readline race conditions with sequential prompts.
-  let solo = opts.solo ?? selectedTemplate?.solo ?? true;
+  //
+  // PRIORITY ORDER:
+  //   1. Template declares solo: true  → always solo (e.g. Solo Founder)
+  //   2. User passes --solo on CLI     → explicitly solo
+  //   3. Otherwise                     → ask the user
+  //
+  // BUG FIX: Commander.js .option("--solo", ..., false) sets opts.solo to
+  // boolean `false` by default, NOT undefined. The ?? operator only falls
+  // through on null/undefined, so `opts.solo ?? template.solo` never reached
+  // the template check. We must check the template first.
+  let solo: boolean;
   if (selectedTemplate?.solo) {
-    // Template is definitively solo — no confirmation needed
+    // Template is definitively solo — no confirmation needed, no override
+    solo = true;
     if (!nonInteractive) {
       logger.info("");
       logger.info(`Template "${selectedTemplate.displayName}" runs all claws on one machine.`);
       logger.info("");
     }
-  } else if (!opts.solo && !nonInteractive) {
+  } else if (process.argv.includes("--solo")) {
+    // User explicitly passed --solo on the command line
+    solo = true;
+  } else if (!nonInteractive) {
     const soloConfirm = await promptConfirm("Operating solo (no mesh coordination)?", true);
-    if (!soloConfirm) {
-      solo = false;
+    solo = soloConfirm;
+    if (!solo) {
       logger.info("");
       logger.info("Mesh mode selected. Each squad member will need to:");
       logger.info("  1. Run: openclaw milimo onboard --squad <name> --role <role>");
       logger.info("  2. Share the mesh secret for authentication");
       logger.info("");
     }
+  } else {
+    // Non-interactive without --solo and non-solo template: default to true
+    solo = true;
   }
 
   // Step 4: Squad Name
