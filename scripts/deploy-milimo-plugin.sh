@@ -173,6 +173,37 @@ else
 fi
 '
 
+# Run assistant setup to configure workspace files
+echo ""
+echo "▸ Running assistant setup to configure workspace..."
+docker exec openshell-cluster-nemoclaw nsenter -t "$PID" -a -- su - sandbox -c \
+  "python3 /sandbox/milimo-blueprint/orchestrator/assistant_setup.py 2>&1" \
+  || echo "  ⚠ Assistant setup not run (may need onboarding first)"
+
+# Configure Telegram if token is provided
+if [[ -n "${TELEGRAM_BOT_TOKEN:-}" ]]; then
+  echo ""
+  echo "▸ Configuring Telegram channel..."
+  docker exec openshell-cluster-nemoclaw nsenter -t "$PID" -a -- python3 -c "
+import json
+
+with open('/sandbox/.openclaw/openclaw.json', 'r') as f:
+    config = json.load(f)
+
+config.setdefault('channels', {})['telegram'] = {
+    'enabled': True,
+    'botToken': '$TELEGRAM_BOT_TOKEN',
+    'dmPolicy': 'pairing',
+    'groupPolicy': 'open'
+}
+
+with open('/sandbox/.openclaw/openclaw.json', 'w') as f:
+    json.dump(config, f, indent=2)
+
+print('  ✓ Telegram channel configured')
+"
+fi
+
 # Verify deployment
 echo ""
 echo "▸ Verifying deployment..."
