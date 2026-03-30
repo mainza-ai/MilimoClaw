@@ -47,6 +47,8 @@ WORKSPACE_DIR = Path.home() / ".openclaw" / "workspace"
 BOOTSTRAP_FILE = WORKSPACE_DIR / "BOOTSTRAP.md"
 IDENTITY_FILE = WORKSPACE_DIR / "IDENTITY.md"
 USER_FILE = WORKSPACE_DIR / "USER.md"
+AGENTS_FILE = WORKSPACE_DIR / "AGENTS.md"
+MILIMO_CONTEXT_FILE = WORKSPACE_DIR / "MILIMO_CLAW.md"
 
 
 def find_template() -> Path:
@@ -201,6 +203,8 @@ def setup_workspace_files(config: AssistantConfig) -> None:
     - Deletes BOOTSTRAP.md (signals "I know who I am")
     - Updates IDENTITY.md with assistant details
     - Updates USER.md with operator info
+    - Writes MILIMO_CLAW.md with full Milimo context
+    - Updates AGENTS.md to read MILIMO_CLAW.md on startup
     """
     # Delete BOOTSTRAP.md to signal identity is known
     if BOOTSTRAP_FILE.exists():
@@ -237,6 +241,100 @@ _The squad has {len(config.active_claws)} active claws: {', '.join(config.active
 """
     USER_FILE.write_text(user_content, encoding="utf-8")
     print(f"✓ User file updated: {USER_FILE}")
+
+    # Write MILIMO_CLAW.md with full context (read from system.md render)
+    rendered_system = render_template(config)
+    MILIMO_CONTEXT_FILE.write_text(rendered_system, encoding="utf-8")
+    print(f"✓ Milimo context written: {MILIMO_CONTEXT_FILE}")
+
+    # Update AGENTS.md to include Milimo context in startup
+    _update_agents_file()
+
+
+def _update_agents_file() -> None:
+    """
+    Update AGENTS.md to include Milimo Claw context in session startup.
+
+    Modifies the "Session Startup" section to read MILIMO_CLAW.md first.
+    Preserves existing content but injects the Milimo instruction.
+    """
+    if not AGENTS_FILE.exists():
+        # Create minimal AGENTS.md if missing
+        agents_content = """# AGENTS.md - Your Workspace
+
+This folder is home. Treat it that way.
+
+## Session Startup
+
+Before doing anything else:
+
+1. Read `MILIMO_CLAW.md` — your full squad context, claw knowledge, and capabilities
+2. Read `SOUL.md` — this is who you are
+3. Read `USER.md` — this is who you're helping
+4. Read `IDENTITY.md` — your name, creature, vibe, and squad context
+
+## Memory
+
+You wake up fresh each session. These files are your continuity.
+
+"""
+        AGENTS_FILE.write_text(agents_content, encoding="utf-8")
+        print(f"✓ Created AGENTS.md with Milimo startup instruction")
+        return
+
+    # Read existing AGENTS.md
+    content = AGENTS_FILE.read_text(encoding="utf-8")
+
+    # Check if already has Milimo instruction
+    if "MILIMO_CLAW.md" in content:
+        print(f"✓ AGENTS.md already includes Milimo context instruction")
+        return
+
+    # Find "Session Startup" section and inject Milimo instruction
+    import re
+
+    # Pattern to match Session Startup section
+    pattern = r"(## Session Startup.*?Before doing anything else:.*?)(1\. Read)"
+
+    milimo_instruction = """1. Read `MILIMO_CLAW.md` — your full squad context, claw knowledge, and capabilities
+2. Read """
+
+    replacement = r"\1" + milimo_instruction
+
+    # Try to inject after "Before doing anything else:"
+    if "Before doing anything else:" in content:
+        # Renumber existing items
+        modified = content.replace(
+            "Before doing anything else:\n",
+            "Before doing anything else:\n\n1. Read `MILIMO_CLAW.md` — your full squad context, claw knowledge, and capabilities\n"
+        )
+        # Re-number subsequent items (2, 3, 4 instead of 1, 2, 3)
+        modified = re.sub(
+            r"\n(\d+)\. Read (`SOUL\.md`|`USER\.md`|`IDENTITY\.md`)",
+            lambda m: f"\n{int(m.group(1)) + 1}. Read {m.group(2)}",
+            modified
+        )
+        AGENTS_FILE.write_text(modified, encoding="utf-8")
+        print(f"✓ Updated AGENTS.md with Milimo startup instruction")
+    else:
+        # Prepend Milimo instruction to the file
+        modified = content.replace(
+            "# AGENTS.md - Your Workspace",
+            """# AGENTS.md - Your Workspace
+
+## Session Startup
+
+Before doing anything else:
+
+1. Read `MILIMO_CLAW.md` — your full squad context, claw knowledge, and capabilities
+2. Read `SOUL.md` — this is who you are
+3. Read `USER.md` — this is who you're helping
+4. Read `IDENTITY.md` — your name, creature, vibe, and squad context
+
+"""
+        )
+        AGENTS_FILE.write_text(modified, encoding="utf-8")
+        print(f"✓ Updated AGENTS.md with Milimo startup section")
 
 
 def setup_assistant() -> None:
@@ -302,6 +400,8 @@ def verify_setup() -> dict[str, bool]:
         "workspace_identity_exists": IDENTITY_FILE.exists(),
         "workspace_user_exists": USER_FILE.exists(),
         "bootstrap_removed": not BOOTSTRAP_FILE.exists(),
+        "milimo_context_exists": MILIMO_CONTEXT_FILE.exists(),
+        "agents_includes_milimo": AGENTS_FILE.exists() and "MILIMO_CLAW.md" in AGENTS_FILE.read_text(encoding="utf-8") if AGENTS_FILE.exists() else False,
     }
 
 
