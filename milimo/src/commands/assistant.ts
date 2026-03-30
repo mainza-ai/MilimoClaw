@@ -82,7 +82,8 @@ export async function assistantStart(): Promise<void> {
 
     console.log(`Starting ${name}... ${emoji}\n`);
 
-    const result = spawn("openclaw", ["agent", "--agent", "main"], { stdio: "inherit" });
+    // Launch the interactive TUI instead of a single, required-message turn
+    const result = spawn("openclaw", ["tui", "--session", "main"], { stdio: "inherit" });
 
     return new Promise((resolve, reject) => {
         result.on("close", (code) => {

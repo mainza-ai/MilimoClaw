@@ -75,7 +75,8 @@ async function assistantStart() {
     const name = assistant?.name ?? "your assistant";
     const emoji = assistant?.emoji ?? "🦀";
     console.log(`Starting ${name}... ${emoji}\n`);
-    const result = (0, node_child_process_1.spawn)("openclaw", ["agent", "--agent", "main"], { stdio: "inherit" });
+    // Launch the interactive TUI instead of a single, required-message turn
+    const result = (0, node_child_process_1.spawn)("openclaw", ["tui", "--session", "main"], { stdio: "inherit" });
     return new Promise((resolve, reject) => {
         result.on("close", (code) => {
             if (code === 0)
