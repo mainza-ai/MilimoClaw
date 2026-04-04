@@ -74,18 +74,18 @@ UNINSTALL=false
 DRY_RUN=false
 SKIP_NEMOCLAW=false
 
-for arg in "$@"; do
-  case "$arg" in
-    --non-interactive) NON_INTERACTIVE=true ;;
-    --solo) SOLO_MODE=true ;;
-    --operator-name) shift; OPERATOR_NAME="$1" ;;
-    --squad-name) shift; SQUAD_NAME="$1" ;;
-    --warroom-mode) shift; WARROOM_MODE="$1" ;;
-    --auto) AUTO_INSTALL=true ;;
-    --uninstall) UNINSTALL=true ;;
-    --dry-run) DRY_RUN=true ;;
-    --skip-nemoclaw) SKIP_NEMOCLAW=true ;;
-    --sandbox-name) shift; SANDBOX_NAME="$1" ;;
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --non-interactive) NON_INTERACTIVE=true; shift ;;
+    --solo) SOLO_MODE=true; shift ;;
+    --operator-name) OPERATOR_NAME="$2"; shift 2 ;;
+    --squad-name) SQUAD_NAME="$2"; shift 2 ;;
+    --warroom-mode) WARROOM_MODE="$2"; shift 2 ;;
+    --auto) AUTO_INSTALL=true; shift ;;
+    --uninstall) UNINSTALL=true; shift ;;
+    --dry-run) DRY_RUN=true; shift ;;
+    --skip-nemoclaw) SKIP_NEMOCLAW=true; shift ;;
+    --sandbox-name) SANDBOX_NAME="$2"; shift 2 ;;
     --version|-v)
       printf "milimo-claw-installer v%s\n" "$MILIMO_VERSION"
       exit 0
@@ -113,7 +113,7 @@ for arg in "$@"; do
       printf "\n"
       exit 0
       ;;
-    *) error "Unknown option: $arg" ;;
+    *) error "Unknown option: $1" ;;
   esac
 done
 
@@ -381,26 +381,71 @@ deploy_to_sandbox() {
 
   # Deploy plugin
   info "Transferring plugin to sandbox..."
-  docker cp "$plugin_bundle" "$gateway:/tmp/milimo-plugin.tar.gz" 2>/dev/null
-  docker exec "$gateway" kubectl cp "/tmp/milimo-plugin.tar.gz" "openshell/$SANDBOX_NAME:/tmp/milimo-plugin.tar.gz" 2>/dev/null
-  docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c "
+  if ! docker cp "$plugin_bundle" "$gateway:/tmp/milimo-plugin.tar.gz"; then
+    error "Failed to copy plugin bundle to gateway container"
+  fi
+  if ! docker exec "$gateway" kubectl cp "/tmp/milimo-plugin.tar.gz" "openshell/$SANDBOX_NAME:/tmp/milimo-plugin.tar.gz"; then
+    error "Failed to copy plugin bundle to sandbox pod"
+  fi
+
+  info "Extracting and registering plugin..."
+  local extract_output
+  extract_output=$(docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c "
+    # Remove any previous installation
+    rm -rf /root/.openclaw/extensions/milimo
+    rm -rf /sandbox/extensions/milimo
+
+    # Extract to sandbox extensions dir
     mkdir -p /sandbox/extensions/milimo
     tar xzf /tmp/milimo-plugin.tar.gz -C /sandbox/extensions/milimo --strip-components=1
     rm -f /tmp/milimo-plugin.tar.gz
+
+    # Verify dist/index.js exists
+    if [ ! -f /sandbox/extensions/milimo/dist/index.js ]; then
+      echo 'ERROR: dist/index.js not found after extraction'
+      ls -la /sandbox/extensions/milimo/ 2>/dev/null || echo 'Directory empty'
+      exit 1
+    fi
+    echo 'OK: dist/index.js present'
+
+    # Install production dependencies
     cd /sandbox/extensions/milimo
-    npm install --production 2>/dev/null || true
-    openclaw plugins install /sandbox/extensions/milimo 2>&1 || true
-  " 2>/dev/null
+    npm install --production 2>&1 | tail -5
+
+    # Register the plugin
+    echo '---PLUGIN_INSTALL_OUTPUT---'
+    openclaw plugins install /sandbox/extensions/milimo 2>&1
+    echo '---END_PLUGIN_INSTALL---'
+
+    # Verify plugin is registered
+    openclaw plugins list 2>&1
+  " 2>&1) || {
+    error "Plugin extraction/registration failed:
+$extract_output"
+  }
+
+  # Check for errors in output
+  if echo "$extract_output" | grep -q "ERROR:"; then
+    error "Plugin deployment error:
+$(echo "$extract_output" | grep 'ERROR:')"
+  fi
+
   ok "Plugin deployed"
 
   # Deploy blueprint
   info "Transferring blueprint to sandbox..."
-  docker cp "$blueprint_bundle" "$gateway:/tmp/milimo-blueprint.tar.gz" 2>/dev/null
-  docker exec "$gateway" kubectl cp "/tmp/milimo-blueprint.tar.gz" "openshell/$SANDBOX_NAME:/tmp/milimo-blueprint.tar.gz" 2>/dev/null
+  if ! docker cp "$blueprint_bundle" "$gateway:/tmp/milimo-blueprint.tar.gz"; then
+    error "Failed to copy blueprint bundle to gateway container"
+  fi
+  if ! docker exec "$gateway" kubectl cp "/tmp/milimo-blueprint.tar.gz" "openshell/$SANDBOX_NAME:/tmp/milimo-blueprint.tar.gz"; then
+    error "Failed to copy blueprint bundle to sandbox pod"
+  fi
+
   docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c "
     tar xzf /tmp/milimo-blueprint.tar.gz -C /sandbox --strip-components=1
     rm -f /tmp/milimo-blueprint.tar.gz
-  " 2>/dev/null
+    echo 'Blueprint extracted'
+  " 2>&1 || warn "Blueprint extraction had warnings (continuing)"
   ok "Blueprint deployed"
 }
 
@@ -477,7 +522,7 @@ with open('/sandbox/.milimo/config.json', 'w') as f:
 print('Config written')
 \"
     chown -R sandbox:sandbox /sandbox/.milimo
-  " 2>/dev/null
+  " 2>&1 || warn "Config write had warnings"
 
   ok "Squad: $squad (solo template)"
   ok "Operator: $operator"
@@ -494,24 +539,35 @@ verify_installation() {
   local gateway
   gateway=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -i "openshell\|nemoclaw\|cluster" | head -1 || true)
 
-  # Check plugin loaded
+  # Check plugin loaded — run actual command, not just grep
   local plugin_check
   plugin_check=$(docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c "
-    openclaw plugins list 2>&1 | grep -i 'milimo' || echo 'NOT_FOUND'
-  " 2>/dev/null || echo "ERROR")
+    echo '=== Plugin List ==='
+    openclaw plugins list 2>&1
+    echo '=== Milimo Command Test ==='
+    openclaw milimo --help 2>&1 || echo 'MILIMO_COMMAND_NOT_FOUND'
+  " 2>&1) || true
 
-  if echo "$plugin_check" | grep -qi "milimo"; then
+  if echo "$plugin_check" | grep -qi "milimo.*loaded\|milimo.*plugin"; then
     ok "Milimo Claw plugin is loaded"
+  elif echo "$plugin_check" | grep -qi "MILIMO_COMMAND_NOT_FOUND\|unknown command"; then
+    error "Milimo Claw plugin is NOT loaded. Debug output:
+$plugin_check
+
+To fix manually:
+  1. nemoclaw $SANDBOX_NAME connect
+  2. openclaw plugins install /sandbox/extensions/milimo
+  3. Check for errors in the output"
   else
-    warn "Plugin not showing as loaded yet"
-    info "Connect to sandbox and run: openclaw plugins install /sandbox/extensions/milimo"
+    warn "Plugin status unclear. Full output:
+$plugin_check"
   fi
 
   # Check blueprint
   local blueprint_check
   blueprint_check=$(docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c "
     ls /sandbox/milimo-blueprint/orchestrator/build/build_claw.py 2>/dev/null && echo 'OK' || echo 'MISSING'
-  " 2>/dev/null || echo "ERROR")
+  " 2>&1)
 
   if [ "$blueprint_check" = "OK" ]; then
     ok "Build Claw blueprint present"
@@ -523,7 +579,7 @@ verify_installation() {
   local config_check
   config_check=$(docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c "
     cat /sandbox/.milimo/config.json 2>/dev/null | python3 -c \"import json,sys; d=json.load(sys.stdin); print(d.get('squad',{}).get('name','?'))\" 2>/dev/null || echo 'MISSING'
-  " 2>/dev/null || echo "ERROR")
+  " 2>&1)
 
   if [ "$config_check" != "MISSING" ] && [ "$config_check" != "ERROR" ]; then
     ok "Milimo config: $config_check"
