@@ -14,7 +14,7 @@ from typing import Any, Protocol
 import uuid
 import json
 
-from finance.finance_init import FinanceOperationalLog, FinanceLogEntry
+from .finance_init import FinanceOperationalLog, FinanceLogEntry
 
 
 class InferenceClient(Protocol):

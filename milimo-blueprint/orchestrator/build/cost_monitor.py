@@ -19,9 +19,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from build.build_init import BuildFilesystemInit, BuildOperationalLog, BuildLogEntry
-from build.approval_handler import BuildApprovalHandler
-from build.signal_dispatcher import BuildSignalDispatcher
+from .build_init import BuildFilesystemInit, BuildOperationalLog, BuildLogEntry
+from .approval_handler import BuildApprovalHandler
+from .signal_dispatcher import BuildSignalDispatcher
 
 logger = logging.getLogger(__name__)
 

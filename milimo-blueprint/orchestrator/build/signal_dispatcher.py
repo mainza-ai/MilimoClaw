@@ -20,7 +20,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
-from build.build_init import BuildFilesystemInit, BuildOperationalLog, BuildLogEntry
+from .build_init import BuildFilesystemInit, BuildOperationalLog, BuildLogEntry
 
 logger = logging.getLogger(__name__)
 

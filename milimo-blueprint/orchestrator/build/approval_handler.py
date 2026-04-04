@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-from build.build_init import BuildFilesystemInit, BuildOperationalLog, BuildLogEntry
+from .build_init import BuildFilesystemInit, BuildOperationalLog, BuildLogEntry
 
 logger = logging.getLogger(__name__)
 

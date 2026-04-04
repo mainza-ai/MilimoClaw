@@ -14,8 +14,8 @@ from pathlib import Path
 from typing import Literal
 import json
 
-from finance.finance_init import FinanceOperationalLog, FinanceLogEntry
-from finance.invoice_manager import Invoice, InvoiceManager
+from .finance_init import FinanceOperationalLog, FinanceLogEntry
+from .invoice_manager import Invoice, InvoiceManager
 
 
 @dataclass

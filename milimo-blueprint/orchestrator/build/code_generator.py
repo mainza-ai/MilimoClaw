@@ -20,9 +20,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from build.build_init import BuildFilesystemInit, BuildOperationalLog, BuildLogEntry
-from build.approval_handler import BuildApprovalHandler
-from build.issue_manager import ComplexityScore
+from .build_init import BuildFilesystemInit, BuildOperationalLog, BuildLogEntry
+from .approval_handler import BuildApprovalHandler
+from .issue_manager import ComplexityScore
 
 logger = logging.getLogger(__name__)
 

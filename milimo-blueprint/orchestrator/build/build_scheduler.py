@@ -17,7 +17,7 @@ import threading
 from datetime import datetime, timezone
 from typing import Any
 
-from build.build_init import BuildOperationalLog, BuildLogEntry
+from .build_init import BuildOperationalLog, BuildLogEntry
 
 logger = logging.getLogger(__name__)
 

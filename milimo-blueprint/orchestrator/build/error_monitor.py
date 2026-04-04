@@ -19,9 +19,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from build.build_init import BuildFilesystemInit, BuildOperationalLog, BuildLogEntry
-from build.approval_handler import BuildApprovalHandler
-from build.code_generator import CodeGenerator
+from .build_init import BuildFilesystemInit, BuildOperationalLog, BuildLogEntry
+from .approval_handler import BuildApprovalHandler
+from .code_generator import CodeGenerator
 
 logger = logging.getLogger(__name__)
 

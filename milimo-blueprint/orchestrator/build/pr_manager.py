@@ -18,9 +18,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from build.build_init import BuildFilesystemInit, BuildOperationalLog, BuildLogEntry
-from build.approval_handler import BuildApprovalHandler, PRActivityLog
-from build.code_generator import ResolutionResult
+from .build_init import BuildFilesystemInit, BuildOperationalLog, BuildLogEntry
+from .approval_handler import BuildApprovalHandler, PRActivityLog
+from .code_generator import ResolutionResult
 
 logger = logging.getLogger(__name__)
 

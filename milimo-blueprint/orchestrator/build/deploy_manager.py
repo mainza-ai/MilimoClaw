@@ -18,10 +18,10 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from build.build_init import BuildFilesystemInit, BuildOperationalLog, BuildLogEntry
-from build.approval_handler import BuildApprovalHandler, DeployActivityLog
-from build.signal_dispatcher import BuildSignalDispatcher
-from build.pr_manager import PRRecord
+from .build_init import BuildFilesystemInit, BuildOperationalLog, BuildLogEntry
+from .approval_handler import BuildApprovalHandler, DeployActivityLog
+from .signal_dispatcher import BuildSignalDispatcher
+from .pr_manager import PRRecord
 
 logger = logging.getLogger(__name__)
 

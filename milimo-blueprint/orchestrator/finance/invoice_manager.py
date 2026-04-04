@@ -16,14 +16,14 @@ import json
 import uuid
 import re
 
-from finance.finance_init import (
+from .finance_init import (
     FinanceFilesystemInit,
     FinanceOperationalLog,
     FinanceLogEntry,
     PaymentEventsLog,
     PaymentEvent,
 )
-from finance.signal_dispatcher import FinanceSignalDispatcher
+from .signal_dispatcher import FinanceSignalDispatcher
 
 
 class InferenceClient(Protocol):

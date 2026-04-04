@@ -22,28 +22,28 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from build.build_init import (
+from .build_init import (
     BASE,
     BuildFilesystemInit,
     BuildOperationalLog,
     INFERENCE_FALLBACK_CHAIN,
     BUILD_CATEGORIES,
 )
-from build.build_scheduler import BuildScheduler
-from build.signal_dispatcher import BuildSignalDispatcher
-from build.approval_handler import (
+from .build_scheduler import BuildScheduler
+from .signal_dispatcher import BuildSignalDispatcher
+from .approval_handler import (
     BuildApprovalHandler,
     PRActivityLog,
     DeployActivityLog,
 )
-from build.issue_manager import IssueManager
-from build.code_generator import CodeGenerator
-from build.pr_manager import PRManager
-from build.deploy_manager import DeployManager
-from build.error_monitor import ErrorMonitor
-from build.cost_monitor import CostMonitor
-from build.dependency_auditor import DependencyAuditor
-from build.doc_maintainer import DocMaintainer
+from .issue_manager import IssueManager
+from .code_generator import CodeGenerator
+from .pr_manager import PRManager
+from .deploy_manager import DeployManager
+from .error_monitor import ErrorMonitor
+from .cost_monitor import CostMonitor
+from .dependency_auditor import DependencyAuditor
+from .doc_maintainer import DocMaintainer
 
 logger = logging.getLogger(__name__)
 

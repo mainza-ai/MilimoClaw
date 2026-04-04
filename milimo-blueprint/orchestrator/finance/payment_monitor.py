@@ -13,15 +13,15 @@ from pathlib import Path
 from typing import Any, Protocol
 import json
 
-from finance.finance_init import (
+from .finance_init import (
     FinanceFilesystemInit,
     FinanceOperationalLog,
     FinanceLogEntry,
     PaymentEventsLog,
     PaymentEvent,
 )
-from finance.signal_dispatcher import FinanceSignalDispatcher
-from finance.invoice_manager import Invoice
+from .signal_dispatcher import FinanceSignalDispatcher
+from .invoice_manager import Invoice
 
 
 class StripeClient(Protocol):

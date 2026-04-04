@@ -13,9 +13,9 @@ from pathlib import Path
 from typing import Any, Protocol
 import json
 
-from finance.finance_init import FinanceFilesystemInit, FinanceOperationalLog, FinanceLogEntry
-from finance.signal_dispatcher import FinanceSignalDispatcher
-from finance.invoice_manager import Invoice
+from .finance_init import FinanceFilesystemInit, FinanceOperationalLog, FinanceLogEntry
+from .signal_dispatcher import FinanceSignalDispatcher
+from .invoice_manager import Invoice
 
 
 class InferenceClient(Protocol):

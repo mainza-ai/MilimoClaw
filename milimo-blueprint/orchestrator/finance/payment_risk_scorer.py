@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Protocol
 
-from finance.finance_init import PaymentEventsLog
+from .finance_init import PaymentEventsLog
 
 
 class InferenceClient(Protocol):

@@ -21,7 +21,7 @@ and documentation maintenance.
 - build_claw: Main entry point
 """
 
-from build.build_init import (
+from .build_init import (
     BASE,
     REQUIRED_DIRS,
     REQUIRED_FILES,
@@ -33,19 +33,19 @@ from build.build_init import (
     InitResult,
     ValidationResult,
 )
-from build.build_claw import BuildClaw
-from build.build_scheduler import (
+from .build_claw import BuildClaw
+from .build_scheduler import (
     BuildScheduler,
     ERROR_MONITOR_INTERVAL,
     COST_MONITOR_INTERVAL,
     DEPENDENCY_AUDIT_INTERVAL,
 )
-from build.signal_dispatcher import (
+from .signal_dispatcher import (
     BuildSignalDispatcher,
     PendingBehaviorQuery,
     ANALYTICS_WAIT_SECONDS,
 )
-from build.approval_handler import (
+from .approval_handler import (
     BuildApprovalHandler,
     BuildApprovalAction,
     ApprovalResult,

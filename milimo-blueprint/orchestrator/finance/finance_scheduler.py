@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Callable
 import json
 
-from finance.finance_init import FinanceOperationalLog, FinanceLogEntry
+from .finance_init import FinanceOperationalLog, FinanceLogEntry
 
 
 class FinanceScheduler:

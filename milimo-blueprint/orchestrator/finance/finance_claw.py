@@ -13,21 +13,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
 
-from finance.finance_init import (
+from .finance_init import (
     FinanceFilesystemInit,
     FinanceOperationalLog,
     PaymentEventsLog,
     FinanceLogEntry,
 )
-from finance.signal_dispatcher import FinanceSignalDispatcher
-from finance.pricing_engine import PricingEngine
-from finance.invoice_manager import InvoiceManager
-from finance.approval_handler import FinanceApprovalHandler
-from finance.payment_risk_scorer import PaymentRiskScorer
-from finance.payment_monitor import PaymentMonitor
-from finance.revenue_tracker import RevenueTracker
-from finance.expense_tracker import ExpenseTracker
-from finance.finance_scheduler import FinanceScheduler
+from .signal_dispatcher import FinanceSignalDispatcher
+from .pricing_engine import PricingEngine
+from .invoice_manager import InvoiceManager
+from .approval_handler import FinanceApprovalHandler
+from .payment_risk_scorer import PaymentRiskScorer
+from .payment_monitor import PaymentMonitor
+from .revenue_tracker import RevenueTracker
+from .expense_tracker import ExpenseTracker
+from .finance_scheduler import FinanceScheduler
 
 
 class InferenceClient(Protocol):

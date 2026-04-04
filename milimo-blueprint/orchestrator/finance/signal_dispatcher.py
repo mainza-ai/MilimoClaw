@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
 
-from finance.finance_init import FinanceOperationalLog, FinanceLogEntry
+from .finance_init import FinanceOperationalLog, FinanceLogEntry
 
 
 class MeshGateway(Protocol):
