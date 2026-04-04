@@ -1,12 +1,13 @@
 # Milimo Claw — Architecture Guide
 
 > Technical deep-dive into the multi-sandbox mesh architecture.
+> **Last Updated:** 2026-04-04
 
 ---
 
 ## System Overview
 
-Milimo Claw is a distributed multi-agent system where each agent (claw) runs in its own isolated NemoClaw sandbox. The system has six architectural layers:
+Milimo Claw is a distributed multi-agent system where each agent (claw) runs in its own isolated NemoClaw sandbox. The system has seven architectural layers:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -25,6 +26,7 @@ Milimo Claw is a distributed multi-agent system where each agent (claw) runs in 
 │ COORDINATION LAYER                                              │
 │ Mesh Coordinator · Gateway Adapter · Typed Contracts           │
 │ Region Detector · Latency Monitor · Failover Manager           │
+│ Event Normalization (Clawhip pattern)                          │
 ├─────────────────────────────────────────────────────────────────┤
 │ EVOLUTION LAYER                                                 │
 │ Tool Generator · Tool Validator · Tool Sandbox · Pattern Detect│
@@ -32,6 +34,8 @@ Milimo Claw is a distributed multi-agent system where each agent (claw) runs in 
 ├─────────────────────────────────────────────────────────────────┤
 │ INTELLIGENCE LAYER                                              │
 │ Privacy Router · Sensitivity Classifier · Inference Routing    │
+│ Category-Based Model Selection (OmO pattern)                   │
+│ Inference Fallback Chain (OmO pattern)                         │
 ├─────────────────────────────────────────────────────────────────┤
 │ BLUEPRINT LAYER                                                 │
 │ Role Configs · Sandbox Policies · Templates · Schema           │
@@ -40,35 +44,6 @@ Milimo Claw is a distributed multi-agent system where each agent (claw) runs in 
 │ RUNTIME LAYER                                                   │
 │ NemoClaw · OpenShell · Docker · Landlock · seccomp             │
 │ Relay Server · WebSocket Gateway                               │
-└─────────────────────────────────────────────────────────────────┘
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ OPERATOR LAYER │
-│ War Room TUI · Approval Engine · Audit Trail · Rate Limiter │
-│ Health Dashboard · Push Notifications │
-├─────────────────────────────────────────────────────────────────┤
-│ PAYMENT LAYER │
-│ Stripe Connect · Fee Calculator · Payouts · Invoices │
-│ Webhooks · Connected Accounts │
-├─────────────────────────────────────────────────────────────────┤
-│ PROVENANCE LAYER │
-│ Ed25519 Signer · Signature Verifier · Chain Validator │
-│ Attestation Generator · Performance Badges │
-├─────────────────────────────────────────────────────────────────┤
-│ COORDINATION LAYER │
-│ Mesh Coordinator · Typed Contracts · Health Monitor │
-│ Region Detector · Latency Monitor · Failover Manager │
-├─────────────────────────────────────────────────────────────────┤
-│ INTELLIGENCE LAYER │
-│ Privacy Router · Sensitivity Classifier · Inference Routing │
-├─────────────────────────────────────────────────────────────────┤
-│ BLUEPRINT LAYER │
-│ Role Configs · Sandbox Policies · Templates · Schema │
-│ Regions Config · Rate Limits │
-├─────────────────────────────────────────────────────────────────┤
-│ RUNTIME LAYER │
-│ NemoClaw · OpenShell · Docker · Landlock · seccomp │
-│ Relay Server · WebSocket Gateway │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -96,6 +71,13 @@ Each claw runs inside a NemoClaw sandbox with kernel-level isolation:
 │   └── reports/  # Read-only cross-mount for Content Claw
 ├── finance/      # Finance Claw — invoices, revenue, pricing
 └── build/        # Build Claw — codebase, secrets, deploy configs
+    ├── repo/     # Codebase (GitHub mount)
+    ├── context/  # Sprint plans, error patterns, cost tracking
+    ├── prs/      # PR state tracking (drafted/approved/merged)
+    ├── deployments/ # Deploy state (pending/history)
+    ├── docs/     # Changelog, API docs, devlog
+    ├── memory/   # Filesystem memory pattern (Clawhip)
+    └── logs/     # Operational, PR, deploy, cost alerts
 ```
 
 Each claw has **read-write** access only to its own mount. Cross-mounts are explicitly declared and **read-only**.
@@ -134,6 +116,21 @@ The **message matrix** defines which types each role can send to which recipient
 
 Messages not in this matrix are **dropped and logged**. There is no freeform text between claws.
 
+### Event Normalization (Clawhip Pattern)
+
+All incoming messages are normalized to canonical event format at ingress:
+
+```python
+def normalize_message(raw: dict) -> dict:
+    return {
+        "event": f"build.{raw['message_type']}",
+        "source": raw.get("sender_role", "unknown"),
+        "repo_name": raw.get("payload", {}).get("project_id"),
+        "timestamp": raw["timestamp"],
+        "metadata": raw.get("payload", {}),
+    }
+```
+
 ### Valid Message Types
 
 | Type | Description | Requires Approval |
@@ -144,6 +141,7 @@ Messages not in this matrix are **dropped and logged**. There is no freeform tex
 | `signal` | Alert — deadline, risk, completion | No |
 | `deliverable` | Completed work product | **Yes** |
 | `summary` | Periodic report | No |
+| `overdue_alert` | SLA overdue warning | No |
 
 ---
 
@@ -155,6 +153,8 @@ The `MeshCoordinator` manages the squad topology:
 - **Routing** — Messages validated against contracts, then delivered to recipient inbox
 - **Health monitoring** — Periodic heartbeats; unhealthy claws marked and War Room notified
 - **Topology persistence** — Mesh state saved to disk as `topology.json`
+- **Retry logic** — Automatic reconnection with exponential backoff
+- **Health check loop** — Automated periodic health verification
 
 ### Gateway Adapter
 
@@ -165,16 +165,6 @@ The mesh supports multiple transport modes via the `GatewayAdapter` interface:
 | **File-based** | Development/Fallback | Uses local filesystem queues when gateway unavailable |
 | **Unix Socket** | Single Host | Inter-sandbox communication on same machine via OpenShell |
 | **WebSocket** | Multi-Host | Distributed mesh across different machines |
-
-```python
-# Gateway adapter selection
-gateway = create_gateway(GatewayConfig(
-    endpoint="unix:///var/run/openshell/gateway.sock",  # or tcp://host:port
-    mesh_secret="squad-secret",
-    squad_id="my-squad",
-    role="content",
-))
-```
 
 ### Mesh States
 
@@ -265,6 +255,30 @@ Inference Request → Sensitivity Classifier → Routing Decision
 - Unknown data types → Local NIM fallback.
 - Locked routes cannot be overridden by squad policy.
 
+### Category-Based Model Selection (OmO Pattern)
+
+The Build Claw uses semantic categories to route inference calls to optimal models:
+
+| Category | Model | Temperature | Use Case |
+|---|---|---|---|
+| `code_generation` | Local NIM | 0.1 | Source code, patches |
+| `pr_review` | Cloud Nemotron | 0.3 | PR descriptions, reviews |
+| `deploy_planning` | Cloud Nemotron | 0.2 | Deploy strategies |
+| `doc_writing` | Cloud Nemotron | 0.7 | Changelogs, devlogs |
+| `issue_scoring` | Cloud Nemotron | 0.2 | Complexity estimation |
+
+### Inference Fallback Chain (OmO Pattern)
+
+All inference calls use exponential backoff across a fallback chain:
+
+```python
+INFERENCE_FALLBACK_CHAIN = [
+    "primary_model",
+    "claude-sonnet-4-6",
+    "gemini-3.1-pro",
+]
+```
+
 ---
 
 ## War Room Architecture
@@ -298,9 +312,17 @@ The War Room is **not** a sandbox — it's the human oversight layer sitting abo
 | Mode | Behavior | Use Case |
 |---|---|---|
 | **AUTO** | Claw acts immediately, logs for review | Low-stakes routine actions |
-| **REVIEW** | Queued for human approval before execution | Client communications, PR merges |
-| **HOLD** | Paused, requires explicit squad confirmation | Brand voice changes, offboarding |
+| **REVIEW** | Queued for human approval before execution | Client communications, PR creation |
+| **HOLD** | Paused, requires explicit squad confirmation | PR merge, deployment |
 | **VETO** | Any squad member can block, requires re-vote | Invoices >$500, payment execution |
+
+### Build Claw Two-Stage Approval
+
+The Build Claw has a **critical two-stage approval** flow that differs from other claws:
+
+1. **PR Creation** → REVIEW approval → moves to HOLD
+2. **PR Merge** → HOLD release → merges to main (REVIEW approval does NOT merge)
+3. **Deployment** → Separate HOLD → release triggers deploy (merge ≠ deploy)
 
 ### Rate Limiting
 
@@ -329,15 +351,58 @@ Rate limit status is visible in the War Room via `getRateLimitStatus()`.
 | Approval engine | TypeScript | `milimo/src/warroom/approval.ts` | 4-mode approval with escalation |
 | Rate limiter | TypeScript | `milimo/src/warroom/rate-limiter.ts` | Token bucket rate limiting |
 | Audit logger | TypeScript | `milimo/src/warroom/audit.ts` | JSONL audit trail |
+| Gateway client | TypeScript | `milimo/src/mesh/gateway-client.ts` | Mesh communication with HKDF |
 | Privacy router | Python | `milimo-blueprint/orchestrator/privacy_router.py` | Sensitivity classification + routing |
 | Contracts | Python | `milimo-blueprint/orchestrator/contracts.py` | Message contract validation |
 | Mesh coordinator | Python | `milimo-blueprint/orchestrator/mesh.py` | Topology, routing, health |
-| Gateway adapter | Python | `milimo-blueprint/orchestrator/gateway_adapter.py` | Multi-transport gateway |
-| Tool generator | Python | `milimo-blueprint/orchestrator/tool_generator.py` | LLM-based code generation |
-| Tool validator | Python | `milimo-blueprint/orchestrator/tool_validator.py` | AST security validation |
-| Tool sandbox | Python | `milimo-blueprint/orchestrator/tool_sandbox.py` | Isolated tool execution |
 | Evolution cycle | Python | `milimo-blueprint/orchestrator/evolution_cycle.py` | Weekly self-evolution pipeline |
-| Blueprint manager | Python | `milimo-blueprint/orchestrator/blueprint_manager.py` | Version control & export |
+| Tool builder | Python | `milimo-blueprint/orchestrator/tool_builder.py` | Dynamic tool generation + validation |
+| Solo init | Python | `milimo-blueprint/orchestrator/solo_init.py` | Solo mode initialization |
+| Assistant setup | Python | `milimo-blueprint/orchestrator/assistant_setup.py` | Assistant system prompt rendering |
+| **Build Claw** | Python | `milimo-blueprint/orchestrator/build/` | 13 modules — engineering automation |
+| **Content Claw** | Python | `milimo-blueprint/orchestrator/content/` | 11 modules — creative output |
+| **Ops Claw** | Python | `milimo-blueprint/orchestrator/ops/` | 11 modules — client/project management |
+| **Analytics Claw** | Python | `milimo-blueprint/orchestrator/analytics/` | 12 modules — intelligence layer |
+| **Finance Claw** | Python | `milimo-blueprint/orchestrator/finance/` | 12 modules — financial operations |
+
+---
+
+## Build Claw Architecture
+
+### Module Structure
+
+```
+orchestrator/build/
+├── __init__.py              — Package exports
+├── build_init.py            — Filesystem init, inference fallback chain, category routing
+├── build_claw.py            — Main entry point, component wiring
+├── build_scheduler.py       — Timer-based scheduling, missed job recovery
+├── signal_dispatcher.py     — Event normalization, renderer/sink separation, SLA timer
+├── approval_handler.py      — Two-stage REVIEW→HOLD, file-based task persistence
+├── issue_manager.py         — GitHub issues, sprint planning, velocity tracking
+├── code_generator.py        — Hash-anchored code generation, AST-aware search
+├── pr_manager.py            — PR lifecycle with two-stage REVIEW→HOLD→merge
+├── deploy_manager.py        — Separate HOLD flow, background execution
+├── error_monitor.py         — ErrorPattern/ErrorEvent, tmux monitoring hooks
+├── cost_monitor.py          — Baseline calculation, drift detection
+├── dependency_auditor.py    — Vulnerability assessment, security PR routing
+└── doc_maintainer.py        — Changelog/devlog generation, shipping summaries
+```
+
+### Enhancements from External Projects
+
+| Feature | Source | Module |
+|---|---|---|
+| Inference fallback chain | oh-my-openagent | build_init.py |
+| Category-based model selection | oh-my-openagent | build_init.py |
+| Hash-anchored code generation | oh-my-openagent | code_generator.py |
+| Task dependency storage | oh-my-openagent | approval_handler.py |
+| Background execution | oh-my-openagent | deploy_manager.py, pr_manager.py |
+| Session recovery | oh-my-openagent | build_init.py |
+| Typed event normalization | clawhip | signal_dispatcher.py |
+| Renderer/sink separation | clawhip | signal_dispatcher.py |
+| Tmux session monitoring | clawhip | error_monitor.py |
+| Filesystem memory pattern | clawhip | All modules with `_log` lists |
 
 ---
 
@@ -345,20 +410,28 @@ Rate limit status is visible in the War Room via `getRateLimitStatus()`.
 
 ### Unit Tests
 
-- **JavaScript:** 76 tests covering plugin exports, config parsing, blueprint validation
-- **Python:** 73 tests covering privacy routing, contracts, mesh coordination
+- **JavaScript:** 318 tests covering plugin exports, config parsing, blueprint validation, encryption, approval engine, War Room TUI
+- **Python:** 1192 tests covering all 5 claws, orchestrator core, Build Claw (116 tests), integration tests
 
 ### Integration Tests
 
-Located in `test/integration/`:
+Located in `milimo-blueprint/tests/`:
 
 | Test File | Coverage |
 |-----------|----------|
-| `harness.js` | Test utilities for TS ↔ Python boundary |
-| `blueprint-manager.test.js` | Version, export, diff, rollback |
-| `mesh-coordinator.test.js` | Registration, routing, gateway |
-| `privacy-router.test.js` | Classification, routing decisions |
-| `evolution-cycle.test.js` | Cycle stages, registry |
+| `test_build_unit.py` | Build Claw unit tests (101 tests) |
+| `test_build_mvr_integration.py` | Build Claw MVR sequence (15 tests) |
+| `test_content_unit.py` | Content Claw unit tests |
+| `test_ops_unit.py` | Ops Claw unit tests |
+| `test_analytics_unit.py` | Analytics Claw unit tests |
+| `test_finance_unit.py` | Finance Claw unit tests |
+| `test_mesh_coordinator.py` | Mesh coordination, registration, routing |
+| `test_privacy_router.py` | Classification, routing decisions |
+| `test_evolution_cycle.py` | Cycle stages, registry |
+| `test_feature_brief_acknowledged.py` | Build Claw SLA timer tests |
+| `test_assistant_setup.py` | System prompt rendering |
+| `test_solo_init.py` | Solo mode initialization |
+| `test_finance_init.py` | Finance logging and payment events |
 
 ### CI/CD
 
@@ -367,6 +440,22 @@ GitHub Actions workflow (`.github/workflows/integration.yml`) runs:
 - Unit tests (Node.js 18/20, Python 3.11/3.12)
 - Integration tests
 - Security scan (npm audit, bandit)
+
+---
+
+## Security Architecture
+
+### MilimoClaw-Specific Security Fixes
+
+| Issue | Fix | File |
+|---|---|---|
+| Hardcoded JWT secret | Throws if `JWT_SECRET` env var is unset | `milimo-server/src/server.ts` |
+| CORS `origin: true` | Restricted to `ALLOWED_ORIGINS` env var | `milimo-server/src/server.ts` |
+| WebSocket no auth | JWT required for all WS connections | `milimo-server/src/server.ts` |
+| Refresh token not validated | Proper token store with expiration + rotation | `milimo-server/src/routes/auth.ts` |
+| Weak mesh key derivation | HKDF replaces byte-cycling | `milimo/src/mesh/gateway-client.ts` |
+| k8s SYS_ADMIN capability | Dropped to ALL + only SYSLOG | `k8s/sandbox-pod.yaml` |
+| Fallback messages unencrypted | AES-256-GCM encryption for file queue | `milimo/src/mesh/gateway-client.ts` |
 
 ---
 
