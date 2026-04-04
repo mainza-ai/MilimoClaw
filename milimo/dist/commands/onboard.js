@@ -433,6 +433,28 @@ async function cliOnboard(opts) {
         logger.warn("Assistant setup skipped — run 'openclaw milimo assistant setup' manually.");
         logger.warn(err instanceof Error ? err.message : String(err));
     }
+    // Clear old sessions and memory so the assistant loads fresh context
+    logger.info("");
+    logger.info("Clearing old session history for fresh context...");
+    try {
+        const { execSync } = await import("child_process");
+        const home = process.env.HOME ?? "/tmp";
+        const sessionsDir = `${home}/.openclaw/agents/main/sessions`;
+        const memoryDir = `${home}/.openclaw/workspace/memory`;
+        const memoryFile = `${home}/.openclaw/workspace/MEMORY.md`;
+        // Clear session history
+        execSync(`rm -f "${sessionsDir}"/*.jsonl "${sessionsDir}"/sessions.json 2>/dev/null || true`);
+        // Clear daily/channel memory
+        execSync(`rm -rf "${memoryDir}"/daily "${memoryDir}"/channel 2>/dev/null || true`);
+        // Clear MEMORY.md
+        execSync(`rm -f "${memoryFile}" 2>/dev/null || true`);
+        // Remove bootstrap file so identity is configured
+        execSync(`rm -f "${home}/.openclaw/workspace/BOOTSTRAP.md" 2>/dev/null || true`);
+        logger.info(" ✓ Old sessions and memory cleared");
+    }
+    catch {
+        logger.warn("  Could not clear old sessions — agent may have stale context");
+    }
     // Step 12: Success
     const { name, emoji } = assistant;
     logger.info("");

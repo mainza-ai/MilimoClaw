@@ -30,6 +30,8 @@ import yaml
 
 # Template search paths — tried in order
 _TEMPLATE_CANDIDATES = [
+    # 0. Bundled with orchestrator (sandbox deployment) — PRIMARY
+    Path(__file__).resolve().parent / "templates" / "assistant_system_prompt.md",
     # 1. Relative to CWD (development on host)
     Path("milimo-claw-docs/reference/MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md"),
     # 2. Relative to this script's directory (plugin bundled copy)

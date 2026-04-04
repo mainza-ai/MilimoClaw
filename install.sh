@@ -4,13 +4,11 @@
 #
 # MilimoClaw One-Command Installer
 #
-# Handles everything: prerequisites, NemoClaw bootstrap, MilimoClaw deployment,
-# and onboarding. Single command, zero manual steps.
+# Deploys MilimoClaw plugin + blueprint into an existing NemoClaw sandbox.
+# NemoClaw must be installed and the sandbox must be running before this script.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/mainza-ai/MilimoClaw/main/install.sh | bash
-#   # or locally:
-#   ./install.sh
+#   cd /path/to/MilimoClaw
 #   ./install.sh --solo --operator-name "YourName" --squad-name "my-squad"
 #
 set -euo pipefail
@@ -19,8 +17,6 @@ set -euo pipefail
 # Configuration
 # ---------------------------------------------------------------------------
 MILIMO_VERSION="2.0.0"
-NODE_MIN_VERSION="22"
-PYTHON_MIN_VERSION="3.12"
 SANDBOX_NAME="${MILIMO_SANDBOX_NAME:-my-assistant}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 ROOT_DIR="$SCRIPT_DIR"
@@ -50,17 +46,6 @@ log_step() { printf "\n${C_GREEN}${C_BOLD}>>> %s${C_RESET}\n" "$*"; }
 
 command_exists() { command -v "$1" &>/dev/null; }
 
-version_gte() {
-  local IFS=.
-  local -a a=($1) b=($2)
-  for i in 0 1 2; do
-    local ai=${a[$i]:-0} bi=${b[$i]:-0}
-    if ((ai > bi)); then return 0; fi
-    if ((ai < bi)); then return 1; fi
-  done
-  return 0
-}
-
 # ---------------------------------------------------------------------------
 # CLI Arguments
 # ---------------------------------------------------------------------------
@@ -72,7 +57,6 @@ WARROOM_MODE="minimal"
 AUTO_INSTALL=false
 UNINSTALL=false
 DRY_RUN=false
-SKIP_NEMOCLAW=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -84,7 +68,6 @@ while [[ $# -gt 0 ]]; do
     --auto) AUTO_INSTALL=true; shift ;;
     --uninstall) UNINSTALL=true; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
-    --skip-nemoclaw) SKIP_NEMOCLAW=true; shift ;;
     --sandbox-name) SANDBOX_NAME="$2"; shift 2 ;;
     --gateway-container) GATEWAY_CONTAINER="$2"; shift 2 ;;
     --version|-v)
@@ -94,7 +77,6 @@ while [[ $# -gt 0 ]]; do
     --help|-h)
       printf "\n  ${C_BOLD}MilimoClaw Installer${C_RESET}  ${C_DIM}v%s${C_RESET}\n\n" "$MILIMO_VERSION"
       printf "  ${C_DIM}Usage:${C_RESET}\n"
-      printf "    curl -fsSL https://raw.githubusercontent.com/mainza-ai/MilimoClaw/main/install.sh | bash\n"
       printf "    ./install.sh [options]\n\n"
       printf "  ${C_DIM}Options:${C_RESET}\n"
       printf "    --solo                  Solo mode (all 5 claws active) [default]\n"
@@ -103,15 +85,13 @@ while [[ $# -gt 0 ]]; do
       printf "    --warroom-mode <mode>   War Room mode: full|minimal|disabled\n"
       printf "    --non-interactive       Skip all prompts, use defaults\n"
       printf "    --auto                  Auto-install missing dependencies\n"
-      printf "    --skip-nemoclaw         Skip NemoClaw bootstrap\n"
       printf "    --dry-run               Show what would be done without doing it\n"
       printf "    --uninstall             Remove MilimoClaw, keep NemoClaw\n"
       printf "    --version, -v           Print version and exit\n"
       printf "    --help                  Show this help message\n\n"
-      printf "  ${C_DIM}Environment:${C_RESET}\n"
-      printf "    NVIDIA_API_KEY          API key for NVIDIA inference\n"
-      printf "    MILIMO_SANDBOX_NAME     Sandbox pod name (default: my-assistant)\n"
-      printf "\n"
+      printf "  ${C_DIM}Prerequisites:${C_RESET}\n"
+      printf "    NemoClaw must be installed and sandbox running.\n"
+      printf "    Install NemoClaw: curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash\n\n"
       exit 0
       ;;
     *) error "Unknown option: $1"; exit 1 ;;
@@ -124,26 +104,22 @@ done
 do_uninstall() {
   log_step "Uninstalling MilimoClaw"
 
-  info "Removing MilimoClaw plugin from sandbox..."
+  info "Removing MilimoClaw from sandbox..."
   if command_exists docker; then
     local gateway
     gateway=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -i "openshell\|nemoclaw\|cluster" | head -1 || true)
     if [ -n "$gateway" ]; then
-      local pid
-      pid=$(find_sandbox_pid)
-      if [ -n "$pid" ]; then
-        docker exec "$gateway" nsenter -t "$pid" -a -- bash -c "
-          rm -rf /sandbox/extensions/milimo
-          rm -rf /sandbox/.milimo
-          echo 'Milimo plugin removed'
-        "
-      fi
+      docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c '
+        rm -rf /sandbox/extensions/milimo
+        rm -rf /sandbox/.openclaw-data/extensions/milimo
+        rm -rf /sandbox/.milimo
+        rm -rf /sandbox/milimo-blueprint
+        echo "Milimo files removed from sandbox"
+      ' 2>/dev/null || true
     fi
   fi
 
   info "Removing local MilimoClaw files..."
-  rm -rf /opt/milimo
-  rm -rf /opt/milimo-blueprint
   rm -rf "${HOME}/.milimo"
 
   ok "MilimoClaw uninstalled. NemoClaw sandbox is preserved."
@@ -172,23 +148,12 @@ print_banner() {
 }
 
 # ---------------------------------------------------------------------------
-# Helper: Find sandbox PID
-# ---------------------------------------------------------------------------
-find_sandbox_pid() {
-  local gateway="$1"
-  # Find the PID of the sandbox process (sleep infinity running as sandbox user)
-  # uid can be 998 or 999 depending on NemoClaw version
-  docker exec "$gateway" ps aux 2>/dev/null | grep "sleep infinity" | grep -E "99[89]" | awk '{print $2}' | head -1
-}
-
-# ---------------------------------------------------------------------------
-# Helper: Run command inside sandbox namespace via nsenter
+# Helper: Run command inside sandbox pod via kubectl exec
 # ---------------------------------------------------------------------------
 sandbox_exec() {
   local gateway="$1"
-  local pid="$2"
-  shift 2
-  docker exec -i "$gateway" nsenter -t "$pid" -a -- bash -c "$*"
+  shift
+  docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c "$*"
 }
 
 # ---------------------------------------------------------------------------
@@ -199,24 +164,8 @@ check_prerequisites() {
 
   # Docker
   if ! command_exists docker; then
-    if [ "$AUTO_INSTALL" = true ]; then
-      info "Installing Docker..."
-      if [[ "$OSTYPE" == "darwin"* ]]; then
-        warn "Docker Desktop for Mac must be installed manually."
-        warn "Download from: https://docs.docker.com/desktop/install/mac-install/"
-        return 1
-      elif command_exists apt-get; then
-        curl -fsSL https://get.docker.com | sh
-      else
-        warn "Cannot auto-install Docker on this system."
-        return 1
-      fi
-    else
-      error "Docker is not installed. Required for sandbox runtime.
-  Install from: https://docs.docker.com/get-docker/"
-    fi
+    error "Docker is not installed. Required for sandbox runtime."
   fi
-
   if ! docker info &>/dev/null; then
     error "Docker is not running. Please start Docker and try again."
   fi
@@ -224,26 +173,14 @@ check_prerequisites() {
 
   # Node.js
   if ! command_exists node; then
-    if [ "$AUTO_INSTALL" = true ]; then
-      info "Installing Node.js..."
-      if [[ "$OSTYPE" == "darwin"* ]] && command_exists brew; then
-        brew install node
-      elif command_exists apt-get; then
-        curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-        apt-get install -y nodejs
-      fi
-    else
-      error "Node.js >= ${NODE_MIN_VERSION} is not installed.
-  Install from: https://nodejs.org/"
-    fi
+    error "Node.js is not installed. Required to build the Milimo plugin."
   fi
-
   local node_version
   node_version=$(node --version | sed 's/^v//')
   local node_major
   node_major=$(echo "$node_version" | cut -d. -f1)
-  if ((node_major < NODE_MIN_VERSION)); then
-    error "Node.js $node_version is too old. MilimoClaw requires Node.js >= ${NODE_MIN_VERSION}."
+  if ((node_major < 22)); then
+    error "Node.js $node_version is too old. MilimoClaw requires Node.js >= 22."
   fi
   ok "Node.js $node_version"
 
@@ -262,108 +199,31 @@ check_prerequisites() {
     ok "Python $py_version"
   fi
 
-  # NVIDIA API Key
-  if [ -z "${NVIDIA_API_KEY:-}" ]; then
-    warn "NVIDIA_API_KEY environment variable is not set."
-    warn "Get one at: https://build.nvidia.com/"
-    warn "Export it: export NVIDIA_API_KEY=nvapi-..."
-    if [ "$NON_INTERACTIVE" = false ]; then
-      read -rp "Continue anyway? (y/N) " -n 1 -r
-      echo
-      if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        exit 0
-      fi
-    fi
-  else
-    ok "NVIDIA API key configured"
-  fi
-}
-
-# ---------------------------------------------------------------------------
-# Phase 2: NemoClaw Bootstrap
-# ---------------------------------------------------------------------------
-bootstrap_nemoclaw() {
-  if [ "$SKIP_NEMOCLAW" = true ]; then
-    skip "NemoClaw bootstrap (skipped)"
-    return 0
-  fi
-
-  log_step "Checking NemoClaw"
-
-  # Check if gateway container is running
-  local gateway
-  gateway=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -i "openshell\|nemoclaw\|cluster" | head -1 || true)
-
-  if [ -n "$gateway" ]; then
-    local pod_status
-    pod_status=$(docker exec "$gateway" kubectl get pod "$SANDBOX_NAME" -n openshell --no-headers -o custom-columns=":status.phase" 2>/dev/null || echo "NotFound")
-    if [ "$pod_status" = "Running" ]; then
-      skip "NemoClaw sandbox '$SANDBOX_NAME' already running"
-      return 0
-    fi
-  fi
-
-  # Check if nemoclaw CLI exists
-  if command_exists nemoclaw; then
-    ok "NemoClaw CLI found ($(nemoclaw --version 2>/dev/null || echo 'installed'))"
-    info "Starting sandbox..."
-    nemoclaw "$SANDBOX_NAME" start 2>/dev/null || true
-    # Wait for sandbox
-    local retries=30
-    while ((retries > 0)); do
-      pod_status=$(docker exec "$gateway" kubectl get pod "$SANDBOX_NAME" -n openshell --no-headers -o custom-columns=":status.phase" 2>/dev/null || echo "NotFound")
-      if [ "$pod_status" = "Running" ]; then
-        ok "Sandbox '$SANDBOX_NAME' is Running"
-        return 0
-      fi
-      retries=$((retries - 1))
-      sleep 2
-    done
-    warn "Sandbox did not reach Running state in 60s. Continuing anyway..."
-    return 0
-  fi
-
-  # NemoClaw not installed — clone and install
-  warn "NemoClaw is not installed."
-  if [ "$AUTO_INSTALL" = true ] || [ "$NON_INTERACTIVE" = true ]; then
-    info "Cloning NemoClaw..."
-    local tmp_dir
-    tmp_dir=$(mktemp -d)
-    git clone --depth 1 https://github.com/NVIDIA/NemoClaw.git "$tmp_dir/NemoClaw" 2>/dev/null
-    cd "$tmp_dir/NemoClaw"
-    info "Running NemoClaw installer..."
-    NEMOCLAW_NON_INTERACTIVE=1 NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1 bash install.sh --non-interactive --yes-i-accept-third-party-software 2>&1 | tail -20
-    cd "$ROOT_DIR"
-    rm -rf "$tmp_dir"
-    ok "NemoClaw installed"
-  else
-    warn "Install NemoClaw first:"
-    warn "  curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash"
-    warn "Then re-run this installer."
-    exit 1
-  fi
-}
-
-# ---------------------------------------------------------------------------
-# Phase 3: Build & Deploy via nsenter Pipe
-# ---------------------------------------------------------------------------
-deploy_to_sandbox() {
-  log_step "Deploying MilimoClaw to sandbox"
-
+  # NemoClaw sandbox must be running
   local gateway
   gateway=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -i "openshell\|nemoclaw\|cluster" | head -1 || true)
   if [ -z "$gateway" ]; then
-    error "No gateway container found. Is NemoClaw running?"
+    error "No NemoClaw gateway container found.
+  Install NemoClaw first: curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash"
   fi
   ok "Gateway: $gateway"
 
-  # Find sandbox PID
-  local pid
-  pid=$(find_sandbox_pid "$gateway")
-  if [ -z "$pid" ]; then
-    error "Could not find sandbox PID. Is the sandbox pod running?"
+  # Check sandbox pod
+  local pod_status
+  pod_status=$(docker exec "$gateway" kubectl get pod "$SANDBOX_NAME" -n openshell --no-headers -o custom-columns=":status.phase" 2>/dev/null || echo "NotFound")
+  if [ "$pod_status" != "Running" ]; then
+    error "Sandbox pod '$SANDBOX_NAME' is not Running (status: $pod_status).
+  Start it with: nemoclaw $SANDBOX_NAME connect"
   fi
-  ok "Sandbox PID: $pid"
+  ok "Sandbox '$SANDBOX_NAME' is Running"
+}
+
+# ---------------------------------------------------------------------------
+# Phase 2: Build & Deploy
+# ---------------------------------------------------------------------------
+deploy_to_sandbox() {
+  local gateway
+  gateway=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -i "openshell\|nemoclaw\|cluster" | head -1 || true)
 
   # ---- Step 1: Build plugin on host ----
   log_step "Building Milimo plugin"
@@ -371,7 +231,7 @@ deploy_to_sandbox() {
   info "Installing dependencies..."
   npm install 2>&1 | tail -5
   info "Building plugin (TypeScript)..."
-  npm run build 2>&1 | tail -5
+  npx tsc 2>&1 | tail -5
   cd "$ROOT_DIR"
 
   if [ ! -f "$ROOT_DIR/milimo/dist/index.js" ]; then
@@ -379,138 +239,217 @@ deploy_to_sandbox() {
   fi
   ok "Plugin built (dist/index.js)"
 
-  # ---- Step 2: Create plugin tar with correct flags ----
-  local plugin_tar="/tmp/milimo-plugin-full.tar.gz"
-  info "Creating plugin archive..."
+  # ---- Step 2: Transfer plugin source to sandbox ----
+  log_step "Deploying MilimoClaw to sandbox"
+
+  info "Transferring plugin source to sandbox..."
   cd "$ROOT_DIR/milimo"
-  COPYFILE_DISABLE=1 tar czf "$plugin_tar" \
-    --no-mac-metadata \
-    dist openclaw.plugin.json package.json node_modules
+  tar czf /tmp/milimo-source-deploy.tar.gz \
+    --exclude='__tests__' --exclude='*.test.ts' --exclude='tsconfig.tsbuildinfo' \
+    . 2>/dev/null
   cd "$ROOT_DIR"
 
-  local tar_size
-  tar_size=$(du -h "$plugin_tar" | cut -f1)
-  ok "Plugin archive created ($tar_size)"
+  docker cp /tmp/milimo-source-deploy.tar.gz "$gateway":/tmp/milimo-source-deploy.tar.gz 2>/dev/null
+  docker exec "$gateway" kubectl cp /tmp/milimo-source-deploy.tar.gz openshell/"$SANDBOX_NAME":/tmp/milimo-source-deploy.tar.gz 2>/dev/null
+  rm -f /tmp/milimo-source-deploy.tar.gz
 
-  # ---- Step 3: Pipe plugin into sandbox namespace ----
-  info "Transferring plugin to sandbox (nsenter pipe)..."
-  cat "$plugin_tar" | docker exec -i "$gateway" nsenter -t "$pid" -a -- bash -c 'cat > /tmp/milimo-plugin-full.tar.gz'
-
-  # ---- Step 4: Extract plugin in sandbox ----
-  info "Extracting plugin..."
-  sandbox_exec "$gateway" "$pid" '
-    mkdir -p /tmp/milimo-extract && cd /tmp/milimo-extract && \
-    tar xzf /tmp/milimo-plugin-full.tar.gz --warning=no-unknown-keyword && \
+  sandbox_exec "$gateway" '
     mkdir -p /sandbox/extensions/milimo && \
-    rm -rf /sandbox/extensions/milimo/* && \
-    cp -r dist openclaw.plugin.json package.json node_modules /sandbox/extensions/milimo/ && \
-    chown -R sandbox:sandbox /sandbox/extensions/milimo && \
-    find /sandbox/extensions/milimo -name "._*" -delete && \
-    rm -rf /tmp/milimo-extract /tmp/milimo-plugin-full.tar.gz
+    tar xzf /tmp/milimo-source-deploy.tar.gz -C /sandbox/extensions/milimo && \
+    rm /tmp/milimo-source-deploy.tar.gz && \
+    echo "Plugin source extracted"
+  '
+  ok "Plugin source transferred"
+
+  # ---- Step 3: Build plugin inside sandbox ----
+  info "Building plugin inside sandbox..."
+  sandbox_exec "$gateway" '
+    cd /sandbox/extensions/milimo && \
+    npm install 2>&1 | tail -3 && \
+    npx tsc 2>&1 | tail -3 && \
+    echo "Build complete"
   '
 
-  if ! sandbox_exec "$gateway" "$pid" 'test -f /sandbox/extensions/milimo/dist/index.js'; then
-    error "Plugin extraction failed — dist/index.js not found in sandbox"
+  if ! sandbox_exec "$gateway" 'test -f /sandbox/extensions/milimo/dist/index.js'; then
+    error "Plugin build failed — dist/index.js not found in sandbox"
   fi
-  ok "Plugin extracted to /sandbox/extensions/milimo"
+  ok "Plugin built in sandbox"
+
+  # ---- Step 4: Copy to sandbox user extensions ----
+  info "Installing plugin for sandbox user..."
+  sandbox_exec "$gateway" '
+    mkdir -p /sandbox/.openclaw-data/extensions && \
+    rm -rf /sandbox/.openclaw-data/extensions/milimo && \
+    cp -r /sandbox/extensions/milimo /sandbox/.openclaw-data/extensions/milimo && \
+    chown -R sandbox:sandbox /sandbox/.openclaw-data/extensions/milimo && \
+    echo "Plugin installed for sandbox user"
+  '
+
+  if ! sandbox_exec "$gateway" 'test -f /sandbox/.openclaw-data/extensions/milimo/dist/index.js'; then
+    error "Plugin not found in sandbox user extensions dir"
+  fi
+  ok "Plugin installed for sandbox user"
 
   # ---- Step 5: Deploy blueprint ----
   log_step "Deploying blueprint"
-  local blueprint_tar="/tmp/milimo-blueprint.tar.gz"
-  info "Creating blueprint archive..."
   cd "$ROOT_DIR"
-  COPYFILE_DISABLE=1 tar czf "$blueprint_tar" \
-    --no-mac-metadata \
+  tar czf /tmp/milimo-blueprint-deploy.tar.gz \
     --exclude='__pycache__' --exclude='*.pyc' --exclude='.pytest_cache' \
-    milimo-blueprint/
-  info "Transferring blueprint to sandbox..."
-  cat "$blueprint_tar" | docker exec -i "$gateway" nsenter -t "$pid" -a -- bash -c 'cat > /tmp/milimo-blueprint.tar.gz'
+    milimo-blueprint/ 2>/dev/null
 
-  sandbox_exec "$gateway" "$pid" '
-    mkdir -p /sandbox/milimo-blueprint && \
-    cd /tmp && \
-    tar xzf /tmp/milimo-blueprint.tar.gz --warning=no-unknown-keyword && \
-    cp -r milimo-blueprint/* /sandbox/milimo-blueprint/ && \
+  docker cp /tmp/milimo-blueprint-deploy.tar.gz "$gateway":/tmp/milimo-blueprint-deploy.tar.gz 2>/dev/null
+  docker exec "$gateway" kubectl cp /tmp/milimo-blueprint-deploy.tar.gz openshell/"$SANDBOX_NAME":/tmp/milimo-blueprint-deploy.tar.gz 2>/dev/null
+  rm -f /tmp/milimo-blueprint-deploy.tar.gz
+
+  sandbox_exec "$gateway" '
+    cd /sandbox && \
+    tar xzf /tmp/milimo-blueprint-deploy.tar.gz && \
+    rm /tmp/milimo-blueprint-deploy.tar.gz && \
     chown -R sandbox:sandbox /sandbox/milimo-blueprint && \
-    rm -rf /tmp/milimo-blueprint.tar.gz /tmp/milimo-blueprint
+    echo "Blueprint deployed"
   '
-  rm -f "$blueprint_tar"
 
-  if ! sandbox_exec "$gateway" "$pid" 'test -d /sandbox/milimo-blueprint/orchestrator/build'; then
+  if ! sandbox_exec "$gateway" 'test -d /sandbox/milimo-blueprint/orchestrator/build'; then
     error "Blueprint extraction failed — orchestrator/build/ not found"
   fi
   ok "Blueprint deployed to /sandbox/milimo-blueprint"
 
-  # ---- Step 6: Deploy support files ----
+  # ---- Step 6: Deploy assistant template ----
   log_step "Deploying support files"
 
-  # Assistant system prompt template
-  local template_file="$ROOT_DIR/milimo-claw-docs/reference/MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md"
+  local template_file="$ROOT_DIR/milimo-blueprint/orchestrator/templates/assistant_system_prompt.md"
   if [ -f "$template_file" ]; then
     info "Deploying assistant system prompt template..."
-    cat "$template_file" | docker exec -i "$gateway" nsenter -t "$pid" -a -- bash -c '
-      mkdir -p /sandbox/.milimo && \
-      cat > /sandbox/.milimo/MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md && \
-      chown sandbox:sandbox /sandbox/.milimo/MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md
+    sandbox_exec "$gateway" '
+      mkdir -p /sandbox/.milimo/templates && \
+      echo "Template dir created"
+    '
+    docker cp "$template_file" "$gateway":/tmp/assistant_template.md 2>/dev/null
+    docker exec "$gateway" kubectl cp /tmp/assistant_template.md openshell/"$SANDBOX_NAME":/tmp/assistant_template.md 2>/dev/null
+    sandbox_exec "$gateway" '
+      cp /tmp/assistant_template.md /sandbox/.milimo/templates/assistant_system_prompt.md && \
+      cp /tmp/assistant_template.md /sandbox/milimo-claw-docs/reference/MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md 2>/dev/null || true && \
+      rm /tmp/assistant_template.md && \
+      chown -R sandbox:sandbox /sandbox/.milimo/templates && \
+      echo "Template deployed"
     '
     ok "Assistant template deployed"
   else
-    warn "Assistant template not found at $template_file"
+    # Check alternate location
+    template_file="$ROOT_DIR/milimo-claw-docs/reference/MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md"
+    if [ -f "$template_file" ]; then
+      docker cp "$template_file" "$gateway":/tmp/assistant_template.md 2>/dev/null
+      docker exec "$gateway" kubectl cp /tmp/assistant_template.md openshell/"$SANDBOX_NAME":/tmp/assistant_template.md 2>/dev/null
+      sandbox_exec "$gateway" '
+        mkdir -p /sandbox/.milimo/templates && \
+        cp /tmp/assistant_template.md /sandbox/.milimo/templates/assistant_system_prompt.md && \
+        rm /tmp/assistant_template.md && \
+        chown -R sandbox:sandbox /sandbox/.milimo/templates && \
+        echo "Template deployed from milimo-claw-docs"
+      '
+      ok "Assistant template deployed (from milimo-claw-docs)"
+    else
+      warn "Assistant template not found — assistant setup will use inline fallback"
+    fi
   fi
 
-  # assistant_setup.py
-  local setup_file="$ROOT_DIR/milimo-blueprint/orchestrator/assistant_setup.py"
-  if [ -f "$setup_file" ]; then
-    info "Deploying assistant_setup.py..."
-    cat "$setup_file" | docker exec -i "$gateway" nsenter -t "$pid" -a -- bash -c '
-      mkdir -p /sandbox/milimo-blueprint/orchestrator && \
-      cat > /sandbox/milimo-blueprint/orchestrator/assistant_setup.py && \
-      chown sandbox:sandbox /sandbox/milimo-blueprint/orchestrator/assistant_setup.py
-    '
-    ok "assistant_setup.py deployed"
-  fi
+  # ---- Step 7: Fix permissions ----
+  log_step "Fixing permissions"
+  sandbox_exec "$gateway" '
+    # Fix .milimo ownership
+    mkdir -p /sandbox/.milimo/blueprints
+    chown -R sandbox:sandbox /sandbox/.milimo
 
-  # ---- Step 7: Update /sandbox/.openclaw/openclaw.json ----
-  log_step "Registering plugin in sandbox config"
-  sandbox_exec "$gateway" "$pid" '
+    # Fix .openclaw ownership
+    chown -R sandbox:sandbox /sandbox/.openclaw
+    chmod -R 755 /sandbox/.openclaw
+
+    # Fix credentials dir
+    mkdir -p /sandbox/.openclaw/credentials
+    chown -R sandbox:sandbox /sandbox/.openclaw/credentials
+    chmod 755 /sandbox/.openclaw/credentials
+
+    # Fix agents/main dir
+    mkdir -p /sandbox/.openclaw/agents/main
+    chown -R sandbox:sandbox /sandbox/.openclaw/agents/main
+    chmod -R 775 /sandbox/.openclaw/agents/main
+
+    echo "All permissions fixed"
+  '
+  ok "Permissions fixed"
+
+  # ---- Step 8: Fix template search path in assistant_setup.py ----
+  info "Fixing assistant template search path..."
+  sandbox_exec "$gateway" '
     python3 -c "
-import json
-with open(\"/sandbox/.openclaw/openclaw.json\") as f:
+path = \"/sandbox/milimo-blueprint/orchestrator/assistant_setup.py\"
+import os
+if os.path.exists(path):
+    with open(path) as f:
+        lines = f.readlines()
+    new_lines = []
+    for line in lines:
+        new_lines.append(line)
+        if \"_TEMPLATE_CANDIDATES = [\" in line:
+            new_lines.append(\"    # 0. Bundled with orchestrator (sandbox deployment)\n\")
+            new_lines.append(\"    Path(__file__).resolve().parent / \\\"templates\\\" / \\\"assistant_system_prompt.md\\\",\n\")
+    with open(path, \"w\") as f:
+        f.writelines(new_lines)
+    print(\"Template search path fixed\")
+else:
+    print(\"assistant_setup.py not found, skipping\")
+"
+  '
+  ok "Template search path fixed"
+
+  # ---- Step 9: Register plugin in openclaw.json ----
+  log_step "Registering plugin"
+
+  local reg_script
+  # Clean stale temp files from previous failed runs
+  rm -f /tmp/milimo-register.* /tmp/milimo-config.* 2>/dev/null
+
+  reg_script=$(mktemp /tmp/milimo-register.XXXXXX)
+  reg_script="${reg_script}.py"
+  cat > "$reg_script" << 'PYEOF'
+import json, os
+from datetime import datetime, timezone
+
+config_path = "/sandbox/.openclaw/openclaw.json"
+with open(config_path) as f:
     config = json.load(f)
 
-config[\"plugins\"] = {
-    \"load\": {
-        \"paths\": [\"/sandbox/extensions/milimo\"]
+config["plugins"] = {
+    "entries": {
+        "milimo": { "enabled": True }
     },
-    \"entries\": {
-        \"milimo\": {
-            \"enabled\": True
-        }
-    },
-    \"installs\": {
-        \"milimo\": {
-            \"source\": \"path\",
-            \"sourcePath\": \"/sandbox/extensions/milimo\",
-            \"installPath\": \"/sandbox/extensions/milimo\",
-            \"version\": \"${MILIMO_VERSION}\",
-            \"installedAt\": \"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\"
+    "installs": {
+        "milimo": {
+            "source": "path",
+            "sourcePath": "/sandbox/extensions/milimo",
+            "installPath": "/sandbox/.openclaw-data/extensions/milimo",
+            "version": os.environ.get("MILIMO_VERSION", "2.0.0"),
+            "installedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
         }
     }
 }
 
-with open(\"/sandbox/.openclaw/openclaw.json\", \"w\") as f:
+with open(config_path, "w") as f:
     json.dump(config, f, indent=2)
-    f.write(\"\\n\")
+    f.write("\n")
 
-print(\"Sandbox config updated successfully\")
-"
-  '
+print("Plugin registered in openclaw.json")
+PYEOF
+
+  docker cp "$reg_script" "$gateway":/tmp/milimo-register.py 2>/dev/null
+  docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- python3 /tmp/milimo-register.py 2>/dev/null
+  docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- rm /tmp/milimo-register.py 2>/dev/null
+  rm -f "$reg_script"
   ok "Plugin registered in /sandbox/.openclaw/openclaw.json"
 
-  # ---- Step 8: Restart gateway to load plugin ----
+  # ---- Step 10: Restart gateway ----
   log_step "Restarting OpenClaw gateway"
-  sandbox_exec "$gateway" "$pid" '
-    # Kill openclaw process — it auto-restarts
+  sandbox_exec "$gateway" '
     pkill -f "openclaw" 2>/dev/null || true
     echo "Gateway restart initiated"
   '
@@ -520,7 +459,7 @@ print(\"Sandbox config updated successfully\")
 }
 
 # ---------------------------------------------------------------------------
-# Phase 4: Non-Interactive Onboarding
+# Phase 3: Non-Interactive Onboarding
 # ---------------------------------------------------------------------------
 run_onboarding() {
   log_step "Configuring MilimoClaw"
@@ -538,139 +477,141 @@ run_onboarding() {
 
   local gateway
   gateway=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -i "openshell\|nemoclaw\|cluster" | head -1 || true)
-  local pid
-  pid=$(find_sandbox_pid "$gateway")
 
-  # Write config directly to sandbox — BOTH paths:
-  # /root/.milimo/config.json  — where the plugin reads (runs as root, HOME=/root)
-  # /sandbox/.milimo/config.json — where Python orchestrator reads
-  sandbox_exec "$gateway" "$pid" "
-    mkdir -p /root/.milimo /sandbox/.milimo
-    python3 -c \"
-import json
+  # Write config script to a temp file to avoid quoting hell
+  local config_script
+  config_script=$(mktemp /tmp/milimo-config.XXXXXX)
+  cat > "$config_script" << PYEOF
+import json, os
 from datetime import datetime, timezone
 
 now = datetime.now(timezone.utc).isoformat()
+squad = "${squad}"
+operator = "${operator}"
+warroom = "${WARROOM_MODE}"
+version = "${MILIMO_VERSION}"
 
-# Plugin ConfigManager format (flat fields — what the TypeScript plugin reads)
+# Plugin ConfigManager format (flat — what the TypeScript plugin reads)
 plugin_config = {
-    'squadName': '${squad}',
-    'clawRole': '',
-    'template': 'solo',
-    'solo': True,
-    'operatorName': '${operator}',
-    'warRoomMode': '${WARROOM_MODE}',
-    'onboardedAt': now,
-    'activeClaws': ['content', 'ops', 'analytics', 'finance', 'build']
+    "squadName": squad,
+    "clawRole": "",
+    "template": "solo",
+    "solo": True,
+    "operatorName": operator,
+    "warRoomMode": warroom,
+    "onboardedAt": now,
+    "activeClaws": ["content", "ops", "analytics", "finance", "build"]
 }
 
-# Orchestrator format (nested — for Python code and human readability)
+# Orchestrator format (nested — for Python code)
 orchestrator_config = {
-    'version': '${MILIMO_VERSION}',
-    'squad': {
-        'name': '${squad}',
-        'template': 'solo',
-        'mode': 'solo',
-        'onboarded_at': now
+    "version": version,
+    "squad": {
+        "name": squad,
+        "template": "solo",
+        "mode": "solo",
+        "onboarded_at": now
     },
-    'operator': {
-        'name': '${operator}'
+    "operator": { "name": operator },
+    "claws": {
+        "content": { "enabled": True, "mount": "/sandbox/content" },
+        "ops": { "enabled": True, "mount": "/sandbox/clients" },
+        "analytics": { "enabled": True, "mount": "/sandbox/analytics" },
+        "finance": { "enabled": True, "mount": "/sandbox/finance" },
+        "build": { "enabled": True, "mount": "/sandbox/build" }
     },
-    'claws': {
-        'content': { 'enabled': True, 'mount': '/sandbox/content' },
-        'ops': { 'enabled': True, 'mount': '/sandbox/clients' },
-        'analytics': { 'enabled': True, 'mount': '/sandbox/analytics' },
-        'finance': { 'enabled': True, 'mount': '/sandbox/finance' },
-        'build': { 'enabled': True, 'mount': '/sandbox/build' }
-    },
-    'war_room': {
-        'mode': '${WARROOM_MODE}'
-    },
-    'mesh': {
-        'enabled': False,
-        'secret': None
-    },
-    'inference': {
-        'provider': 'nvidia-prod',
-        'model': 'nvidia/nemotron-3-super-120b-a12b',
-        'baseUrl': 'https://integrate.api.nvidia.com/v1',
-        'api': 'openai-responses'
-    },
-    'blueprint_dir': '/sandbox/milimo-blueprint',
-    'assistant': {
-        'name': 'Nova',
-        'creature': 'a claw',
-        'vibe': 'sharp and unhurled',
-        'emoji': '🦀'
-    },
-    'activeClaws': ['content', 'ops', 'analytics', 'finance', 'build']
+    "war_room": { "mode": warroom },
+    "mesh": { "enabled": False, "secret": None },
+    "blueprint_dir": "/sandbox/milimo-blueprint",
+    "activeClaws": ["content", "ops", "analytics", "finance", "build"]
 }
 
-# Write plugin config to /root/.milimo (where plugin reads as root)
-with open('/root/.milimo/config.json', 'w') as f:
+# Write plugin config to /root/.milimo (plugin reads as root)
+os.makedirs("/root/.milimo", exist_ok=True)
+with open("/root/.milimo/config.json", "w") as f:
     json.dump(plugin_config, f, indent=2)
 
-# Write orchestrator config to /sandbox/.milimo (for Python code)
-with open('/sandbox/.milimo/config.json', 'w') as f:
+# Write orchestrator config to /sandbox/.milimo (Python reads here)
+os.makedirs("/sandbox/.milimo", exist_ok=True)
+with open("/sandbox/.milimo/config.json", "w") as f:
     json.dump(orchestrator_config, f, indent=2)
 
-print('Both configs written')
-\"
-    chown -R sandbox:sandbox /sandbox/.milimo
-    chown -R root:root /root/.milimo
-  "
+# Fix ownership
+os.chown("/sandbox/.milimo/config.json", 999, 999)
+os.chown("/root/.milimo/config.json", 0, 0)
+
+print("Both configs written")
+print(f"  Squad: {squad} (solo)")
+print(f"  Operator: {operator}")
+PYEOF
+
+  docker cp "$config_script" "$gateway":/tmp/milimo-config.py 2>/dev/null
+  docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- python3 /tmp/milimo-config.py 2>/dev/null
+  docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- rm /tmp/milimo-config.py 2>/dev/null
+  rm -f "$config_script"
 
   ok "Squad: $squad (solo template)"
   ok "Operator: $operator"
   ok "Claws: Content, Ops, Analytics, Finance, Build — all enabled"
   ok "War Room: $WARROOM_MODE"
+
+  # ---- Run assistant setup ----
+  info "Configuring squad assistant..."
+  sandbox_exec "$gateway" '
+    # Clear old sessions and memory so the assistant loads fresh context
+    rm -f /sandbox/.openclaw/agents/main/sessions/*.jsonl
+    rm -f /sandbox/.openclaw/agents/main/sessions/sessions.json
+    rm -f /sandbox/.openclaw/workspace/MEMORY.md
+    rm -rf /sandbox/.openclaw/workspace/memory/daily/
+    rm -rf /sandbox/.openclaw/workspace/memory/channel/
+
+    cd /sandbox/milimo-blueprint && python3 orchestrator/assistant_setup.py 2>&1 || echo "Assistant setup skipped — run manually with: openclaw milimo assistant setup"
+  '
 }
 
 # ---------------------------------------------------------------------------
-# Phase 5: Verification
+# Phase 4: Verification
 # ---------------------------------------------------------------------------
 verify_installation() {
   log_step "Verifying installation"
 
   local gateway
   gateway=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -i "openshell\|nemoclaw\|cluster" | head -1 || true)
-  local pid
-  pid=$(find_sandbox_pid "$gateway")
 
-  # Check plugin loaded — run actual command
+  # Check plugin loaded
   local plugin_check
-  plugin_check=$(sandbox_exec "$gateway" "$pid" '
-    echo "=== Plugin List ==="
-    openclaw plugins list 2>&1
-    echo "=== Milimo Command Test ==="
+  plugin_check=$(sandbox_exec "$gateway" '
     openclaw milimo --help 2>&1 || echo "MILIMO_COMMAND_NOT_FOUND"
   ') || true
 
-  if echo "$plugin_check" | grep -qi "milimo.*loaded\|Milimo Claw\|registered"; then
+  if echo "$plugin_check" | grep -qi "milimo.*registered\|Milimo Claw\|Squad:"; then
     ok "Milimo Claw plugin is loaded"
+    # Extract squad info
+    local squad_info
+    squad_info=$(echo "$plugin_check" | grep -i "Squad:" | head -1 | sed 's/.*│//' | sed 's/│.*//' | xargs)
+    if [ -n "$squad_info" ]; then
+      ok "Squad: $squad_info"
+    fi
   elif echo "$plugin_check" | grep -qi "MILIMO_COMMAND_NOT_FOUND\|unknown command"; then
-    error "Milimo Claw plugin is NOT loaded. Debug output:
-$plugin_check
-
-To fix manually:
-  1. nemoclaw $SANDBOX_NAME connect
-  2. cd /sandbox/extensions/milimo && npm install && npx tsc
-  3. openclaw plugins install /sandbox/extensions/milimo
-  4. pkill -f openclaw (gateway auto-restarts)"
+    error "Milimo Claw plugin is NOT loaded.
+To fix manually inside the sandbox:
+  1. cd /sandbox/extensions/milimo && npm install && npx tsc
+  2. openclaw plugins install /sandbox/extensions/milimo
+  3. pkill -f openclaw (gateway auto-restarts)"
   else
-    warn "Plugin status unclear. Full output:
+    warn "Plugin status unclear. Output:
 $plugin_check"
   fi
 
   # Check Build Claw modules
   local build_check
-  build_check=$(sandbox_exec "$gateway" "$pid" '
+  build_check=$(sandbox_exec "$gateway" '
     ls /sandbox/milimo-blueprint/orchestrator/build/build_claw.py 2>/dev/null && echo "OK" || echo "MISSING"
-  ')
+  ') || true
 
   if [ "$build_check" = "OK" ]; then
     local module_count
-    module_count=$(sandbox_exec "$gateway" "$pid" 'ls /sandbox/milimo-blueprint/orchestrator/build/*.py 2>/dev/null | grep -v __init__ | wc -l')
+    module_count=$(sandbox_exec "$gateway" 'ls /sandbox/milimo-blueprint/orchestrator/build/*.py 2>/dev/null | grep -v __init__ | wc -l') || true
     ok "Build Claw present ($module_count modules)"
   else
     warn "Build Claw blueprint not found"
@@ -678,9 +619,9 @@ $plugin_check"
 
   # Check config
   local config_check
-  config_check=$(sandbox_exec "$gateway" "$pid" '
+  config_check=$(sandbox_exec "$gateway" '
     cat /sandbox/.milimo/config.json 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get(\"squad\",{}).get(\"name\",\"?\"))" 2>/dev/null || echo "MISSING"
-  ')
+  ') || true
 
   if [ "$config_check" != "MISSING" ] && [ "$config_check" != "ERROR" ]; then
     ok "Milimo config: squad=$config_check"
@@ -726,7 +667,6 @@ main() {
   _INSTALL_START=$SECONDS
   print_banner
   check_prerequisites
-  bootstrap_nemoclaw
   deploy_to_sandbox
   run_onboarding
   verify_installation
