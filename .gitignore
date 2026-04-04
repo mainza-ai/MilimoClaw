@@ -28,6 +28,7 @@ build/
 # Keep plugin dist (compiled TypeScript)
 !nemoclaw/dist/
 !milimo/dist/
+!milimo-blueprint/orchestrator/build/
 
 # =============================================================================
 # Environment & Secrets
