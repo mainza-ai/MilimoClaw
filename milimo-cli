@@ -1,0 +1,300 @@
+#!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# milimo — MilimoClaw CLI Wrapper
+#
+# Single entry point for all MilimoClaw operations. Proxies commands
+# to the sandbox transparently so users never type nemoclaw, openclaw,
+# or kubectl directly.
+#
+# Usage:
+#   milimo install [--solo --operator-name NAME --squad-name NAME]
+#   milimo status
+#   milimo warroom
+#   milimo doctor
+#   milimo connect
+#   milimo logs
+#   milimo health
+#
+set -euo pipefail
+
+SANDBOX_NAME="${MILIMO_SANDBOX_NAME:-my-assistant}"
+MILIMO_VERSION="2.0.0"
+
+# ---------------------------------------------------------------------------
+# Colors
+# ---------------------------------------------------------------------------
+if [[ -z "${NO_COLOR:-}" && -t 1 ]]; then
+  C_GREEN=$'\033[38;5;148m'
+  C_BOLD=$'\033[1m'
+  C_DIM=$'\033[2m'
+  C_RED=$'\033[1;31m'
+  C_YELLOW=$'\033[1;33m'
+  C_CYAN=$'\033[1;36m'
+  C_RESET=$'\033[0m'
+else
+  C_GREEN='' C_BOLD='' C_DIM='' C_RED='' C_YELLOW='' C_CYAN='' C_RESET=''
+fi
+
+info()    { printf "${C_CYAN}[INFO]${C_RESET}  %s\n" "$*"; }
+ok()      { printf "  ${C_GREEN}✓${C_RESET}  %s\n" "$*"; }
+error()   { printf "${C_RED}[ERROR]${C_RESET} %s\n" "$*" >&2; }
+
+# ---------------------------------------------------------------------------
+# Helper: run a command inside the sandbox
+# ---------------------------------------------------------------------------
+sandbox_exec() {
+  local container
+  container=$(docker ps --filter "name=openshell-cluster" --format "{{.Names}}" 2>/dev/null | head -1)
+  if [ -z "$container" ]; then
+    error "NemoClaw gateway container not found. Is NemoClaw installed?"
+    error "Run: milimo install"
+    return 1
+  fi
+
+  docker exec "$container" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c "$*" 2>&1
+}
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
+
+cmd_install() {
+  # Find the install.sh in the same directory as this script
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  local install_script="$script_dir/install.sh"
+
+  if [ ! -f "$install_script" ]; then
+    # Try parent directory (for when milimo-cli is symlinked to PATH)
+    install_script="$script_dir/../install.sh"
+  fi
+
+  if [ ! -f "$install_script" ]; then
+    error "install.sh not found. Please run from the MilimoClaw directory."
+    return 1
+  fi
+
+  bash "$install_script" "$@"
+}
+
+cmd_status() {
+  echo ""
+  echo " ╔═══════════════════════════════════════════╗"
+  echo " ║  MILIMO CLAW — Status Dashboard          ║"
+  echo " ╚═══════════════════════════════════════════╝"
+  echo ""
+
+  # Sandbox status
+  echo -n "  Sandbox:        "
+  if nemoclaw "$SANDBOX_NAME" status &>/dev/null; then
+    ok "Running"
+  else
+    error "Not running"
+    echo "    Run: milimo install"
+    return 1
+  fi
+
+  # Plugin status
+  echo -n "  Milimo plugin:  "
+  local plugin_status
+  plugin_status=$(sandbox_exec 'openclaw plugins list 2>&1 | grep -i "milimo" | grep -i "loaded" || true')
+  if [ -n "$plugin_status" ]; then
+    ok "Loaded"
+  else
+    error "Not loaded"
+  fi
+
+  # Config
+  echo -n "  Config:         "
+  local has_config
+  has_config=$(sandbox_exec 'test -f /sandbox/.milimo/config.json && echo yes || echo no' 2>/dev/null || echo "no")
+  if [ "$has_config" = "yes" ]; then
+    local squad role template
+    squad=$(sandbox_exec 'python3 -c "import json; print(json.load(open(\"/sandbox/.milimo/config.json\"))[\"squad\"][\"name\"])"' 2>/dev/null || echo "?")
+    role=$(sandbox_exec 'python3 -c "import json; print(json.load(open(\"/sandbox/.milimo/config.json\"))[\"operator\"][\"role\"])"' 2>/dev/null || echo "?")
+    template=$(sandbox_exec 'python3 -c "import json; print(json.load(open(\"/sandbox/.milimo/config.json\"))[\"squad\"][\"template\"])"' 2>/dev/null || echo "?")
+    echo "    Squad: $squad | Role: $role | Template: $template"
+  else
+    error "Not configured"
+    echo "    Run: milimo install"
+  fi
+
+  # Build Claw modules
+  echo -n "  Build Claw:     "
+  local module_count
+  module_count=$(sandbox_exec 'ls /sandbox/milimo-blueprint/orchestrator/build/*.py 2>/dev/null | grep -v __ | wc -l' 2>/dev/null || echo "0")
+  if [ "$module_count" -gt 0 ]; then
+    ok "$module_count modules"
+  else
+    error "Not deployed"
+  fi
+
+  echo ""
+}
+
+cmd_warroom() {
+  sandbox_exec 'openclaw milimo warroom'
+}
+
+cmd_connect() {
+  nemoclaw "$SANDBOX_NAME" connect
+}
+
+cmd_doctor() {
+  echo ""
+  echo " ╔═══════════════════════════════════════════╗"
+  echo " ║  MILIMO CLAW — Doctor                    ║"
+  echo " ╚═══════════════════════════════════════════╝"
+  echo ""
+
+  local issues=0
+
+  # Check prerequisites
+  echo -n "  Docker:         "
+  if command -v docker &>/dev/null && docker info &>/dev/null; then
+    ok "$(docker --version)"
+  else
+    error "Not found or not running"
+    ((issues++))
+  fi
+
+  echo -n "  Node.js:        "
+  if command -v node &>/dev/null; then
+    ok "$(node --version)"
+  else
+    error "Not found (required for plugin build)"
+    ((issues++))
+  fi
+
+  echo -n "  Python:         "
+  if command -v python3 &>/dev/null; then
+    ok "$(python3 --version)"
+  else
+    error "Not found"
+    ((issues++))
+  fi
+
+  echo -n "  nemoclaw:       "
+  if command -v nemoclaw &>/dev/null; then
+    ok "$(nemoclaw --version 2>/dev/null || echo "installed")"
+  else
+    error "Not found — run: milimo install"
+    ((issues++))
+  fi
+
+  # Check sandbox
+  echo -n "  Sandbox:        "
+  if nemoclaw "$SANDBOX_NAME" status &>/dev/null; then
+    ok "Running"
+  else
+    error "Not running"
+    ((issues++))
+  fi
+
+  # Check plugin
+  echo -n "  Plugin loaded:  "
+  local plugin_check
+  plugin_check=$(sandbox_exec 'openclaw plugins list 2>&1 | grep -i "milimo.*loaded" || true' 2>/dev/null || echo "")
+  if [ -n "$plugin_check" ]; then
+    ok "Yes"
+  else
+    error "No — reinstall with: milimo install"
+    ((issues++))
+  fi
+
+  # Check config
+  echo -n "  Config valid:   "
+  local config_check
+  config_check=$(sandbox_exec 'python3 -c "import json; json.load(open(\"/sandbox/.milimo/config.json\")); print(\"ok\")" 2>/dev/null || echo "invalid"' 2>/dev/null || echo "missing")
+  if [ "$config_check" = "ok" ]; then
+    ok "Yes"
+  else
+    error "$config_check"
+    ((issues++))
+  fi
+
+  # Check build claw
+  echo -n "  Build Claw:     "
+  local build_check
+  build_check=$(sandbox_exec 'python3 -c "import sys; sys.path.insert(0, \"/sandbox/milimo-blueprint/orchestrator\"); from build.build_claw import BuildClaw; print(\"ok\")" 2>/dev/null || echo "broken"' 2>/dev/null || echo "missing")
+  if [ "$build_check" = "ok" ]; then
+    ok "All modules importable"
+  else
+    error "$build_check"
+    ((issues++))
+  fi
+
+  echo ""
+  if [ "$issues" -eq 0 ]; then
+    ok "All checks passed — MilimoClaw is healthy"
+  else
+    error "$issues issue(s) found"
+  fi
+  echo ""
+}
+
+cmd_logs() {
+  sandbox_exec 'openclaw milimo logs "$@"' -- "$@"
+}
+
+cmd_health() {
+  sandbox_exec 'openclaw milimo health'
+}
+
+cmd_help() {
+  echo ""
+  echo " ╔═══════════════════════════════════════════╗"
+  echo " ║  MILIMO CLAW v${MILIMO_VERSION} — CLI Wrapper              ║"
+  echo " ╚═══════════════════════════════════════════╝"
+  echo ""
+  echo " Usage: milimo <command> [options]"
+  echo ""
+  echo " Commands:"
+  echo "   install     Install MilimoClaw (NemoClaw + plugin + onboarding)"
+  echo "   status      Show squad and plugin status"
+  echo "   warroom     Launch the War Room TUI"
+  echo "   connect     Open interactive shell in the sandbox"
+  echo "   doctor      Run diagnostic checks"
+  echo "   logs        View audit logs"
+  echo "   health      Check squad claw health"
+  echo "   help        Show this help message"
+  echo ""
+  echo " Install options:"
+  echo "   --solo              Solo operator mode (all 5 claws)"
+  echo "   --operator-name N   Set operator name"
+  echo "   --squad-name N      Set squad name"
+  echo "   --non-interactive   Skip interactive prompts"
+  echo ""
+  echo " Examples:"
+  echo "   milimo install --solo --operator-name Alice"
+  echo "   milimo status"
+  echo "   milimo warroom"
+  echo "   milimo doctor"
+  echo ""
+  echo " The milimo never stops. Work. Without working."
+  echo ""
+}
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+COMMAND="${1:-help}"
+shift || true
+
+case "$COMMAND" in
+  install)    cmd_install "$@" ;;
+  status)     cmd_status ;;
+  warroom)    cmd_warroom ;;
+  connect)    cmd_connect ;;
+  doctor)     cmd_doctor ;;
+  logs)       cmd_logs "$@" ;;
+  health)     cmd_health ;;
+  help|--help|-h) cmd_help ;;
+  *)
+    error "Unknown command: $COMMAND"
+    echo "Run: milimo help"
+    exit 1
+    ;;
+esac

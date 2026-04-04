@@ -192,6 +192,10 @@ function clearOnboardConfig() {
 var config_legacy_js_1 = require("./config-legacy.js");
 Object.defineProperty(exports, "configPath", { enumerable: true, get: function () { return config_legacy_js_1.configPath; } });
 function loadNemoClawConfig() {
+    // MilimoClaw runs on top of NemoClaw — it reads inference config from
+    // NemoClaw's onboard state. If NemoClaw is not installed or not onboarded,
+    // we return null gracefully; the caller should fall back to OpenClaw config
+    // or use defaults.
     const nemoclawDir = (0, node_path_1.join)(process.env.HOME ?? "/tmp", ".nemoclaw");
     const nemoclawPath = (0, node_path_1.join)(nemoclawDir, "config.json");
     if ((0, node_fs_1.existsSync)(nemoclawPath)) {
@@ -203,9 +207,11 @@ function loadNemoClawConfig() {
             }
         }
         catch {
-            // Fall through to OpenClaw config
+            // NemoClaw config exists but is malformed — fall through to OpenClaw config
         }
     }
+    // Fallback: read inference config from OpenClaw's own config
+    // (NemoClaw writes its inference settings here during onboarding)
     const openclawPath = (0, node_path_1.join)(process.env.HOME ?? "/tmp", ".openclaw", "openclaw.json");
     if ((0, node_fs_1.existsSync)(openclawPath)) {
         try {
@@ -219,7 +225,7 @@ function loadNemoClawConfig() {
             }
         }
         catch {
-            // Config parse error
+            // OpenClaw config exists but is malformed — return null
         }
     }
     return null;

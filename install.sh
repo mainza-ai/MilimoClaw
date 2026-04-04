@@ -2,33 +2,35 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
-# MilimoClaw Installer
+# MilimoClaw One-Command Installer
 #
-# Installs Milimo Claw on top of an existing NemoClaw + OpenShell setup.
-# MilimoClaw extends NemoClaw with multi-agent squad coordination,
-# role-specific claw blueprints, privacy routing, and the War Room TUI.
-#
-# Prerequisites:
-#   - NVIDIA NemoClaw installed and onboarded
-#   - Docker (or compatible container runtime) running
-#   - Node.js >= 22.0.0
+# Handles everything: prerequisites, NemoClaw bootstrap, MilimoClaw deployment,
+# and onboarding. Single command, zero manual steps.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/mainzak/MilimoClaw/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/mainza-ai/MilimoClaw/main/install.sh | bash
 #   # or locally:
 #   ./install.sh
-
+#   ./install.sh --solo --operator-name "YourName" --squad-name "my-squad"
+#
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# Color / style
+# Configuration
+# ---------------------------------------------------------------------------
+MILIMO_VERSION="2.0.0"
+NODE_MIN_VERSION="22"
+PYTHON_MIN_VERSION="3.12"
+SANDBOX_NAME="${MILIMO_SANDBOX_NAME:-my-assistant}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+ROOT_DIR="$SCRIPT_DIR"
+BUNDLE_DIR="$ROOT_DIR/dist-bundle"
+
+# ---------------------------------------------------------------------------
+# Colors
 # ---------------------------------------------------------------------------
 if [[ -z "${NO_COLOR:-}" && -t 1 ]]; then
-  if [[ "${COLORTERM:-}" == "truecolor" || "${COLORTERM:-}" == "24bit" ]]; then
-    C_GREEN=$'\033[38;2;118;185;0m'
-  else
-    C_GREEN=$'\033[38;5;148m'
-  fi
+  C_GREEN=$'\033[38;5;148m'
   C_BOLD=$'\033[1m'
   C_DIM=$'\033[2m'
   C_RED=$'\033[1;31m'
@@ -39,26 +41,11 @@ else
   C_GREEN='' C_BOLD='' C_DIM='' C_RED='' C_YELLOW='' C_CYAN='' C_RESET=''
 fi
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
-MILIMO_VERSION="0.1.0"
-NODE_MIN_VERSION="22"
-MILIMO_INSTALL_DIR="${MILIMO_INSTALL_DIR:-/opt/milimo}"
-MILIMO_BLUEPRINT_DIR="${MILIMO_BLUEPRINT_DIR:-/opt/milimo-blueprint}"
-MILIMO_CONFIG_DIR="${HOME}/.milimo"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-info() { printf "${C_CYAN}[INFO]${C_RESET}  %s\n" "$*"; }
-warn() { printf "${C_YELLOW}[WARN]${C_RESET}  %s\n" "$*"; }
-error() {
-  printf "${C_RED}[ERROR]${C_RESET} %s\n" "$*" >&2
-  exit 1
-}
-ok() { printf "  ${C_GREEN}✓${C_RESET}  %s\n" "$*"; }
+info()    { printf "${C_CYAN}[INFO]${C_RESET}  %s\n" "$*"; }
+warn()    { printf "${C_YELLOW}[WARN]${C_RESET}  %s\n" "$*"; }
+error()   { printf "${C_RED}[ERROR]${C_RESET} %s\n" "$*" >&2; }
+ok()      { printf "  ${C_GREEN}✓${C_RESET}  %s\n" "$*"; }
+skip()    { printf "  ${C_DIM}⊘${C_RESET}  %s\n" "$*"; }
 log_step() { printf "\n${C_GREEN}${C_BOLD}>>> %s${C_RESET}\n" "$*"; }
 
 command_exists() { command -v "$1" &>/dev/null; }
@@ -73,6 +60,96 @@ version_gte() {
   done
   return 0
 }
+
+# ---------------------------------------------------------------------------
+# CLI Arguments
+# ---------------------------------------------------------------------------
+NON_INTERACTIVE=false
+SOLO_MODE=true  # Default: solo mode (all 5 claws)
+OPERATOR_NAME=""
+SQUAD_NAME=""
+WARROOM_MODE="minimal"
+AUTO_INSTALL=false
+UNINSTALL=false
+DRY_RUN=false
+SKIP_NEMOCLAW=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --non-interactive) NON_INTERACTIVE=true ;;
+    --solo) SOLO_MODE=true ;;
+    --operator-name) shift; OPERATOR_NAME="$1" ;;
+    --squad-name) shift; SQUAD_NAME="$1" ;;
+    --warroom-mode) shift; WARROOM_MODE="$1" ;;
+    --auto) AUTO_INSTALL=true ;;
+    --uninstall) UNINSTALL=true ;;
+    --dry-run) DRY_RUN=true ;;
+    --skip-nemoclaw) SKIP_NEMOCLAW=true ;;
+    --sandbox-name) shift; SANDBOX_NAME="$1" ;;
+    --version|-v)
+      printf "milimo-claw-installer v%s\n" "$MILIMO_VERSION"
+      exit 0
+      ;;
+    --help|-h)
+      printf "\n  ${C_BOLD}MilimoClaw Installer${C_RESET}  ${C_DIM}v%s${C_RESET}\n\n" "$MILIMO_VERSION"
+      printf "  ${C_DIM}Usage:${C_RESET}\n"
+      printf "    curl -fsSL https://raw.githubusercontent.com/mainza-ai/MilimoClaw/main/install.sh | bash\n"
+      printf "    ./install.sh [options]\n\n"
+      printf "  ${C_DIM}Options:${C_RESET}\n"
+      printf "    --solo                  Solo mode (all 5 claws active) [default]\n"
+      printf "    --operator-name <name>  Operator name (default: \$USER)\n"
+      printf "    --squad-name <name>     Squad name (default: milimo-squad)\n"
+      printf "    --warroom-mode <mode>   War Room mode: full|minimal|disabled\n"
+      printf "    --non-interactive       Skip all prompts, use defaults\n"
+      printf "    --auto                  Auto-install missing dependencies\n"
+      printf "    --skip-nemoclaw         Skip NemoClaw bootstrap\n"
+      printf "    --dry-run               Show what would be done without doing it\n"
+      printf "    --uninstall             Remove MilimoClaw, keep NemoClaw\n"
+      printf "    --version, -v           Print version and exit\n"
+      printf "    --help                  Show this help message\n\n"
+      printf "  ${C_DIM}Environment:${C_RESET}\n"
+      printf "    NVIDIA_API_KEY          API key for NVIDIA inference\n"
+      printf "    MILIMO_SANDBOX_NAME     Sandbox pod name (default: my-assistant)\n"
+      printf "\n"
+      exit 0
+      ;;
+    *) error "Unknown option: $arg" ;;
+  esac
+done
+
+# ---------------------------------------------------------------------------
+# Uninstall
+# ---------------------------------------------------------------------------
+do_uninstall() {
+  log_step "Uninstalling MilimoClaw"
+
+  info "Removing MilimoClaw plugin from sandbox..."
+  if command_exists docker; then
+    local gateway
+    gateway=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -i "openshell\|nemoclaw\|cluster" | head -1 || true)
+    if [ -n "$gateway" ]; then
+      docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c "
+        openclaw plugins uninstall milimo 2>/dev/null || true
+        rm -rf /sandbox/extensions/milimo
+        rm -rf /sandbox/.milimo
+        echo 'Milimo plugin removed'
+      " 2>/dev/null || warn "Could not remove plugin from sandbox"
+    fi
+  fi
+
+  info "Removing local MilimoClaw files..."
+  rm -rf /opt/milimo
+  rm -rf /opt/milimo-blueprint
+  rm -rf "${HOME}/.milimo"
+  rm -rf "$BUNDLE_DIR"
+
+  ok "MilimoClaw uninstalled. NemoClaw sandbox is preserved."
+  exit 0
+}
+
+if [ "$UNINSTALL" = true ]; then
+  do_uninstall
+fi
 
 # ---------------------------------------------------------------------------
 # Banner
@@ -92,14 +169,50 @@ print_banner() {
 }
 
 # ---------------------------------------------------------------------------
-# Pre-flight checks
+# Phase 1: Prerequisites
 # ---------------------------------------------------------------------------
-preflight() {
-  log_step "Running pre-flight checks"
+check_prerequisites() {
+  log_step "Checking prerequisites"
 
-  # Check Node.js
+  # Docker
+  if ! command_exists docker; then
+    if [ "$AUTO_INSTALL" = true ]; then
+      info "Installing Docker..."
+      if [[ "$OSTYPE" == "darwin"* ]]; then
+        warn "Docker Desktop for Mac must be installed manually."
+        warn "Download from: https://docs.docker.com/desktop/install/mac-install/"
+        return 1
+      elif command_exists apt-get; then
+        curl -fsSL https://get.docker.com | sh
+      else
+        warn "Cannot auto-install Docker on this system."
+        return 1
+      fi
+    else
+      error "Docker is not installed. Required for sandbox runtime.
+  Install from: https://docs.docker.com/get-docker/"
+    fi
+  fi
+
+  if ! docker info &>/dev/null; then
+    error "Docker is not running. Please start Docker and try again."
+  fi
+  ok "Docker is running"
+
+  # Node.js
   if ! command_exists node; then
-    error "Node.js is not installed. MilimoClaw requires Node.js >= ${NODE_MIN_VERSION}."
+    if [ "$AUTO_INSTALL" = true ]; then
+      info "Installing Node.js..."
+      if [[ "$OSTYPE" == "darwin"* ]] && command_exists brew; then
+        brew install node
+      elif command_exists apt-get; then
+        curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+        apt-get install -y nodejs
+      fi
+    else
+      error "Node.js >= ${NODE_MIN_VERSION} is not installed.
+  Install from: https://nodejs.org/"
+    fi
   fi
 
   local node_version
@@ -111,215 +224,355 @@ preflight() {
   fi
   ok "Node.js $node_version"
 
-  # Check npm
+  # npm
   if ! command_exists npm; then
     error "npm is not installed."
   fi
   ok "npm $(npm --version)"
 
-  # Check Docker
-  if ! command_exists docker; then
-    warn "Docker is not installed. Required for sandbox runtime."
-    warn "Install from https://docs.docker.com/get-docker/"
-  elif ! docker info &>/dev/null; then
-    warn "Docker is not running. Please start Docker."
+  # Python
+  if ! command_exists python3; then
+    warn "Python 3 is not installed. Required for blueprint orchestrator."
   else
-    ok "Docker is running"
+    local py_version
+    py_version=$(python3 --version 2>&1 | awk '{print $2}')
+    ok "Python $py_version"
   fi
 
-  # Check OpenShell (installed by NemoClaw)
-  if ! command_exists openshell; then
-    warn "OpenShell is not installed. MilimoClaw requires NemoClaw's OpenShell runtime."
-    warn "Install NemoClaw first: curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash"
-    warn ""
-    read -rp "Continue anyway? (y/N) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-      exit 0
-    fi
-  else
-    ok "OpenShell $(openshell --version 2>/dev/null || echo 'installed')"
-  fi
-
-  # Check NemoClaw onboarding
-  if [ ! -d "${HOME}/.nemoclaw" ] && [ ! -f "${HOME}/.openclaw/openclaw.json" ]; then
-    warn "NemoClaw does not appear to be onboarded."
-    warn "MilimoClaw extends NemoClaw. You must onboard NemoClaw first:"
-    warn "  nemoclaw onboard"
-    warn ""
-    read -rp "Continue anyway? (y/N) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-      exit 0
-    fi
-  else
-    ok "NemoClaw appears to be onboarded"
-  fi
-
-  # Check NVIDIA API key
+  # NVIDIA API Key
   if [ -z "${NVIDIA_API_KEY:-}" ]; then
     warn "NVIDIA_API_KEY environment variable is not set."
-    warn "Some inference features may not work without it."
-  fi
-}
-
-# ---------------------------------------------------------------------------
-# Build MilimoClaw plugin
-# ---------------------------------------------------------------------------
-build_plugin() {
-  log_step "Building MilimoClaw plugin"
-
-  if [ ! -d "${SCRIPT_DIR}/milimo" ]; then
-    error "Milimo plugin source not found at ${SCRIPT_DIR}/milimo"
-    info "Run this script from the MilimoClaw repository root."
-  fi
-
-  cd "${SCRIPT_DIR}/milimo"
-
-  info "Installing dependencies..."
-  npm install --ignore-scripts
-
-  info "Building TypeScript..."
-  if npm run build 2>/dev/null; then
-    ok "Plugin built successfully"
-  else
-    warn "Build script not found or failed. Attempting manual compilation..."
-    npx tsc --noEmit || true
-  fi
-
-  cd "${SCRIPT_DIR}"
-}
-
-# ---------------------------------------------------------------------------
-# Install MilimoClaw plugin into OpenClaw
-# ---------------------------------------------------------------------------
-install_plugin() {
-  log_step "Installing MilimoClaw plugin"
-
-  # Copy plugin to install directory
-  if [ -d "${MILIMO_INSTALL_DIR}" ]; then
-    info "Removing previous installation from ${MILIMO_INSTALL_DIR}"
-    rm -rf "${MILIMO_INSTALL_DIR}"
-  fi
-
-  mkdir -p "${MILIMO_INSTALL_DIR}"
-
-  # Prefer built dist/, fall back to src/
-  if [ -d "${SCRIPT_DIR}/milimo/dist" ]; then
-    cp -r "${SCRIPT_DIR}/milimo/dist/"* "${MILIMO_INSTALL_DIR}/"
-  else
-    cp -r "${SCRIPT_DIR}/milimo/src/"* "${MILIMO_INSTALL_DIR}/"
-  fi
-  cp "${SCRIPT_DIR}/milimo/openclaw.plugin.json" "${MILIMO_INSTALL_DIR}/"
-  cp "${SCRIPT_DIR}/milimo/package.json" "${MILIMO_INSTALL_DIR}/"
-
-  # Install runtime dependencies
-  cd "${MILIMO_INSTALL_DIR}"
-  npm install --omit=dev --ignore-scripts 2>/dev/null || true
-  cd "${SCRIPT_DIR}"
-
-  ok "Plugin files installed to ${MILIMO_INSTALL_DIR}"
-
-  # Copy blueprint
-  if [ -d "${SCRIPT_DIR}/milimo-blueprint" ]; then
-    if [ -d "${MILIMO_BLUEPRINT_DIR}" ]; then
-      rm -rf "${MILIMO_BLUEPRINT_DIR}"
+    warn "Get one at: https://build.nvidia.com/"
+    warn "Export it: export NVIDIA_API_KEY=nvapi-..."
+    if [ "$NON_INTERACTIVE" = false ]; then
+      read -rp "Continue anyway? (y/N) " -n 1 -r
+      echo
+      if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        exit 0
+      fi
     fi
-    mkdir -p "${MILIMO_BLUEPRINT_DIR}"
-    cp -r "${SCRIPT_DIR}/milimo-blueprint/"* "${MILIMO_BLUEPRINT_DIR}/"
-    ok "Blueprint installed to ${MILIMO_BLUEPRINT_DIR}"
-  fi
-
-  # Install plugin into OpenClaw (if available on host)
-  if command_exists openclaw; then
-    info "Registering plugin with OpenClaw..."
-    openclaw plugins install "${MILIMO_INSTALL_DIR}" 2>/dev/null \
-      || warn "Could not register plugin. You may need to run this inside the sandbox."
+  else
+    ok "NVIDIA API key configured"
   fi
 }
 
 # ---------------------------------------------------------------------------
-# Set up Milimo config directory
+# Phase 2: NemoClaw Bootstrap
 # ---------------------------------------------------------------------------
-setup_config() {
-  log_step "Setting up MilimoClaw configuration"
+bootstrap_nemoclaw() {
+  if [ "$SKIP_NEMOCLAW" = true ]; then
+    skip "NemoClaw bootstrap (skipped)"
+    return 0
+  fi
 
-  mkdir -p "${MILIMO_CONFIG_DIR}"
-  mkdir -p "${MILIMO_CONFIG_DIR}/blueprints"
-  mkdir -p "${MILIMO_CONFIG_DIR}/audit"
-  mkdir -p "${MILIMO_CONFIG_DIR}/mesh"
-  mkdir -p "${MILIMO_CONFIG_DIR}/evolution"
-  mkdir -p "${MILIMO_CONFIG_DIR}/tools"
-  mkdir -p "${MILIMO_CONFIG_DIR}/attestations"
-  mkdir -p "${MILIMO_CONFIG_DIR}/keys"
-  mkdir -p "${MILIMO_CONFIG_DIR}/health"
+  log_step "Checking NemoClaw"
 
-  ok "Config directory created at ${MILIMO_CONFIG_DIR}"
+  # Check if sandbox is already running
+  local gateway
+  gateway=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -i "openshell\|nemoclaw\|cluster" | head -1 || true)
+
+  if [ -n "$gateway" ]; then
+    local pod_status
+    pod_status=$(docker exec "$gateway" kubectl get pod "$SANDBOX_NAME" -n openshell --no-headers -o custom-columns=":status.phase" 2>/dev/null || echo "NotFound")
+    if [ "$pod_status" = "Running" ]; then
+      skip "NemoClaw sandbox '$SANDBOX_NAME' already running"
+      return 0
+    fi
+  fi
+
+  # Check if nemoclaw CLI exists
+  if command_exists nemoclaw; then
+    ok "NemoClaw CLI found ($(nemoclaw --version 2>/dev/null || echo 'installed'))"
+    info "Starting sandbox..."
+    nemoclaw "$SANDBOX_NAME" start 2>/dev/null || true
+    # Wait for sandbox
+    local retries=30
+    while ((retries > 0)); do
+      pod_status=$(docker exec "$gateway" kubectl get pod "$SANDBOX_NAME" -n openshell --no-headers -o custom-columns=":status.phase" 2>/dev/null || echo "NotFound")
+      if [ "$pod_status" = "Running" ]; then
+        ok "Sandbox '$SANDBOX_NAME' is Running"
+        return 0
+      fi
+      retries=$((retries - 1))
+      sleep 2
+    done
+    warn "Sandbox did not reach Running state in 60s. Continuing anyway..."
+    return 0
+  fi
+
+  # NemoClaw not installed — clone and install
+  warn "NemoClaw is not installed."
+  if [ "$AUTO_INSTALL" = true ] || [ "$NON_INTERACTIVE" = true ]; then
+    info "Cloning NemoClaw..."
+    local tmp_dir
+    tmp_dir=$(mktemp -d)
+    git clone --depth 1 https://github.com/NVIDIA/NemoClaw.git "$tmp_dir/NemoClaw" 2>/dev/null
+    cd "$tmp_dir/NemoClaw"
+    info "Running NemoClaw installer..."
+    NEMOCLAW_NON_INTERACTIVE=1 NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1 bash install.sh --non-interactive --yes-i-accept-third-party-software 2>&1 | tail -20
+    cd "$ROOT_DIR"
+    rm -rf "$tmp_dir"
+    ok "NemoClaw installed"
+  else
+    warn "Install NemoClaw first:"
+    warn "  curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash"
+    warn "Then re-run this installer."
+    exit 1
+  fi
 }
 
 # ---------------------------------------------------------------------------
-# Print summary
+# Phase 3: Build & Deploy Bundles
+# ---------------------------------------------------------------------------
+deploy_to_sandbox() {
+  log_step "Deploying MilimoClaw to sandbox"
+
+  local gateway
+  gateway=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -i "openshell\|nemoclaw\|cluster" | head -1 || true)
+  if [ -z "$gateway" ]; then
+    error "No gateway container found. Is NemoClaw running?"
+  fi
+
+  # Build bundles if they don't exist
+  if [ ! -f "$BUNDLE_DIR/milimo-plugin-v${MILIMO_VERSION}.tar.gz" ]; then
+    info "Building plugin bundle..."
+    if [ -x "$SCRIPT_DIR/scripts/build-bundle.sh" ]; then
+      bash "$SCRIPT_DIR/scripts/build-bundle.sh" --version "$MILIMO_VERSION"
+    else
+      # Fallback: build inline
+      cd "$ROOT_DIR/milimo"
+      npm install --production --ignore-scripts 2>&1 | tail -3
+      npm run build 2>&1 | tail -3
+      cd "$ROOT_DIR"
+
+      mkdir -p "$BUNDLE_DIR/milimo"
+      cp -r "$ROOT_DIR/milimo/dist" "$BUNDLE_DIR/milimo/"
+      cp -r "$ROOT_DIR/milimo/node_modules" "$BUNDLE_DIR/milimo/"
+      cp "$ROOT_DIR/milimo/openclaw.plugin.json" "$BUNDLE_DIR/milimo/"
+      cp "$ROOT_DIR/milimo/package.json" "$BUNDLE_DIR/milimo/"
+      echo "$MILIMO_VERSION" > "$BUNDLE_DIR/milimo/VERSION"
+
+      cd "$BUNDLE_DIR"
+      tar --owner=sandbox --group=sandbox -czf "milimo-plugin-v${MILIMO_VERSION}.tar.gz" milimo/
+      cd "$ROOT_DIR"
+    fi
+  fi
+  ok "Plugin bundle ready"
+
+  if [ ! -f "$BUNDLE_DIR/milimo-blueprint-v${MILIMO_VERSION}.tar.gz" ]; then
+    info "Building blueprint bundle..."
+    if [ -x "$SCRIPT_DIR/scripts/build-blueprint-bundle.sh" ]; then
+      bash "$SCRIPT_DIR/scripts/build-blueprint-bundle.sh" --version "$MILIMO_VERSION"
+    else
+      mkdir -p "$BUNDLE_DIR"
+      cd "$ROOT_DIR"
+      tar --owner=sandbox --group=sandbox \
+        --exclude='__pycache__' --exclude='*.pyc' --exclude='.pytest_cache' \
+        --exclude='tests/' --exclude='test_*.py' \
+        -czf "$BUNDLE_DIR/milimo-blueprint-v${MILIMO_VERSION}.tar.gz" \
+        milimo-blueprint/
+    fi
+  fi
+  ok "Blueprint bundle ready"
+
+  # Deploy via docker cp + kubectl cp
+  local plugin_bundle="$BUNDLE_DIR/milimo-plugin-v${MILIMO_VERSION}.tar.gz"
+  local blueprint_bundle="$BUNDLE_DIR/milimo-blueprint-v${MILIMO_VERSION}.tar.gz"
+
+  # Deploy plugin
+  info "Transferring plugin to sandbox..."
+  docker cp "$plugin_bundle" "$gateway:/tmp/milimo-plugin.tar.gz" 2>/dev/null
+  docker exec "$gateway" kubectl cp "/tmp/milimo-plugin.tar.gz" "openshell/$SANDBOX_NAME:/tmp/milimo-plugin.tar.gz" 2>/dev/null
+  docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c "
+    mkdir -p /sandbox/extensions/milimo
+    tar xzf /tmp/milimo-plugin.tar.gz -C /sandbox/extensions/milimo --strip-components=1
+    rm -f /tmp/milimo-plugin.tar.gz
+    cd /sandbox/extensions/milimo
+    npm install --production 2>/dev/null || true
+    openclaw plugins install /sandbox/extensions/milimo 2>&1 || true
+  " 2>/dev/null
+  ok "Plugin deployed"
+
+  # Deploy blueprint
+  info "Transferring blueprint to sandbox..."
+  docker cp "$blueprint_bundle" "$gateway:/tmp/milimo-blueprint.tar.gz" 2>/dev/null
+  docker exec "$gateway" kubectl cp "/tmp/milimo-blueprint.tar.gz" "openshell/$SANDBOX_NAME:/tmp/milimo-blueprint.tar.gz" 2>/dev/null
+  docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c "
+    tar xzf /tmp/milimo-blueprint.tar.gz -C /sandbox --strip-components=1
+    rm -f /tmp/milimo-blueprint.tar.gz
+  " 2>/dev/null
+  ok "Blueprint deployed"
+}
+
+# ---------------------------------------------------------------------------
+# Phase 4: Non-Interactive Onboarding
+# ---------------------------------------------------------------------------
+run_onboarding() {
+  log_step "Configuring MilimoClaw"
+
+  local operator="${OPERATOR_NAME:-${USER:-operator}}"
+  local squad="${SQUAD_NAME:-milimo-squad}"
+
+  if [ "$DRY_RUN" = true ]; then
+    info "Dry run — would configure:"
+    info "  Squad: $squad (solo template, all 5 claws)"
+    info "  Operator: $operator"
+    info "  War Room: $WARROOM_MODE"
+    return 0
+  fi
+
+  # Write config directly to sandbox
+  local gateway
+  gateway=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -i "openshell\|nemoclaw\|cluster" | head -1 || true)
+
+  docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c "
+    mkdir -p /sandbox/.milimo
+    python3 -c \"
+import json
+from datetime import datetime, timezone
+
+config = {
+    'version': '${MILIMO_VERSION}',
+    'squad': {
+        'name': '${squad}',
+        'template': 'solo',
+        'mode': 'solo',
+        'onboarded_at': datetime.now(timezone.utc).isoformat()
+    },
+    'operator': {
+        'name': '${operator}'
+    },
+    'claws': {
+        'content': { 'enabled': True, 'mount': '/sandbox/content' },
+        'ops': { 'enabled': True, 'mount': '/sandbox/clients' },
+        'analytics': { 'enabled': True, 'mount': '/sandbox/analytics' },
+        'finance': { 'enabled': True, 'mount': '/sandbox/finance' },
+        'build': { 'enabled': True, 'mount': '/sandbox/build' }
+    },
+    'war_room': {
+        'mode': '${WARROOM_MODE}'
+    },
+    'mesh': {
+        'enabled': False,
+        'secret': None
+    },
+    'inference': {
+        'provider': 'nvidia-prod',
+        'model': 'nvidia/nemotron-3-super-120b-a12b',
+        'baseUrl': 'https://integrate.api.nvidia.com/v1',
+        'api': 'openai-responses'
+    },
+    'blueprint_dir': '/sandbox/milimo-blueprint',
+    'assistant': {
+        'name': 'Nova',
+        'creature': 'a claw',
+        'vibe': 'sharp and unhurried',
+        'emoji': '🦀'
+    },
+    'activeClaws': ['content', 'ops', 'analytics', 'finance', 'build']
+}
+
+with open('/sandbox/.milimo/config.json', 'w') as f:
+    json.dump(config, f, indent=2)
+print('Config written')
+\"
+    chown -R sandbox:sandbox /sandbox/.milimo
+  " 2>/dev/null
+
+  ok "Squad: $squad (solo template)"
+  ok "Operator: $operator"
+  ok "Claws: Content, Ops, Analytics, Finance, Build — all enabled"
+  ok "War Room: $WARROOM_MODE"
+}
+
+# ---------------------------------------------------------------------------
+# Phase 5: Verification
+# ---------------------------------------------------------------------------
+verify_installation() {
+  log_step "Verifying installation"
+
+  local gateway
+  gateway=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -i "openshell\|nemoclaw\|cluster" | head -1 || true)
+
+  # Check plugin loaded
+  local plugin_check
+  plugin_check=$(docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c "
+    openclaw plugins list 2>&1 | grep -i 'milimo' || echo 'NOT_FOUND'
+  " 2>/dev/null || echo "ERROR")
+
+  if echo "$plugin_check" | grep -qi "milimo"; then
+    ok "Milimo Claw plugin is loaded"
+  else
+    warn "Plugin not showing as loaded yet"
+    info "Connect to sandbox and run: openclaw plugins install /sandbox/extensions/milimo"
+  fi
+
+  # Check blueprint
+  local blueprint_check
+  blueprint_check=$(docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c "
+    ls /sandbox/milimo-blueprint/orchestrator/build/build_claw.py 2>/dev/null && echo 'OK' || echo 'MISSING'
+  " 2>/dev/null || echo "ERROR")
+
+  if [ "$blueprint_check" = "OK" ]; then
+    ok "Build Claw blueprint present"
+  else
+    warn "Build Claw blueprint not found"
+  fi
+
+  # Check config
+  local config_check
+  config_check=$(docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c "
+    cat /sandbox/.milimo/config.json 2>/dev/null | python3 -c \"import json,sys; d=json.load(sys.stdin); print(d.get('squad',{}).get('name','?'))\" 2>/dev/null || echo 'MISSING'
+  " 2>/dev/null || echo "ERROR")
+
+  if [ "$config_check" != "MISSING" ] && [ "$config_check" != "ERROR" ]; then
+    ok "Milimo config: $config_check"
+  else
+    warn "Milimo config not found"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Summary
 # ---------------------------------------------------------------------------
 print_summary() {
+  local operator="${OPERATOR_NAME:-${USER:-operator}}"
+  local squad="${SQUAD_NAME:-milimo-squad}"
+  local elapsed=$((SECONDS - _INSTALL_START))
+
   echo ""
   printf "  ${C_GREEN}${C_BOLD}──────────────────────────────────────────────────────${C_RESET}\n"
   printf "  ${C_GREEN}${C_BOLD}  MilimoClaw v%s — Installation Complete${C_RESET}\n" "$MILIMO_VERSION"
   printf "  ${C_GREEN}${C_BOLD}──────────────────────────────────────────────────────${C_RESET}\n"
   echo ""
-  echo "  Plugin:     ${MILIMO_INSTALL_DIR}"
-  echo "  Blueprint:  ${MILIMO_BLUEPRINT_DIR}"
-  echo "  Config:     ${MILIMO_CONFIG_DIR}"
+  echo "  Squad:      $squad (solo — all 5 claws active)"
+  echo "  Operator:   $operator"
+  echo "  Claws:      Content · Ops · Analytics · Finance · Build"
+  echo "  War Room:   $WARROOM_MODE"
+  echo "  Elapsed:    ${elapsed}s"
   echo ""
   echo "  Next steps:"
-  echo "    1. Connect to sandbox:  openshell sandbox connect <name>"
-  echo "    2. Onboard Milimo:      openclaw milimo onboard"
-  echo "    3. Check status:        openclaw milimo squad status"
-  echo "    4. Launch War Room:     openclaw milimo warroom"
+  echo "    Launch War Room:  nemoclaw $SANDBOX_NAME connect → openclaw milimo warroom"
+  echo "    Check status:     openclaw milimo health"
+  echo "    Talk to assistant: openclaw tui"
   echo ""
   printf "  ${C_GREEN}${C_BOLD}──────────────────────────────────────────────────────${C_RESET}\n"
   echo ""
-  ok "Installation complete!"
+  ok "The milimo never stops. Work. Without working."
+  echo ""
 }
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 main() {
-  # Parse flags
-  NON_INTERACTIVE=""
-  for arg in "$@"; do
-    case "$arg" in
-      --non-interactive) NON_INTERACTIVE=1 ;;
-      --version | -v)
-        printf "milimo-claw-installer v%s\n" "$MILIMO_VERSION"
-        exit 0
-        ;;
-      --help | -h)
-        printf "\n  ${C_BOLD}MilimoClaw Installer${C_RESET}  ${C_DIM}v%s${C_RESET}\n\n" "$MILIMO_VERSION"
-        printf "  ${C_DIM}Usage:${C_RESET}\n"
-        printf "    curl -fsSL https://raw.githubusercontent.com/mainzak/MilimoClaw/main/install.sh | bash\n"
-        printf "    ./install.sh [options]\n\n"
-        printf "  ${C_DIM}Options:${C_RESET}\n"
-        printf "    --non-interactive    Skip prompts (uses env vars / defaults)\n"
-        printf "    --version, -v        Print installer version and exit\n"
-        printf "    --help               Show this help message and exit\n\n"
-        printf "  ${C_DIM}Environment:${C_RESET}\n"
-        printf "    NVIDIA_API_KEY          API key for NVIDIA inference\n"
-        printf "    MILIMO_INSTALL_DIR      Plugin install path (default: /opt/milimo)\n"
-        printf "    MILIMO_BLUEPRINT_DIR    Blueprint install path (default: /opt/milimo-blueprint)\n"
-        printf "\n"
-        exit 0
-        ;;
-      *) error "Unknown option: $arg" ;;
-    esac
-  done
-
   _INSTALL_START=$SECONDS
   print_banner
-  preflight
-  build_plugin
-  install_plugin
-  setup_config
+  check_prerequisites
+  bootstrap_nemoclaw
+  deploy_to_sandbox
+  run_onboarding
+  verify_installation
   print_summary
 }
 

@@ -4,7 +4,7 @@ export interface PendingMessage {
     sender_role: string;
     recipient_role: string;
     message_type: string;
-    payload: any;
+    payload: Record<string, unknown>;
     squad_id: string;
     timestamp: string;
     needs_approval: boolean;

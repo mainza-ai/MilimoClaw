@@ -192,10 +192,13 @@ Commands:
         console.log(`Type: ${msg.message_type}`);
         console.log(`Payload:`);
         if (msg.message_type === 'tool_proposal') {
-            console.log(`  Tool Name: ${msg.payload?.tool_name}`);
-            console.log(`  Trigger:   ${msg.payload?.trigger_pattern?.trigger_description}`);
-            console.log(`  Expected Uplift: +${msg.payload?.estimated_improvement}% on ${msg.payload?.metric_target}`);
-            console.log(`  Data Sources: ${msg.payload?.data_sources_required?.join(', ')}`);
+            const payload = msg.payload;
+            console.log(`  Tool Name: ${payload?.tool_name}`);
+            const triggerPattern = payload?.trigger_pattern;
+            console.log(`  Trigger:   ${triggerPattern?.trigger_description}`);
+            console.log(`  Expected Uplift: +${payload?.estimated_improvement}% on ${payload?.metric_target}`);
+            const dataSources = payload?.data_sources_required;
+            console.log(`  Data Sources: ${dataSources?.join(', ')}`);
         }
         else {
             console.log(JSON.stringify(msg.payload, null, 2));

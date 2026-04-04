@@ -134,8 +134,9 @@ class GatewayClient {
                     this.handleIncomingMessage(message);
                 }
             }
-            catch {
-                // Ignore parse errors
+            catch (err) {
+                // Log parse errors for debugging but don't crash
+                console.warn("[GatewayClient] Failed to parse incoming message:", err);
             }
         });
         this.socket.on("close", () => {
@@ -221,14 +222,10 @@ class GatewayClient {
         return JSON.parse(decrypted.toString("utf8"));
     }
     deriveKey(sender, recipient) {
-        const salt = Buffer.from(`${sender}:${recipient}`, "utf8");
-        const secret = Buffer.from(this.meshSecret, "utf8");
-        const combined = Buffer.concat([salt, secret]);
-        const key = Buffer.alloc(32);
-        for (let i = 0; i < 32; i++) {
-            key[i] = combined[i % combined.length] ?? 0;
-        }
-        return key;
+        const salt = Buffer.from(`${sender}:${recipient}:${this.squadId}`, "utf8");
+        const keyMaterial = Buffer.from(this.meshSecret, "utf8");
+        // Use HKDF (HMAC-based Key Derivation Function) for proper key derivation
+        return Buffer.from((0, node_crypto_1.hkdfSync)("sha256", keyMaterial, salt, `milimo-mesh:${sender}:${recipient}`, 32));
     }
     sendFileMessage(message) {
         const queueDir = (0, node_path_1.join)(process.env.HOME ?? "/tmp", ".milimo", "mesh", "pending", this.squadId, message.recipient_role);

@@ -68,6 +68,12 @@ function showConfig(config: MilimoOnboardConfig, logger: PluginLogger): void {
 }
 
 function isNonInteractive(opts: OnboardOptions): boolean {
+  // Non-interactive mode is enabled when all required CLI options are provided
+  // Solo mode only requires: squad, template, warRoomMode (no role needed)
+  if (opts.solo) {
+    return !!(opts.squad && opts.template && opts.warRoomMode);
+  }
+  // Mesh mode requires: squad, role, template, warRoomMode
   if (!opts.squad || !opts.role || !opts.template) return false;
   if (!opts.warRoomMode) return false;
   return true;

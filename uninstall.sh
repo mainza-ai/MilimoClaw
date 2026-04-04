@@ -5,47 +5,44 @@
 # MilimoClaw Uninstaller
 #
 # Removes MilimoClaw resources while preserving NemoClaw and OpenShell.
-#   - MilimoClaw plugin from /opt/milimo
-#   - MilimoClaw blueprint from /opt/milimo-blueprint
+#   - MilimoClaw plugin from sandbox
+#   - MilimoClaw blueprint from sandbox
 #   - ~/.milimo config directory
-#   - MilimoClaw Docker containers and images
+#   - Local build bundles
 #
-# Preserves: NemoClaw, OpenShell, OpenClaw, Docker, Node.js, Ollama
+# Preserves: NemoClaw, OpenShell, OpenClaw, Docker, Node.js
 
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# Color / style
+# Colors
 # ---------------------------------------------------------------------------
 if [[ -z "${NO_COLOR:-}" && -t 1 ]]; then
-  if [[ "${COLORTERM:-}" == "truecolor" || "${COLORTERM:-}" == "24bit" ]]; then
-    C_GREEN=$'\033[38;2;118;185;0m'
-  else
-    C_GREEN=$'\033[38;5;148m'
-  fi
+  C_GREEN=$'\033[38;5;148m'
   C_BOLD=$'\033[1m'
   C_DIM=$'\033[2m'
   C_RED=$'\033[1;31m'
   C_YELLOW=$'\033[1;33m'
+  C_CYAN=$'\033[1;36m'
   C_RESET=$'\033[0m'
 else
-  C_GREEN='' C_BOLD='' C_DIM='' C_RED='' C_YELLOW='' C_RESET=''
+  C_GREEN='' C_BOLD='' C_DIM='' C_RED='' C_YELLOW='' C_CYAN='' C_RESET=''
 fi
 
-info() { printf "${C_GREEN}[uninstall]${C_RESET} %s\n" "$*"; }
-warn() { printf "${C_YELLOW}[uninstall]${C_RESET} %s\n" "$*"; }
-fail() {
-  printf "${C_RED}[uninstall]${C_RESET} %s\n" "$*" >&2
-  exit 1
-}
-ok() { printf "  ${C_GREEN}✓${C_RESET}  %s\n" "$*"; }
+info()    { printf "${C_CYAN}[INFO]${C_RESET}  %s\n" "$*"; }
+warn()    { printf "${C_YELLOW}[WARN]${C_RESET}  %s\n" "$*"; }
+ok()      { printf "  ${C_GREEN}✓${C_RESET}  %s\n" "$*"; }
+log_step() { printf "\n${C_GREEN}${C_BOLD}>>> %s${C_RESET}\n" "$*"; }
+
+command_exists() { command -v "$1" &>/dev/null; }
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-MILIMO_INSTALL_DIR="${MILIMO_INSTALL_DIR:-/opt/milimo}"
-MILIMO_BLUEPRINT_DIR="${MILIMO_BLUEPRINT_DIR:-/opt/milimo-blueprint}"
-MILIMO_CONFIG_DIR="${HOME}/.milimo"
+SANDBOX_NAME="${MILIMO_SANDBOX_NAME:-my-assistant}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+ROOT_DIR="$SCRIPT_DIR"
+BUNDLE_DIR="$ROOT_DIR/dist-bundle"
 
 ASSUME_YES=false
 
@@ -56,6 +53,7 @@ usage() {
   printf "    ./uninstall.sh [--yes]\n\n"
   printf "  ${C_GREEN}Options:${C_RESET}\n"
   printf "    --yes             Skip the confirmation prompt\n"
+  printf "    --sandbox-name N  Sandbox pod name (default: my-assistant)\n"
   printf "    -h, --help        Show this help\n"
   printf "\n"
 }
@@ -66,11 +64,15 @@ while [ $# -gt 0 ]; do
       ASSUME_YES=true
       shift
       ;;
+    --sandbox-name)
+      shift; SANDBOX_NAME="$1"
+      shift
+      ;;
     -h | --help)
       usage
       exit 0
       ;;
-    *) fail "Unknown argument: $1" ;;
+    *) warn "Unknown argument: $1" ;;
   esac
 done
 
@@ -81,10 +83,10 @@ confirm() {
 
   printf "\n"
   printf "  ${C_YELLOW}What will be removed:${C_RESET}\n"
-  printf "  ${C_DIM}  · MilimoClaw plugin (${MILIMO_INSTALL_DIR})${C_RESET}\n"
-  printf "  ${C_DIM}  · MilimoClaw blueprint (${MILIMO_BLUEPRINT_DIR})${C_RESET}\n"
-  printf "  ${C_DIM}  · MilimoClaw config (~/.milimo)${C_RESET}\n"
-  printf "  ${C_DIM}  · MilimoClaw Docker containers and images${C_RESET}\n"
+  printf "  ${C_DIM}  · MilimoClaw plugin from sandbox${C_RESET}\n"
+  printf "  ${C_DIM}  · MilimoClaw blueprint from sandbox${C_RESET}\n"
+  printf "  ${C_DIM}  · ~/.milimo config directory${C_RESET}\n"
+  printf "  ${C_DIM}  · Local build bundles (dist-bundle/)${C_RESET}\n"
   printf "\n"
   printf "  ${C_DIM}NemoClaw, OpenShell, OpenClaw, Docker, Node.js are preserved.${C_RESET}\n"
   printf "\n"
@@ -104,78 +106,71 @@ confirm() {
   esac
 }
 
-remove_path() {
-  local path="$1"
-  if [ -e "$path" ] || [ -L "$path" ]; then
-    rm -rf "$path"
-    info "Removed $path"
-  fi
-}
+remove_sandbox_plugin() {
+  log_step "Removing plugin from sandbox"
 
-remove_milimo_plugin() {
-  info "Removing MilimoClaw plugin..."
-  remove_path "${MILIMO_INSTALL_DIR}"
-  remove_path "${MILIMO_BLUEPRINT_DIR}"
-}
-
-remove_milimo_config() {
-  info "Removing MilimoClaw config..."
-  remove_path "${MILIMO_CONFIG_DIR}"
-}
-
-remove_docker_resources() {
-  if ! command -v docker >/dev/null 2>&1; then
-    warn "docker not found; skipping Docker cleanup."
+  if ! command_exists docker; then
+    warn "Docker not found; skipping sandbox cleanup."
     return 0
   fi
 
-  if ! docker info >/dev/null 2>&1; then
-    warn "docker is not running; skipping Docker cleanup."
+  if ! docker info &>/dev/null; then
+    warn "Docker is not running; skipping sandbox cleanup."
     return 0
   fi
 
-  # Remove MilimoClaw containers
-  local -a container_ids=()
-  local line
-  while IFS= read -r line; do
-    [ -n "$line" ] || continue
-    container_ids+=("$line")
-  done < <(
-    docker ps -a --format '{{.ID}} {{.Image}} {{.Names}}' 2>/dev/null \
-      | awk 'BEGIN { IGNORECASE=1 } { if ($0 ~ /milimo/) print $1 }' \
-      | awk '!seen[$0]++'
-  )
+  local gateway
+  gateway=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -i "openshell\|nemoclaw\|cluster" | head -1 || true)
 
-  if [ "${#container_ids[@]}" -gt 0 ]; then
-    for cid in "${container_ids[@]}"; do
-      docker rm -f "$cid" >/dev/null 2>&1 && info "Removed container $cid" || warn "Failed to remove container $cid"
-    done
-  else
-    info "No MilimoClaw Docker containers found"
+  if [ -z "$gateway" ]; then
+    info "No gateway container found; skipping sandbox cleanup."
+    return 0
   fi
 
-  # Remove MilimoClaw images
-  local -a image_ids=()
-  while IFS= read -r line; do
-    [ -n "$line" ] || continue
-    image_ids+=("$line")
-  done < <(
-    docker images --format '{{.ID}} {{.Repository}}:{{.Tag}}' 2>/dev/null \
-      | awk 'BEGIN { IGNORECASE=1 } { if ($0 ~ /milimo/) print $1 }' \
-      | awk '!seen[$0]++'
-  )
+  # Uninstall plugin via OpenClaw
+  docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c "
+    openclaw plugins uninstall milimo 2>/dev/null || true
+    rm -rf /sandbox/extensions/milimo
+    rm -rf /sandbox/milimo-blueprint
+    rm -rf /sandbox/.milimo
+    rm -rf /sandbox/.nemoclaw/config.json
+    echo 'Milimo plugin removed from sandbox'
+  " 2>/dev/null || warn "Could not remove plugin from sandbox (it may not be installed)"
 
-  if [ "${#image_ids[@]}" -gt 0 ]; then
-    for iid in "${image_ids[@]}"; do
-      docker rmi -f "$iid" >/dev/null 2>&1 && info "Removed image $iid" || warn "Failed to remove image $iid"
-    done
+  ok "Plugin removed from sandbox"
+}
+
+remove_local_files() {
+  log_step "Removing local files"
+
+  # Remove ~/.milimo config
+  if [ -d "${HOME}/.milimo" ]; then
+    rm -rf "${HOME}/.milimo"
+    ok "Removed ~/.milimo"
   else
-    info "No MilimoClaw Docker images found"
+    info "~/.milimo does not exist"
+  fi
+
+  # Remove legacy install paths
+  if [ -d "/opt/milimo" ]; then
+    rm -rf /opt/milimo
+    ok "Removed /opt/milimo"
+  fi
+
+  if [ -d "/opt/milimo-blueprint" ]; then
+    rm -rf /opt/milimo-blueprint
+    ok "Removed /opt/milimo-blueprint"
+  fi
+
+  # Remove build bundles
+  if [ -d "$BUNDLE_DIR" ]; then
+    rm -rf "$BUNDLE_DIR"
+    ok "Removed build bundles"
   fi
 }
 
 unregister_plugin() {
-  if command -v openclaw >/dev/null 2>&1; then
+  if command_exists openclaw; then
     info "Unregistering Milimo plugin from OpenClaw..."
     openclaw plugins uninstall milimo >/dev/null 2>&1 \
       || warn "Could not unregister plugin. It may not be registered."
@@ -188,7 +183,7 @@ print_bye() {
   printf "\n"
   printf "  ${C_GREEN}${C_BOLD}Claws retracted.${C_RESET}  ${C_DIM}Until next time.${C_RESET}\n"
   printf "\n"
-  printf "  ${C_DIM}https://github.com/mainzak/MilimoClaw${C_RESET}\n"
+  printf "  ${C_DIM}https://github.com/mainza-ai/MilimoClaw${C_RESET}\n"
   printf "\n"
 }
 
@@ -200,9 +195,8 @@ main() {
 
   confirm
   unregister_plugin
-  remove_milimo_plugin
-  remove_milimo_config
-  remove_docker_resources
+  remove_sandbox_plugin
+  remove_local_files
   print_bye
 }
 
