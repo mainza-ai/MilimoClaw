@@ -31,7 +31,6 @@ jobs:
           cache: 'npm'
           cache-dependency-path: |
             milimo/package-lock.json
-            nemoclaw/package-lock.json
             package-lock.json
 
       - name: Setup Python ${{ matrix.python-version }}
@@ -43,18 +42,16 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyyaml
+          pip install pyyaml pytest
 
       - name: Install Node.js dependencies
         run: |
           npm ci
           cd milimo && npm ci
-          cd ../nemoclaw && npm ci
 
       - name: Build TypeScript
         run: |
           cd milimo && npm run build
-          cd ../nemoclaw && npm run build
 
       - name: Run unit tests
         run: npm test
@@ -71,8 +68,7 @@ jobs:
       - name: Run Python tests
         run: |
           cd milimo-blueprint
-          python -m pytest tests/ -v || echo "pytest not installed, skipping"
-        continue-on-error: true
+          python -m pytest tests/ -v
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -100,21 +96,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run ESLint
-        run: npm run lint || echo "No lint script, skipping"
-        continue-on-error: true
-
       - name: Run TypeScript check
         run: |
           cd milimo && npx tsc --noEmit
-          cd ../nemoclaw && npx tsc --noEmit
-        continue-on-error: true
 
       - name: Run Python lint
         run: |
           pip install ruff
           ruff check milimo-blueprint/orchestrator/ --output-format=github
-        continue-on-error: true
 
   security:
     name: Security Scan
@@ -126,10 +115,8 @@ jobs:
 
       - name: Run npm audit
         run: npm audit --audit-level=high
-        continue-on-error: true
 
       - name: Run Python security check
         run: |
           pip install bandit
           bandit -r milimo-blueprint/orchestrator/ -ll
-        continue-on-error: true

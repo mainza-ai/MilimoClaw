@@ -145,7 +145,7 @@ class TestFinanceLogEntry:
     def test_to_dict(self):
         """Log entry serializes correctly."""
         entry = FinanceLogEntry(
-            timestamp="2026-03-21T10:00:00",
+            timestamp="2026-04-04T04:13:39",
             action_type="invoice_generated",
             entity_id="inv-123",
             amount=1500.00,
@@ -154,7 +154,7 @@ class TestFinanceLogEntry:
         )
 
         data = entry.to_dict()
-        assert data["timestamp"] == "2026-03-21T10:00:00"
+        assert data["timestamp"] == "2026-04-04T04:13:39"
         assert data["action_type"] == "invoice_generated"
         assert data["entity_id"] == "inv-123"
         assert data["amount"] == 1500.00
@@ -190,7 +190,7 @@ class TestFinanceOperationalLog:
         log = FinanceOperationalLog(log_path)
 
         entry = FinanceLogEntry(
-            timestamp="2026-03-21T10:00:00",
+            timestamp="2026-04-04T04:13:39",
             action_type="test_action",
             entity_id="test-123",
             amount=None,
@@ -207,7 +207,7 @@ class TestFinanceOperationalLog:
         log = FinanceOperationalLog(log_path)
 
         entry = FinanceLogEntry(
-            timestamp="2026-03-21T10:00:00",
+            timestamp="2026-04-04T04:13:39",
             action_type="test_action",
             entity_id="test-123",
             amount=100.0,
@@ -227,9 +227,10 @@ class TestFinanceOperationalLog:
         log_path = tmp_path / "logs" / "operational.log"
         log = FinanceOperationalLog(log_path)
 
+        timestamps = ['2026-04-03T04:15:59', '2026-04-02T04:15:59', '2026-04-01T04:15:59', '2026-03-31T04:15:59', '2026-03-30T04:15:59']
         for i in range(5):
             entry = FinanceLogEntry(
-                timestamp=f"2026-03-2{i}T10:00:00",
+                timestamp=timestamps[i],
                 action_type=f"action_{i}",
                 entity_id=f"entity_{i}",
                 amount=None,
@@ -248,7 +249,7 @@ class TestFinanceOperationalLog:
 
         for i in range(5):
             entry = FinanceLogEntry(
-                timestamp="2026-03-21T10:00:00",
+                timestamp="2026-04-04T04:13:39",
                 action_type="invoice_generated" if i % 2 == 0 else "payment_received",
                 entity_id=f"entity_{i}",
                 amount=None,
@@ -267,7 +268,7 @@ class TestFinanceOperationalLog:
 
         for i in range(5):
             entry = FinanceLogEntry(
-                timestamp="2026-03-21T10:00:00",
+                timestamp="2026-04-04T04:13:39",
                 action_type="invoice_generated",
                 entity_id=f"entity_{i}",
                 amount=None,
@@ -286,7 +287,7 @@ class TestPaymentEvent:
     def test_to_dict(self):
         """Payment event serializes correctly."""
         event = PaymentEvent(
-            timestamp="2026-03-21T10:00:00",
+            timestamp="2026-04-04T04:13:39",
             event_type="invoice_sent",
             invoice_id="inv-123",
             client_id="client-456",
@@ -295,7 +296,7 @@ class TestPaymentEvent:
         )
 
         data = event.to_dict()
-        assert data["timestamp"] == "2026-03-21T10:00:00"
+        assert data["timestamp"] == "2026-04-04T04:13:39"
         assert data["event_type"] == "invoice_sent"
         assert data["invoice_id"] == "inv-123"
 
@@ -324,7 +325,7 @@ class TestPaymentEventsLog:
         log = PaymentEventsLog(log_path)
 
         event = PaymentEvent(
-            timestamp="2026-03-21T10:00:00",
+            timestamp="2026-04-04T04:13:39",
             event_type="invoice_sent",
             invoice_id="inv-123",
             client_id="client-456",
@@ -340,9 +341,10 @@ class TestPaymentEventsLog:
         log_path = tmp_path / "logs" / "payment-events.log"
         log = PaymentEventsLog(log_path)
 
+        timestamps = ['2026-04-03T04:15:59', '2026-04-02T04:15:59', '2026-04-01T04:15:59', '2026-03-31T04:15:59', '2026-03-30T04:15:59']
         for i in range(5):
             event = PaymentEvent(
-                timestamp=f"2026-03-2{i}T10:00:00",
+                timestamp=timestamps[i],
                 event_type="invoice_sent",
                 invoice_id=f"inv-{i}",
                 client_id="client-456",
@@ -361,7 +363,7 @@ class TestPaymentEventsLog:
 
         for i in range(5):
             event = PaymentEvent(
-                timestamp="2026-03-21T10:00:00",
+                timestamp="2026-04-04T04:13:39",
                 event_type="invoice_sent",
                 invoice_id=f"inv-{i}",
                 client_id=f"client-{i % 2}",
@@ -381,7 +383,7 @@ class TestPaymentEventsLog:
         event_types = ["invoice_sent", "payment_overdue", "payment_overdue", "invoice_sent"]
         for i, event_type in enumerate(event_types):
             event = PaymentEvent(
-                timestamp="2026-03-21T10:00:00",
+                timestamp="2026-04-04T04:13:39",
                 event_type=event_type,
                 invoice_id=f"inv-{i}",
                 client_id="client-456",

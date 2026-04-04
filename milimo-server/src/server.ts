@@ -20,7 +20,13 @@ import { authRoutes } from "./routes/auth.js";
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const HOST = process.env.HOST || "0.0.0.0";
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error(
+    "JWT_SECRET environment variable is required. Generate one with: openssl rand -hex 32"
+  );
+}
 
 const fastify = Fastify({
   logger: {
@@ -36,8 +42,10 @@ const fastify = Fastify({
 });
 
 // Register plugins
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(",") || [];
+
 await fastify.register(cors, {
-  origin: true,
+  origin: ALLOWED_ORIGINS.length > 0 ? ALLOWED_ORIGINS : false,
   credentials: true,
 });
 
@@ -74,9 +82,26 @@ await fastify.register(pendingRoutes, { prefix: "/api/v1/pending" });
 await fastify.register(actionRoutes, { prefix: "/api/v1/pending" });
 await fastify.register(statusRoutes, { prefix: "/api/v1/status" });
 
-// WebSocket endpoint for real-time updates
+// WebSocket endpoint for real-time updates (requires JWT authentication)
 fastify.register(async function (fastify) {
   fastify.get("/ws", { websocket: true }, (connection, request) => {
+    // Authenticate WebSocket connection via query parameter
+    const token = request.query?.token as string | undefined;
+    if (!token) {
+      fastify.log.warn("WebSocket connection rejected: no token provided");
+      connection.socket.close(4001, "Authentication required");
+      return;
+    }
+
+    try {
+      const decoded = fastify.jwt.verify(token);
+      fastify.log.info({ user: decoded }, "WebSocket client authenticated");
+    } catch (err) {
+      fastify.log.warn("WebSocket connection rejected: invalid token");
+      connection.socket.close(4001, "Invalid token");
+      return;
+    }
+
     fastify.log.info("WebSocket client connected");
 
     connection.socket.on("message", (message) => {

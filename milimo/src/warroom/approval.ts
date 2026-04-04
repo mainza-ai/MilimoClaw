@@ -12,7 +12,7 @@ export interface PendingMessage {
   sender_role: string;
   recipient_role: string;
   message_type: string;
-  payload: any;
+  payload: Record<string, unknown>;
   squad_id: string;
   timestamp: string;
   needs_approval: boolean;
@@ -102,10 +102,10 @@ export class ApprovalEngine {
 
   public evaluateAction(message: PendingMessage): { mode: ApprovalMode, trigger?: string, description?: string } {
     // 1. Check escalation triggers based on payload heuristics
-    
+
     // Example: invoice_over_500
     if (message.message_type === 'deliverable' && message.payload && message.payload.type === 'invoice') {
-      const amount = message.payload.amount || 0;
+      const amount = (message.payload.amount as number) || 0;
       if (amount > 500) {
         const rule = this.escalationRules.find(r => r.trigger === 'invoice_over_500');
         if (rule) {
@@ -134,7 +134,7 @@ export class ApprovalEngine {
     if (message.needs_approval) {
       return { mode: 'REVIEW' };
     }
-    
+
     return { mode: 'AUTO' };
   }
 
@@ -157,7 +157,7 @@ export class ApprovalEngine {
       const targetInbox = join(this.meshDir, 'inbox', message.recipient_role);
       const fileName = message.file_path.split('/').pop()!;
       const targetPath = join(targetInbox, fileName);
-      
+
       try {
         renameSync(message.file_path, targetPath);
       } catch (e) {
@@ -168,7 +168,7 @@ export class ApprovalEngine {
       const rejectedDir = join(this.meshDir, 'rejected');
       const fileName = message.file_path.split('/').pop()!;
       const targetPath = join(rejectedDir, fileName);
-      
+
       try {
         renameSync(message.file_path, targetPath);
       } catch (e) {

@@ -11,12 +11,12 @@ export class WarRoomTUI {
   private isRunning: boolean = false;
   private refreshInterval: NodeJS.Timeout | null = null;
   private pendingQueue: PendingMessage[] = [];
-  
+
   constructor(private squadId: string, private operatorId: string = 'local-operator') {
     this.engine = new ApprovalEngine(squadId);
     this.audit = new AuditLogger(squadId);
     this.evolution = new EvolutionManager(squadId);
-    
+
     this.rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout
@@ -88,19 +88,19 @@ Commands:
   exit        - Leave the War Room
 `);
         break;
-      
+
       case 'ls':
         this.listPending();
         break;
-      
+
       case 'view':
         this.viewAction(parts[1]);
         break;
-      
+
       case 'approve':
         this.processAction(parts[1], 'APPROVED');
         break;
-      
+
       case 'veto':
         this.processAction(parts[1], 'REJECTED');
         break;
@@ -117,11 +117,11 @@ Commands:
       case 'tools':
         this.evolution.showEvolutionLog();
         break;
-      
+
       case 'disable-tool':
         this.evolution.toggleTool(parts[1], parts[2], false);
         break;
-      
+
       case 'enable-tool':
         this.evolution.toggleTool(parts[1], parts[2], true);
         break;
@@ -134,7 +134,7 @@ Commands:
       case 'quit':
         this.stop();
         return;
-      
+
       case '':
         break;
 
@@ -180,16 +180,19 @@ Commands:
     console.log(`Route: ${msg.sender_role} -> ${msg.recipient_role}`);
     console.log(`Type: ${msg.message_type}`);
     console.log(`Payload:`);
-    
+
     if (msg.message_type === 'tool_proposal') {
-      console.log(`  Tool Name: ${msg.payload?.tool_name}`);
-      console.log(`  Trigger:   ${msg.payload?.trigger_pattern?.trigger_description}`);
-      console.log(`  Expected Uplift: +${msg.payload?.estimated_improvement}% on ${msg.payload?.metric_target}`);
-      console.log(`  Data Sources: ${msg.payload?.data_sources_required?.join(', ')}`);
+      const payload = msg.payload as Record<string, unknown>;
+      console.log(`  Tool Name: ${payload?.tool_name}`);
+      const triggerPattern = payload?.trigger_pattern as Record<string, unknown> | undefined;
+      console.log(`  Trigger:   ${triggerPattern?.trigger_description}`);
+      console.log(`  Expected Uplift: +${payload?.estimated_improvement}% on ${payload?.metric_target}`);
+      const dataSources = payload?.data_sources_required as string[] | undefined;
+      console.log(`  Data Sources: ${dataSources?.join(', ')}`);
     } else {
       console.log(JSON.stringify(msg.payload, null, 2));
     }
-    
+
     const evalResult = this.engine.evaluateAction(msg);
     if (evalResult.description) {
       console.log(`Notice: ${evalResult.description}`);

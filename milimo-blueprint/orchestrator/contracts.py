@@ -87,6 +87,8 @@ VALID_MESSAGE_TYPES = {
     "revenue_summary",
     # Tool proposal
     "tool_proposal",
+    # Finance → War Room: Overdue payment alert
+    "overdue_alert",
 }
 
 # Message types that require War Room approval (AUTO priority by default)
@@ -386,6 +388,15 @@ MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
         "frequency": "on_event",
         "sla_minutes": 10,
         "priority": "AUTO",
+    },
+    # Finance → War Room: Overdue payment alert
+    "overdue_alert": {
+        "sender_roles": ["finance"],
+        "recipient_roles": ["war_room"],
+        "required_payload": ["invoice_id", "client_id", "amount", "days_overdue"],
+        "optional_payload": ["last_contact", "escalation_level"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
     },
 }
 

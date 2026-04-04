@@ -255,6 +255,10 @@ export function clearOnboardConfig(): void {
 export { configPath } from "./config-legacy.js";
 
 export function loadNemoClawConfig(): { model: string; endpointUrl: string } | null {
+  // MilimoClaw runs on top of NemoClaw — it reads inference config from
+  // NemoClaw's onboard state. If NemoClaw is not installed or not onboarded,
+  // we return null gracefully; the caller should fall back to OpenClaw config
+  // or use defaults.
   const nemoclawDir = join(process.env.HOME ?? "/tmp", ".nemoclaw");
   const nemoclawPath = join(nemoclawDir, "config.json");
 
@@ -266,10 +270,12 @@ export function loadNemoClawConfig(): { model: string; endpointUrl: string } | n
         return { model: config.model, endpointUrl: config.endpointUrl };
       }
     } catch {
-      // Fall through to OpenClaw config
+      // NemoClaw config exists but is malformed — fall through to OpenClaw config
     }
   }
 
+  // Fallback: read inference config from OpenClaw's own config
+  // (NemoClaw writes its inference settings here during onboarding)
   const openclawPath = join(process.env.HOME ?? "/tmp", ".openclaw", "openclaw.json");
   if (existsSync(openclawPath)) {
     try {
@@ -286,7 +292,7 @@ export function loadNemoClawConfig(): { model: string; endpointUrl: string } | n
         return { model: primaryModel, endpointUrl: baseUrl };
       }
     } catch {
-      // Config parse error
+      // OpenClaw config exists but is malformed — return null
     }
   }
 

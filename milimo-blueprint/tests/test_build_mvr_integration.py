@@ -13,12 +13,19 @@ Step 9 is the critical correctness test — REVIEW approval must NOT trigger mer
 from __future__ import annotations
 
 import json
+import os
+import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+# Fix Python 'build' package shadowing our build module
+_orchestrator_path = os.path.join(os.path.dirname(__file__), "..", "orchestrator")
+if _orchestrator_path not in sys.path:
+    sys.path.insert(0, _orchestrator_path)
 
 
 class TestBuildMVR:
@@ -157,7 +164,7 @@ class TestBuildMVR:
         import build.issue_manager
         original_wait = build.issue_manager.ANALYTICS_WAIT_SECONDS
         build.issue_manager.ANALYTICS_WAIT_SECONDS = 0.1
-        
+
         with patch("build.issue_manager.time.sleep"):
             plan = build_claw.issue_manager.generate_sprint_plan()
 
@@ -170,7 +177,7 @@ class TestBuildMVR:
         import build.issue_manager
         original_wait = build.issue_manager.ANALYTICS_WAIT_SECONDS
         build.issue_manager.ANALYTICS_WAIT_SECONDS = 0.1
-        
+
         with patch("build.issue_manager.time.sleep"):
             plan = build_claw.issue_manager.generate_sprint_plan()
 
@@ -186,7 +193,7 @@ class TestBuildMVR:
         import build.issue_manager
         original_wait = build.issue_manager.ANALYTICS_WAIT_SECONDS
         build.issue_manager.ANALYTICS_WAIT_SECONDS = 0.1
-        
+
         with patch("build.issue_manager.time.sleep"):
             plan = build_claw.issue_manager.generate_sprint_plan()
 

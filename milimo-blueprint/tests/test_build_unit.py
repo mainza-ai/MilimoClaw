@@ -11,6 +11,7 @@ Tests for build_init.py, signal_dispatcher.py, and approval_handler.py.
 from __future__ import annotations
 
 import json
+import sys
 import tempfile
 import threading
 import time
@@ -20,7 +21,16 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from build import (
+_test_dir = Path(__file__).parent
+_orchestrator_dir = _test_dir.parent / "orchestrator"
+if str(_orchestrator_dir) not in sys.path:
+    sys.path.insert(0, str(_orchestrator_dir))
+
+from build.build_claw import BuildClaw
+from build.build_init import (
+    BASE,
+    REQUIRED_DIRS,
+    REQUIRED_FILES,
     BuildFilesystemInit,
     BuildLogEntry,
     BuildOperationalLog,
@@ -34,7 +44,6 @@ from build.approval_handler import (
     DeployActivityLog,
     PRActivityLog,
 )
-from build.build_init import BASE, REQUIRED_DIRS, REQUIRED_FILES
 from build.signal_dispatcher import (
     ANALYTICS_WAIT_SECONDS,
     BuildSignalDispatcher,

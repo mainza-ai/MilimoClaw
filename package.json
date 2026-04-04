@@ -1,29 +1,23 @@
 {
-  "name": "nemoclaw",
+  "name": "milimo-claw",
   "version": "0.1.0",
-  "description": "NemoClaw — run OpenClaw inside OpenShell with NVIDIA inference",
+  "description": "Milimo Claw — multi-agent autonomous hustle platform built on NVIDIA NemoClaw",
   "license": "Apache-2.0",
-  "bin": {
-    "nemoclaw": "./bin/nemoclaw.js"
-  },
   "scripts": {
     "test": "vitest run",
-    "prepare": "if [ -d .git ]; then prek install --hook-type pre-commit --hook-type commit-msg --hook-type pre-push; fi",
-    "prepublishOnly": "cd nemoclaw && env -u npm_config_global -u npm_config_prefix -u npm_config_omit npm install --ignore-scripts && ./node_modules/.bin/tsc"
+    "test:coverage": "vitest run --coverage",
+    "prepare": "if [ -d .git ]; then prek install --hook-type pre-commit --hook-type commit-msg --hook-type pre-push; fi"
   },
   "dependencies": {
     "openclaw": "2026.3.11"
   },
   "files": [
-    "bin/",
-    "nemoclaw/dist/",
-    "nemoclaw/openclaw.plugin.json",
-    "nemoclaw/package.json",
     "milimo/dist/",
     "milimo/openclaw.plugin.json",
     "milimo/package.json",
-    "nemoclaw-blueprint/",
     "milimo-blueprint/",
+    "milimo-server/dist/",
+    "milimo-server/package.json",
     "scripts/",
     "Dockerfile",
     ".dockerignore"
@@ -33,7 +27,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/NVIDIA/NemoClaw.git"
+    "url": "https://github.com/mainzak/MilimoClaw.git"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.5.0",

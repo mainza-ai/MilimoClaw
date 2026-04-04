@@ -239,7 +239,10 @@ class FinanceOperationalLog:
                 try:
                     data = json.loads(line)
                     entry = FinanceLogEntry.from_dict(data)
-                    entry_time = datetime.fromisoformat(entry.timestamp).timestamp()
+                    _dt = datetime.fromisoformat(entry.timestamp)
+                    if _dt.tzinfo is None:
+                        _dt = _dt.replace(tzinfo=timezone.utc)
+                    entry_time = _dt.timestamp()
                     if entry_time >= cutoff:
                         if action_type is None or entry.action_type == action_type:
                             entries.append(entry)
@@ -316,7 +319,10 @@ class PaymentEventsLog:
                 try:
                     data = json.loads(line)
                     event = PaymentEvent.from_dict(data)
-                    event_time = datetime.fromisoformat(event.timestamp).timestamp()
+                    _dt = datetime.fromisoformat(event.timestamp)
+                    if _dt.tzinfo is None:
+                        _dt = _dt.replace(tzinfo=timezone.utc)
+                    event_time = _dt.timestamp()
                     if event_time >= cutoff:
                         events.append(event)
                 except (json.JSONDecodeError, KeyError, ValueError):

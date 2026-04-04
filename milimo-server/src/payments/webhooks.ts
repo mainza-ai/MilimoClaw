@@ -9,7 +9,7 @@
  */
 
 import Stripe from 'stripe';
-import { FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { handlePaymentSuccess, handleAccountRequirementsUpdated } from './stripe.js';
 import { generateInvoiceFromSession, renderInvoice } from './invoices.js';
 
@@ -171,7 +171,9 @@ async function handlePayoutCreated(event: Stripe.Event): Promise<void> {
   console.log(`[Webhook] Amount: $${(payout.amount / 100).toFixed(2)}`);
 
   if (webhookHandlers.onPayoutCreated) {
-    await webhookHandlers.onPayoutCreated(payout.id, payout.id, payout.amount);
+    // Extract accountId from the Stripe account object or metadata
+    const accountId = (payout as any).destination || (payout as any).account || payout.id;
+    await webhookHandlers.onPayoutCreated(payout.id, accountId, payout.amount);
   }
 }
 
@@ -240,7 +242,7 @@ export async function handleV2ThinEvent(
 
 // ---------------------------------------------------------------------------
 
-export function createWebhookRoute(fastify: any): void {
+export function createWebhookRoute(fastify: FastifyInstance): void {
   fastify.post('/webhooks/stripe', {
     config: {
       rawBody: true,

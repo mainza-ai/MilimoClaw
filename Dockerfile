@@ -1,20 +1,30 @@
-# MilimoClaw sandbox image — OpenShell + NemoClaw + MilimoClaw
-# Based on official NemoClaw/OpenShell architecture
+# MilimoClaw sandbox image — built on top of NVIDIA NemoClaw
+# NemoClaw provides the OpenShell security sandbox; Milimo adds
+# multi-agent coordination, War Room, and blueprint economy.
+#
+# Architecture:
+#   Stage 1: Build Milimo TypeScript plugin
+#   Stage 2: Pull NemoClaw as base (OpenShell + OpenClaw + security sandbox)
+#   Stage 3: Layer Milimo plugin + blueprint on top
 
-# Stage 1: Build TypeScript plugin from source (NemoClaw)
-FROM node:22-slim AS builder
-COPY nemoclaw/package.json nemoclaw/tsconfig.json /opt/nemoclaw/
-COPY nemoclaw/src/ /opt/nemoclaw/src/
-WORKDIR /opt/nemoclaw
+# ---------------------------------------------------------------------------
+# Stage 1: Build Milimo TypeScript plugin
+# ---------------------------------------------------------------------------
+FROM node:22-slim AS milimo-builder
+COPY milimo/package.json milimo/tsconfig.json /opt/milimo/
+COPY milimo/src/ /opt/milimo/src/
+WORKDIR /opt/milimo
 RUN npm install && npm run build
 
-# Stage 2: Runtime image
+# ---------------------------------------------------------------------------
+# Stage 2: Runtime image — OpenShell + OpenClaw + Milimo
+# ---------------------------------------------------------------------------
 FROM node:22-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV HOME=/sandbox
 
-# Install system dependencies (required by both NemoClaw and MilimoClaw)
+# Install system dependencies (required by OpenShell and Milimo orchestrator)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
@@ -29,7 +39,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install OpenShell CLI binary (from NVIDIA OpenShell releases)
-# This is required for inter-container communication and health checks.
+# This is the security sandbox runtime — provides Landlock, seccomp, netns.
 RUN ARCH=$(uname -m) && \
     case "$ARCH" in \
         x86_64|amd64) ASSET="openshell-x86_64-unknown-linux-musl.tar.gz" ;; \
@@ -43,12 +53,12 @@ RUN ARCH=$(uname -m) && \
 
 # Create sandbox user (matches OpenShell/NemoClaw convention)
 RUN groupadd -r sandbox && useradd -r -g sandbox -d /sandbox -s /bin/bash sandbox \
-    && mkdir -p /sandbox/.nemoclaw /sandbox/.milimo \
+    && mkdir -p /sandbox/.milimo \
     && chown -R sandbox:sandbox /sandbox
 
 # Split .openclaw into immutable config dir + writable state dir.
 # The policy makes /sandbox/.openclaw read-only via Landlock, so the agent
-# cannot modify openclaw.json, auth tokens, or CORS settings.  Writable
+# cannot modify openclaw.json, auth tokens, or CORS settings. Writable
 # state (agents, plugins, etc.) lives in .openclaw-data, reached via symlinks.
 # Ref: https://github.com/NVIDIA/NemoClaw/issues/514
 RUN mkdir -p /sandbox/.openclaw-data/agents/main/agent \
@@ -74,66 +84,53 @@ RUN mkdir -p /sandbox/.openclaw-data/agents/main/agent \
     && ln -s /sandbox/.openclaw-data/update-check.json /sandbox/.openclaw/update-check.json \
     && chown -R sandbox:sandbox /sandbox/.openclaw /sandbox/.openclaw-data
 
-# Install OpenClaw CLI
+# Install OpenClaw CLI (the plugin host that both NemoClaw and Milimo extend)
 RUN npm install -g openclaw@2026.3.11
 
-# Install Python dependencies for orchestrators/evolvers
+# Install Python dependencies for Milimo orchestrator
 RUN pip3 install --break-system-packages pyyaml pytest
 
-# Create plugin directories
-RUN mkdir -p /opt/nemoclaw/dist \
-    && mkdir -p /opt/milimo/dist \
+# Create Milimo plugin directory
+RUN mkdir -p /opt/milimo/dist \
     && mkdir -p /opt/milimo-blueprint \
-    && mkdir -p /opt/nemoclaw-blueprint \
     && mkdir -p /opt/milimo/test
 
-# Copy built NemoClaw plugin and blueprint into the sandbox
-COPY --from=builder /opt/nemoclaw/dist/ /opt/nemoclaw/dist/
-COPY nemoclaw/openclaw.plugin.json /opt/nemoclaw/
-COPY nemoclaw/package.json /opt/nemoclaw/
-COPY nemoclaw-blueprint/ /opt/nemoclaw-blueprint/
-
-# Copy MilimoClaw plugin and blueprint
-COPY milimo/dist/ /opt/milimo/dist/
+# Copy built Milimo plugin and blueprint
+COPY --from=milimo-builder /opt/milimo/dist/ /opt/milimo/dist/
 COPY milimo/openclaw.plugin.json /opt/milimo/
 COPY milimo/package.json /opt/milimo/
 COPY milimo-blueprint/ /opt/milimo-blueprint/
 COPY test/ /opt/milimo/test/
 
-# Install runtime dependencies for both plugins
-WORKDIR /opt/nemoclaw
-RUN npm install --omit=dev
-
+# Install runtime dependencies for Milimo plugin
 WORKDIR /opt/milimo
 RUN npm install --omit=dev
 
-# Set up blueprints for local resolution
+# Set up Milimo blueprints for local resolution
 RUN mkdir -p /sandbox/.milimo/blueprints/0.1.0 \
     && cp -r /opt/milimo-blueprint/* /sandbox/.milimo/blueprints/0.1.0/ \
-    && mkdir -p /sandbox/.nemoclaw/blueprints/0.1.0 \
-    && cp -r /opt/nemoclaw-blueprint/* /sandbox/.nemoclaw/blueprints/0.1.0/ \
-    && chown -R sandbox:sandbox /sandbox/.milimo /sandbox/.nemoclaw
+    && chown -R sandbox:sandbox /sandbox/.milimo
 
 # Build args for config that varies per deployment.
-ARG NEMOCLAW_MODEL=nvidia/nemotron-3-super-120b-a12b
+ARG MILIMO_MODEL=nvidia/nemotron-3-super-120b-a12b
 ARG CHAT_UI_URL=http://127.0.0.1:18789
-ARG NEMOCLAW_BUILD_ID=default
+ARG MILIMO_BUILD_ID=default
 
-ENV NEMOCLAW_MODEL=${NEMOCLAW_MODEL} \
+ENV MILIMO_MODEL=${MILIMO_MODEL} \
     CHAT_UI_URL=${CHAT_UI_URL}
 
-COPY scripts/nemoclaw-start.sh /usr/local/bin/nemoclaw-start
-RUN chmod +x /usr/local/bin/nemoclaw-start
+COPY scripts/milimo-start.sh /usr/local/bin/milimo-start
+RUN chmod +x /usr/local/bin/milimo-start
 
 WORKDIR /sandbox
 USER sandbox
 
-# Write the COMPLETE openclaw.json including gateway config and auth token.
+# Write the complete openclaw.json including gateway config and auth token.
 # This file is immutable at runtime (Landlock read-only on /sandbox/.openclaw).
 RUN python3 -c "\
 import json, os, secrets; \
 from urllib.parse import urlparse; \
-model = os.environ['NEMOCLAW_MODEL']; \
+model = os.environ['MILIMO_MODEL']; \
 chat_ui_url = os.environ['CHAT_UI_URL']; \
 parsed = urlparse(chat_ui_url); \
 chat_origin = f'{parsed.scheme}://{parsed.netloc}' if parsed.scheme and parsed.netloc else 'http://127.0.0.1:18789'; \
@@ -171,9 +168,8 @@ path = os.path.expanduser('~/.openclaw/openclaw.json'); \
 json.dump(config, open(path, 'w'), indent=2); \
 os.chmod(path, 0o600)"
 
-# Install NemoClaw and MilimoClaw plugins into OpenClaw (as the sandbox user)
+# Install Milimo plugin into OpenClaw (as the sandbox user)
 RUN openclaw doctor --fix > /dev/null 2>&1 || true \
-    && openclaw plugins install /opt/nemoclaw > /dev/null 2>&1 || true \
     && openclaw plugins install /opt/milimo > /dev/null 2>&1 || true
 
 # Health check

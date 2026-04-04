@@ -101,9 +101,10 @@ war_room:
       - cli_notification
 
 evolution:
-  cycle: weekly
-  day: sunday
-  time: "02:00"
+  cycle_day: "sunday"
+  schedule:
+    time: "02:00"
+    cycle: weekly
   per_claw:
     content:
       enabled: true

@@ -50,6 +50,9 @@ USER_FILE = WORKSPACE_DIR / "USER.md"
 AGENTS_FILE = WORKSPACE_DIR / "AGENTS.md"
 MILIMO_CONTEXT_FILE = WORKSPACE_DIR / "MILIMO_CLAW.md"
 
+# Resolved at import time so tests can monkeypatch it
+TEMPLATE_PATH: Path | None = None
+
 
 def find_template() -> Path:
     """Find the assistant system prompt template from multiple candidate paths."""
@@ -131,8 +134,14 @@ def render_template(config: AssistantConfig) -> str:
 
     Uses simple str.replace() — no third-party templating required.
     """
-    template_path = find_template()
-    template = template_path.read_text(encoding="utf-8")
+    # Use TEMPLATE_PATH if set (for test monkeypatching), otherwise find it
+    template_path = TEMPLATE_PATH if TEMPLATE_PATH is not None else find_template()
+    try:
+        template = template_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f"System prompt template not found at {template_path}"
+        )
 
     substitutions = {
         "{{assistant_name}}": config.name,

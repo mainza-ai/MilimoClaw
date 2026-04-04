@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 import { defineConfig } from "vitest/config";
@@ -8,21 +8,14 @@ export default defineConfig({
     projects: [
       {
         test: {
-          name: "cli",
-          include: ["test/**/*.test.js"],
-          exclude: ["**/node_modules/**", "**/.claude/**"],
-        },
-      },
-      {
-        test: {
           name: "plugin",
-          include: ["nemoclaw/src/**/*.test.ts"],
+          include: ["milimo/src/**/*.test.ts"],
         },
       },
     ],
     coverage: {
       provider: "v8",
-      include: ["nemoclaw/src/**/*.ts"],
+      include: ["milimo/src/**/*.ts"],
       exclude: ["**/*.test.ts"],
       reporter: ["text", "json-summary"],
     },

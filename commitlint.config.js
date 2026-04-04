@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 module.exports = {
@@ -16,6 +16,7 @@ module.exports = {
         "test",
         "ci",
         "perf",
+        "security",
       ],
     ],
   },

@@ -30,6 +30,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from ..privacy_router import PrivacyRouter
+from ..tool_registry import ToolRegistry
 from .content_init import (
     ContentFilesystemInit,
     ContentOperationalLog,
@@ -61,11 +63,17 @@ class ContentClaw:
         inference_client: Any,
         mesh_sender: Callable[[dict[str, Any]], None] | None = None,
         base_path: Path | None = None,
+        privacy_router: PrivacyRouter | None = None,
+        tool_registry: ToolRegistry | None = None,
+        war_room: Any | None = None,
     ) -> None:
         self._squad_id = squad_id
         self._inference_client = inference_client
         self._mesh_sender = mesh_sender
         self._base_path = base_path or Path("/sandbox/content")
+        self._privacy_router = privacy_router
+        self._tool_registry = tool_registry
+        self._war_room = war_room
 
         # Component references — initialized in startup()
         self._fs: ContentFilesystemInit | None = None
@@ -130,10 +138,11 @@ class ContentClaw:
 
         # 4. Content generator
         self._generator = ContentGenerator(
-            fs=self._fs,
-            inference_client=self._inference_client,
+            privacy_router=self._privacy_router or PrivacyRouter(),
+            tool_registry=self._tool_registry or ToolRegistry(self._base_path / "tools"),
             operational_log=self._operational_log,
-            voice_manager=self._voice_manager,
+            fs=self._fs,
+            war_room=self._war_room,
         )
 
         # 5. Brief manager
@@ -147,12 +156,14 @@ class ContentClaw:
         self._approval_handler = ContentApprovalHandler(
             fs=self._fs,
             operational_log=self._operational_log,
+            war_room=self._war_room,
         )
 
         # 7. Platform publisher
         self._publisher = PlatformPublisher(
             fs=self._fs,
             operational_log=self._operational_log,
+            war_room=self._war_room,
         )
 
         # 8. Performance monitor
@@ -160,6 +171,7 @@ class ContentClaw:
             fs=self._fs,
             operational_log=self._operational_log,
             mesh_sender=self._mesh_sender,
+            war_room=self._war_room,
         )
 
         # 9. Publish scheduler

@@ -1,4 +1,4 @@
-.PHONY: check lint format lint-ts lint-py format-ts format-py docs docs-strict docs-live docs-clean
+.PHONY: check lint format lint-ts lint-py format-ts format-py test test-ts test-py test-integration
 
 check: lint-ts lint-py
 	@echo "All checks passed."
@@ -6,29 +6,28 @@ check: lint-ts lint-py
 lint: lint-ts lint-py
 
 lint-ts:
-	cd nemoclaw && npm run check
+	cd milimo && npm run check 2>/dev/null || npx tsc --noEmit
 
 lint-py:
-	cd nemoclaw-blueprint && $(MAKE) check
+	cd milimo-blueprint && python3 -m pytest tests/ -v --tb=short
 
 format: format-ts format-py
 
 format-ts:
-	cd nemoclaw && npm run lint:fix && npm run format
+	cd milimo && npx prettier --write "src/**/*.ts" 2>/dev/null || true
 
 format-py:
-	cd nemoclaw-blueprint && $(MAKE) format
+	cd milimo-blueprint && python3 -m ruff format . 2>/dev/null || true
 
-# --- Documentation ---
+# --- Testing ---
 
-docs:
-	uv run --group docs sphinx-build -b html docs docs/_build/html
+test: test-ts test-py test-integration
 
-docs-strict:
-	uv run --group docs sphinx-build -W -b html docs docs/_build/html
+test-ts:
+	cd milimo && npm test
 
-docs-live:
-	uv run --group docs sphinx-autobuild docs docs/_build/html --open-browser
+test-py:
+	cd milimo-blueprint && python3 -m pytest tests/ -v
 
-docs-clean:
-	rm -rf docs/_build
+test-integration:
+	node --test test/integration/*.test.js

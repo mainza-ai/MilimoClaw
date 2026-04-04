@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Milimo Claw sandbox entrypoint. Configures OpenClaw and starts the dashboard
@@ -80,7 +80,8 @@ PYAUTH
 print_dashboard_urls() {
   local token chat_ui_base local_url remote_url
 
-  token="$(python3 - <<'PYTOKEN'
+  token="$(
+    python3 - <<'PYTOKEN'
 import json
 import os
 path = os.path.expanduser('~/.openclaw/openclaw.json')
@@ -91,7 +92,7 @@ except Exception:
 else:
     print(cfg.get('gateway', {}).get('auth', {}).get('token', ''))
 PYTOKEN
-)"
+  )"
 
   chat_ui_base="${CHAT_UI_URL%/}"
   local_url="http://127.0.0.1:${PUBLIC_PORT}/"
@@ -106,7 +107,7 @@ PYTOKEN
 }
 
 start_auto_pair() {
-  nohup python3 - <<'PYAUTOPAIR' >> /tmp/gateway.log 2>&1 &
+  nohup python3 - <<'PYAUTOPAIR' >>/tmp/gateway.log 2>&1 &
 import json
 import subprocess
 import time
@@ -167,18 +168,18 @@ PYAUTOPAIR
 }
 
 echo 'Setting up Milimo Claw...'
-openclaw doctor --fix > /dev/null 2>&1 || true
-openclaw models set nvidia/nemotron-3-super-120b-a12b > /dev/null 2>&1 || true
+openclaw doctor --fix >/dev/null 2>&1 || true
+openclaw models set nvidia/nemotron-3-super-120b-a12b >/dev/null 2>&1 || true
 write_auth_profile
 export CHAT_UI_URL PUBLIC_PORT
 fix_openclaw_config
-openclaw plugins install /opt/milimo > /dev/null 2>&1 || true
+openclaw plugins install /opt/milimo >/dev/null 2>&1 || true
 
 if [ ${#MILIMO_CMD[@]} -gt 0 ]; then
   exec "${MILIMO_CMD[@]}"
 fi
 
-nohup openclaw gateway run > /tmp/gateway.log 2>&1 &
+nohup openclaw gateway run >/tmp/gateway.log 2>&1 &
 echo "[gateway] openclaw gateway launched (pid $!)"
 start_auto_pair
 print_dashboard_urls

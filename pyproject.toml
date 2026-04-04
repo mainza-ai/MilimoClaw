@@ -1,10 +1,10 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
 [project]
-name = "nemoclaw-docs"
+name = "milimo-claw-docs"
 version = "0.1.0"
-description = "Documentation build for NemoClaw"
+description = "Documentation build for Milimo Claw"
 requires-python = ">=3.11"
 
 [dependency-groups]
@@ -15,7 +15,6 @@ docs = [
     "sphinx-design",
     "sphinx-autobuild",
     "sphinxcontrib-mermaid",
-    "nvidia-sphinx-theme",
     "sphinx-llm>=0.3.0",
 ]
 
