@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — Historical audit report. Kept for reference only.
+
+---
 # BUILD CLAW AUDIT REPORT
 ## Implementation Gap Analysis
 

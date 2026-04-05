@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — AI generation prompt. Not user documentation.
+
+---
 # MILIMO CLAW — ANALYTICS CLAW IMPLEMENTATION PROMPT
 # ─────────────────────────────────────────────────────────────────────────────
 # Attach this prompt alongside:

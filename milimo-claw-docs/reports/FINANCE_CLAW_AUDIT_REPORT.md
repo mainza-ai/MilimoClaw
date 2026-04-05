@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — Historical audit report. Kept for reference only.
+
+---
 # FINANCE CLAW IMPLEMENTATION AUDIT REPORT
 ## Date: 2026-03-21
 ## Status: ❌ NOT IMPLEMENTED - 0% COMPLETE
@@ -45,7 +48,7 @@
     └── payment-events.log
 ```
 
-**Current State:** 
+**Current State:**
 - ❌ `orchestrator/finance/` directory does NOT exist
 - ❌ No filesystem initialization module
 - ❌ No directory structure creation
@@ -164,7 +167,7 @@
 
 ```
 Stage 1 — REVIEW:
-Operator sees full invoice: Client name, project description, 
+Operator sees full invoice: Client name, project description,
 line items, total amount, payment terms, due date, payment risk score.
 Operator can: APPROVE (proceed to Stage 2), EDIT, BLOCK
 

@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — Historical audit report. Kept for reference only.
+
+---
 # MilimoClaw Comprehensive Audit Report
 
 **Date**: 2026-03-20 (Updated)
@@ -166,7 +169,7 @@ const API_BASE = process.env.MILIMO_SERVER_URL || "http://localhost:3001";
 
 **Current Subcommands**:
 - `status` - Show squad status
-- `role` - Show claw role details  
+- `role` - Show claw role details
 - `finals` - Show finals mode status
 
 **Missing**:

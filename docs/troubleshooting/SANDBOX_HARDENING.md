@@ -1,3 +1,7 @@
+> ⚠️ **DEPRECATED** — All issues resolved. Kept for historical reference only.
+
+---
+
 # Sandbox Hardening and Stabilization
 
 This document summarizes the solutions implemented to resolve sandbox creation failures and ensure the MilimoClaw environment is production-ready.

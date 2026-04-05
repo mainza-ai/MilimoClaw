@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — AI generation prompt. Not user documentation.
+
+---
 # MILIMO CLAW — SOLO MODE ROLE SELECTION FIX
 # ─────────────────────────────────────────────────────────────────────────────
 # Targeted fix. One bug. Five files. Ship it.
@@ -79,7 +82,9 @@ if (isSolo) {
 } else {
   // Mesh mode: operator runs exactly one claw on this machine.
   // Role selection is correct and necessary here.
-  console.log("\nMesh mode — which claw are you running on this machine?\n");
+  console.log("
+Mesh mode — which claw are you running on this machine?
+");
 
   // Only offer roles that are active in the selected template
   const allRoles = [
@@ -106,7 +111,8 @@ if (isSolo) {
     .filter(c => c !== clawRole)
     .join(", ");
 
-  console.log(`\n✓ You are running the ${clawRole} claw on this machine.`);
+  console.log(`
+✓ You are running the ${clawRole} claw on this machine.`);
   if (others) {
     console.log(`  Other squad members will run: ${others}`);
   }

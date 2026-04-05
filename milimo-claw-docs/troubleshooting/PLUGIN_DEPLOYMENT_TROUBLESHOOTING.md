@@ -1,3 +1,9 @@
+> ⚠️ **DEPRECATED** — Resolved issues from the old deployment flow. No longer actionable.
+>
+> Kept for historical reference only.
+
+---
+
 # Milimo Claw Plugin Deployment Troubleshooting
 
 **Date:** 2026-03-27

@@ -1,6 +1,9 @@
+> ⚠️ **DEPRECATED** — Historical status report. All phases complete. See [README.md](../../README.md) for current state.
+
+---
 # NemoClaw Onboarding Investigation
 
-**Date:** 2026-03-19  
+**Date:** 2026-03-19
 **Purpose:** Understand NemoClaw's onboarding flow to design MilimoClaw's onboarding process
 
 ---
@@ -387,14 +390,14 @@ interface MilimoOnboardConfig {
   clawRole: ClawRole;
   template: string;
   solo: boolean;
-  
+
   // Mesh configuration
   meshMembers: string[];
   meshSecret?: string;
-  
+
   // Inference (inherits from NemoClaw)
   inferenceProfile: string;
-  
+
   // Timestamps
   initializedAt: string;
   onboardedAt: string;

@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — Historical status report. All phases complete. See [README.md](../../README.md) for current state.
+
+---
 # MilimoClaw Plugin Installation Investigation
 
 **Date:** 2026-03-27

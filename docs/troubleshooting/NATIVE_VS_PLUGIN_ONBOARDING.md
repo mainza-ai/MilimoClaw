@@ -1,3 +1,7 @@
+> ⚠️ **DEPRECATED** — We now use plugin onboarding exclusively. See [README.md](../README.md).
+
+---
+
 # Native vs Plugin Onboarding
 
 ## The Critical Difference

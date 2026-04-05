@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — Historical audit report. Kept for reference only.
+
+---
 # Milimo Claw Audit Documentation Index
 
 This index provides a comprehensive overview of all audit and verification activities for the Milimo Claw implementation.

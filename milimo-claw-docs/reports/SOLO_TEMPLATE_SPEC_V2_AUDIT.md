@@ -1,8 +1,11 @@
+> ⚠️ **DEPRECATED** — Historical status report. All phases complete. See [README.md](../../README.md) for current state.
+
+---
 # MILIMO_CLAW_SOLO_TEMPLATE_SPEC_V2.md — Code Audit Report
 
-**Audit Date:** 2026-03-22  
-**Auditor:** AI Assistant  
-**Spec Version:** v2 (742 lines)  
+**Audit Date:** 2026-03-22
+**Auditor:** AI Assistant
+**Spec Version:** v2 (742 lines)
 **Codebase Commit:** `5213c09`
 
 ---
@@ -53,16 +56,16 @@ This audit compares the current code implementation against `MILIMO_CLAW_SOLO_TE
 ### Spec Requirement
 
 > **Phase A — Verify Isolation and Shared Mount (before anything else)**
-> 
-> A1. Confirm all five sandbox filesystem mounts exist and are isolated  
-> A2. Write a test file to `/sandbox/analytics/reports/weekly-intelligence.json`  
-> A3. Confirm Content Claw can read the file from its sandbox  
-> A4. Confirm Ops Claw can read the file from its sandbox  
-> A5. Confirm Finance Claw can read the file from its sandbox  
-> A6. Confirm Build Claw can read the file from its sandbox  
-> A7. Confirm Content Claw CANNOT read `/sandbox/clients` (should fail)  
-> A8. Confirm Finance Claw CANNOT read `/sandbox/build` (should fail)  
-> 
+>
+> A1. Confirm all five sandbox filesystem mounts exist and are isolated
+> A2. Write a test file to `/sandbox/analytics/reports/weekly-intelligence.json`
+> A3. Confirm Content Claw can read the file from its sandbox
+> A4. Confirm Ops Claw can read the file from its sandbox
+> A5. Confirm Finance Claw can read the file from its sandbox
+> A6. Confirm Build Claw can read the file from its sandbox
+> A7. Confirm Content Claw CANNOT read `/sandbox/clients` (should fail)
+> A8. Confirm Finance Claw CANNOT read `/sandbox/build` (should fail)
+>
 > **Stop here if any of A1–A6 fails. Fix the mount configuration before proceeding.**
 
 ### Implementation Findings
@@ -111,7 +114,7 @@ Create a dedicated Phase A integration test file:
 ### Spec Requirement
 
 > **The Evolution Cycle schedule now has specific times with 5-minute gaps:**
-> 
+>
 > - Sunday 01:00 — Analytics Claw: baseline recalculation
 > - Sunday 02:00 — Analytics Claw: weekly intelligence report generated
 > - Sunday 02:05 — Content Claw: evolution cycle begins (reads fresh report)
@@ -178,7 +181,7 @@ evolution:
 ### Spec Requirement
 
 > **Eight rules, numbered, covering all the critical cross-claw constraints:**
-> 
+>
 > 1. **OPS → FINANCE sequencing:** `pricing_query` must be sent and `pricing_response` received BEFORE `project_brief` is sent to any creative claw.
 > 2. **FINANCE two-stage invoice:** Stage 1 REVIEW approve moves invoice to HOLD queue only. Stage 2 HOLD release is the only trigger for Stripe transmission.
 > 3. **BUILD two-stage PR + deploy:** PR REVIEW approve → HOLD (not merge). PR HOLD release → GitHub merge. Deploy stages automatically after merge. Deploy HOLD release → production deployment.
@@ -272,9 +275,9 @@ ANALYTICS_WAIT_SECONDS = 300  # 5 minutes
 ### Spec Requirement
 
 > **The one shared-read file:** `/sandbox/analytics/reports/weekly-intelligence.json`
-> 
+>
 > This is the only file in the entire mesh that all five claws can read directly without a message contract. It is written by the Analytics Claw every Sunday and mounted as read-only in every other claw's sandbox policy.
-> 
+>
 > **Verify this mount is configured in every claw's sandbox policy file. This is the most critical single configuration item in the solo template.**
 
 ### Implementation Findings
@@ -383,7 +386,7 @@ cost_guard:
 ### Spec Requirement
 
 > **Per-claw behavior during Deep Work Mode:**
-> 
+>
 > | Claw | Active behavior | Paused behavior |
 > |------|-----------------|-----------------|
 > | Content | Nothing | Draft generation, publishing |

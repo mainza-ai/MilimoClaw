@@ -1,3 +1,9 @@
+> ⚠️ **DEPRECATED** — This document describes the old k3s-based installation flow. Use the setup steps in [README.md](../README.md) instead.
+>
+> Kept for historical reference only. Do not follow these instructions.
+
+---
+
 # MilimoClaw Quick Start Guide
 
 > Get MilimoClaw running on macOS (Apple Silicon) with native NemoClaw onboarding.

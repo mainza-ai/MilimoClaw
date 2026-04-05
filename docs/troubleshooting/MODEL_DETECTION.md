@@ -1,3 +1,7 @@
+> ⚠️ **DEPRECATED** — Obsolete. Model detection is now handled by the privacy router.
+
+---
+
 # Model Detection in MilimoClaw
 
 ## Problem

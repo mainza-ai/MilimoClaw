@@ -1,3 +1,9 @@
+> ⚠️ **DEPRECATED** — Describes the old multi-laptop mesh setup. Use [README.md](../../README.md) instead.
+>
+> Kept for historical reference only.
+
+---
+
 # Milimo Claw — Squad Setup Guide
 
 > Step-by-step walkthrough for forming a squad and deploying your first claws.

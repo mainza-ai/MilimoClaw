@@ -1,3 +1,9 @@
+> ⚠️ **DEPRECATED** — Superseded by the setup steps in [README.md](../../README.md).
+>
+> Kept for historical reference only.
+
+---
+
 # MilimoClaw Complete Setup Guide
 
 > Documented: 2026-04-04 — Verified end-to-end sandbox deployment with fresh NemoClaw install

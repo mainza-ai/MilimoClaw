@@ -38,6 +38,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sudo \
     && rm -rf /var/lib/apt/lists/*
 
+# Install GitHub CLI (gh) — required by the OpenClaw GitHub skill
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt-get update && apt-get install -y gh \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install OpenShell CLI binary (from NVIDIA OpenShell releases)
 # This is the security sandbox runtime — provides Landlock, seccomp, netns.
 RUN ARCH=$(uname -m) && \
@@ -171,6 +178,9 @@ os.chmod(path, 0o600)"
 # Install Milimo plugin into OpenClaw (as the sandbox user)
 RUN openclaw doctor --fix > /dev/null 2>&1 || true \
     && openclaw plugins install /opt/milimo > /dev/null 2>&1 || true
+
+# Install OpenClaw GitHub skill (requires gh CLI)
+RUN openclaw skills install github > /dev/null 2>&1 || true
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

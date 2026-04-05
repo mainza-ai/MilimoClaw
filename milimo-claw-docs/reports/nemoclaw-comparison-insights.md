@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — Historical audit report. Kept for reference only.
+
+---
 # NemoClaw vs. MilimoClaw: Deep Comparison Analysis
 
 ## Executive Summary

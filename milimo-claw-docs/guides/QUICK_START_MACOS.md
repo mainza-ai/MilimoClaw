@@ -1,3 +1,9 @@
+> ⚠️ **DEPRECATED** — Superseded by the setup steps in [README.md](../../README.md). Use the NemocLaw-based flow instead.
+>
+> Kept for historical reference only.
+
+---
+
 # Milimo Claw — Quick Start Guide (macOS Docker)
 
 > Get Milimo Claw running on macOS using Docker with cloud inference.

@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — AI generation prompt. Not user documentation.
+
+---
 # MILIMO CLAW — BUILD CLAW IMPLEMENTATION PROMPT
 # ─────────────────────────────────────────────────────────────────────────────
 # Attach this prompt alongside:
@@ -175,7 +178,10 @@ REQUIRED_FILES = {
         "drift_pct": 0.0,
         "last_updated": None
     },
-    "docs/changelog.md": "# Changelog\n\nAll notable changes documented here.\n",
+    "docs/changelog.md": "# Changelog
+
+All notable changes documented here.
+",
     "logs/operational.log": None,      # JSONL — create empty
     "logs/pr-activity.log": None,
     "logs/deploy-activity.log": None,

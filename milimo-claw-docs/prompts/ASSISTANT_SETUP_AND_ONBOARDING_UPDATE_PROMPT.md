@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — AI generation prompt. Not user documentation.
+
+---
 # MILIMO CLAW — ASSISTANT SETUP + ONBOARDING WIZARD UPDATE PROMPT
 # ─────────────────────────────────────────────────────────────────────────────
 # Attach this prompt alongside:
@@ -152,7 +155,8 @@ def load_assistant_config() -> AssistantConfig:
     """
     if not MILIMO_CONFIG_PATH.exists():
         raise FileNotFoundError(
-            f"Milimo config not found at {MILIMO_CONFIG_PATH}\n"
+            f"Milimo config not found at {MILIMO_CONFIG_PATH}
+"
             "Run onboarding first: milimo onboard"
         )
 
@@ -161,7 +165,8 @@ def load_assistant_config() -> AssistantConfig:
     assistant = config.get("assistant", {})
     if not assistant.get("name"):
         raise ValueError(
-            "Assistant name not configured.\n"
+            "Assistant name not configured.
+"
             "Run onboarding to set your assistant's name: milimo onboard"
         )
 
@@ -190,7 +195,8 @@ def render_template(config: AssistantConfig) -> str:
     """
     if not TEMPLATE_PATH.exists():
         raise FileNotFoundError(
-            f"System prompt template not found at {TEMPLATE_PATH}\n"
+            f"System prompt template not found at {TEMPLATE_PATH}
+"
             "Ensure MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md is "
             "in milimo-claw-docs/reference/"
         )
@@ -374,7 +380,8 @@ function getAssistantConfig(): AssistantConfig | null {
 }
 
 export async function assistantSetup(): Promise<void> {
-  console.log("Setting up squad assistant...\n");
+  console.log("Setting up squad assistant...
+");
 
   const result = spawn("python3", [
     "milimo-blueprint/orchestrator/assistant_setup.py"
@@ -399,11 +406,13 @@ export async function assistantVerify(): Promise<void> {
       const assistant = getAssistantConfig();
       if (code === 0) {
         const name = assistant?.name ?? "your assistant";
-        console.log(`\n${name} setup is complete.`);
+        console.log(`
+${name} setup is complete.`);
         console.log("Start with: milimo assistant start");
         resolve();
       } else {
-        console.error("\nAssistant setup incomplete. Run: milimo assistant setup");
+        console.error("
+Assistant setup incomplete. Run: milimo assistant setup");
         reject(new Error("Assistant setup verification failed"));
       }
     });
@@ -422,7 +431,8 @@ export async function assistantStart(): Promise<void> {
   const name = assistant?.name ?? "your assistant";
   const emoji = assistant?.emoji ?? "🦀";
 
-  console.log(`Starting ${name}... ${emoji}\n`);
+  console.log(`Starting ${name}... ${emoji}
+`);
 
   const result = spawn("openclaw", ["agent", "--agent", "main"], {
     stdio: "inherit"
@@ -543,9 +553,11 @@ async function promptAssistantPersona(): Promise<{
   vibe: string;
   emoji: string;
 }> {
-  console.log("\n── Assistant Persona ─────────────────────────────────");
+  console.log("
+── Assistant Persona ─────────────────────────────────");
   console.log("Your squad assistant is your conversational interface to");
-  console.log("all your claws. Give it a name, a creature, and a vibe.\n");
+  console.log("all your claws. Give it a name, a creature, and a vibe.
+");
   console.log("Examples:");
   console.log('  Name: Nova  · Creature: a hawk   · Vibe: fast and precise  · 🦅');
   console.log('  Name: Rex   · Creature: a wolf   · Vibe: direct and loyal  · 🐺');
@@ -682,7 +694,8 @@ config is saved and directories created, automatically run assistant setup:
 ```typescript
 // After saving config.json...
 
-console.log("\nConfiguring squad assistant...");
+console.log("
+Configuring squad assistant...");
 try {
   await assistantSetup();  // from commands/assistant.ts
 } catch (err) {
@@ -827,7 +840,9 @@ if (isSolo) {
 
 } else {
   // Mesh mode: operator runs exactly one claw — role selection makes sense
-  console.log("\nMesh mode — which claw are you running on this machine?\n");
+  console.log("
+Mesh mode — which claw are you running on this machine?
+");
 
   const roleChoices = [
     { value: "content",   label: "content   — Creative output — posts, copy, campaigns, brand voice" },
@@ -846,7 +861,8 @@ if (isSolo) {
     default: availableRoles[0].value
   });
 
-  console.log(`\n✓ You are running the ${clawRole} claw on this machine.`);
+  console.log(`
+✓ You are running the ${clawRole} claw on this machine.`);
   console.log(
     `  Other squad members will run: ` +
     template.clawsActive.filter(c => c !== clawRole).join(", ")

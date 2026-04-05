@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — AI generation prompt. Not user documentation.
+
+---
 # MILIMO CLAW — SOLO TEMPLATE IMPROVEMENT PLAN IMPLEMENTATION PROMPT
 # ─────────────────────────────────────────────────────────────────────────────
 # Attach this prompt alongside:

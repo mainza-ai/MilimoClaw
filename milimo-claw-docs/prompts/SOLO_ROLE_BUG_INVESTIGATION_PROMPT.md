@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — AI generation prompt. Not user documentation.
+
+---
 # MILIMO CLAW — SOLO ROLE SELECTION BUG: ROOT CAUSE INVESTIGATION
 # ─────────────────────────────────────────────────────────────────────────────
 # The solo mode role selection fix has been written twice and neither
@@ -185,8 +188,10 @@ let clawRole: ClawRole;
 if (isSolo) {
   clawRole = "solo" as ClawRole;
   const activeClaws = selectedTemplate.clawsActive.join(" · ");
-  console.log(`\n✓ Solo mode — all claws will run on this machine:`);
-  console.log(`  ${activeClaws}\n`);
+  console.log(`
+✓ Solo mode — all claws will run on this machine:`);
+  console.log(`  ${activeClaws}
+`);
 } else {
   const roleChoices = [
     { value: "content",   title: "content   — Creative output — posts, copy, campaigns, brand voice" },
@@ -202,8 +207,10 @@ if (isSolo) {
   const others = selectedTemplate.clawsActive
     .filter(c => c !== clawRole)
     .join(", ");
-  console.log(`\n✓ You are running the ${clawRole} claw on this machine.`);
-  if (others) console.log(`  Other squad members will run: ${others}\n`);
+  console.log(`
+✓ You are running the ${clawRole} claw on this machine.`);
+  if (others) console.log(`  Other squad members will run: ${others}
+`);
 }
 ```
 

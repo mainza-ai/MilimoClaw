@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — Historical audit report. Kept for reference only.
+
+---
 # Milimo Claw Comprehensive Audit Report
 
 **Audit Period:** Phases 2–5

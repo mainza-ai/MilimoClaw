@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — Historical audit report. Kept for reference only.
+
+---
 # ANALYTICS CLAW IMPLEMENTATION AUDIT REPORT
 ## Date: 2026-03-21
 ## Status: ✅ COMPLETE - 199/199 TESTS PASSING (100%)

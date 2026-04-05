@@ -175,6 +175,19 @@ export CHAT_UI_URL PUBLIC_PORT
 fix_openclaw_config
 openclaw plugins install /opt/milimo >/dev/null 2>&1 || true
 
+# Configure GitHub CLI authentication if GITHUB_TOKEN is set
+if [ -n "${GITHUB_TOKEN:-}" ]; then
+  echo "[github] Configuring gh CLI authentication..."
+  gh auth login --with-token <<<"${GITHUB_TOKEN}" 2>/dev/null || true
+  gh auth status 2>/dev/null && echo "[github] gh CLI authenticated successfully" || echo "[github] gh CLI auth failed — check GITHUB_TOKEN"
+fi
+
+# Ensure OpenClaw GitHub skill is installed (runtime fallback)
+if ! openclaw skills list 2>/dev/null | grep -q github; then
+  echo "[github] Installing OpenClaw GitHub skill..."
+  openclaw skills install github 2>/dev/null || true
+fi
+
 if [ ${#MILIMO_CMD[@]} -gt 0 ]; then
   exec "${MILIMO_CMD[@]}"
 fi

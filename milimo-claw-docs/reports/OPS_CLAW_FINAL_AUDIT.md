@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — Historical audit report. Kept for reference only.
+
+---
 # OPS CLAW FINAL AUDIT REPORT
 ## Complete Implementation Review Against Spec
 

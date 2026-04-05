@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — Historical status report. All phases complete. See [README.md](../../README.md) for current state.
+
+---
 # Phase 3 Implementation Status Report
 
 **Date:** March 18, 2026

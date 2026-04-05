@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — AI generation prompt. Not user documentation.
+
+---
 # MILIMO CLAW — MASTER CODEBASE AUDIT AND COMPLETION PROMPT
 # ─────────────────────────────────────────────────────────────────────────────
 # Give this prompt to any AI coding assistant to perform a systematic audit

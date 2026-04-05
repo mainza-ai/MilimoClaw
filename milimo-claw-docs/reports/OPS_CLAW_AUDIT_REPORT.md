@@ -1,9 +1,12 @@
+> ⚠️ **DEPRECATED** — Historical audit report. Kept for reference only.
+
+---
 # OPS CLAW AUDIT REPORT
 ## Implementation Gap Analysis vs. MILIMO_CLAW_OPS_CLAW_SPEC.md
 
-**Audit Date:** 2026-03-21  
-**Implementation Date:** 2026-03-22  
-**Spec Location:** `milimo-claw-docs/reference/MILIMO_CLAW_OPS_CLAW_SPEC.md`  
+**Audit Date:** 2026-03-21
+**Implementation Date:** 2026-03-22
+**Spec Location:** `milimo-claw-docs/reference/MILIMO_CLAW_OPS_CLAW_SPEC.md`
 **Status:** ✅ **100% IMPLEMENTED**
 
 ---
@@ -59,7 +62,7 @@ The Ops Claw has been **fully implemented** following the specification in `MILI
 ### Phase 0: Contracts Fix ✅
 
 - [x] Added `pricing_query` schema to MESSAGE_TYPE_SCHEMAS
-- [x] Added `client_onboarded` schema to MESSAGE_TYPE_SCHEMAS  
+- [x] Added `client_onboarded` schema to MESSAGE_TYPE_SCHEMAS
 - [x] Updated `client_health_signal` to include "ops" in sender_roles
 - [x] Added `client_health_signal_ops` for Analytics → Ops routing
 
@@ -245,5 +248,5 @@ The implementation follows the Finance Claw pattern and adheres to all standards
 
 ---
 
-*Implementation completed: 2026-03-22*  
+*Implementation completed: 2026-03-22*
 *Per: OPS_CLAW_IMPLEMENTATION_PROMPT.md*

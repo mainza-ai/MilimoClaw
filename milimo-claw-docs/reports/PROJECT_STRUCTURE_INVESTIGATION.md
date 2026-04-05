@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — Historical status report. All phases complete. See [README.md](../../README.md) for current state.
+
+---
 # Project Structure Investigation Report
 
 **Date:** March 2026

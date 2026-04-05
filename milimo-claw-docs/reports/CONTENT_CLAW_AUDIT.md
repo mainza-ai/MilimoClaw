@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — Historical audit report. Kept for reference only.
+
+---
 # Content Claw Implementation Audit Report
 # Generated: 2026-03-21
 # Updated: 2026-03-21 (Post-Fix)

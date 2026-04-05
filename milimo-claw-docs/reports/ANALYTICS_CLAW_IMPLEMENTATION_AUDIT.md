@@ -1,8 +1,11 @@
+> ⚠️ **DEPRECATED** — Historical audit report. Kept for reference only.
+
+---
 # ANALYTICS CLAW IMPLEMENTATION AUDIT
 ## Milimo Claw — Comprehensive Gap Analysis
 
-**Date:** 2026-03-21  
-**Auditor:** AI Implementation Review  
+**Date:** 2026-03-21
+**Auditor:** AI Implementation Review
 **Spec Document:** milimo-claw-docs/reference/MILIMO_CLAW_ANALYTICS_CLAW_SPEC.md
 
 ---

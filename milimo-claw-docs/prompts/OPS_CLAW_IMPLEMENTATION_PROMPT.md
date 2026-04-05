@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — AI generation prompt. Not user documentation.
+
+---
 # MILIMO CLAW — OPS CLAW IMPLEMENTATION PROMPT
 # ─────────────────────────────────────────────────────────────────────────────
 # Attach this prompt alongside:
@@ -188,39 +191,78 @@ REQUIRED_DIRS = [
 
 REQUIRED_TEMPLATE_FILES = {
     "templates/welcome-message.md": (
-        "Hi {{client_name}},\n\nThank you for reaching out to {{squad_name}}. "
-        "We'd love to learn more about your project.\n\n"
-        "Could you tell us a bit more about what you're looking for?\n\n"
-        "Best,\n{{squad_name}}"
+        "Hi {{client_name}},
+
+Thank you for reaching out to {{squad_name}}. "
+        "We'd love to learn more about your project.
+
+"
+        "Could you tell us a bit more about what you're looking for?
+
+"
+        "Best,
+{{squad_name}}"
     ),
     "templates/intake-questionnaire.md": (
-        "## Project Brief\n\n"
-        "1. What is the goal of this project?\n"
-        "2. What is your target timeline/deadline?\n"
-        "3. What does success look like to you?\n"
-        "4. Do you have any existing brand guidelines or references?\n"
+        "## Project Brief
+
+"
+        "1. What is the goal of this project?
+"
+        "2. What is your target timeline/deadline?
+"
+        "3. What does success look like to you?
+"
+        "4. Do you have any existing brand guidelines or references?
+"
         "5. What is your approximate budget range?"
     ),
     "templates/proposal-template.md": (
-        "## Proposal for {{project_name}}\n\n"
-        "**Scope:** {{scope_description}}\n\n"
-        "**Timeline:** {{timeline}}\n\n"
-        "**Investment:** {{price_range}}\n\n"
-        "**Deliverables:**\n{{deliverables}}"
+        "## Proposal for {{project_name}}
+
+"
+        "**Scope:** {{scope_description}}
+
+"
+        "**Timeline:** {{timeline}}
+
+"
+        "**Investment:** {{price_range}}
+
+"
+        "**Deliverables:**
+{{deliverables}}"
     ),
     "templates/change-order-template.md": (
-        "## Change Order Request\n\n"
-        "**Original Scope:** {{original_scope}}\n\n"
-        "**Requested Addition:** {{new_request}}\n\n"
-        "**Additional Investment:** {{additional_cost}}\n\n"
+        "## Change Order Request
+
+"
+        "**Original Scope:** {{original_scope}}
+
+"
+        "**Requested Addition:** {{new_request}}
+
+"
+        "**Additional Investment:** {{additional_cost}}
+
+"
         "**Revised Timeline:** {{revised_timeline}}"
     ),
     "templates/delivery-message.md": (
-        "Hi {{client_name}},\n\n"
-        "Your project is complete! Here's what we delivered:\n\n"
-        "{{deliverables_summary}}\n\n"
-        "Please review and let us know if you have any questions.\n\n"
-        "Best,\n{{squad_name}}"
+        "Hi {{client_name}},
+
+"
+        "Your project is complete! Here's what we delivered:
+
+"
+        "{{deliverables_summary}}
+
+"
+        "Please review and let us know if you have any questions.
+
+"
+        "Best,
+{{squad_name}}"
     ),
     "templates/deep-work-response.md": (
         "Hey {{client_name}}, I'm heads-down on a focused sprint until "

@@ -1,3 +1,7 @@
+> ⚠️ **DEPRECATED** — Obsolete DGX Spark install notes. No longer relevant.
+
+---
+
 # NemoClaw on DGX Spark
 
 > **WIP** — This page is actively being updated as we work through Spark installs. Expect changes.

@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — AI generation prompt. Not user documentation.
+
+---
 # MILIMO CLAW — SOLO TEMPLATE V2 AUDIT REMEDIATION PROMPT
 # ─────────────────────────────────────────────────────────────────────────────
 # Attach this prompt alongside:
@@ -416,8 +419,10 @@ def _read_report_as_claw(claw_role: str, report_path: Path) -> dict:
 
     assert declared, (
         f"{claw_role} sandbox policy does not declare read access to "
-        f"{report_path}.\n"
-        f"Declared read_only mounts: {read_only_mounts}\n"
+        f"{report_path}.
+"
+        f"Declared read_only mounts: {read_only_mounts}
+"
         f"Fix: add the shared_read entry to "
         f"policies/{claw_role}-sandbox.yaml"
     )
@@ -496,8 +501,10 @@ def _assert_cross_sandbox_read_blocked(
             continue   # This cross-mount is intentional and expected
         assert not blocked_str.startswith(mount), (
             f"ISOLATION VIOLATION: {reading_claw} has access to {blocked_path} "
-            f"via mount {mount}.\n"
-            f"This claw should NOT be able to read this path.\n"
+            f"via mount {mount}.
+"
+            f"This claw should NOT be able to read this path.
+"
             f"Fix: remove the mount entry from "
             f"policies/{reading_claw}-sandbox.yaml"
         )
@@ -1093,12 +1100,17 @@ def _apply_lighter_prompt_strategy(
     for marker in TRIM_MARKERS:
         if marker in trimmed:
             idx = trimmed.index(marker)
-            next_section = trimmed.find("\n\n", idx + len(marker) + 200)
+            next_section = trimmed.find("
+
+", idx + len(marker) + 200)
             if next_section != -1:
                 # Keep first 200 chars of context section, cut the rest
                 trimmed = (
                     trimmed[:idx + len(marker) + 200] +
-                    "\n[context trimmed — cost guard active]\n\n" +
+                    "
+[context trimmed — cost guard active]
+
+" +
                     trimmed[next_section:]
                 )
 

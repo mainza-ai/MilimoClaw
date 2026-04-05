@@ -1,6 +1,9 @@
+> ⚠️ **DEPRECATED** — Historical status report. All phases complete. See [README.md](../../README.md) for current state.
+
+---
 # MilimoClaw Onboarding Implementation
 
-**Date:** 2026-03-19  
+**Date:** 2026-03-19
 **Status:** Implemented
 
 ---

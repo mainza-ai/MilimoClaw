@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — Historical status report. All phases complete. See [README.md](../../README.md) for current state.
+
+---
 # Phase 5: Blueprint Economy - Status Report
 
 **Date:** March 18, 2026

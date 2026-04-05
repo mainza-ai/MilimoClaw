@@ -1,3 +1,9 @@
+> ⚠️ **DEPRECATED** — Old deploy commands from the k3s-based flow. Use [README.md](../../README.md) instead.
+>
+> Kept for historical reference only.
+
+---
+
 # Quick Reference: Deploy Plugin to Sandbox
 
 **Last Updated:** 2026-03-27
