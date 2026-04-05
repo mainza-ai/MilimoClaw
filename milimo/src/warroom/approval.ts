@@ -35,7 +35,12 @@ export class ApprovalEngine {
 
   constructor(squadId: string, tier: string = 'free') {
     const home = process.env.HOME || process.env.USERPROFILE || homedir() || '/tmp';
-    this.meshDir = join(home, '.milimo', 'mesh');
+    // Mesh data directory — supports both host and container environments
+    // Container: /sandbox/.milimo/mesh/ (Path.home() in Python)
+    // Host: ~/.milimo/mesh/
+    const sandboxMesh = join('/sandbox', '.milimo', 'mesh');
+    const homeMesh = join(home, '.milimo', 'mesh');
+    this.meshDir = existsSync(sandboxMesh) ? sandboxMesh : homeMesh;
     this.warRoomInbox = join(this.meshDir, 'inbox', 'war_room');
     this.audit = new AuditLogger(squadId);
     this.tier = getTierFromString(tier);
@@ -50,28 +55,34 @@ export class ApprovalEngine {
     this.loadEscalationRules();
   }
 
-        private loadEscalationRules() {
-                try {
-                        const configPath = join(process.cwd(), 'milimo-blueprint', 'mesh_config.yaml');
-                        if (!existsSync(configPath)) {
-                                throw new Error('Config not found');
-                        }
-                        const content = readFileSync(configPath, 'utf8');
-                        const config = yamlParse(content);
-                        if (config && config.escalation_rules) {
-                                this.escalationRules = config.escalation_rules.map((rule: any) => ({
-                                        trigger: rule.trigger,
-                                        action: rule.action.toUpperCase() as ApprovalMode,
-                                        description: rule.description,
-                                }));
-                        }
-                } catch (e) {
-                        console.warn('Failed to load escalation rules from mesh_config.yaml. Using defaults.');
-                        this.escalationRules = [
-                                { trigger: 'invoice_over_500', action: 'VETO', description: 'Any invoice >$500 requires squad-wide approval' }
-                        ];
-                }
-        }
+  private loadEscalationRules() {
+    try {
+      // Try multiple locations: host, container blueprint, container sandbox
+      const candidates = [
+        join(process.cwd(), 'milimo-blueprint', 'mesh_config.yaml'),
+        join('/sandbox', '.milimo', 'blueprints', '0.1.0', 'mesh_config.yaml'),
+        join(process.cwd(), 'mesh_config.yaml'),
+      ];
+      const configPath = candidates.find(p => existsSync(p));
+      if (!configPath) {
+        throw new Error('Config not found');
+      }
+      const content = readFileSync(configPath, 'utf8');
+      const config = yamlParse(content);
+      if (config && config.escalation_rules) {
+        this.escalationRules = config.escalation_rules.map((rule: any) => ({
+          trigger: rule.trigger,
+          action: rule.action.toUpperCase() as ApprovalMode,
+          description: rule.description,
+        }));
+      }
+    } catch (e) {
+      console.warn('Failed to load escalation rules from mesh_config.yaml. Using defaults.');
+      this.escalationRules = [
+        { trigger: 'invoice_over_500', action: 'VETO', description: 'Any invoice >$500 requires squad-wide approval' }
+      ];
+    }
+  }
 
   public getPendingMessages(): PendingMessage[] {
     try {

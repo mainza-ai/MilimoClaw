@@ -332,7 +332,11 @@ class MeshCoordinator:
         # 3. Check if approval is required
         needs_approval = self._validator.requires_approval(message.message_type)
 
-        # 4. Send via gateway if connected, otherwise use file-based
+        # 4. If approval is required, route to War Room first
+        if needs_approval and message.recipient_role != "war_room":
+            return self._route_to_warroom(message)
+
+        # 5. Send via gateway if connected, otherwise use file-based
         if self._gateway and self._gateway.state == ConnectionState.CONNECTED:
             return self._send_via_gateway(message, needs_approval)
         else:
@@ -457,6 +461,44 @@ class MeshCoordinator:
         return True
 
     # ── Internals ─────────────────────────────────────────────────────
+
+    def _route_to_warroom(self, message: ClawMessage) -> DeliveryResult:
+        """Route a message to the War Room inbox for operator approval.
+
+        The message is written to the war_room inbox with metadata about
+        the original intended recipient. After operator approval, the
+        ApprovalEngine moves it to the actual claw inbox.
+        """
+        # Create a war_room-wrapped message that preserves original routing info
+        warroom_msg = {
+            "message_id": message.message_id,
+            "sender_role": message.sender_role,
+            "recipient_role": message.recipient_role,
+            "message_type": message.message_type,
+            "payload": message.payload,
+            "squad_id": message.squad_id,
+            "timestamp": message.timestamp,
+            "needs_approval": True,
+        }
+
+        target = self._mesh_dir / "inbox" / "war_room"
+        target.mkdir(parents=True, exist_ok=True)
+        filename = f"{message.timestamp.replace(':', '-')}_{message.message_id}.json"
+        (target / filename).write_text(json.dumps(warroom_msg, indent=2))
+
+        logger.info(
+            "Message %s routed to War Room for approval "
+            "(original recipient: %s)",
+            message.message_id,
+            message.recipient_role,
+        )
+
+        return DeliveryResult(
+            delivered=True,
+            reason="Message routed to War Room for operator approval",
+            message_id=message.message_id,
+            requires_approval=True,
+        )
 
     def _write_message(self, message: ClawMessage, needs_approval: bool) -> None:
         """Write a message to the recipient's inbox."""

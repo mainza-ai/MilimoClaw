@@ -455,11 +455,27 @@ Press H to close this help.
 
 		try {
 			const home = process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
-			const registryPath = require("path").join(home, ".milimo", "tools", this.squadId, role, "registry.json");
+			// Support both host and container environments
+			const sandboxMesh = require("path").join("/sandbox", ".milimo");
+			const homeMesh = require("path").join(home, ".milimo");
+			const meshRoot = require("fs").existsSync(sandboxMesh) ? sandboxMesh : homeMesh;
+			const registryPath = require("path").join(meshRoot, "tools", this.squadId, role, "registry.json");
 			if (require("fs").existsSync(registryPath)) {
 				const data = JSON.parse(require("fs").readFileSync(registryPath, "utf-8"));
 				status.tools = Object.keys(data.tools ?? {}).length;
 				status.status = status.tools > 0 ? "active" : "idle";
+			}
+
+			// Also check heartbeats for live status
+			const heartbeatPath = require("path").join(meshRoot, "mesh", "heartbeats", `${role}.json`);
+			if (require("fs").existsSync(heartbeatPath)) {
+				const hb = JSON.parse(require("fs").readFileSync(heartbeatPath, "utf-8"));
+				const lastBeat = new Date(hb.timestamp).getTime();
+				const now = Date.now();
+				if (now - lastBeat < 60000) {
+					status.status = "active";
+					status.lastCycle = hb.timestamp;
+				}
 			}
 		} catch {
 			status.status = "error";
@@ -570,7 +586,11 @@ Press H to close this help.
   private fetchRevenueData(): void {
     try {
       const home = process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
-      const summaryPath = require("path").join(home, ".milimo", "finance", "revenue", "weekly_summary.json");
+      // Support both host and container environments
+      const sandboxMesh = require("path").join("/sandbox", ".milimo");
+      const homeMesh = require("path").join(home, ".milimo");
+      const meshRoot = require("fs").existsSync(sandboxMesh) ? sandboxMesh : homeMesh;
+      const summaryPath = require("path").join(meshRoot, "finance", "revenue", "weekly_summary.json");
 
       if (require("fs").existsSync(summaryPath)) {
         const data = JSON.parse(require("fs").readFileSync(summaryPath, "utf-8"));

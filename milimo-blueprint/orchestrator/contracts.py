@@ -40,6 +40,9 @@ logger = logging.getLogger("milimo.contracts")
 
 # Valid claw roles
 VALID_ROLES = {"content", "ops", "analytics", "finance", "build"}
+# Assistant is a valid sender but not a claw role
+ASSISTANT_ROLE = "assistant"
+VALID_SENDERS = VALID_ROLES | {ASSISTANT_ROLE}
 # War room is a valid recipient but not a sender role
 VALID_RECIPIENTS = VALID_ROLES | {"war_room"}
 
@@ -89,6 +92,10 @@ VALID_MESSAGE_TYPES = {
     "tool_proposal",
     # Finance → War Room: Overdue payment alert
     "overdue_alert",
+    # Assistant message types
+    "assistant_query",
+    "assistant_task",
+    "assistant_response",
 }
 
 # Message types that require War Room approval (AUTO priority by default)
@@ -398,6 +405,33 @@ MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
         "frequency": "on_event",
         "priority": "REVIEW",
     },
+    # Assistant → Any Claw: Query (read-only status request)
+    "assistant_query": {
+        "sender_roles": ["assistant"],
+        "recipient_roles": ["content", "ops", "analytics", "finance", "build"],
+        "required_payload": ["query"],
+        "optional_payload": ["context", "priority_hint"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Assistant → Any Claw: Task assignment (requires operator approval)
+    "assistant_task": {
+        "sender_roles": ["assistant"],
+        "recipient_roles": ["content", "ops", "analytics", "finance", "build"],
+        "required_payload": ["task_description", "deadline"],
+        "optional_payload": ["context", "priority_hint", "attachments"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    # Claw → Assistant: Response to assistant query
+    "assistant_response": {
+        "sender_roles": ["content", "ops", "analytics", "finance", "build"],
+        "recipient_roles": ["war_room"],
+        "required_payload": ["query_id", "response"],
+        "optional_payload": ["data", "confidence", "generated_at"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
 }
 
 
@@ -564,10 +598,10 @@ class ContractValidator:
         all checks, or valid=False with a reason explaining the rejection.
         """
         # 1. Validate sender role
-        if message.sender_role not in VALID_ROLES:
+        if message.sender_role not in VALID_SENDERS:
             return ValidationResult(
                 valid=False,
-                reason=f"Invalid sender role: '{message.sender_role}'. Must be one of: {', '.join(sorted(VALID_ROLES))}",
+                reason=f"Invalid sender role: '{message.sender_role}'. Must be one of: {', '.join(sorted(VALID_SENDERS))}",
                 message_id=message.message_id,
             )
 

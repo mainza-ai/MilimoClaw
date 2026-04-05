@@ -24,6 +24,7 @@ ENV_FILE="$PROJECT_ROOT/.env"
 if [ -f "$ENV_FILE" ]; then
   echo -e "${GREEN}Loading environment from .env file...${NC}"
   set -a
+  # shellcheck source=/dev/null
   source "$ENV_FILE"
   set +a
 else
@@ -57,6 +58,7 @@ echo -e "${GREEN}Starting MilimoClaw container...${NC}"
 docker run -d --name MilimoClaw \
   --entrypoint "/bin/sh" \
   -e NVIDIA_API_KEY="$NVIDIA_API_KEY" \
+  -e BUILD_CLAW_NVIDIA_API_KEY="$BUILD_CLAW_NVIDIA_API_KEY" \
   -e GITHUB_TOKEN="$GITHUB_TOKEN" \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v ~/.nemoclaw:/root/.nemoclaw \

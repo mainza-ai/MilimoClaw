@@ -16,7 +16,12 @@ class ApprovalEngine {
     tier = rate_limiter_1.Tier.FREE;
     constructor(squadId, tier = 'free') {
         const home = process.env.HOME || process.env.USERPROFILE || (0, os_1.homedir)() || '/tmp';
-        this.meshDir = (0, path_1.join)(home, '.milimo', 'mesh');
+        // Mesh data directory — supports both host and container environments
+        // Container: /sandbox/.milimo/mesh/ (Path.home() in Python)
+        // Host: ~/.milimo/mesh/
+        const sandboxMesh = (0, path_1.join)('/sandbox', '.milimo', 'mesh');
+        const homeMesh = (0, path_1.join)(home, '.milimo', 'mesh');
+        this.meshDir = (0, fs_1.existsSync)(sandboxMesh) ? sandboxMesh : homeMesh;
         this.warRoomInbox = (0, path_1.join)(this.meshDir, 'inbox', 'war_room');
         this.audit = new audit_1.AuditLogger(squadId);
         this.tier = (0, rate_limiter_1.getTierFromString)(tier);
@@ -31,8 +36,14 @@ class ApprovalEngine {
     }
     loadEscalationRules() {
         try {
-            const configPath = (0, path_1.join)(process.cwd(), 'milimo-blueprint', 'mesh_config.yaml');
-            if (!(0, fs_1.existsSync)(configPath)) {
+            // Try multiple locations: host, container blueprint, container sandbox
+            const candidates = [
+                (0, path_1.join)(process.cwd(), 'milimo-blueprint', 'mesh_config.yaml'),
+                (0, path_1.join)('/sandbox', '.milimo', 'blueprints', '0.1.0', 'mesh_config.yaml'),
+                (0, path_1.join)(process.cwd(), 'mesh_config.yaml'),
+            ];
+            const configPath = candidates.find(p => (0, fs_1.existsSync)(p));
+            if (!configPath) {
                 throw new Error('Config not found');
             }
             const content = (0, fs_1.readFileSync)(configPath, 'utf8');

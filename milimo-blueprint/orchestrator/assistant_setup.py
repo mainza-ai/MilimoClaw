@@ -27,6 +27,10 @@ from pathlib import Path
 
 import yaml
 
+# Blueprint base path — works in both Docker container and host installs
+# Container: /opt/milimo-blueprint, Host: milimo-blueprint/ (relative)
+BLUEPRINT_BASE = Path(__file__).resolve().parent.parent
+
 
 # Template search paths — tried in order
 _TEMPLATE_CANDIDATES = [

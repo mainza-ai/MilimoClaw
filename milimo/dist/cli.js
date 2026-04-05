@@ -139,8 +139,9 @@ function registerCliCommands(ctx, api) {
         .command("warroom")
         .description("Launch the War Room interactive operator dashboard")
         .option("-o, --operator <name>", "Override operator ID", "local-operator")
+        .option("--list", "List pending messages without TUI (non-interactive)")
         .action(async (opts) => {
-        await (0, warroom_js_1.cliWarRoom)({ operator: opts.operator, logger, pluginConfig });
+        await (0, warroom_js_1.cliWarRoom)({ operator: opts.operator, logger, pluginConfig, list: opts.list });
     });
     // ── openclaw milimo health ────────────────────────────────────────
     milimo

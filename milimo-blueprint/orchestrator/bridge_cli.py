@@ -264,14 +264,67 @@ def handle_marketplace_publish(args: dict[str, Any]) -> dict[str, Any]:
 
 
 def handle_mesh_flow_state(args: dict[str, Any]) -> dict[str, Any]:
-    """Get cross-claw mesh signal flow state."""
+    """Get cross-claw mesh signal flow state — live topology and pending messages."""
+    from pathlib import Path
+    from datetime import timedelta
+
     squad_id = args.get("squad", "default")
 
     try:
+        mesh_dir = Path.home() / ".milimo" / "mesh"
+        topology_file = mesh_dir / "topology.json"
+
+        # Load live topology
+        nodes: dict[str, Any] = {}
+        if topology_file.exists():
+            try:
+                topo_data = json.loads(topology_file.read_text())
+                nodes = topo_data.get("nodes", {})
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        # Count pending messages per claw
+        pending_counts: dict[str, int] = {}
+        total_pending = 0
+        if (mesh_dir / "inbox").exists():
+            for claw_dir in (mesh_dir / "inbox").iterdir():
+                if claw_dir.is_dir():
+                    count = len(list(claw_dir.glob("*.json")))
+                    pending_counts[claw_dir.name] = count
+                    total_pending += count
+
+        # Count delivered messages this week
+        delivered_this_week = 0
+        week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+        if (mesh_dir / "delivered").exists():
+            for msg_file in (mesh_dir / "delivered").glob("*.json"):
+                try:
+                    data = json.loads(msg_file.read_text())
+                    ts = data.get("timestamp", "")
+                    if ts:
+                        msg_dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                        if msg_dt > week_ago:
+                            delivered_this_week += 1
+                except (json.JSONDecodeError, OSError, ValueError):
+                    pass
+
+        # Build node status summary
+        node_summaries = {}
+        for role, node_data in nodes.items():
+            node_summaries[role] = {
+                "status": node_data.get("status", "unknown"),
+                "address": node_data.get("address", ""),
+                "last_heartbeat": node_data.get("last_heartbeat"),
+                "pending_messages": pending_counts.get(role, 0),
+            }
+
         return {
-            "signals": [],
-            "last_transmission": None,
-            "signal_count_this_week": 0,
+            "nodes": node_summaries,
+            "total_pending": total_pending,
+            "delivered_this_week": delivered_this_week,
+            "pending_by_claw": pending_counts,
+            "transport_mode": "file",  # Default; read from config if available
+            "last_updated": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
         logger.exception("Failed to get mesh flow state")
@@ -668,6 +721,581 @@ from datetime import datetime, timezone, timedelta
 # Command Registry
 # ---------------------------------------------------------------------------
 
+def handle_send_to_claw(args: dict[str, Any]) -> dict[str, Any]:
+    """Send a typed message from the assistant to a specific claw via the mesh.
+
+    The assistant (Lucy) uses this to instruct or query claws. All messages
+    are sent with REVIEW priority so the operator must approve before the
+    claw acts on them.
+    """
+    from .contracts import (
+        ClawMessage,
+        ContractValidator,
+        VALID_SENDERS,
+        VALID_RECIPIENTS,
+        VALID_MESSAGE_TYPES,
+        ASSISTANT_ROLE,
+    )
+    from .mesh import MeshCoordinator
+
+    recipient_role = args.get("role", "")
+    message_type = args.get("type", "")
+    payload = args.get("payload", {})
+    squad_id = args.get("squad_id", "default")
+
+    if not recipient_role:
+        raise RuntimeError("role is required (e.g., 'content', 'ops', 'analytics', 'finance', 'build')")
+    if not message_type:
+        raise RuntimeError("type is required (e.g., 'assistant_query', 'assistant_task')")
+
+    # Validate inputs
+    if ASSISTANT_ROLE not in VALID_SENDERS:
+        raise RuntimeError("Assistant role not configured as valid sender")
+    if recipient_role not in VALID_RECIPIENTS:
+        raise RuntimeError(f"Invalid recipient role: {recipient_role}")
+    if message_type not in VALID_MESSAGE_TYPES:
+        raise RuntimeError(f"Invalid message type: {message_type}")
+
+    # Build the message
+    message = ClawMessage(
+        sender_role=ASSISTANT_ROLE,
+        recipient_role=recipient_role,
+        message_type=message_type,
+        payload=payload,
+        squad_id=squad_id,
+    )
+
+    # Route through MeshCoordinator using the real mesh config
+    mesh_dir = Path.home() / ".milimo" / "mesh"
+    config_path = Path(__file__).parent.parent / "mesh_config.yaml"
+    if config_path.exists():
+        mesh = MeshCoordinator.from_config_file(
+            str(config_path), squad_id=squad_id, mesh_dir=str(mesh_dir)
+        )
+    else:
+        mesh = MeshCoordinator.from_dict({}, squad_id=squad_id, mesh_dir=str(mesh_dir))
+
+    # Register all known claws so the mesh knows who exists
+    for claw_role in ["content", "ops", "analytics", "finance", "build"]:
+        mesh.register_claw(claw_role, address=f"local://{claw_role}")
+
+    result = mesh.send_message(message)
+
+    return {
+        "delivered": result.delivered,
+        "message_id": result.message_id,
+        "reason": result.reason,
+        "requires_approval": result.requires_approval,
+        "recipient": recipient_role,
+        "message_type": message_type,
+    }
+
+
+def handle_claw_status(args: dict[str, Any]) -> dict[str, Any]:
+    """Get detailed status of a specific claw by reading its sandbox and health data."""
+    squad_id = args.get("squad_id", "default")
+    claw_role = args.get("role", "")
+
+    if not claw_role:
+        raise RuntimeError("role is required")
+    if claw_role not in {"content", "ops", "analytics", "finance", "build"}:
+        raise RuntimeError(f"Invalid claw role: {claw_role}")
+
+    home = Path.home()
+    result: dict[str, Any] = {"role": claw_role}
+
+    # Read health data
+    health_file = home / ".milimo" / "health" / squad_id / f"{claw_role}.json"
+    if health_file.exists():
+        try:
+            result["health"] = json.loads(health_file.read_text())
+        except (json.JSONDecodeError, OSError):
+            result["health"] = {"status": "unknown", "error": "failed to read health file"}
+    else:
+        result["health"] = {"status": "no_health_data"}
+
+    # Read tool registry
+    registry_file = home / ".milimo" / "tools" / squad_id / claw_role / "registry.json"
+    if registry_file.exists():
+        try:
+            reg_data = json.loads(registry_file.read_text())
+            tools = reg_data.get("tools", {})
+            result["tool_count"] = len(tools)
+            result["last_evolution"] = reg_data.get("last_evolution")
+        except (json.JSONDecodeError, OSError):
+            result["tool_count"] = 0
+    else:
+        result["tool_count"] = 0
+
+    # Read pending messages for this claw
+    mesh_dir = home / ".milimo" / "mesh"
+    inbox = mesh_dir / "inbox" / claw_role
+    if inbox.exists():
+        pending = []
+        for msg_file in sorted(inbox.glob("*.json")):
+            try:
+                msg = json.loads(msg_file.read_text())
+                pending.append({
+                    "message_id": msg.get("message_id"),
+                    "sender": msg.get("sender_role"),
+                    "type": msg.get("message_type"),
+                    "timestamp": msg.get("timestamp"),
+                })
+            except (json.JSONDecodeError, OSError):
+                pass
+        result["pending_messages"] = pending
+    else:
+        result["pending_messages"] = []
+
+    # Read sandbox status (check if sandbox directory exists)
+    sandbox_path = Path(f"/sandbox/{claw_role}")
+    result["sandbox_exists"] = sandbox_path.exists()
+    if sandbox_path.exists():
+        try:
+            result["sandbox_contents"] = [
+                d.name for d in sandbox_path.iterdir() if d.is_dir()
+            ]
+        except OSError:
+            result["sandbox_contents"] = []
+
+    return result
+
+
+def handle_ops_active_projects(args: dict[str, Any]) -> dict[str, Any]:
+    """List active client projects from the Ops claw sandbox."""
+    sandbox = Path("/sandbox/clients")
+    result: dict[str, Any] = {"projects": [], "sandbox_exists": sandbox.exists()}
+
+    if not sandbox.exists():
+        result["note"] = "Ops sandbox not initialized. Run build_init to create /sandbox/clients/"
+        return result
+
+    # Look for client/project files
+    for client_dir in sorted(sandbox.iterdir()):
+        if client_dir.is_dir():
+            client_data: dict[str, Any] = {"name": client_dir.name, "projects": []}
+            for project_file in client_dir.glob("*.json"):
+                try:
+                    data = json.loads(project_file.read_text())
+                    client_data["projects"].append({
+                        "id": data.get("project_id", project_file.stem),
+                        "status": data.get("status", "unknown"),
+                        "client_id": data.get("client_id"),
+                    })
+                except (json.JSONDecodeError, OSError):
+                    pass
+            result["projects"].append(client_data)
+
+    # Also check for flat project files
+    for project_file in sorted(sandbox.glob("*.json")):
+        try:
+            data = json.loads(project_file.read_text())
+            result["projects"].append({
+                "id": data.get("project_id", project_file.stem),
+                "status": data.get("status", "unknown"),
+                "client_id": data.get("client_id"),
+            })
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    return result
+
+
+def handle_content_pending_drafts(args: dict[str, Any]) -> dict[str, Any]:
+    """List pending content drafts from the Content claw sandbox."""
+    sandbox = Path("/sandbox/content")
+    result: dict[str, Any] = {"drafts": [], "sandbox_exists": sandbox.exists()}
+
+    if not sandbox.exists():
+        result["note"] = "Content sandbox not initialized."
+        return result
+
+    # Check data directory for draft files
+    data_dir = sandbox / "data"
+    if data_dir.exists():
+        for draft_file in sorted(data_dir.glob("*.json")):
+            try:
+                data = json.loads(draft_file.read_text())
+                result["drafts"].append({
+                    "id": data.get("draft_id", draft_file.stem),
+                    "status": data.get("status", "unknown"),
+                    "platform": data.get("platform"),
+                    "content_type": data.get("content_type"),
+                    "client_id": data.get("client_id"),
+                })
+            except (json.JSONDecodeError, OSError):
+                pass
+
+    # Also check for draft files directly in sandbox
+    for draft_file in sorted(sandbox.glob("*.json")):
+        try:
+            data = json.loads(draft_file.read_text())
+            if "draft" in draft_file.stem.lower() or "content" in draft_file.stem.lower():
+                result["drafts"].append({
+                    "id": data.get("draft_id", draft_file.stem),
+                    "status": data.get("status", "unknown"),
+                })
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    return result
+
+
+def handle_build_open_prs(args: dict[str, Any]) -> dict[str, Any]:
+    """List open PRs from the Build claw using the gh CLI."""
+    import subprocess
+
+    result: dict[str, Any] = {"prs": [], "gh_available": False}
+
+    # Check if gh CLI is available
+    try:
+        gh_check = subprocess.run(
+            ["gh", "--version"], capture_output=True, text=True, timeout=5
+        )
+        result["gh_available"] = gh_check.returncode == 0
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        result["gh_available"] = False
+        result["note"] = "gh CLI not available. Install with: brew install gh"
+        return result
+
+    # Fetch open PRs
+    try:
+        pr_output = subprocess.run(
+            ["gh", "pr", "list", "--state", "open", "--json",
+             "number,title,author,createdAt,updatedAt,labels,url"],
+            capture_output=True, text=True, timeout=30
+        )
+        if pr_output.returncode == 0:
+            result["prs"] = json.loads(pr_output.stdout)
+        else:
+            result["error"] = pr_output.stderr.strip()
+    except subprocess.TimeoutExpired:
+        result["error"] = "gh pr list timed out"
+    except (json.JSONDecodeError, OSError) as e:
+        result["error"] = str(e)
+
+    return result
+
+
+def handle_analytics_latest_report_summary(args: dict[str, Any]) -> dict[str, Any]:
+    """Summarize the latest intelligence report from the Analytics claw."""
+    reports_dir = Path("/sandbox/analytics/reports")
+    result: dict[str, Any] = {"report": None, "reports_found": [], "reports_dir_exists": reports_dir.exists()}
+
+    if not reports_dir.exists():
+        result["note"] = "Analytics reports directory not found."
+        return result
+
+    # Find the latest report files
+    report_files = sorted(reports_dir.glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
+
+    for rf in report_files[:10]:
+        result["reports_found"].append({
+            "filename": rf.name,
+            "modified": datetime.fromtimestamp(rf.stat().st_mtime, tz=timezone.utc).isoformat(),
+            "size_bytes": rf.stat().st_size,
+        })
+
+    # Read the latest report
+    if report_files:
+        latest = report_files[0]
+        try:
+            data = json.loads(latest.read_text())
+            result["report"] = {
+                "filename": latest.name,
+                "content": data,
+            }
+        except (json.JSONDecodeError, OSError) as e:
+            result["report"] = {"filename": latest.name, "error": str(e)}
+
+    return result
+
+
+def handle_generate_sprint_plan(args: dict[str, Any]) -> dict[str, Any]:
+    """Trigger sprint plan generation by writing to the Build claw's sprint context."""
+    from .build.build_init import BuildFilesystemInit
+
+    result: dict[str, Any] = {"status": "pending", "plan_path": ""}
+
+    # Ensure build sandbox exists
+    build_base = Path("/sandbox/build")
+    if not build_base.exists():
+        init_result = BuildFilesystemInit().initialize()
+        result["sandbox_init"] = {
+            "created_dirs": init_result.created_dirs,
+            "failed": init_result.failed,
+        }
+        if init_result.failed:
+            result["status"] = "error"
+            result["error"] = f"Sandbox init failed: {init_result.failed}"
+            return result
+
+    # Write a sprint plan request file
+    sprint_dir = build_base / "context" / "sprint"
+    sprint_dir.mkdir(parents=True, exist_ok=True)
+
+    plan_request = {
+        "requested_at": datetime.now(timezone.utc).isoformat(),
+        "requested_by": "assistant",
+        "status": "pending",
+        "instructions": args.get("instructions", "Generate sprint plan from current backlog"),
+        "backlog_source": args.get("backlog_source", "github_issues"),
+    }
+
+    plan_file = sprint_dir / "sprint-plan-request.json"
+    plan_file.write_text(json.dumps(plan_request, indent=2))
+    result["plan_path"] = str(plan_file)
+    result["status"] = "request_written"
+
+    return result
+
+
+def handle_run_opportunity_scoring(args: dict[str, Any]) -> dict[str, Any]:
+    """Trigger opportunity scoring by writing to the Analytics claw's context."""
+    sandbox = Path("/sandbox/analytics")
+    result: dict[str, Any] = {"status": "pending", "request_path": ""}
+
+    if not sandbox.exists():
+        result["note"] = "Analytics sandbox not initialized."
+        return result
+
+    context_dir = sandbox / "context"
+    context_dir.mkdir(parents=True, exist_ok=True)
+
+    scoring_request = {
+        "requested_at": datetime.now(timezone.utc).isoformat(),
+        "requested_by": "assistant",
+        "status": "pending",
+        "criteria": args.get("criteria", ["revenue_potential", "client_fit", "effort_estimate"]),
+        "scope": args.get("scope", "all_opportunities"),
+    }
+
+    request_file = context_dir / "opportunity-scoring-request.json"
+    request_file.write_text(json.dumps(scoring_request, indent=2))
+    result["request_path"] = str(request_file)
+    result["status"] = "request_written"
+
+    return result
+
+
+def handle_generate_weekly_report(args: dict[str, Any]) -> dict[str, Any]:
+    """Generate a weekly report by aggregating data from all claws."""
+    squad_id = args.get("squad_id", "default")
+    week_start = args.get("week_start")
+
+    report: dict[str, Any] = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "week_start": week_start or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "claws": {},
+    }
+
+    # Aggregate from each claw
+    for role in ["content", "ops", "analytics", "finance", "build"]:
+        claw_info: dict[str, Any] = {"role": role}
+
+        # Tool count
+        registry_file = Path.home() / ".milimo" / "tools" / squad_id / role / "registry.json"
+        if registry_file.exists():
+            try:
+                reg_data = json.loads(registry_file.read_text())
+                claw_info["tool_count"] = len(reg_data.get("tools", {}))
+                claw_info["last_evolution"] = reg_data.get("last_evolution")
+            except (json.JSONDecodeError, OSError):
+                claw_info["tool_count"] = 0
+        else:
+            claw_info["tool_count"] = 0
+
+        # Health status
+        health_file = Path.home() / ".milimo" / "health" / squad_id / f"{role}.json"
+        if health_file.exists():
+            try:
+                claw_info["health"] = json.loads(health_file.read_text())
+            except (json.JSONDecodeError, OSError):
+                claw_info["health"] = "unreadable"
+        else:
+            claw_info["health"] = "no_data"
+
+        # Pending messages
+        inbox = Path.home() / ".milimo" / "mesh" / "inbox" / role
+        if inbox.exists():
+            claw_info["pending_messages"] = len(list(inbox.glob("*.json")))
+        else:
+            claw_info["pending_messages"] = 0
+
+        report["claws"][role] = claw_info
+
+    # Write report to analytics reports directory
+    reports_dir = Path("/sandbox/analytics/reports")
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    report_file = reports_dir / f"weekly-report-{report['week_start']}.json"
+    report_file.write_text(json.dumps(report, indent=2))
+    report["report_path"] = str(report_file)
+
+    return report
+
+
+def handle_check_all_deadlines(args: dict[str, Any]) -> dict[str, Any]:
+    """Check deadlines across all claws."""
+    result: dict[str, Any] = {"checked_at": datetime.now(timezone.utc).isoformat(), "deadlines": []}
+    now = datetime.now(timezone.utc)
+
+    # Check Build claw sprint deadlines
+    sprint_plan = Path("/sandbox/build/context/sprint/current-plan.json")
+    if sprint_plan.exists():
+        try:
+            data = json.loads(sprint_plan.read_text())
+            if data.get("status") != "empty" and data.get("deadline"):
+                deadline = datetime.fromisoformat(data["deadline"])
+                result["deadlines"].append({
+                    "claw": "build",
+                    "type": "sprint",
+                    "deadline": data["deadline"],
+                    "days_remaining": (deadline - now).days,
+                    "status": "upcoming" if deadline > now else "overdue",
+                })
+        except (json.JSONDecodeError, OSError, ValueError):
+            pass
+
+    # Check Content claw draft deadlines
+    content_data = Path("/sandbox/content/data")
+    if content_data.exists():
+        for draft_file in content_data.glob("*.json"):
+            try:
+                data = json.loads(draft_file.read_text())
+                if data.get("deadline"):
+                    deadline = datetime.fromisoformat(data["deadline"])
+                    result["deadlines"].append({
+                        "claw": "content",
+                        "type": "draft",
+                        "draft_id": data.get("draft_id", draft_file.stem),
+                        "deadline": data["deadline"],
+                        "days_remaining": (deadline - now).days,
+                        "status": "upcoming" if deadline > now else "overdue",
+                    })
+            except (json.JSONDecodeError, OSError, ValueError):
+                pass
+
+    # Check Ops claw project deadlines
+    ops_data = Path("/sandbox/clients")
+    if ops_data.exists():
+        for project_file in ops_data.glob("*.json"):
+            try:
+                data = json.loads(project_file.read_text())
+                if data.get("deadline"):
+                    deadline = datetime.fromisoformat(data["deadline"])
+                    result["deadlines"].append({
+                        "claw": "ops",
+                        "type": "project",
+                        "project_id": data.get("project_id", project_file.stem),
+                        "deadline": data["deadline"],
+                        "days_remaining": (deadline - now).days,
+                        "status": "upcoming" if deadline > now else "overdue",
+                    })
+            except (json.JSONDecodeError, OSError, ValueError):
+                pass
+
+    # Sort by urgency
+    result["deadlines"].sort(key=lambda d: d.get("days_remaining", 999))
+    result["total_deadlines"] = len(result["deadlines"])
+    result["overdue_count"] = sum(1 for d in result["deadlines"] if d["status"] == "overdue")
+
+    return result
+
+
+def handle_run_dependency_audit(args: dict[str, Any]) -> dict[str, Any]:
+    """Run a dependency audit on the Build claw's repo."""
+    import subprocess
+
+    result: dict[str, Any] = {"status": "pending", "audit_path": ""}
+
+    repo_path = Path("/sandbox/build/repo")
+    if not repo_path.exists():
+        result["note"] = "Build repo not found. Clone a repo first."
+        return result
+
+    audits: list[dict[str, Any]] = []
+
+    # Python dependencies
+    requirements = repo_path / "requirements.txt"
+    if requirements.exists():
+        try:
+            pip_audit = subprocess.run(
+                ["pip", "list", "--outdated", "--format=json"],
+                capture_output=True, text=True, timeout=30, cwd=str(repo_path)
+            )
+            if pip_audit.returncode == 0:
+                outdated = json.loads(pip_audit.stdout)
+                audits.append({
+                    "type": "python",
+                    "outdated_count": len(outdated),
+                    "packages": outdated[:20],  # Limit output
+                })
+        except (subprocess.TimeoutExpired, FileNotFoundError, json.JSONDecodeError, OSError):
+            audits.append({"type": "python", "error": "audit_failed"})
+
+    # Node.js dependencies
+    package_json = repo_path / "package.json"
+    if package_json.exists():
+        try:
+            npm_audit = subprocess.run(
+                ["npm", "audit", "--json"],
+                capture_output=True, text=True, timeout=60, cwd=str(repo_path)
+            )
+            if npm_audit.returncode != 0 or npm_audit.stdout:
+                try:
+                    audit_data = json.loads(npm_audit.stdout)
+                    audits.append({
+                        "type": "nodejs",
+                        "vulnerabilities": audit_data.get("vulnerabilities", {}),
+                        "metadata": audit_data.get("metadata", {}),
+                    })
+                except json.JSONDecodeError:
+                    audits.append({"type": "nodejs", "raw_output": npm_audit.stdout[:500]})
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+            audits.append({"type": "nodejs", "error": "audit_failed"})
+
+    result["audits"] = audits
+    result["status"] = "complete"
+    result["audited_at"] = datetime.now(timezone.utc).isoformat()
+
+    # Write audit result
+    audit_dir = Path("/sandbox/build/context/audit")
+    audit_dir.mkdir(parents=True, exist_ok=True)
+    audit_file = audit_dir / f"dependency-audit-{datetime.now(timezone.utc).strftime('%Y%m%d')}.json"
+    audit_file.write_text(json.dumps(result, indent=2))
+    result["audit_path"] = str(audit_file)
+
+    return result
+
+
+def handle_discover_tools(args: dict[str, Any]) -> dict[str, Any]:
+    """Discover what tools each claw currently has deployed."""
+    squad_id = args.get("squad_id", "default")
+    result: dict[str, Any] = {"claws": {}, "discovered_at": datetime.now(timezone.utc).isoformat()}
+
+    for role in ["content", "ops", "analytics", "finance", "build"]:
+        claw_tools: dict[str, Any] = {"tools": [], "count": 0, "last_evolution": None}
+
+        registry_file = Path.home() / ".milimo" / "tools" / squad_id / role / "registry.json"
+        if registry_file.exists():
+            try:
+                reg_data = json.loads(registry_file.read_text())
+                tools = reg_data.get("tools", {})
+                claw_tools["tools"] = [
+                    {"name": name, "version": info.get("version", "unknown")}
+                    for name, info in tools.items()
+                ]
+                claw_tools["count"] = len(tools)
+                claw_tools["last_evolution"] = reg_data.get("last_evolution")
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        result["claws"][role] = claw_tools
+
+    result["total_tools"] = sum(c["count"] for c in result["claws"].values())
+    return result
+
+
 COMMAND_HANDLERS: dict[str, Any] = {
     "evolution_status": handle_evolution_status,
     "blueprint_info": handle_blueprint_info,
@@ -691,6 +1319,18 @@ COMMAND_HANDLERS: dict[str, Any] = {
     "deep_work_status": handle_deep_work_status,
     "collect_health": handle_collect_health,
     "squad_config": handle_squad_config,
+    "send_to_claw": handle_send_to_claw,
+    "claw_status": handle_claw_status,
+    "ops_active_projects": handle_ops_active_projects,
+    "content_pending_drafts": handle_content_pending_drafts,
+    "build_open_prs": handle_build_open_prs,
+    "analytics_latest_report_summary": handle_analytics_latest_report_summary,
+    "generate_sprint_plan": handle_generate_sprint_plan,
+    "run_opportunity_scoring": handle_run_opportunity_scoring,
+    "generate_weekly_report": handle_generate_weekly_report,
+    "check_all_deadlines": handle_check_all_deadlines,
+    "run_dependency_audit": handle_run_dependency_audit,
+    "discover_tools": handle_discover_tools,
 }
 
 

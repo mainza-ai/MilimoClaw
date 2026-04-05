@@ -29,6 +29,13 @@ message_matrix:
     analytics: [query, behavior_query]
     content: [summary, shipping_summary]
     war_room: [signal, deliverable, tool_proposal]
+  assistant:
+    content: [assistant_query, assistant_task]
+    ops: [assistant_query, assistant_task]
+    analytics: [assistant_query, assistant_task]
+    finance: [assistant_query, assistant_task]
+    build: [assistant_query, assistant_task]
+    war_room: [assistant_response]
 
 message_types:
   brief:
@@ -120,6 +127,15 @@ message_types:
     requires_approval: false
   client_health_signal_ops:
     description: "Client health signal from Analytics to Ops"
+    requires_approval: false
+  assistant_query:
+    description: "Assistant query to a claw (read-only status request)"
+    requires_approval: true
+  assistant_task:
+    description: "Assistant task assignment to a claw (requires operator approval)"
+    requires_approval: true
+  assistant_response:
+    description: "Claw response back to assistant via War Room"
     requires_approval: false
 
 escalation_rules:
