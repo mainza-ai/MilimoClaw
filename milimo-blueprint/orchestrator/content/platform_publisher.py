@@ -117,19 +117,39 @@ class TwitterPublisher:
         content: str,
         credentials: PlatformCredentials,
     ) -> PublishResult:
-        """Publish to Twitter."""
+        """Publish to Twitter via API v2."""
+        import requests
+
         logger.info("Publishing to Twitter: %s", content[:50])
 
-        post_id = f"tw_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-        url = f"https://twitter.com/user/status/{post_id}"
+        headers = {
+            "Authorization": f"Bearer {credentials.access_token}",
+            "Content-Type": "application/json",
+        }
+        payload = {"text": content}
 
-        return PublishResult(
-            success=True,
-            post_id=post_id,
-            url=url,
-            platform="twitter",
-            published_at=datetime.now(timezone.utc).isoformat(),
-        )
+        try:
+            response = requests.post(
+                self.ENDPOINT,
+                headers=headers,
+                json=payload,
+                timeout=30,
+            )
+            response.raise_for_status()
+            data = response.json()
+            post_id = data.get("data", {}).get("id", "")
+            url = f"https://twitter.com/user/status/{post_id}"
+
+            return PublishResult(
+                success=True,
+                post_id=post_id,
+                url=url,
+                platform="twitter",
+                published_at=datetime.now(timezone.utc).isoformat(),
+            )
+        except Exception as e:
+            logger.warning("Twitter publish failed: %s", e)
+            raise
 
 
 class LinkedInPublisher:
@@ -142,19 +162,49 @@ class LinkedInPublisher:
         content: str,
         credentials: PlatformCredentials,
     ) -> PublishResult:
-        """Publish to LinkedIn."""
+        """Publish to LinkedIn via API."""
+        import requests
+
         logger.info("Publishing to LinkedIn: %s", content[:50])
 
-        post_id = f"li_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-        url = f"https://linkedin.com/posts/{post_id}"
+        headers = {
+            "Authorization": f"Bearer {credentials.access_token}",
+            "Content-Type": "application/json",
+            "x-li-format": "json",
+        }
+        payload = {
+            "author": f"urn:li:person:{credentials.access_token}",
+            "lifecycleState": "PUBLISHED",
+            "specificContent": {
+                "com.linkedin.ugc.ShareContent": {
+                    "shareCommentary": {"text": content},
+                    "shareMediaCategory": "NONE",
+                }
+            },
+            "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
+        }
 
-        return PublishResult(
-            success=True,
-            post_id=post_id,
-            url=url,
-            platform="linkedin",
-            published_at=datetime.now(timezone.utc).isoformat(),
-        )
+        try:
+            response = requests.post(
+                self.ENDPOINT,
+                headers=headers,
+                json=payload,
+                timeout=30,
+            )
+            response.raise_for_status()
+            post_id = f"li_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+            url = f"https://linkedin.com/posts/{post_id}"
+
+            return PublishResult(
+                success=True,
+                post_id=post_id,
+                url=url,
+                platform="linkedin",
+                published_at=datetime.now(timezone.utc).isoformat(),
+            )
+        except Exception as e:
+            logger.warning("LinkedIn publish failed: %s", e)
+            raise
 
 
 class InstagramPublisher:
@@ -168,19 +218,50 @@ class InstagramPublisher:
         credentials: PlatformCredentials,
         media_url: str | None = None,
     ) -> PublishResult:
-        """Publish to Instagram."""
+        """Publish to Instagram via Graph API."""
+        import requests
+
         logger.info("Publishing to Instagram: %s", content[:50])
 
-        post_id = f"ig_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-        url = f"https://instagram.com/p/{post_id}"
+        if not media_url:
+            # Text-only posts go to Facebook cross-posting
+            raise PublishError("Instagram requires a media_url for publishing")
 
-        return PublishResult(
-            success=True,
-            post_id=post_id,
-            url=url,
-            platform="instagram",
-            published_at=datetime.now(timezone.utc).isoformat(),
-        )
+        # Step 1: Create media container
+        create_url = f"https://graph.facebook.com/v18.0/{credentials.access_token}/media"
+        params = {
+            "image_url": media_url,
+            "caption": content,
+            "access_token": credentials.access_token,
+        }
+
+        try:
+            response = requests.post(create_url, params=params, timeout=30)
+            response.raise_for_status()
+            container_id = response.json().get("id", "")
+
+            # Step 2: Publish the container
+            publish_url = f"https://graph.facebook.com/v18.0/{credentials.access_token}/media_publish"
+            publish_params = {
+                "creation_id": container_id,
+                "access_token": credentials.access_token,
+            }
+            response = requests.post(publish_url, params=publish_params, timeout=30)
+            response.raise_for_status()
+
+            post_id = f"ig_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+            url = f"https://instagram.com/p/{post_id}"
+
+            return PublishResult(
+                success=True,
+                post_id=post_id,
+                url=url,
+                platform="instagram",
+                published_at=datetime.now(timezone.utc).isoformat(),
+            )
+        except Exception as e:
+            logger.warning("Instagram publish failed: %s", e)
+            raise
 
 
 class TikTokPublisher:

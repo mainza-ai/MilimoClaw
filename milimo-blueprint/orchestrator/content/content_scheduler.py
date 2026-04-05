@@ -171,16 +171,22 @@ class ContentScheduler:
         risks = []
         if self._generator:
             try:
+                # Use a dedicated event loop for async generation
                 import asyncio
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
                 try:
-                    plan = loop.run_until_complete(
-                        self._generator.generate_daily_plan()
-                    )
-                    logger.info("Generated daily plan: %s", plan.plan_id)
-                finally:
-                    loop.close()
+                    loop = asyncio.get_running_loop()
+                    # Already in an async context — use create_task
+                    asyncio.ensure_future(self._generator.generate_daily_plan())
+                except RuntimeError:
+                    # No running loop — create a new one (sync context)
+                    loop = asyncio.new_event_loop()
+                    try:
+                        plan = loop.run_until_complete(
+                            self._generator.generate_daily_plan()
+                        )
+                        logger.info("Generated daily plan: %s", plan.plan_id)
+                    finally:
+                        loop.close()
             except Exception as e:
                 logger.error("Failed to generate daily plan: %s", e)
 

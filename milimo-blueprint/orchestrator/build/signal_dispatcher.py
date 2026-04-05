@@ -321,10 +321,21 @@ class BuildSignalDispatcher:
             self._write_fallback_message(message)
 
     def _write_fallback_message(self, message: dict[str, Any]) -> None:
-        fallback_dir = self._fs.base / "messages"
-        fallback_dir.mkdir(parents=True, exist_ok=True)
-        path = fallback_dir / f"{message.get('message_id', 'unknown')}.json"
-        self._fs.atomic_write_json(path, message)
+        """Write a message to the recipient's mesh inbox directory.
+
+        Uses the canonical mesh inbox path (~/.milimo/mesh/inbox/{recipient}/)
+        so that the recipient's InboxPoller can actually read it.
+        """
+        from pathlib import Path
+
+        recipient_role = message.get("recipient_role", "unknown")
+        mesh_inbox = Path.home() / ".milimo" / "mesh" / "inbox" / recipient_role
+        mesh_inbox.mkdir(parents=True, exist_ok=True)
+
+        msg_id = message.get("message_id", f"msg-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}")
+        path = mesh_inbox / f"{msg_id}.json"
+        path.write_text(json.dumps(message, indent=2))
+        logger.info("Fallback message written to %s", path)
 
     def _send_overdue_ack_warning(self, feature_brief_id: str, claw: str = "build") -> None:
         """Send a preliminary acknowledgment when feature brief response is overdue.

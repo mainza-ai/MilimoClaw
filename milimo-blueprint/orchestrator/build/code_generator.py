@@ -205,8 +205,65 @@ Provide the implementation with file paths and content."""
 
     def run_tests(self) -> tuple[str, int, int]:
         """Run tests and return (status, passing, failing)."""
-        # Placeholder — in production, this would run actual tests
-        return ("passing", 0, 0)
+        import subprocess
+
+        # Try running pytest in the repo directory
+        try:
+            result = subprocess.run(
+                ["python", "-m", "pytest", "--tb=short", "-q", "--json", "--json-file=/tmp/test_results.json"],
+                cwd=str(self._repo_path),
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+
+            if result.returncode == 0:
+                # Parse pytest-json output for counts
+                try:
+                    import json
+                    json_path = Path("/tmp/test_results.json")
+                    if json_path.exists():
+                        data = json.loads(json_path.read_text())
+                        summary = data.get("summary", {})
+                        passing = summary.get("passed", 0)
+                        failing = summary.get("failed", 0)
+                        return ("passing", passing, failing)
+                except Exception:
+                    pass
+                return ("passing", 0, 0)
+            else:
+                # Count failures from output
+                failing = 0
+                for line in result.stdout.split("\n") + result.stderr.split("\n"):
+                    if "FAILED" in line or "ERROR" in line:
+                        failing += 1
+                return ("failing", 0, failing)
+
+        except FileNotFoundError:
+            # pytest not installed — try running tests with unittest
+            try:
+                result = subprocess.run(
+                    ["python", "-m", "unittest", "discover", "-s", "test"],
+                    cwd=str(self._repo_path),
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                )
+                if result.returncode == 0:
+                    return ("passing", 0, 0)
+                else:
+                    failing = result.stdout.count("FAIL") + result.stdout.count("ERROR")
+                    return ("failing", 0, failing)
+            except Exception:
+                return ("skipped", 0, 0)
+
+        except subprocess.TimeoutExpired:
+            logger.warning("Test execution timed out after 300 seconds")
+            return ("timeout", 0, 0)
+
+        except Exception as e:
+            logger.warning("Test execution failed: %s", e)
+            return ("error", 0, 0)
 
     def analyze_failure_and_fix(
         self,

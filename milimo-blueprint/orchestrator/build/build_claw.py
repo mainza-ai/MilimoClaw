@@ -19,6 +19,8 @@ session recovery from oh-my-openagent patterns.
 from __future__ import annotations
 
 import logging
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -212,7 +214,7 @@ class BuildClaw:
 
         # Wire inbound handlers
         self._inbound_handlers = {
-            "feature_brief": self._dispatcher.handle_feature_brief,
+            "feature_brief": self._handle_feature_brief_with_execution,
             "retention_signals": self._dispatcher.handle_retention_signals,
             "behavior_query_response": self._dispatcher.handle_behavior_query_response,
         }
@@ -244,6 +246,137 @@ class BuildClaw:
             handler(message)
         else:
             logger.warning("No handler for message type: %s", msg_type)
+
+    # ------------------------------------------------------------------
+    # Execution Pipeline: feature_brief → sprint plan → approval → code → PR
+    # ------------------------------------------------------------------
+
+    def _handle_feature_brief_with_execution(self, message: dict[str, Any]) -> None:
+        """
+        Handle feature_brief and trigger the full execution pipeline.
+
+        Pipeline:
+        1. Log receipt and start SLA timer (via dispatcher)
+        2. Generate sprint plan from open GitHub issues
+        3. Queue sprint plan for War Room approval
+        4. Start a background watcher that polls for approval decisions
+           and triggers code generation when approved
+        """
+        # Step 1: Log and start SLA timer
+        self._dispatcher.handle_feature_brief(message)
+
+        # Step 2 & 3: Generate sprint plan and queue for approval
+        # Run in background thread to not block message processing
+        thread = threading.Thread(
+            target=self._execute_sprint_pipeline,
+            daemon=True,
+            name="build-execution-pipeline",
+        )
+        thread.start()
+
+    def _execute_sprint_pipeline(self) -> None:
+        """
+        Execute the full sprint pipeline: plan → approve → code → PR.
+
+        This runs in a background thread after a feature_brief is received.
+        """
+        try:
+            # Step 2: Generate sprint plan (fetches issues, scores complexity, queues for approval)
+            logger.info("Starting sprint planning pipeline")
+            plan = self._issue_manager.generate_sprint_plan()
+            logger.info("Sprint plan generated: %s with %d issues", plan.plan_id, len(plan.issues))
+
+            if not plan.issues:
+                logger.info("No issues in sprint plan — pipeline complete")
+                return
+
+            # Step 4: Start background approval watcher
+            self._watch_for_approval(plan.plan_id)
+
+        except Exception as e:
+            logger.error("Sprint pipeline failed: %s", e)
+
+    def _watch_for_approval(self, plan_id: str) -> None:
+        """
+        Poll for sprint plan approval and execute issues when approved.
+
+        Checks every 30 seconds for up to 24 hours.
+        """
+        max_wait_seconds = 86400  # 24 hours
+        poll_interval = 30
+        waited = 0
+
+        while waited < max_wait_seconds:
+            try:
+                plan_path = self._fs.base / "context" / "sprint" / "current-plan.json"
+                if plan_path.exists():
+                    import json
+                    plan_data = json.loads(plan_path.read_text())
+                    if plan_data.get("status") == "approved":
+                        logger.info("Sprint plan %s approved — executing issues", plan_id)
+                        self._execute_approved_plan(plan_data)
+                        return
+                    elif plan_data.get("status") == "rejected":
+                        logger.warning("Sprint plan %s rejected — pipeline aborted", plan_id)
+                        return
+
+                time.sleep(poll_interval)
+                waited += poll_interval
+            except Exception as e:
+                logger.error("Error polling for approval: %s", e)
+                time.sleep(poll_interval)
+                waited += poll_interval
+
+        logger.warning("Sprint plan %s approval timed out after %d seconds", plan_id, max_wait_seconds)
+
+    def _execute_approved_plan(self, plan_data: dict) -> None:
+        """
+        Execute all issues in an approved sprint plan.
+
+        For each issue:
+        1. Resolve it (read context → generate code → test → fix)
+        2. Create a PR
+        3. Queue for merge hold
+        """
+        issues = plan_data.get("issues", [])
+        plan_id = plan_data.get("plan_id", "unknown")
+
+        for idx, issue in enumerate(issues):
+            try:
+                issue_number = issue.get("issue_number", 0)
+                logger.info(
+                    "Executing issue %d/%d: #%d — %s",
+                    idx + 1, len(issues), issue_number, issue.get("title", ""),
+                )
+
+                # Import ComplexityScore for the code generator
+                from .issue_manager import ComplexityScore
+                score = ComplexityScore(
+                    issue_number=issue_number,
+                    issue_title=issue.get("title", ""),
+                    complexity_tier=issue.get("complexity_tier", "M"),
+                    estimated_hours=issue.get("estimated_hours", 8.0),
+                    clarity_score=issue.get("clarity_score", "clear"),
+                )
+
+                # Resolve the issue (code generation + testing)
+                result = self._code_gen.resolve_issue(score)
+                logger.info(
+                    "Issue #%d resolved: %s (tests: %d passing, %d failing, %d attempts)",
+                    issue_number, result.status, result.tests_passing,
+                    result.tests_failing, result.attempts,
+                )
+
+                if result.status == "ready_for_pr":
+                    # Create PR
+                    pr = self._pr_manager.open_pr(result)
+                    logger.info(
+                        "PR created for issue #%d: %s (review_action: %s)",
+                        issue_number, pr.pr_id, pr.review_action_id,
+                    )
+
+            except Exception as e:
+                logger.error("Failed to execute issue %s: %s", issue.get("issue_number"), e)
 
     def handle_approval_decision(
         self,

@@ -177,15 +177,18 @@ def start_build_claw(heartbeat_interval: int = 30, poll_interval: int = 5):
     try:
         from orchestrator.build.build_claw import BuildClaw
         from orchestrator.build.build_init import BASE
+        from orchestrator.inference_client import NvidiaInferenceClient
+        from orchestrator.github_client import GitHubClient
 
-        # Create mock clients for now (until proper injection is wired)
-        class MockGitHubClient:
-            def __init__(self):
-                self.token = os.environ.get("GITHUB_TOKEN", "")
+        # Create real clients with environment-based configuration
+        inference_client = NvidiaInferenceClient(
+            api_key=os.environ.get("NVIDIA_API_KEY") or os.environ.get("BUILD_CLAW_NVIDIA_API_KEY"),
+            api_base=os.environ.get("NVIDIA_API_BASE"),
+        )
 
-        class MockInferenceClient:
-            def __init__(self):
-                self.api_key = os.environ.get("BUILD_CLAW_NVIDIA_API_KEY") or os.environ.get("NVIDIA_API_KEY", "")
+        github_client = GitHubClient(
+            repo=os.environ.get("GITHUB_REPO"),
+        )
 
         class MockVercelClient:
             pass
@@ -195,8 +198,8 @@ def start_build_claw(heartbeat_interval: int = 30, poll_interval: int = 5):
 
         claw = BuildClaw(
             squad_id=SQUAD_ID,
-            inference_client=MockInferenceClient(),
-            github_client=MockGitHubClient(),
+            inference_client=inference_client,
+            github_client=github_client,
             vercel_client=MockVercelClient(),
             sentry_client=MockSentryClient(),
             base_path=BASE,
@@ -231,17 +234,87 @@ def start_build_claw(heartbeat_interval: int = 30, poll_interval: int = 5):
 
 
 def start_generic_claw(role: str, heartbeat_interval: int = 30, poll_interval: int = 5):
-    """Start a generic claw (content, ops, analytics, finance) with heartbeat and inbox polling."""
-    # Start heartbeat
-    heartbeat = HeartbeatEmitter(role, heartbeat_interval)
-    heartbeat.start()
+    """Start a generic claw (content, ops, analytics, finance) with heartbeat, inbox polling, and message handlers."""
+    try:
+        # Import the appropriate claw class based on role
+        if role == "content":
+            from orchestrator.content.content_claw import ContentClaw
+            from orchestrator.inference_client import NvidiaInferenceClient
+            inference = NvidiaInferenceClient(
+                api_key=os.environ.get("NVIDIA_API_KEY"),
+                api_base=os.environ.get("NVIDIA_API_BASE"),
+            )
+            claw = ContentClaw(
+                squad_id=SQUAD_ID,
+                inference_client=inference,
+                base_path=Path("/sandbox/content"),
+            )
+            claw.startup()
+            message_handler = claw.handle_inbound
+        elif role == "ops":
+            from orchestrator.ops.ops_claw import OpsClaw
+            from orchestrator.inference_client import NvidiaInferenceClient
+            inference = NvidiaInferenceClient(
+                api_key=os.environ.get("NVIDIA_API_KEY"),
+                api_base=os.environ.get("NVIDIA_API_BASE"),
+            )
+            claw = OpsClaw(
+                squad_id=SQUAD_ID,
+                inference_client=inference,
+                base_path=Path("/sandbox/ops"),
+            )
+            claw.startup()
+            message_handler = claw.handle_inbound
+        elif role == "analytics":
+            from orchestrator.analytics.analytics_claw import AnalyticsClaw
+            claw = AnalyticsClaw(
+                squad_id=SQUAD_ID,
+                base_path=Path("/sandbox/analytics"),
+            )
+            claw.startup()
+            message_handler = claw.handle_inbound
+        elif role == "finance":
+            from orchestrator.finance.finance_claw import FinanceClaw
+            claw = FinanceClaw(
+                squad_id=SQUAD_ID,
+                base_path=Path("/sandbox/finance"),
+            )
+            claw.startup()
+            message_handler = claw.handle_inbound
+        else:
+            logger.warning("Unknown claw role: %s", role)
+            heartbeat = HeartbeatEmitter(role, heartbeat_interval)
+            heartbeat.start()
+            poller = InboxPoller(role, poll_interval)
+            poller.start()
+            return heartbeat, poller
 
-    # Start inbox poller (no message handler yet for generic claws)
-    poller = InboxPoller(role, poll_interval)
-    poller.start()
+        # Start heartbeat
+        heartbeat = HeartbeatEmitter(role, heartbeat_interval)
+        heartbeat.start()
 
-    logger.info("Generic claw %s started with heartbeat and inbox polling", role)
-    return heartbeat, poller
+        # Start inbox poller with the claw's message handler
+        poller = InboxPoller(role, poll_interval, message_handler)
+        poller.start()
+
+        logger.info("Claw %s started with heartbeat, inbox polling, and message handler", role)
+        return heartbeat, poller
+
+    except ImportError as e:
+        logger.error("Failed to import %s claw: %s", role, e)
+        # Fall back to basic heartbeat + poller
+        heartbeat = HeartbeatEmitter(role, heartbeat_interval)
+        heartbeat.start()
+        poller = InboxPoller(role, poll_interval)
+        poller.start()
+        return heartbeat, poller
+    except Exception as e:
+        logger.error("Failed to start %s claw: %s", role, e)
+        heartbeat = HeartbeatEmitter(role, heartbeat_interval)
+        heartbeat.start()
+        poller = InboxPoller(role, poll_interval)
+        poller.start()
+        return heartbeat, poller
 
 
 # ---------------------------------------------------------------------------
@@ -270,13 +343,39 @@ def main():
     HEARTBEAT_DIR.mkdir(parents=True, exist_ok=True)
     INBOX_DIR.mkdir(parents=True, exist_ok=True)
 
+    # Track all components for graceful shutdown
+    components: list = []
+
     # Handle shutdown gracefully
     def shutdown(signum, frame):
         logger.info("Shutting down claw launcher...")
+        for component in components:
+            try:
+                if hasattr(component, "stop"):
+                    component.stop()
+                    logger.info("Stopped component: %s", type(component).__name__)
+            except Exception as e:
+                logger.error("Error stopping component %s: %s", type(component).__name__, e)
+        logger.info("All components stopped. Exiting.")
         sys.exit(0)
 
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
+
+    # Start FailoverManager for process supervision
+    failover_manager = None
+    try:
+        from orchestrator.mesh_failover import FailoverManager
+        failover_manager = FailoverManager(
+            heartbeat_dir=str(HEARTBEAT_DIR),
+            check_interval=60,
+            unhealthy_threshold=90,
+        )
+        failover_manager.start()
+        components.append(failover_manager)
+        logger.info("FailoverManager started — monitoring claw heartbeats")
+    except Exception as e:
+        logger.warning("Failed to start FailoverManager: %s", e)
 
     if args.all:
         logger.info("Starting all claws...")
@@ -286,9 +385,17 @@ def main():
                 claw, heartbeat, poller = start_build_claw(args.heartbeat_interval, args.poll_interval)
                 if claw:
                     started.append(role)
+                    if heartbeat:
+                        components.append(heartbeat)
+                    if poller:
+                        components.append(poller)
             else:
                 heartbeat, poller = start_generic_claw(role, args.heartbeat_interval, args.poll_interval)
                 started.append(role)
+                if heartbeat:
+                    components.append(heartbeat)
+                if poller:
+                    components.append(poller)
 
         logger.info("Started %d/%d claws: %s", len(started), len(ALL_ROLES), ", ".join(started))
     else:
@@ -296,12 +403,21 @@ def main():
         if args.role == "build":
             claw, heartbeat, poller = start_build_claw(args.heartbeat_interval, args.poll_interval)
             if claw:
+                started = ["build"]
+                if heartbeat:
+                    components.append(heartbeat)
+                if poller:
+                    components.append(poller)
                 logger.info("Build Claw started successfully")
             else:
                 logger.error("Failed to start Build Claw")
                 sys.exit(1)
         else:
             heartbeat, poller = start_generic_claw(args.role, args.heartbeat_interval, args.poll_interval)
+            if heartbeat:
+                components.append(heartbeat)
+            if poller:
+                components.append(poller)
             logger.info("%s claw started", args.role)
 
     # Keep main thread alive

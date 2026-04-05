@@ -1,0 +1,200 @@
+# Milimo Claw — Docker Compose
+#
+# Multi-service orchestration for the Milimo Claw system.
+# Starts all 5 claws, the mesh coordinator, and the bridge CLI.
+#
+# Usage:
+#   docker-compose up -d
+#   docker-compose logs -f build-claw
+#   docker-compose down
+#
+# Required environment variables (set in .env or pass via --env-file):
+#   NVIDIA_API_KEY     — NVIDIA NIM API key
+#   GITHUB_TOKEN       — GitHub personal access token
+#   GITHUB_REPO        — Repository in owner/repo format
+#   SQUAD_ID           — Squad identifier (default: zulu)
+
+services:
+  # ---------------------------------------------------------------------------
+  # Build Claw — Code generation, PR management, deployment
+  # ---------------------------------------------------------------------------
+  build-claw:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: milimo-build-claw
+    restart: unless-stopped
+    environment:
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - NVIDIA_API_BASE=${NVIDIA_API_BASE:-https://integrate.api.nvidia.com/v1}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO=${GITHUB_REPO}
+      - SQUAD_ID=${SQUAD_ID:-zulu}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - milimo-mesh:/root/.milimo/mesh
+      - milimo-sandbox:/sandbox
+      - milimo-build:/sandbox/build
+    command: >
+      python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/claw_launcher.py
+      --role build
+      --heartbeat-interval 30
+      --poll-interval 5
+      --verbose
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import os; p = os.path.expanduser('~/.milimo/mesh/heartbeats/build.json'); assert os.path.exists(p), 'no heartbeat'"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - milimo-network
+
+  # ---------------------------------------------------------------------------
+  # Content Claw — Content generation, scheduling, publishing
+  # ---------------------------------------------------------------------------
+  content-claw:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: milimo-content-claw
+    restart: unless-stopped
+    environment:
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - NVIDIA_API_BASE=${NVIDIA_API_BASE:-https://integrate.api.nvidia.com/v1}
+      - SQUAD_ID=${SQUAD_ID:-zulu}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - milimo-mesh:/root/.milimo/mesh
+      - milimo-sandbox:/sandbox
+      - milimo-content:/sandbox/content
+    command: >
+      python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/claw_launcher.py
+      --role content
+      --heartbeat-interval 30
+      --poll-interval 5
+      --verbose
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import os; p = os.path.expanduser('~/.milimo/mesh/heartbeats/content.json'); assert os.path.exists(p), 'no heartbeat'"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - milimo-network
+
+  # ---------------------------------------------------------------------------
+  # Ops Claw — Operations, incident management, client communication
+  # ---------------------------------------------------------------------------
+  ops-claw:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: milimo-ops-claw
+    restart: unless-stopped
+    environment:
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - NVIDIA_API_BASE=${NVIDIA_API_BASE:-https://integrate.api.nvidia.com/v1}
+      - SQUAD_ID=${SQUAD_ID:-zulu}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - milimo-mesh:/root/.milimo/mesh
+      - milimo-sandbox:/sandbox
+      - milimo-ops:/sandbox/ops
+    ports:
+      - "8080:8080"  # Webhook server
+    command: >
+      python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/claw_launcher.py
+      --role ops
+      --heartbeat-interval 30
+      --poll-interval 5
+      --verbose
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import os; p = os.path.expanduser('~/.milimo/mesh/heartbeats/ops.json'); assert os.path.exists(p), 'no heartbeat'"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - milimo-network
+
+  # ---------------------------------------------------------------------------
+  # Analytics Claw — Platform analytics, performance monitoring
+  # ---------------------------------------------------------------------------
+  analytics-claw:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: milimo-analytics-claw
+    restart: unless-stopped
+    environment:
+      - SQUAD_ID=${SQUAD_ID:-zulu}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - milimo-mesh:/root/.milimo/mesh
+      - milimo-sandbox:/sandbox
+      - milimo-analytics:/sandbox/analytics
+    command: >
+      python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/claw_launcher.py
+      --role analytics
+      --heartbeat-interval 30
+      --poll-interval 5
+      --verbose
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import os; p = os.path.expanduser('~/.milimo/mesh/heartbeats/analytics.json'); assert os.path.exists(p), 'no heartbeat'"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - milimo-network
+
+  # ---------------------------------------------------------------------------
+  # Finance Claw — Payments, invoicing, financial reporting
+  # ---------------------------------------------------------------------------
+  finance-claw:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: milimo-finance-claw
+    restart: unless-stopped
+    environment:
+      - SQUAD_ID=${SQUAD_ID:-zulu}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - milimo-mesh:/root/.milimo/mesh
+      - milimo-sandbox:/sandbox
+      - milimo-finance:/sandbox/finance
+    command: >
+      python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/claw_launcher.py
+      --role finance
+      --heartbeat-interval 30
+      --poll-interval 5
+      --verbose
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import os; p = os.path.expanduser('~/.milimo/mesh/heartbeats/finance.json'); assert os.path.exists(p), 'no heartbeat'"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - milimo-network
+
+# ---------------------------------------------------------------------------
+# Volumes — Persistent data across container restarts
+# ---------------------------------------------------------------------------
+volumes:
+  milimo-mesh:       # Shared mesh (heartbeats, inboxes, topology)
+  milimo-sandbox:    # Shared sandbox filesystem
+  milimo-build:      # Build Claw workspace
+  milimo-content:    # Content Claw workspace
+  milimo-ops:        # Ops Claw workspace
+  milimo-analytics:  # Analytics Claw workspace
+  milimo-finance:    # Finance Claw workspace
+
+# ---------------------------------------------------------------------------
+# Network — Shared network for inter-claw communication
+# ---------------------------------------------------------------------------
+networks:
+  milimo-network:
+    driver: bridge

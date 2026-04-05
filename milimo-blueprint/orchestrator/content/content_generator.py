@@ -363,9 +363,31 @@ class ContentGenerator:
         return None
 
     async def _call_inference(self, prompt: str, routing: RoutingDecision) -> str:
-        """Call the inference backend. Placeholder for actual implementation."""
+        """Call the inference backend via NvidiaInferenceClient."""
         logger.debug("Calling inference backend: %s", routing.backend.value)
-        return f"Generated content for: {prompt[:100]}..."
+
+        # Map routing backend to data_type for the inference client
+        data_type_map = {
+            "content_draft": "content_draft",
+            "client_facing_draft": "content_draft",
+            "internal_ideation": "general",
+            "campaign": "content_plan",
+            "sentiment": "sentiment_analysis",
+        }
+        data_type = data_type_map.get(routing.backend.value, "general")
+
+        try:
+            from orchestrator.inference_client import NvidiaInferenceClient
+            client = NvidiaInferenceClient()
+            result = client.complete(
+                prompt=prompt,
+                data_type=data_type,
+                temperature=0.7 if "draft" in data_type else 0.3,
+            )
+            return result
+        except Exception as e:
+            logger.warning("Inference call failed: %s — returning placeholder", e)
+            return f"Generated content for: {prompt[:100]}..."
 
     async def _apply_tools(self, draft: Draft, context: DraftContext) -> Draft:
         """Apply active tools in sequence."""

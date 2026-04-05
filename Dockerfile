@@ -182,9 +182,19 @@ RUN openclaw doctor --fix > /dev/null 2>&1 || true \
 # Install OpenClaw GitHub skill (requires gh CLI)
 RUN openclaw skills install github > /dev/null 2>&1 || true
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD openshell --version && openclaw --version || exit 1
+# Health check — verifies sandbox runtime AND Milimo Claw heartbeat
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD openshell --version && openclaw --version && \
+    python3 -c " \
+import os, time, sys; \
+hb = os.path.expanduser('~/.milimo/heartbeats/claw_build.json'); \
+exists = os.path.isfile(hb); \
+fresh = False; \
+if exists: \
+    age = time.time() - os.path.getmtime(hb); \
+    fresh = age < 90; \
+sys.exit(0 if fresh else 1) \
+" 2>/dev/null || exit 1
 
 # Lock openclaw.json via DAC (as root)
 USER root
