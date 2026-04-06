@@ -14,13 +14,16 @@ Production-grade claw process supervisor with:
 - Daemon mode with PID file management
 - Crash recovery with exponential backoff
 - Real client integrations (Vercel, Sentry, Mesh)
+- Startup validation and health checks
+- HTTP health endpoint
 
 Usage:
-    python3 claw_launcher.py --all --daemon  # Start all claws in background
-    python3 claw_launcher.py --role build    # Start build claw in foreground
-    python3 claw_launcher.py --stop          # Stop running launcher
-    python3 claw_launcher.py --status        # Check launcher status
-    python3 claw_launcher.py --restart build # Restart a specific claw
+    python3 claw_launcher.py --all --daemon       # Start all claws in background
+    python3 claw_launcher.py --role build         # Start build claw in foreground
+    python3 claw_launcher.py --stop               # Stop running launcher
+    python3 claw_launcher.py --status             # Check launcher status
+    python3 claw_launcher.py --restart build      # Restart a specific claw
+    python3 claw_launcher.py --validate-only      # Validate config and exit
 """
 
 from __future__ import annotations
@@ -31,11 +34,13 @@ import json
 import logging
 import os
 import signal
+import socket
 import sys
 import threading
 import time
 from collections import defaultdict
 from datetime import datetime, timezone
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any, Callable
 
@@ -52,6 +57,7 @@ MESH_DIR = Path.home() / ".milimo" / "mesh"
 HEARTBEAT_DIR = MESH_DIR / "heartbeats"
 INBOX_DIR = MESH_DIR / "inbox"
 OUTBOX_DIR = MESH_DIR / "outbox"
+ALERTS_DIR = MESH_DIR / "alerts"
 LAUNCHER_PID_FILE = MESH_DIR / "launcher.pid"
 LAUNCHER_LOG_FILE = MESH_DIR / "logs" / "launcher.log"
 
@@ -60,6 +66,245 @@ RESTART_WINDOW_SECONDS = 3600
 UNHEALTHY_THRESHOLD = 90
 RESTART_BACKOFF_MAX = 60
 RESULT_TTL_SECONDS = 3600
+HEALTH_PORT = 8081
+
+# Required environment variables for each claw
+REQUIRED_ENV_VARS = {
+    "content": ["NVIDIA_API_KEY"],
+    "ops": ["NVIDIA_API_KEY"],
+    "analytics": ["NVIDIA_API_KEY"],
+    "finance": ["NVIDIA_API_KEY", "STRIPE_SECRET_KEY"],
+    "build": ["NVIDIA_API_KEY", "GITHUB_REPO"],
+}
+
+# Optional environment variables for enhanced functionality
+OPTIONAL_ENV_VARS = {
+    "vercel": ["VERCEL_TOKEN", "VERCEL_TEAM_ID", "VERCEL_PROJECT_ID"],
+    "sentry": ["SENTRY_AUTH_TOKEN", "SENTRY_ORG_SLUG", "SENTRY_PROJECT_SLUG"],
+    "github": ["GITHUB_TOKEN", "GH_TOKEN"],
+}
+
+
+# ---------------------------------------------------------------------------
+# Validation Functions
+# ---------------------------------------------------------------------------
+
+
+def validate_environment(role: str | None = None) -> dict[str, Any]:
+    """Validate required environment variables.
+
+    Args:
+        role: Specific role to validate, or None for all roles
+
+    Returns:
+        Dict with validation results including missing vars and warnings
+    """
+    results = {
+        "valid": True,
+        "missing_required": [],
+        "missing_optional": [],
+        "warnings": [],
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    roles_to_check = [role] if role else ALL_ROLES
+
+    for r in roles_to_check:
+        required = REQUIRED_ENV_VARS.get(r, [])
+        for var in required:
+            if not os.environ.get(var):
+                results["missing_required"].append({"role": r, "var": var})
+                results["valid"] = False
+
+    for category, vars_list in OPTIONAL_ENV_VARS.items():
+        for var in vars_list:
+            if not os.environ.get(var):
+                results["missing_optional"].append({"category": category, "var": var})
+
+    if not os.environ.get("NVIDIA_API_KEY") and not os.environ.get(
+        "BUILD_CLAW_NVIDIA_API_KEY"
+    ):
+        results["warnings"].append("No NVIDIA API key - inference will fail")
+
+    return results
+
+
+def validate_clients() -> dict[str, Any]:
+    """Validate external client connections.
+
+    Returns:
+        Dict with client health check results
+    """
+    results = {
+        "vercel": {"available": False, "healthy": False, "error": None},
+        "sentry": {"available": False, "healthy": False, "error": None},
+        "github": {"available": False, "healthy": False, "error": None},
+    }
+
+    vercel_token = os.environ.get("VERCEL_TOKEN") or os.environ.get("VERCEL_API_TOKEN")
+    if vercel_token:
+        results["vercel"]["available"] = True
+        try:
+            from orchestrator.build.vercel_client import VercelClient
+
+            client = VercelClient(api_token=vercel_token)
+            results["vercel"]["healthy"] = client.health_check()
+        except Exception as e:
+            results["vercel"]["error"] = str(e)
+
+    sentry_token = os.environ.get("SENTRY_AUTH_TOKEN")
+    if sentry_token:
+        results["sentry"]["available"] = True
+        try:
+            from orchestrator.build.sentry_client import SentryClient
+
+            client = SentryClient(auth_token=sentry_token)
+            results["sentry"]["healthy"] = client.health_check()
+        except Exception as e:
+            results["sentry"]["error"] = str(e)
+
+    github_repo = os.environ.get("GITHUB_REPO")
+    if github_repo:
+        results["github"]["available"] = True
+        try:
+            import subprocess
+
+            result = subprocess.run(
+                ["gh", "auth", "status"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            results["github"]["healthy"] = result.returncode == 0
+            if result.returncode != 0:
+                results["github"]["error"] = result.stderr.strip()
+        except Exception as e:
+            results["github"]["error"] = str(e)
+
+    return results
+
+
+def write_alert(alert_type: str, message: str, details: dict | None = None) -> None:
+    """Write an alert to the alerts directory.
+
+    Args:
+        alert_type: Type of alert (e.g., "env_missing", "client_unhealthy")
+        message: Human-readable alert message
+        details: Additional details to include
+    """
+    ALERTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    alert_id = f"{alert_type}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+    alert_file = ALERTS_DIR / f"{alert_id}.json"
+
+    alert = {
+        "alert_id": alert_id,
+        "alert_type": alert_type,
+        "message": message,
+        "details": details or {},
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    alert_file.write_text(json.dumps(alert, indent=2))
+    logger.warning("Alert written: %s - %s", alert_type, message)
+
+
+def print_startup_summary(launcher: "ClawLauncher") -> None:
+    """Print a startup summary to stdout."""
+    status = launcher.status()
+
+    print("\n" + "=" * 60)
+    print("  MILIMO CLAW LAUNCHER - STARTUP SUMMARY")
+    print("=" * 60)
+    print(f"\n  Launcher PID: {os.getpid()}")
+    print(f"  Squad ID: {SQUAD_ID}")
+    print(f"  Started: {datetime.now(timezone.utc).isoformat()}")
+    print(f"\n  Claws Status:")
+    print("-" * 60)
+
+    for role, claw_status in status.get("claws", {}).items():
+        icon = "✓" if claw_status.get("status") == "running" else "✗"
+        uptime = claw_status.get("uptime_seconds", 0)
+        restarts = claw_status.get("restarts", 0)
+        print(
+            f"    [{icon}] {role:12} - {claw_status.get('status', 'unknown'):8} (uptime: {uptime:.0f}s, restarts: {restarts})"
+        )
+
+    print("-" * 60)
+    print(f"\n  Health Endpoint: http://localhost:{HEALTH_PORT}/health")
+    print(f"  Log File: {LAUNCHER_LOG_FILE}")
+    print(f"  PID File: {LAUNCHER_PID_FILE}")
+    print("\n" + "=" * 60 + "\n")
+
+
+# ---------------------------------------------------------------------------
+# HTTP Health Endpoint
+# ---------------------------------------------------------------------------
+
+
+class HealthHandler(BaseHTTPRequestHandler):
+    """HTTP handler for health check endpoint."""
+
+    launcher: "ClawLauncher | None" = None
+
+    def log_message(self, format: str, *args) -> None:
+        pass
+
+    def do_GET(self) -> None:
+        if self.path == "/health" or self.path == "/":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+
+            if self.launcher:
+                status = self.launcher.status()
+                status["health_endpoint"] = "ok"
+                status["timestamp"] = datetime.now(timezone.utc).isoformat()
+            else:
+                status = {"error": "launcher not initialized"}
+
+            self.wfile.write(json.dumps(status, indent=2).encode())
+        elif self.path == "/ready":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+
+            ready = True
+            reasons = []
+
+            if self.launcher:
+                for role, claw_status in (
+                    self.launcher.status().get("claws", {}).items()
+                ):
+                    if claw_status.get("status") != "running":
+                        ready = False
+                        reasons.append(f"{role} not running")
+
+            response = {
+                "ready": ready,
+                "reasons": reasons,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            self.wfile.write(json.dumps(response, indent=2).encode())
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+
+def start_health_server(
+    launcher: "ClawLauncher", port: int = HEALTH_PORT
+) -> threading.Thread:
+    """Start the HTTP health endpoint in a background thread."""
+
+    def run_server():
+        HealthHandler.launcher = launcher
+        server = HTTPServer(("0.0.0.0", port), HealthHandler)
+        logger.info("Health endpoint started on port %d", port)
+        server.serve_forever()
+
+    thread = threading.Thread(target=run_server, daemon=True)
+    thread.start()
+    return thread
 
 
 def write_outbox(
@@ -942,16 +1187,43 @@ def main() -> None:
     parser.add_argument("--stop", action="store_true", help="Stop running launcher")
     parser.add_argument("--status", action="store_true", help="Show launcher status")
     parser.add_argument("--restart", choices=ALL_ROLES, help="Restart a specific claw")
+    parser.add_argument(
+        "--validate-only", action="store_true", help="Validate configuration and exit"
+    )
     parser.add_argument("--heartbeat-interval", type=int, default=30)
     parser.add_argument("--poll-interval", type=int, default=5)
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument(
+        "--health-port",
+        type=int,
+        default=HEALTH_PORT,
+        help="Port for HTTP health endpoint",
+    )
     args = parser.parse_args()
+    health_port = args.health_port
 
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(
         level=log_level,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
+
+    # Handle --validate-only
+    if args.validate_only:
+        print("\n=== Environment Validation ===\n")
+        env_result = validate_environment()
+        print(json.dumps(env_result, indent=2))
+
+        print("\n=== Client Validation ===\n")
+        client_result = validate_clients()
+        print(json.dumps(client_result, indent=2))
+
+        if not env_result["valid"]:
+            print("\n❌ Validation FAILED - missing required environment variables")
+            sys.exit(1)
+        else:
+            print("\n✓ Validation PASSED")
+            sys.exit(0)
 
     # Handle --stop
     if args.stop:
@@ -992,6 +1264,22 @@ def main() -> None:
         launcher.restart_role(args.restart)
         return
 
+    # Validate environment before starting
+    env_result = validate_environment()
+    if not env_result["valid"]:
+        print("\n❌ Missing required environment variables:")
+        for item in env_result["missing_required"]:
+            print(f"   - {item['role']}: {item['var']}")
+        print("\nSet missing variables or use --validate-only for full report.")
+        write_alert("env_missing", "Missing required environment variables", env_result)
+        sys.exit(1)
+
+    # Warn about missing optional vars
+    if env_result["missing_optional"]:
+        logger.warning("Optional integrations not configured:")
+        for item in env_result["missing_optional"]:
+            logger.warning("  - %s: %s", item["category"], item["var"])
+
     # Daemonize if requested
     if args.daemon:
         if LAUNCHER_PID_FILE.exists():
@@ -1004,6 +1292,9 @@ def main() -> None:
         heartbeat_interval=args.heartbeat_interval,
         poll_interval=args.poll_interval,
     )
+
+    # Start health endpoint
+    start_health_server(launcher, health_port)
 
     # Handle shutdown
     def shutdown(signum, frame):
@@ -1028,7 +1319,29 @@ def main() -> None:
     if args.daemon:
         LAUNCHER_PID_FILE.write_text(str(os.getpid()))
 
-    print(json.dumps(launcher.status(), indent=2))
+    # Print startup summary
+    print_startup_summary(launcher)
+
+    # Start health verification thread
+    def verify_health():
+        time.sleep(10)
+        status = launcher.status()
+        unhealthy = []
+        for role, claw_status in status.get("claws", {}).items():
+            if claw_status.get("status") != "running":
+                unhealthy.append(role)
+
+        if unhealthy:
+            write_alert(
+                "startup_health_failed",
+                f"Claws failed to start: {', '.join(unhealthy)}",
+                {"unhealthy_claws": unhealthy},
+            )
+        else:
+            logger.info("All claws healthy after startup verification")
+
+    health_thread = threading.Thread(target=verify_health, daemon=True)
+    health_thread.start()
 
     # Keep running
     try:
