@@ -37,8 +37,13 @@ class ProjectStatus:
     project_id: str
     client_id: str
     status: Literal[
-        "briefing", "pricing_pending", "proposal_sent",
-        "active", "review", "delivered", "completed"
+        "briefing",
+        "pricing_pending",
+        "proposal_sent",
+        "active",
+        "review",
+        "delivered",
+        "completed",
     ]
     deadline: str
     deliverable_received: bool = False
@@ -231,7 +236,9 @@ class ProjectManager:
             logger.warning("deploy_complete missing project_id")
             return
 
-        client_id = message.get("client_id") or self._find_client_for_project(project_id)
+        client_id = message.get("client_id") or self._find_client_for_project(
+            project_id
+        )
         if not client_id:
             logger.warning("No client_id for project %s", project_id)
             return
@@ -446,7 +453,9 @@ class ProjectManager:
         status.last_updated = datetime.now(timezone.utc).isoformat()
         self._save_project_status(client_id, project_id, status)
 
-    def _load_project_status(self, client_id: str, project_id: str) -> ProjectStatus | None:
+    def _load_project_status(
+        self, client_id: str, project_id: str
+    ) -> ProjectStatus | None:
         project_dir = self._fs.get_project_path(client_id, project_id)
         status_file = project_dir / "status.json"
         data = self._fs.read_json(status_file)
@@ -454,7 +463,9 @@ class ProjectManager:
             return None
         return ProjectStatus.from_dict(data)
 
-    def _save_project_status(self, client_id: str, project_id: str, status: ProjectStatus) -> None:
+    def _save_project_status(
+        self, client_id: str, project_id: str, status: ProjectStatus
+    ) -> None:
         project_dir = self._fs.get_project_path(client_id, project_id)
         status_file = project_dir / "status.json"
         self._fs.write_json_atomic(status_file, status.to_dict())
@@ -467,7 +478,31 @@ class ProjectManager:
         return None
 
     def _archive_project(self, client_id: str, project_id: str) -> None:
-        pass
+        """Move a completed project to the completed directory and log the action."""
+        project_dir = self._fs.get_project_path(client_id, project_id)
+        completed_dir = Path("/sandbox/clients/completed") / client_id / project_id
+        completed_dir.parent.mkdir(parents=True, exist_ok=True)
+
+        if project_dir.exists():
+            try:
+                import shutil
+
+                shutil.move(str(project_dir), str(completed_dir))
+                logger.info("Archived project %s for client %s", project_id, client_id)
+            except OSError as e:
+                logger.error("Failed to archive project %s: %s", project_id, e)
+                return
+
+        if self._operational_log:
+            self._operational_log.append(
+                OpsLogEntry(
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    action_type="project_archived",
+                    entity_id=project_id,
+                    outcome="success",
+                    details={"client_id": client_id},
+                )
+            )
 
     def _format_deliverables_summary(self, message: dict[str, Any]) -> str:
         urls = message.get("published_urls", [])

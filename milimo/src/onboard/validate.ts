@@ -88,7 +88,7 @@ export function getTemplateInfo(templatePath: string): TemplateInfo | null {
 
 function findBlueprintDir(templatePath: string): string | null {
   let current = path.dirname(path.resolve(templatePath));
-  
+
   while (current !== "/") {
     if (path.basename(current) === "milimo-blueprint") {
       return current;
@@ -99,7 +99,7 @@ function findBlueprintDir(templatePath: string): string | null {
     }
     current = path.dirname(current);
   }
-  
+
   return null;
 }
 
@@ -109,7 +109,7 @@ export function validateSquadName(name: string): { valid: boolean; error?: strin
   }
 
   const trimmed = name.trim();
-  
+
   if (trimmed.length < 2) {
     return { valid: false, error: "Squad name must be at least 2 characters" };
   }
@@ -139,11 +139,14 @@ export function validateOperatorName(name: string): { valid: boolean; error?: st
   return { valid: true };
 }
 
+import { randomBytes } from "node:crypto";
+
 export function generateMeshSecret(): string {
   const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const bytes = randomBytes(32);
   let secret = "";
   for (let i = 0; i < 32; i++) {
-    secret += chars.charAt(Math.floor(Math.random() * chars.length));
+    secret += chars.charAt(bytes[i] % chars.length);
   }
   return secret;
 }

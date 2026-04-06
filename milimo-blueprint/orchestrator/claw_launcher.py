@@ -5,22 +5,28 @@
 """
 Milimo Claw — Claw Launcher
 
-Starts all claw autonomous agents with:
+Production-grade claw process supervisor with:
 - Filesystem initialization
 - Dependency injection (GitHub client, inference client, etc.)
 - Message inbox polling loop
 - Heartbeat emission on a timer
+- Auto-restart of crashed/stale claws
+- Daemon mode with PID file management
+- Crash recovery with exponential backoff
+- Real client integrations (Vercel, Sentry, Mesh)
 
 Usage:
-    python3 claw_launcher.py [--role build] [--heartbeat-interval 30]
-
-    Or start all claws:
-    python3 claw_launcher.py --all
+    python3 claw_launcher.py --all --daemon  # Start all claws in background
+    python3 claw_launcher.py --role build    # Start build claw in foreground
+    python3 claw_launcher.py --stop          # Stop running launcher
+    python3 claw_launcher.py --status        # Check launcher status
+    python3 claw_launcher.py --restart build # Restart a specific claw
 """
 
 from __future__ import annotations
 
 import argparse
+import errno
 import json
 import logging
 import os
@@ -28,30 +34,95 @@ import signal
 import sys
 import threading
 import time
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-
-# Add blueprint to path
-BLUEPRINT_PATH = Path("/sandbox/.milimo/blueprints/0.1.0")
-if BLUEPRINT_PATH.exists():
-    sys.path.insert(0, str(BLUEPRINT_PATH))
+from typing import Any, Callable
 
 logger = logging.getLogger("milimo.claw_launcher")
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
+# Ensure blueprint is on sys.path so claw imports work in daemon mode
+BLUEPRINT_PATH = Path("/sandbox/.milimo/blueprints/0.1.0")
+if BLUEPRINT_PATH.exists() and str(BLUEPRINT_PATH) not in sys.path:
+    sys.path.insert(0, str(BLUEPRINT_PATH))
 
+ALL_ROLES = ["content", "ops", "analytics", "finance", "build"]
 SQUAD_ID = os.environ.get("SQUAD_ID", "zulu")
 MESH_DIR = Path.home() / ".milimo" / "mesh"
 HEARTBEAT_DIR = MESH_DIR / "heartbeats"
 INBOX_DIR = MESH_DIR / "inbox"
+OUTBOX_DIR = MESH_DIR / "outbox"
+LAUNCHER_PID_FILE = MESH_DIR / "launcher.pid"
+LAUNCHER_LOG_FILE = MESH_DIR / "logs" / "launcher.log"
 
-ALL_ROLES = ["content", "ops", "analytics", "finance", "build"]
+MAX_RESTART_THRESHOLD = 3
+RESTART_WINDOW_SECONDS = 3600
+UNHEALTHY_THRESHOLD = 90
+RESTART_BACKOFF_MAX = 60
+RESULT_TTL_SECONDS = 3600
 
-# ---------------------------------------------------------------------------
-# Heartbeat Emitter
-# ---------------------------------------------------------------------------
+
+def write_outbox(
+    message_id: str,
+    role: str,
+    original_message: dict,
+    result: Any,
+) -> None:
+    """
+    Write a result to the outbox directory.
+    Creates a JSON file at OUTBOX_DIR/{role}/{message_id}.json containing
+    the original message and the handler result, along with timestamps.
+    """
+    outbox_dir = OUTBOX_DIR / role
+    outbox_dir.mkdir(parents=True, exist_ok=True)
+
+    outbox_entry = {
+        "message_id": message_id,
+        "role": role,
+        "squad_id": SQUAD_ID,
+        "original_message": original_message,
+        "result": result,
+        "processed_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": datetime.fromtimestamp(
+            time.time() + RESULT_TTL_SECONDS, tz=timezone.utc
+        ).isoformat(),
+    }
+
+    outbox_file = outbox_dir / f"{message_id}.json"
+    outbox_file.write_text(json.dumps(outbox_entry, indent=2))
+    logger.debug("write_outbox: wrote result for %s to %s", message_id, outbox_file)
+
+
+class ProcessSupervisor:
+    """Tracks claw restarts and enforces the max-restart threshold."""
+
+    def __init__(
+        self,
+        max_restarts: int = MAX_RESTART_THRESHOLD,
+        window_seconds: int = RESTART_WINDOW_SECONDS,
+    ):
+        self.max_restarts = max_restarts
+        self.window_seconds = window_seconds
+        self._restarts: dict[str, list[float]] = defaultdict(list)
+
+    def record_restart(self, role: str) -> bool:
+        """Record a restart attempt. Returns True if restart is allowed."""
+        now = time.time()
+        cutoff = now - self.window_seconds
+        self._restarts[role] = [t for t in self._restarts[role] if t > cutoff]
+        self._restarts[role].append(now)
+        return len(self._restarts[role]) <= self.max_restarts
+
+    def restart_count(self, role: str) -> int:
+        now = time.time()
+        cutoff = now - self.window_seconds
+        return len([t for t in self._restarts.get(role, []) if t > cutoff])
+
+    def is_flapping(self, role: str) -> bool:
+        return self.restart_count(role) > self.max_restarts
+
+    def clear(self, role: str) -> None:
+        self._restarts[role] = []
 
 
 class HeartbeatEmitter:
@@ -62,84 +133,106 @@ class HeartbeatEmitter:
         self.interval = interval
         self._running = False
         self._thread: threading.Thread | None = None
+        self._start_time = time.time()
 
-    def start(self):
-        """Start emitting heartbeats in a background thread."""
+    @property
+    def is_alive(self) -> bool:
+        return self._running and self._thread is not None and self._thread.is_alive()
+
+    def start(self) -> None:
         HEARTBEAT_DIR.mkdir(parents=True, exist_ok=True)
         self._running = True
         self._thread = threading.Thread(target=self._emit_loop, daemon=True)
         self._thread.start()
-        logger.info("Heartbeat emitter started for %s (interval=%ds)", self.role, self.interval)
+        logger.info(
+            "HeartbeatEmitter: started for %s (interval=%ds)", self.role, self.interval
+        )
 
-    def stop(self):
-        """Stop emitting heartbeats."""
+    def stop(self) -> None:
         self._running = False
         if self._thread:
             self._thread.join(timeout=5)
-        logger.info("Heartbeat emitter stopped for %s", self.role)
+        self._clear_heartbeat()
+        logger.info("HeartbeatEmitter: stopped for %s", self.role)
 
-    def _emit_loop(self):
+    def _clear_heartbeat(self) -> None:
+        hb_file = HEARTBEAT_DIR / f"{self.role}.json"
+        if hb_file.exists():
+            try:
+                hb_file.unlink()
+            except OSError:
+                pass
+
+    def _emit_loop(self) -> None:
         while self._running:
             try:
                 self._emit()
             except Exception as e:
-                logger.error("Heartbeat emit failed for %s: %s", self.role, e)
+                logger.error("HeartbeatEmitter: emit failed for %s: %s", self.role, e)
             time.sleep(self.interval)
 
-    def _emit(self):
+    def _emit(self) -> None:
         heartbeat = {
             "role": self.role,
             "squad_id": SQUAD_ID,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "pid": os.getpid(),
             "status": "running",
-            "uptime_seconds": time.monotonic(),
+            "uptime_seconds": round(time.time() - self._start_time, 1),
         }
-        heartbeat_file = HEARTBEAT_DIR / f"{self.role}.json"
-        heartbeat_file.write_text(json.dumps(heartbeat, indent=2))
-
-
-# ---------------------------------------------------------------------------
-# Inbox Poller
-# ---------------------------------------------------------------------------
+        hb_file = HEARTBEAT_DIR / f"{self.role}.json"
+        hb_file.write_text(json.dumps(heartbeat, indent=2))
 
 
 class InboxPoller:
-    """Polls a claw's inbox for new messages and processes them."""
+    """Polls a claw's inbox for new messages, processes them, and writes results to the outbox."""
 
-    def __init__(self, role: str, interval: int = 5, message_handler=None):
+    def __init__(
+        self,
+        role: str,
+        interval: int = 5,
+        message_handler: Callable[[dict], Any] | None = None,
+        outbox_writer: Callable[[str, str, dict, Any], None] | None = None,
+    ):
         self.role = role
         self.interval = interval
         self.inbox = INBOX_DIR / role
+        self.outbox = OUTBOX_DIR / role
         self._running = False
         self._thread: threading.Thread | None = None
         self._processed: set[str] = set()
         self._message_handler = message_handler
+        self._outbox_writer = outbox_writer
 
-    def start(self):
-        """Start polling the inbox in a background thread."""
+    @property
+    def is_alive(self) -> bool:
+        return self._running and self._thread is not None and self._thread.is_alive()
+
+    def start(self) -> None:
         self.inbox.mkdir(parents=True, exist_ok=True)
+        self.outbox.mkdir(parents=True, exist_ok=True)
         self._running = True
         self._thread = threading.Thread(target=self._poll_loop, daemon=True)
         self._thread.start()
-        logger.info("Inbox poller started for %s (interval=%ds)", self.role, self.interval)
+        logger.info(
+            "InboxPoller: started for %s (interval=%ds)", self.role, self.interval
+        )
 
-    def stop(self):
-        """Stop polling the inbox."""
+    def stop(self) -> None:
         self._running = False
         if self._thread:
             self._thread.join(timeout=5)
-        logger.info("Inbox poller stopped for %s", self.role)
+        logger.info("InboxPoller: stopped for %s", self.role)
 
-    def _poll_loop(self):
+    def _poll_loop(self) -> None:
         while self._running:
             try:
                 self._check_inbox()
             except Exception as e:
-                logger.error("Inbox poll failed for %s: %s", self.role, e)
+                logger.error("InboxPoller: poll failed for %s: %s", self.role, e)
             time.sleep(self.interval)
 
-    def _check_inbox(self):
+    def _check_inbox(self) -> None:
         if not self.inbox.exists():
             return
 
@@ -150,283 +243,801 @@ class InboxPoller:
 
             try:
                 content = json.loads(msg_file.read_text())
-                logger.info("Processing message %s for %s: %s", msg_id, self.role, content.get("message_type"))
+                logger.info(
+                    "InboxPoller: processing message %s for %s: %s",
+                    msg_id,
+                    self.role,
+                    content.get("message_type"),
+                )
 
+                result: Any = None
                 if self._message_handler:
-                    self._message_handler(content)
+                    try:
+                        result = self._message_handler(content)
+                    except Exception as e:
+                        logger.error("InboxPoller: handler error for %s: %s", msg_id, e)
+                        result = {"error": str(e)}
 
-                # Mark as processed
                 self._processed.add(msg_id)
 
-                # Archive processed message
+                if self._outbox_writer:
+                    try:
+                        self._outbox_writer(msg_id, self.role, content, result)
+                    except Exception as e:
+                        logger.error(
+                            "InboxPoller: outbox write failed for %s: %s", msg_id, e
+                        )
+
                 archive_dir = self.inbox / "processed"
                 archive_dir.mkdir(exist_ok=True)
                 msg_file.rename(archive_dir / msg_file.name)
 
             except Exception as e:
-                logger.error("Failed to process message %s: %s", msg_id, e)
+                logger.error("InboxPoller: failed to process message %s: %s", msg_id, e)
 
 
-# ---------------------------------------------------------------------------
-# Claw Starter
-# ---------------------------------------------------------------------------
+class HeartbeatMonitor:
+    """Monitors claw heartbeats and triggers auto-restart when stale."""
+
+    def __init__(
+        self,
+        heartbeat_dir: Path,
+        check_interval: int = 60,
+        unhealthy_threshold: int = UNHEALTHY_THRESHOLD,
+    ) -> None:
+        self.heartbeat_dir = heartbeat_dir
+        self.check_interval = check_interval
+        self.unhealthy_threshold = unhealthy_threshold
+        self._running = False
+        self._thread: threading.Thread | None = None
+        self._restart_callback: Callable[[str], None] | None = None
+        self._active_roles: list[str] = []
+
+    def set_restart_callback(self, callback: Callable[[str], None]) -> None:
+        self._restart_callback = callback
+
+    def set_active_roles(self, roles: list[str]) -> None:
+        self._active_roles = list(roles)
+
+    def start(self) -> None:
+        if self._running:
+            return
+        self._running = True
+        self._thread = threading.Thread(target=self._monitor_loop, daemon=True)
+        self._thread.start()
+        logger.info(
+            "HeartbeatMonitor: started (interval=%ds, threshold=%ds)",
+            self.check_interval,
+            self.unhealthy_threshold,
+        )
+
+    def stop(self) -> None:
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=5)
+        logger.info("HeartbeatMonitor: stopped")
+
+    def _monitor_loop(self) -> None:
+        while self._running:
+            try:
+                self._check_heartbeats()
+            except Exception as e:
+                logger.error("HeartbeatMonitor: error: %s", e)
+            time.sleep(self.check_interval)
+
+    def _check_heartbeats(self) -> None:
+        if not self.heartbeat_dir.exists():
+            return
+
+        now = time.time()
+        for hb_file in sorted(self.heartbeat_dir.glob("*.json")):
+            role = hb_file.stem
+            if role not in self._active_roles:
+                continue
+
+            try:
+                hb = json.loads(hb_file.read_text())
+                timestamp = hb.get("timestamp", "")
+                if not timestamp:
+                    continue
+
+                hb_time = datetime.fromisoformat(timestamp).replace(tzinfo=timezone.utc)
+                age_seconds = (datetime.now(timezone.utc) - hb_time).total_seconds()
+
+                if age_seconds > self.unhealthy_threshold:
+                    logger.warning(
+                        "HeartbeatMonitor: claw '%s' stale (%.0fs old, threshold=%ds)",
+                        role,
+                        age_seconds,
+                        self.unhealthy_threshold,
+                    )
+                    if self._restart_callback:
+                        self._restart_callback(role)
+                else:
+                    logger.debug(
+                        "HeartbeatMonitor: claw '%s' healthy (%.0fs old)",
+                        role,
+                        age_seconds,
+                    )
+
+            except Exception as e:
+                logger.warning("HeartbeatMonitor: failed to read %s: %s", hb_file, e)
 
 
-def start_build_claw(heartbeat_interval: int = 30, poll_interval: int = 5):
-    """Start the Build Claw autonomous agent."""
-    try:
+class OutboxCleaner:
+    """Periodically removes expired result files from the outbox."""
+
+    def __init__(
+        self,
+        check_interval: int = 300,
+        ttl_seconds: int = RESULT_TTL_SECONDS,
+    ):
+        self.check_interval = check_interval
+        self.ttl_seconds = ttl_seconds
+        self._running = False
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        if self._running:
+            return
+        self._running = True
+        self._thread = threading.Thread(target=self._clean_loop, daemon=True)
+        self._thread.start()
+        logger.info(
+            "OutboxCleaner: started (interval=%ds, ttl=%ds)",
+            self.check_interval,
+            self.ttl_seconds,
+        )
+
+    def stop(self) -> None:
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=5)
+        logger.info("OutboxCleaner: stopped")
+
+    def _clean_loop(self) -> None:
+        while self._running:
+            try:
+                self._clean_expired()
+            except Exception as e:
+                logger.error("OutboxCleaner: error: %s", e)
+            time.sleep(self.check_interval)
+
+    def _clean_expired(self) -> None:
+        if not OUTBOX_DIR.exists():
+            return
+
+        now = datetime.now(timezone.utc)
+        cleaned = 0
+
+        for role_dir in OUTBOX_DIR.iterdir():
+            if not role_dir.is_dir():
+                continue
+
+            for result_file in role_dir.glob("*.json"):
+                try:
+                    data = json.loads(result_file.read_text())
+                    expires_at = data.get("expires_at")
+                    if not expires_at:
+                        continue
+
+                    expiry_dt = datetime.fromisoformat(
+                        expires_at.replace("Z", "+00:00")
+                    )
+                    if now > expiry_dt:
+                        result_file.unlink()
+                        cleaned += 1
+                        logger.debug(
+                            "OutboxCleaner: removed expired result %s", result_file
+                        )
+                except (json.JSONDecodeError, OSError, ValueError):
+                    pass
+
+        if cleaned > 0:
+            logger.info("OutboxCleaner: cleaned %d expired results", cleaned)
+
+
+class ClawComponents:
+    """Bundles all components for a single running claw."""
+
+    def __init__(
+        self, role: str, claw: Any, heartbeat: HeartbeatEmitter, poller: InboxPoller
+    ):
+        self.role = role
+        self.claw = claw
+        self.heartbeat = heartbeat
+        self.poller = poller
+        self._alive = True
+
+    def is_alive(self) -> bool:
+        return self._alive and self.heartbeat.is_alive and self.poller.is_alive
+
+    def stop(self) -> None:
+        self._alive = False
+        self.poller.stop()
+        self.heartbeat.stop()
+        if self.claw and hasattr(self.claw, "shutdown"):
+            try:
+                self.claw.shutdown()
+            except Exception as e:
+                logger.error("ClawComponents: error shutting down %s: %s", self.role, e)
+
+    def restart(self) -> None:
+        self.stop()
+
+
+class ClawLauncher:
+    """Production claw process supervisor."""
+
+    def __init__(
+        self,
+        heartbeat_interval: int = 30,
+        poll_interval: int = 5,
+        check_interval: int = 60,
+        unhealthy_threshold: int = UNHEALTHY_THRESHOLD,
+    ):
+        self.heartbeat_interval = heartbeat_interval
+        self.poll_interval = poll_interval
+        self.check_interval = check_interval
+        self.unhealthy_threshold = unhealthy_threshold
+
+        self._components: dict[str, ClawComponents] = {}
+        self._supervisor = ProcessSupervisor()
+        self._backoff: dict[str, float] = defaultdict(lambda: 1.0)
+        self._running = False
+        self._lock = threading.Lock()
+        self._monitor = HeartbeatMonitor(
+            heartbeat_dir=HEARTBEAT_DIR,
+            check_interval=check_interval,
+            unhealthy_threshold=unhealthy_threshold,
+        )
+        self._outbox_cleaner = OutboxCleaner()
+
+        MESH_DIR.mkdir(parents=True, exist_ok=True)
+        HEARTBEAT_DIR.mkdir(parents=True, exist_ok=True)
+        INBOX_DIR.mkdir(parents=True, exist_ok=True)
+        OUTBOX_DIR.mkdir(parents=True, exist_ok=True)
+
+    def start_role(self, role: str) -> ClawComponents | None:
+        """Start a single claw role."""
+        with self._lock:
+            if role in self._components and self._components[role].is_alive():
+                logger.warning("ClawLauncher: %s already running", role)
+                return self._components[role]
+
+            logger.info("ClawLauncher: starting %s", role)
+            try:
+                if role == "build":
+                    claw, heartbeat, poller = self._start_build_claw()
+                else:
+                    claw, heartbeat, poller = self._start_generic_claw(role)
+
+                if claw or heartbeat:
+                    components = ClawComponents(role, claw, heartbeat, poller)
+                    self._components[role] = components
+                    self._supervisor.clear(role)
+                    self._backoff[role] = 1.0
+                    logger.info("ClawLauncher: %s started successfully", role)
+                    return components
+                else:
+                    logger.error("ClawLauncher: failed to start %s", role)
+                    return None
+            except Exception as e:
+                logger.error("ClawLauncher: exception starting %s: %s", role, e)
+                return None
+
+    def stop_role(self, role: str) -> None:
+        """Stop a single claw role."""
+        with self._lock:
+            if role not in self._components:
+                logger.warning("ClawLauncher: %s not running", role)
+                return
+            logger.info("ClawLauncher: stopping %s", role)
+            self._components[role].stop()
+            del self._components[role]
+
+    def restart_role(self, role: str) -> ClawComponents | None:
+        """Stop then start a claw role."""
+        logger.info("ClawLauncher: restarting %s", role)
+        self.stop_role(role)
+        time.sleep(2)
+        return self.start_role(role)
+
+    def _monitor_restart_callback(self, role: str) -> None:
+        """Wraps restart_stale_claw for use as a monitor callback."""
+        self.restart_stale_claw(role)
+
+    def restart_stale_claw(self, role: str) -> None:
+        """Called by HeartbeatMonitor when a claw's heartbeat goes stale."""
+        if role not in self._components:
+            return
+
+        if self._supervisor.is_flapping(role):
+            logger.error(
+                "ClawLauncher: %s is flapping (%d restarts in %ds). Not restarting automatically.",
+                role,
+                self._supervisor.restart_count(role),
+                RESTART_WINDOW_SECONDS,
+            )
+            return
+
+        if not self._supervisor.record_restart(role):
+            logger.error(
+                "ClawLauncher: %s exceeded restart threshold (%d in %ds)",
+                role,
+                self._supervisor.restart_count(role),
+                RESTART_WINDOW_SECONDS,
+            )
+            return
+
+        backoff = self._backoff[role]
+        logger.warning(
+            "ClawLauncher: restarting stale claw %s (backoff=%.1fs)",
+            role,
+            backoff,
+        )
+
+        def delayed_restart():
+            time.sleep(backoff)
+            self.restart_role(role)
+
+        self._backoff[role] = min(backoff * 2, RESTART_BACKOFF_MAX)
+        threading.Thread(target=delayed_restart, daemon=True).start()
+
+    def start_all(self) -> None:
+        """Start all 5 claw roles."""
+        self._running = True
+        self._monitor.set_active_roles(ALL_ROLES)
+        self._monitor.set_restart_callback(self._monitor_restart_callback)
+        self._monitor.start()
+        self._outbox_cleaner.start()
+
+        for role in ALL_ROLES:
+            self.start_role(role)
+
+    def stop_all(self) -> None:
+        """Stop all running claws."""
+        self._running = False
+        self._monitor.stop()
+        self._outbox_cleaner.stop()
+        with self._lock:
+            for role in list(self._components.keys()):
+                self._components[role].stop()
+            self._components.clear()
+
+    def status(self) -> dict:
+        """Return status of all claws."""
+        status = {
+            "running": self._running,
+            "launcher_pid": os.getpid(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "claws": {},
+        }
+        for role in ALL_ROLES:
+            components = self._components.get(role)
+            hb_file = HEARTBEAT_DIR / f"{role}.json"
+            if components and components.is_alive():
+                status["claws"][role] = {
+                    "status": "running",
+                    "uptime_seconds": getattr(components.heartbeat, "_start_time", 0),
+                    "restarts": self._supervisor.restart_count(role),
+                    "flapping": self._supervisor.is_flapping(role),
+                }
+            elif hb_file.exists():
+                try:
+                    hb = json.loads(hb_file.read_text())
+                    age = (
+                        datetime.now(timezone.utc)
+                        - datetime.fromisoformat(hb.get("timestamp", "")).replace(
+                            tzinfo=timezone.utc
+                        )
+                    ).total_seconds()
+                    status["claws"][role] = {
+                        "status": "stale",
+                        "age_seconds": round(age, 1),
+                        "restarts": self._supervisor.restart_count(role),
+                    }
+                except Exception:
+                    status["claws"][role] = {"status": "unknown"}
+            else:
+                status["claws"][role] = {
+                    "status": "stopped",
+                    "restarts": self._supervisor.restart_count(role),
+                }
+        return status
+
+    def _start_build_claw(self) -> tuple:
+        """Start the Build claw with real clients when available."""
         from orchestrator.build.build_claw import BuildClaw
         from orchestrator.build.build_init import BASE
         from orchestrator.inference_client import NvidiaInferenceClient
         from orchestrator.github_client import GitHubClient
 
-        # Create real clients with environment-based configuration
         inference_client = NvidiaInferenceClient(
-            api_key=os.environ.get("NVIDIA_API_KEY") or os.environ.get("BUILD_CLAW_NVIDIA_API_KEY"),
+            api_key=os.environ.get("NVIDIA_API_KEY")
+            or os.environ.get("BUILD_CLAW_NVIDIA_API_KEY"),
             api_base=os.environ.get("NVIDIA_API_BASE"),
         )
 
-        github_client = GitHubClient(
-            repo=os.environ.get("GITHUB_REPO"),
+        github_client = GitHubClient(repo=os.environ.get("GITHUB_REPO"))
+
+        # Initialize real Vercel client if token available
+        vercel_client = None
+        vercel_token = os.environ.get("VERCEL_TOKEN") or os.environ.get(
+            "VERCEL_API_TOKEN"
         )
+        if vercel_token:
+            try:
+                from orchestrator.build.vercel_client import VercelClient
 
-        class MockVercelClient:
-            pass
+                vercel_client = VercelClient(
+                    api_token=vercel_token,
+                    team_id=os.environ.get("VERCEL_TEAM_ID"),
+                    project_id=os.environ.get("VERCEL_PROJECT_ID"),
+                )
+                if vercel_client.health_check():
+                    logger.info("ClawLauncher: VercelClient connected successfully")
+                else:
+                    logger.warning(
+                        "ClawLauncher: VercelClient health check failed, using stub"
+                    )
+                    vercel_client = None
+            except ImportError as e:
+                logger.warning("ClawLauncher: VercelClient import failed: %s", e)
+            except Exception as e:
+                logger.warning("ClawLauncher: VercelClient init failed: %s", e)
 
-        class MockSentryClient:
-            pass
+        # Initialize real Sentry client if token available
+        sentry_client = None
+        sentry_token = os.environ.get("SENTRY_AUTH_TOKEN")
+        if sentry_token:
+            try:
+                from orchestrator.build.sentry_client import SentryClient
+
+                sentry_client = SentryClient(
+                    auth_token=sentry_token,
+                    org_slug=os.environ.get("SENTRY_ORG_SLUG"),
+                    project_slug=os.environ.get("SENTRY_PROJECT_SLUG"),
+                )
+                if sentry_client.health_check():
+                    logger.info("ClawLauncher: SentryClient connected successfully")
+                else:
+                    logger.warning(
+                        "ClawLauncher: SentryClient health check failed, using stub"
+                    )
+                    sentry_client = None
+            except ImportError as e:
+                logger.warning("ClawLauncher: SentryClient import failed: %s", e)
+            except Exception as e:
+                logger.warning("ClawLauncher: SentryClient init failed: %s", e)
+
+        # Use stub clients if real ones not available
+        if vercel_client is None:
+
+            class _StubVercelClient:
+                pass
+
+            vercel_client = _StubVercelClient()
+            logger.debug("ClawLauncher: using stub VercelClient")
+
+        if sentry_client is None:
+
+            class _StubSentryClient:
+                pass
+
+            sentry_client = _StubSentryClient()
+            logger.debug("ClawLauncher: using stub SentryClient")
 
         claw = BuildClaw(
             squad_id=SQUAD_ID,
             inference_client=inference_client,
             github_client=github_client,
-            vercel_client=MockVercelClient(),
-            sentry_client=MockSentryClient(),
+            vercel_client=vercel_client,
+            sentry_client=sentry_client,
             base_path=BASE,
         )
-
-        # Start the claw (this initializes filesystem, managers, etc.)
         claw.startup()
-        logger.info("Build Claw started successfully")
 
-        # Start heartbeat
-        heartbeat = HeartbeatEmitter("build", heartbeat_interval)
+        heartbeat = HeartbeatEmitter("build", self.heartbeat_interval)
         heartbeat.start()
 
-        # Start inbox poller
         def handle_message(msg):
             try:
                 claw.handle_inbound(msg)
             except Exception as e:
-                logger.error("Error handling message: %s", e)
+                logger.error("BuildClaw: handle_inbound error: %s", e)
 
-        poller = InboxPoller("build", poll_interval, handle_message)
+        poller = InboxPoller("build", self.poll_interval, handle_message, write_outbox)
         poller.start()
 
         return claw, heartbeat, poller
 
-    except ImportError as e:
-        logger.error("Failed to import BuildClaw: %s", e)
-        return None, None, None
-    except Exception as e:
-        logger.error("Failed to start BuildClaw: %s", e)
-        return None, None, None
+    def _start_generic_claw(self, role: str) -> tuple:
+        """Start a generic claw with real clients when available."""
+        claw = None
+        heartbeat = HeartbeatEmitter(role, self.heartbeat_interval)
+        heartbeat.start()
+
+        poller = InboxPoller(role, self.poll_interval, outbox_writer=write_outbox)
+        poller.start()
+
+        try:
+            if role == "content":
+                from orchestrator.content.content_claw import ContentClaw
+                from orchestrator.inference_client import NvidiaInferenceClient
+
+                inference = NvidiaInferenceClient(
+                    api_key=os.environ.get("NVIDIA_API_KEY"),
+                    api_base=os.environ.get("NVIDIA_API_BASE"),
+                )
+                claw = ContentClaw(
+                    squad_id=SQUAD_ID,
+                    inference_client=inference,
+                    base_path=Path("/sandbox/content"),
+                )
+                claw.startup()
+                poller._message_handler = claw.handle_inbound
+
+            elif role == "ops":
+                from orchestrator.ops.ops_claw import OpsClaw
+                from orchestrator.inference_client import NvidiaInferenceClient
+
+                inference = NvidiaInferenceClient(
+                    api_key=os.environ.get("NVIDIA_API_KEY"),
+                    api_base=os.environ.get("NVIDIA_API_BASE"),
+                )
+                claw = OpsClaw(
+                    squad_id=SQUAD_ID,
+                    inference_client=inference,
+                    base_path=Path("/sandbox/ops"),
+                )
+                claw.startup()
+                poller._message_handler = claw.handle_inbound
+
+            elif role == "analytics":
+                from orchestrator.analytics.analytics_claw import AnalyticsClaw
+                from orchestrator.inference_client import NvidiaInferenceClient
+
+                inference = NvidiaInferenceClient(
+                    api_key=os.environ.get("NVIDIA_API_KEY"),
+                    api_base=os.environ.get("NVIDIA_API_BASE"),
+                )
+                claw = AnalyticsClaw(
+                    squad_id=SQUAD_ID,
+                    inference_client=inference,
+                    base_path=Path("/sandbox/analytics"),
+                )
+                claw.startup()
+                poller._message_handler = claw.handle_inbound
+
+            elif role == "finance":
+                from orchestrator.finance.finance_claw import FinanceClaw
+                from orchestrator.finance.stripe_client import StripeClient
+                from orchestrator.inference_client import NvidiaInferenceClient
+
+                inference = NvidiaInferenceClient(
+                    api_key=os.environ.get("NVIDIA_API_KEY"),
+                    api_base=os.environ.get("NVIDIA_API_BASE"),
+                )
+                stripe = StripeClient(
+                    api_key=os.environ.get("STRIPE_SECRET_KEY"),
+                    webhook_secret=os.environ.get("STRIPE_WEBHOOK_SECRET"),
+                    currency=os.environ.get("STRIPE_CURRENCY", "usd"),
+                )
+
+                # Real MeshGateway using MeshCoordinator
+                class RealMeshGateway:
+                    """MeshGateway implementation using MeshCoordinator."""
+
+                    def __init__(self):
+                        from orchestrator.mesh import MeshCoordinator
+
+                        mesh_dir = str(MESH_DIR)
+                        config_path = BLUEPRINT_PATH / "mesh_config.yaml"
+                        if config_path.exists():
+                            self._mesh = MeshCoordinator.from_config_file(
+                                str(config_path), squad_id=SQUAD_ID, mesh_dir=mesh_dir
+                            )
+                        else:
+                            self._mesh = MeshCoordinator.from_dict(
+                                {}, squad_id=SQUAD_ID, mesh_dir=mesh_dir
+                            )
+                        for claw_role in ALL_ROLES:
+                            self._mesh.register_claw(
+                                claw_role, address=f"local://{claw_role}"
+                            )
+
+                    def send(
+                        self,
+                        message_type: str,
+                        recipient_role: str,
+                        sender_role: str,
+                        payload: dict,
+                        message_id: str,
+                        timestamp: str,
+                    ) -> bool:
+                        from orchestrator.contracts import ClawMessage
+
+                        msg = ClawMessage(
+                            sender_role=sender_role,
+                            recipient_role=recipient_role,
+                            message_type=message_type,
+                            payload=payload,
+                            squad_id=SQUAD_ID,
+                        )
+                        result = self._mesh.send_message(msg)
+                        if not result.delivered:
+                            logger.warning(
+                                "RealMeshGateway: send failed: %s", result.reason
+                            )
+                        return result.delivered
+
+                gateway = RealMeshGateway()
+                logger.info("ClawLauncher: FinanceClaw using RealMeshGateway")
+
+                claw = FinanceClaw(
+                    squad_id=SQUAD_ID,
+                    inference_client=inference,
+                    stripe_client=stripe,
+                    gateway=gateway,
+                    base_path=Path("/sandbox/finance"),
+                )
+                claw.startup()
+                poller._message_handler = claw.handle_inbound
+
+        except ImportError as e:
+            logger.warning(
+                "ClawLauncher: could not import %s claw: %s (running in stub mode)",
+                role,
+                e,
+            )
+        except Exception as e:
+            logger.error("ClawLauncher: error starting %s claw: %s", role, e)
+
+        return claw, heartbeat, poller
 
 
-def start_generic_claw(role: str, heartbeat_interval: int = 30, poll_interval: int = 5):
-    """Start a generic claw (content, ops, analytics, finance) with heartbeat, inbox polling, and message handlers."""
+def _daemonize() -> None:
+    """Fork into background and write PID file."""
     try:
-        # Import the appropriate claw class based on role
-        if role == "content":
-            from orchestrator.content.content_claw import ContentClaw
-            from orchestrator.inference_client import NvidiaInferenceClient
-            inference = NvidiaInferenceClient(
-                api_key=os.environ.get("NVIDIA_API_KEY"),
-                api_base=os.environ.get("NVIDIA_API_BASE"),
-            )
-            claw = ContentClaw(
-                squad_id=SQUAD_ID,
-                inference_client=inference,
-                base_path=Path("/sandbox/content"),
-            )
-            claw.startup()
-            message_handler = claw.handle_inbound
-        elif role == "ops":
-            from orchestrator.ops.ops_claw import OpsClaw
-            from orchestrator.inference_client import NvidiaInferenceClient
-            inference = NvidiaInferenceClient(
-                api_key=os.environ.get("NVIDIA_API_KEY"),
-                api_base=os.environ.get("NVIDIA_API_BASE"),
-            )
-            claw = OpsClaw(
-                squad_id=SQUAD_ID,
-                inference_client=inference,
-                base_path=Path("/sandbox/ops"),
-            )
-            claw.startup()
-            message_handler = claw.handle_inbound
-        elif role == "analytics":
-            from orchestrator.analytics.analytics_claw import AnalyticsClaw
-            claw = AnalyticsClaw(
-                squad_id=SQUAD_ID,
-                base_path=Path("/sandbox/analytics"),
-            )
-            claw.startup()
-            message_handler = claw.handle_inbound
-        elif role == "finance":
-            from orchestrator.finance.finance_claw import FinanceClaw
-            claw = FinanceClaw(
-                squad_id=SQUAD_ID,
-                base_path=Path("/sandbox/finance"),
-            )
-            claw.startup()
-            message_handler = claw.handle_inbound
-        else:
-            logger.warning("Unknown claw role: %s", role)
-            heartbeat = HeartbeatEmitter(role, heartbeat_interval)
-            heartbeat.start()
-            poller = InboxPoller(role, poll_interval)
-            poller.start()
-            return heartbeat, poller
+        pid = os.fork()
+        if pid > 0:
+            print(f"Launcher started in background (PID {pid})")
+            print(f"PID file: {LAUNCHER_PID_FILE}")
+            sys.exit(0)
+    except OSError as e:
+        sys.stderr.write(f"fork failed: {e}\n")
+        sys.exit(1)
 
-        # Start heartbeat
-        heartbeat = HeartbeatEmitter(role, heartbeat_interval)
-        heartbeat.start()
+    os.setsid()
 
-        # Start inbox poller with the claw's message handler
-        poller = InboxPoller(role, poll_interval, message_handler)
-        poller.start()
+    try:
+        pid = os.fork()
+        if pid > 0:
+            sys.exit(0)
+    except OSError as e:
+        sys.stderr.write(f"fork failed: {e}\n")
+        sys.exit(1)
 
-        logger.info("Claw %s started with heartbeat, inbox polling, and message handler", role)
-        return heartbeat, poller
+    LAUNCHER_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    sys.stdout.flush()
+    sys.stderr.flush()
 
-    except ImportError as e:
-        logger.error("Failed to import %s claw: %s", role, e)
-        # Fall back to basic heartbeat + poller
-        heartbeat = HeartbeatEmitter(role, heartbeat_interval)
-        heartbeat.start()
-        poller = InboxPoller(role, poll_interval)
-        poller.start()
-        return heartbeat, poller
-    except Exception as e:
-        logger.error("Failed to start %s claw: %s", role, e)
-        heartbeat = HeartbeatEmitter(role, heartbeat_interval)
-        heartbeat.start()
-        poller = InboxPoller(role, poll_interval)
-        poller.start()
-        return heartbeat, poller
+    with open(LAUNCHER_LOG_FILE, "a") as log:
+        os.dup2(log.fileno(), sys.stdout.fileno())
+    with open(LAUNCHER_LOG_FILE, "a") as log:
+        os.dup2(log.fileno(), sys.stderr.fileno())
+
+    LAUNCHER_PID_FILE.write_text(str(os.getpid()))
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Milimo Claw Launcher")
-    parser.add_argument("--role", choices=ALL_ROLES, default="build", help="Which claw to start")
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Milimo Claw Launcher",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--role", choices=ALL_ROLES, help="Start a specific claw")
     parser.add_argument("--all", action="store_true", help="Start all claws")
-    parser.add_argument("--heartbeat-interval", type=int, default=30, help="Heartbeat interval in seconds")
-    parser.add_argument("--poll-interval", type=int, default=5, help="Inbox poll interval in seconds")
-    parser.add_argument("--verbose", action="store_true", help="Enable debug logging")
+    parser.add_argument("--daemon", action="store_true", help="Run in background")
+    parser.add_argument("--stop", action="store_true", help="Stop running launcher")
+    parser.add_argument("--status", action="store_true", help="Show launcher status")
+    parser.add_argument("--restart", choices=ALL_ROLES, help="Restart a specific claw")
+    parser.add_argument("--heartbeat-interval", type=int, default=30)
+    parser.add_argument("--poll-interval", type=int, default=5)
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
-    # Setup logging
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(
         level=log_level,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    # Ensure mesh directories exist
-    MESH_DIR.mkdir(parents=True, exist_ok=True)
-    HEARTBEAT_DIR.mkdir(parents=True, exist_ok=True)
-    INBOX_DIR.mkdir(parents=True, exist_ok=True)
-
-    # Track all components for graceful shutdown
-    components: list = []
-
-    # Handle shutdown gracefully
-    def shutdown(signum, frame):
-        logger.info("Shutting down claw launcher...")
-        for component in components:
+    # Handle --stop
+    if args.stop:
+        if LAUNCHER_PID_FILE.exists():
             try:
-                if hasattr(component, "stop"):
-                    component.stop()
-                    logger.info("Stopped component: %s", type(component).__name__)
+                pid = int(LAUNCHER_PID_FILE.read_text().strip())
+                os.kill(pid, signal.SIGTERM)
+                print(f"Stopped launcher (PID {pid})")
+                LAUNCHER_PID_FILE.unlink()
+            except ProcessLookupError:
+                print("Launcher not running")
+                LAUNCHER_PID_FILE.unlink(missing_ok=True)
             except Exception as e:
-                logger.error("Error stopping component %s: %s", type(component).__name__, e)
-        logger.info("All components stopped. Exiting.")
+                print(f"Error stopping launcher: {e}")
+        else:
+            print("No launcher PID file found")
+        return
+
+    # Handle --status
+    if args.status:
+        if LAUNCHER_PID_FILE.exists():
+            try:
+                pid = int(LAUNCHER_PID_FILE.read_text().strip())
+                os.kill(pid, 0)
+                print(f"Launcher running (PID {pid})")
+            except ProcessLookupError:
+                print("Launcher not running (stale PID file)")
+                LAUNCHER_PID_FILE.unlink()
+            except Exception as e:
+                print(f"Error checking launcher: {e}")
+        else:
+            print("Launcher not running")
+        return
+
+    # Handle --restart
+    if args.restart:
+        launcher = ClawLauncher()
+        launcher.restart_role(args.restart)
+        return
+
+    # Daemonize if requested
+    if args.daemon:
+        if LAUNCHER_PID_FILE.exists():
+            print("Launcher already running. Use --stop first.")
+            sys.exit(1)
+        _daemonize()
+
+    # Create launcher
+    launcher = ClawLauncher(
+        heartbeat_interval=args.heartbeat_interval,
+        poll_interval=args.poll_interval,
+    )
+
+    # Handle shutdown
+    def shutdown(signum, frame):
+        logger.info("Shutting down...")
+        launcher.stop_all()
+        if LAUNCHER_PID_FILE.exists():
+            LAUNCHER_PID_FILE.unlink()
         sys.exit(0)
 
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
 
-    # Start FailoverManager for process supervision
-    failover_manager = None
-    try:
-        from orchestrator.mesh_failover import FailoverManager
-        failover_manager = FailoverManager(
-            heartbeat_dir=str(HEARTBEAT_DIR),
-            check_interval=60,
-            unhealthy_threshold=90,
-        )
-        failover_manager.start()
-        components.append(failover_manager)
-        logger.info("FailoverManager started — monitoring claw heartbeats")
-    except Exception as e:
-        logger.warning("Failed to start FailoverManager: %s", e)
-
+    # Start claws
     if args.all:
-        logger.info("Starting all claws...")
-        started = []
-        for role in ALL_ROLES:
-            if role == "build":
-                claw, heartbeat, poller = start_build_claw(args.heartbeat_interval, args.poll_interval)
-                if claw:
-                    started.append(role)
-                    if heartbeat:
-                        components.append(heartbeat)
-                    if poller:
-                        components.append(poller)
-            else:
-                heartbeat, poller = start_generic_claw(role, args.heartbeat_interval, args.poll_interval)
-                started.append(role)
-                if heartbeat:
-                    components.append(heartbeat)
-                if poller:
-                    components.append(poller)
-
-        logger.info("Started %d/%d claws: %s", len(started), len(ALL_ROLES), ", ".join(started))
+        launcher.start_all()
+    elif args.role:
+        launcher.start_role(args.role)
     else:
-        logger.info("Starting %s claw...", args.role)
-        if args.role == "build":
-            claw, heartbeat, poller = start_build_claw(args.heartbeat_interval, args.poll_interval)
-            if claw:
-                started = ["build"]
-                if heartbeat:
-                    components.append(heartbeat)
-                if poller:
-                    components.append(poller)
-                logger.info("Build Claw started successfully")
-            else:
-                logger.error("Failed to start Build Claw")
-                sys.exit(1)
-        else:
-            heartbeat, poller = start_generic_claw(args.role, args.heartbeat_interval, args.poll_interval)
-            if heartbeat:
-                components.append(heartbeat)
-            if poller:
-                components.append(poller)
-            logger.info("%s claw started", args.role)
+        launcher.start_all()
 
-    # Keep main thread alive
-    logger.info("Claw launcher running. Press Ctrl+C to stop.")
+    # Write PID file
+    if args.daemon:
+        LAUNCHER_PID_FILE.write_text(str(os.getpid()))
+
+    print(json.dumps(launcher.status(), indent=2))
+
+    # Keep running
     try:
-        while True:
+        while launcher._running:
             time.sleep(1)
     except KeyboardInterrupt:
-        logger.info("Claw launcher stopped.")
+        pass
+
+    launcher.stop_all()
 
 
 if __name__ == "__main__":

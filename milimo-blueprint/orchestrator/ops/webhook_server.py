@@ -32,6 +32,7 @@ class _WebhookHandler(BaseHTTPRequestHandler):
     """HTTP request handler for webhook endpoints."""
 
     # Set by the server at startup
+    ops_claw: Any = None
     dispatcher: Any = None
     alert_buffer: list[dict] = []
     buffer_lock = threading.Lock()
@@ -72,8 +73,14 @@ class _WebhookHandler(BaseHTTPRequestHandler):
         with self.buffer_lock:
             self.alert_buffer.append(alert)
 
-        # Forward to dispatcher if available
-        if self.dispatcher and hasattr(self.dispatcher, "handle_incident"):
+        # Forward to ops_claw for full analysis + remediation pipeline
+        if self.ops_claw and hasattr(self.ops_claw, "handle_incident"):
+            try:
+                self.ops_claw.handle_incident(alert)
+            except Exception as e:
+                logger.error("Failed to dispatch alert to ops claw: %s", e)
+        elif self.dispatcher and hasattr(self.dispatcher, "handle_incident"):
+            # Fallback: just log via dispatcher
             try:
                 self.dispatcher.handle_incident(alert)
             except Exception as e:
@@ -181,10 +188,12 @@ class OpsWebhookServer:
         port: int = 8080,
         host: str = "0.0.0.0",
         dispatcher: Any | None = None,
+        ops_claw: Any | None = None,
     ) -> None:
         self.port = port
         self.host = host
         self.dispatcher = dispatcher
+        self.ops_claw = ops_claw
         self._server: HTTPServer | None = None
         self._thread: threading.Thread | None = None
         self._running = False
@@ -195,8 +204,13 @@ class OpsWebhookServer:
             logger.warning("Webhook server already running")
             return
 
-        # Configure the handler class with our dispatcher
+        # Clear stale alert buffer from previous session
+        with _WebhookHandler.buffer_lock:
+            _WebhookHandler.alert_buffer.clear()
+
+        # Configure the handler class with our dispatcher and ops_claw
         _WebhookHandler.dispatcher = self.dispatcher
+        _WebhookHandler.ops_claw = self.ops_claw
 
         self._server = HTTPServer((self.host, self.port), _WebhookHandler)
         self._running = True

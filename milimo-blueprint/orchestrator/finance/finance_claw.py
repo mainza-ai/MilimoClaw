@@ -127,6 +127,15 @@ class FinanceClaw:
                 f"Failed to initialize Finance filesystem: {init_result.failed}"
             )
 
+        # Validate Stripe configuration
+        import os
+        stripe_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY")
+        if not stripe_key:
+            import logging
+            logging.getLogger("milimo.finance").warning(
+                "STRIPE_SECRET_KEY or STRIPE_API_KEY not set — Finance Claw will use mock Stripe client"
+            )
+
         operational_log = FinanceOperationalLog(
             self.base_path / "logs" / "operational.log"
         )
@@ -306,6 +315,54 @@ class FinanceClaw:
                     approval_handler = self._components.get("approval_handler")
                     if approval_handler:
                         approval_handler.queue_invoice_review(invoice)
+
+            elif message_type == "hold_release":
+                # War Room released a held payment/invoice
+                payment_monitor = self._components.get("payment_monitor")
+                if payment_monitor:
+                    payment_id = payload.get("payment_id", "")
+                    payment_monitor.release_hold(payment_id, payload)
+                    if operational_log:
+                        operational_log.append(FinanceLogEntry(
+                            timestamp=datetime.now(timezone.utc).isoformat(),
+                            action_type="hold_released",
+                            entity_id=payment_id,
+                            amount=None,
+                            outcome="success",
+                            details={"reason": payload.get("reason", "")},
+                        ))
+
+            elif message_type == "review_approve":
+                # War Room approved a financial action
+                approval_handler = self._components.get("approval_handler")
+                if approval_handler:
+                    action_id = payload.get("action_id", "")
+                    approval_handler.process_approval(action_id, payload)
+                    if operational_log:
+                        operational_log.append(FinanceLogEntry(
+                            timestamp=datetime.now(timezone.utc).isoformat(),
+                            action_type="review_approved",
+                            entity_id=action_id,
+                            amount=None,
+                            outcome="success",
+                            details={"approver": payload.get("approver", "war_room")},
+                        ))
+
+            elif message_type == "review_reject":
+                # War Room rejected a financial action
+                approval_handler = self._components.get("approval_handler")
+                if approval_handler:
+                    action_id = payload.get("action_id", "")
+                    approval_handler.process_rejection(action_id, payload)
+                    if operational_log:
+                        operational_log.append(FinanceLogEntry(
+                            timestamp=datetime.now(timezone.utc).isoformat(),
+                            action_type="review_rejected",
+                            entity_id=action_id,
+                            amount=None,
+                            outcome="rejected",
+                            details={"reason": payload.get("reason", "")},
+                        ))
 
             else:
                 if operational_log:

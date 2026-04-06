@@ -32,7 +32,7 @@ services:
       - SQUAD_ID=${SQUAD_ID:-zulu}
       - PYTHONUNBUFFERED=1
     volumes:
-      - milimo-mesh:/root/.milimo/mesh
+      - milimo-mesh:/sandbox/.milimo/mesh
       - milimo-sandbox:/sandbox
       - milimo-build:/sandbox/build
     command: >
@@ -65,7 +65,7 @@ services:
       - SQUAD_ID=${SQUAD_ID:-zulu}
       - PYTHONUNBUFFERED=1
     volumes:
-      - milimo-mesh:/root/.milimo/mesh
+      - milimo-mesh:/sandbox/.milimo/mesh
       - milimo-sandbox:/sandbox
       - milimo-content:/sandbox/content
     command: >
@@ -98,7 +98,7 @@ services:
       - SQUAD_ID=${SQUAD_ID:-zulu}
       - PYTHONUNBUFFERED=1
     volumes:
-      - milimo-mesh:/root/.milimo/mesh
+      - milimo-mesh:/sandbox/.milimo/mesh
       - milimo-sandbox:/sandbox
       - milimo-ops:/sandbox/ops
     ports:
@@ -128,10 +128,16 @@ services:
     container_name: milimo-analytics-claw
     restart: unless-stopped
     environment:
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - NVIDIA_API_BASE=${NVIDIA_API_BASE:-https://integrate.api.nvidia.com/v1}
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      - YOUTUBE_CHANNEL_ID=${YOUTUBE_CHANNEL_ID}
+      - GA_PROPERTY_ID=${GA_PROPERTY_ID}
+      - GA_CREDENTIALS_PATH=${GA_CREDENTIALS_PATH}
       - SQUAD_ID=${SQUAD_ID:-zulu}
       - PYTHONUNBUFFERED=1
     volumes:
-      - milimo-mesh:/root/.milimo/mesh
+      - milimo-mesh:/sandbox/.milimo/mesh
       - milimo-sandbox:/sandbox
       - milimo-analytics:/sandbox/analytics
     command: >
@@ -159,10 +165,15 @@ services:
     container_name: milimo-finance-claw
     restart: unless-stopped
     environment:
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - NVIDIA_API_BASE=${NVIDIA_API_BASE:-https://integrate.api.nvidia.com/v1}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - STRIPE_CURRENCY=${STRIPE_CURRENCY:-usd}
       - SQUAD_ID=${SQUAD_ID:-zulu}
       - PYTHONUNBUFFERED=1
     volumes:
-      - milimo-mesh:/root/.milimo/mesh
+      - milimo-mesh:/sandbox/.milimo/mesh
       - milimo-sandbox:/sandbox
       - milimo-finance:/sandbox/finance
     command: >

@@ -9,7 +9,7 @@
 
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 
 export interface Logger {
@@ -191,7 +191,7 @@ export async function cliLogsList(options: {
     logger.info(`Log files for squad ${squadId}:\n`);
     for (const file of files) {
       const filePath = join(auditDir, file);
-      const stats = require("node:fs").statSync(filePath);
+      const stats = statSync(filePath);
       const sizeKB = Math.round(stats.size / 1024);
       const modified = stats.mtime.toISOString().split("T")[0];
       logger.info(`  ${file.padEnd(30)} ${sizeKB.toString().padStart(6)} KB  ${modified}`);

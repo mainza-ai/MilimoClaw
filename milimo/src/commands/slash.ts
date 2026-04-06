@@ -19,6 +19,8 @@ import type { PluginCommandContext, PluginCommandResult, OpenClawPluginApi } fro
 import { getPluginConfig, CLAW_ROLES } from "../index.js";
 import { loadMilimoState } from "./init.js";
 import { ApprovalEngine } from "../warroom/approval.js";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
 export function handleSlashCommand(
 	ctx: PluginCommandContext,
@@ -214,12 +216,10 @@ function slashRole(api: OpenClawPluginApi): PluginCommandResult {
 }
 
 function slashFinals(): PluginCommandResult {
-	const fs = require("node:fs") as typeof import("node:fs");
-	const fpath = require("node:path") as typeof import("node:path");
 	const home = process.env["HOME"] ?? process.env["USERPROFILE"] ?? "/tmp";
-	const finalsPath = fpath.join(home, ".milimo", "finals-mode.json");
+	const finalsPath = join(home, ".milimo", "finals-mode.json");
 
-	if (!fs.existsSync(finalsPath)) {
+	if (!existsSync(finalsPath)) {
 		return {
 			text: [
 				"**📚 Finals Mode:** Inactive",
@@ -233,7 +233,7 @@ function slashFinals(): PluginCommandResult {
 	}
 
 	try {
-		const raw = fs.readFileSync(finalsPath, "utf-8");
+		const raw = readFileSync(finalsPath, "utf-8");
 		const state = JSON.parse(raw) as { active: boolean; activatedAt: string; duration: string; resumeDate: string | null };
 
 		if (!state.active) {
@@ -343,8 +343,6 @@ function slashHealth(api: OpenClawPluginApi): PluginCommandResult {
 		return { text: "**❌ Error:** Not initialized. Run `openclaw milimo init` first." };
 	}
 
-	const fs = require("node:fs") as typeof import("node:fs");
-	const fpath = require("node:path") as typeof import("node:path");
 	const home = process.env["HOME"] ?? process.env["USERPROFILE"] ?? "/tmp";
 
 	const lines = ["**🦀 Claw Health Summary**", ""];
@@ -352,13 +350,13 @@ function slashHealth(api: OpenClawPluginApi): PluginCommandResult {
 	const claws = state.meshMembers.length > 0 ? state.meshMembers : [state.clawRole];
 
 	for (const claw of claws) {
-		const registryPath = fpath.join(home, ".milimo", "tools", state.squadName, claw, "registry.json");
+		const registryPath = join(home, ".milimo", "tools", state.squadName, claw, "registry.json");
 		let status = "○";
 		let tools = 0;
 
 		try {
-			if (fs.existsSync(registryPath)) {
-				const data = JSON.parse(fs.readFileSync(registryPath, "utf-8"));
+			if (existsSync(registryPath)) {
+				const data = JSON.parse(readFileSync(registryPath, "utf-8"));
 				tools = Object.keys(data.tools ?? {}).length;
 				status = tools > 0 ? "●" : "○";
 			}
@@ -379,8 +377,6 @@ function slashEvolution(api: OpenClawPluginApi): PluginCommandResult {
 		return { text: "**❌ Error:** Not initialized. Run `openclaw milimo init` first." };
 	}
 
-	const fs = require("node:fs") as typeof import("node:fs");
-	const fpath = require("node:path") as typeof import("node:path");
 	const home = process.env["HOME"] ?? process.env["USERPROFILE"] ?? "/tmp";
 
 	const lines = ["**🔧 Evolution Log**", ""];
@@ -388,11 +384,11 @@ function slashEvolution(api: OpenClawPluginApi): PluginCommandResult {
 	const claws = state.meshMembers.length > 0 ? state.meshMembers : [state.clawRole];
 
 	for (const claw of claws) {
-		const registryPath = fpath.join(home, ".milimo", "tools", state.squadName, claw, "registry.json");
+		const registryPath = join(home, ".milimo", "tools", state.squadName, claw, "registry.json");
 
 		try {
-			if (fs.existsSync(registryPath)) {
-				const data = JSON.parse(fs.readFileSync(registryPath, "utf-8"));
+			if (existsSync(registryPath)) {
+				const data = JSON.parse(readFileSync(registryPath, "utf-8"));
 				const tools = data.tools ?? {};
 				const toolNames = Object.keys(tools);
 

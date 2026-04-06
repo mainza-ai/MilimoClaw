@@ -162,7 +162,9 @@ class PaymentMonitor:
                 due_date = datetime.now(timezone.utc).date()
 
             today = datetime.now(timezone.utc).date()
-            days_overdue = max(0, (today - due_date).days) if stripe_status == "open" else 0
+            days_overdue = (
+                max(0, (today - due_date).days) if stripe_status == "open" else 0
+            )
 
             payment_event = PaymentEvent(
                 timestamp=datetime.now(timezone.utc).isoformat(),
@@ -280,7 +282,9 @@ class PaymentMonitor:
         except ValueError:
             days_overdue = 1
 
-        overdue_count = self.payment_events_log.count_overdue_by_client(invoice.client_id)
+        overdue_count = self.payment_events_log.count_overdue_by_client(
+            invoice.client_id
+        )
 
         risk_level = "low"
         if overdue_count >= 2:
@@ -379,8 +383,12 @@ class PaymentMonitor:
         if not invoice.approved_at:
             return False
 
-        approved_time = datetime.fromisoformat(invoice.approved_at.replace("Z", "+00:00"))
-        elapsed_hours = (datetime.now(timezone.utc) - approved_time).total_seconds() / 3600
+        approved_time = datetime.fromisoformat(
+            invoice.approved_at.replace("Z", "+00:00")
+        )
+        elapsed_hours = (
+            datetime.now(timezone.utc) - approved_time
+        ).total_seconds() / 3600
 
         if elapsed_hours > STRIPE_MAX_RETRY_HOURS:
             entry = FinanceLogEntry(
@@ -408,7 +416,7 @@ class PaymentMonitor:
         self.payment_events_log.append(payment_event)
 
         try:
-            from finance.invoice_manager import InvoiceManager
+            from .invoice_manager import InvoiceManager
 
             sent_invoice = self._attempt_stripe_send(invoice)
             return True

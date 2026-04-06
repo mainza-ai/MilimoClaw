@@ -44,6 +44,7 @@ from .gateway_adapter import (
     WebSocketGateway,
     ConnectionState,
 )
+from .privacy_router import PrivacyRouter, RoutingDecision, InferenceBackend
 
 logger = logging.getLogger("milimo.mesh")
 
@@ -111,11 +112,13 @@ class MeshCoordinator:
         squad_id: str = "",
         mesh_dir: str | None = None,
         mesh_config: MeshConfig | None = None,
+        privacy_router: PrivacyRouter | None = None,
     ) -> None:
         self._validator = validator
         self._squad_id = squad_id
         self._nodes: dict[str, ClawNode] = {}
         self._mesh_config = mesh_config or MeshConfig()
+        self._privacy_router = privacy_router
 
         # Initialize gateway adapter
         self._gateway: GatewayAdapter | None = None
@@ -295,9 +298,10 @@ class MeshCoordinator:
 
         Steps:
         1. Validate the message against contracts
-        2. Check recipient is registered and online
-        3. Send via gateway or queue the message
-        4. Flag if approval is required
+        2. Apply privacy classification (if router configured)
+        3. Check recipient is registered and online
+        4. Send via gateway or queue the message
+        5. Flag if approval is required
         """
         # 1. Validate contract
         validation: ValidationResult = self._validator.validate(message)
@@ -309,7 +313,22 @@ class MeshCoordinator:
                 message_id=message.message_id,
             )
 
-        # 2. Check recipient status (war_room is always available)
+        # 2. Privacy classification (if router is configured)
+        if self._privacy_router is not None:
+            privacy_decision = self._privacy_router.route(
+                role=message.sender_role,
+                data_type=message.message_type,
+            )
+            message.payload["_privacy_backend"] = privacy_decision.backend.value
+            message.payload["_privacy_reason"] = privacy_decision.reason
+            logger.info(
+                "Privacy classified %s -> %s (%s)",
+                message.message_type,
+                privacy_decision.backend.value,
+                privacy_decision.reason,
+            )
+
+        # 3. Check recipient status (war_room is always available)
         if message.recipient_role != "war_room":
             recipient = self._nodes.get(message.recipient_role)
             if recipient is None:

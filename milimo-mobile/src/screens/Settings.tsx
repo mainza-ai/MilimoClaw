@@ -17,6 +17,13 @@ import {
   Switch,
   Alert,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../App';
+import { useAuth } from '../hooks/useAuth';
+import { logout } from '../api/warroom';
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 interface Settings {
   notificationsEnabled: boolean;
@@ -28,6 +35,8 @@ interface Settings {
 }
 
 function SettingsScreen(): React.JSX.Element {
+  const navigation = useNavigation<NavigationProp>();
+  const { logout: authLogout } = useAuth();
   const [settings, setSettings] = useState<Settings>({
     notificationsEnabled: true,
     biometricEnabled: true,
@@ -71,9 +80,13 @@ function SettingsScreen(): React.JSX.Element {
         {
           text: 'Log Out',
           style: 'destructive',
-          onPress: () => {
-            // In production, clear auth tokens and navigate to login
-            console.log('Logging out');
+          onPress: async () => {
+            await logout();
+            await authLogout();
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Login' as never }],
+            });
           },
         },
       ]

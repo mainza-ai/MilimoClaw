@@ -134,12 +134,14 @@ class ContentGenerator:
         operational_log: ContentOperationalLog,
         fs: ContentFilesystemInit,
         war_room: Any | None = None,
+        inference_client: Any | None = None,
     ) -> None:
         self._router = privacy_router
         self._tools = tool_registry
         self._log = operational_log
         self._fs = fs
         self._war_room = war_room
+        self._inference_client = inference_client
 
     async def generate_draft(
         self,
@@ -362,29 +364,29 @@ class ContentGenerator:
 
         return None
 
-    async def _call_inference(self, prompt: str, routing: RoutingDecision) -> str:
-        """Call the inference backend via NvidiaInferenceClient."""
-        logger.debug("Calling inference backend: %s", routing.backend.value)
-
-        # Map routing backend to data_type for the inference client
-        data_type_map = {
-            "content_draft": "content_draft",
-            "client_facing_draft": "content_draft",
-            "internal_ideation": "general",
-            "campaign": "content_plan",
-            "sentiment": "sentiment_analysis",
-        }
-        data_type = data_type_map.get(routing.backend.value, "general")
+    async def _call_inference(self, prompt: str, routing: RoutingDecision, data_type: str = "general") -> str:
+        """Call the inference backend via the injected NvidiaInferenceClient."""
+        logger.debug("Calling inference backend: %s (data_type=%s)", routing.backend.value, data_type)
 
         try:
-            from orchestrator.inference_client import NvidiaInferenceClient
-            client = NvidiaInferenceClient()
-            result = client.complete(
-                prompt=prompt,
-                data_type=data_type,
-                temperature=0.7 if "draft" in data_type else 0.3,
-            )
-            return result
+            if self._inference_client is not None:
+                # Use the injected inference client
+                result = self._inference_client.complete(
+                    prompt=prompt,
+                    data_type=data_type,
+                    temperature=0.7 if "draft" in data_type else 0.3,
+                )
+                return result
+            else:
+                # Fallback: create a client on-demand (not ideal but functional)
+                from orchestrator.inference_client import NvidiaInferenceClient
+                client = NvidiaInferenceClient()
+                result = client.complete(
+                    prompt=prompt,
+                    data_type=data_type,
+                    temperature=0.7 if "draft" in data_type else 0.3,
+                )
+                return result
         except Exception as e:
             logger.warning("Inference call failed: %s — returning placeholder", e)
             return f"Generated content for: {prompt[:100]}..."

@@ -282,3 +282,37 @@ class OpsSignalDispatcher:
 
     def mark_pricing_confirmed(self, project_id: str) -> None:
         self._confirm_pricing(project_id)
+
+    def handle_incident(self, alert: dict[str, Any]) -> None:
+        """Handle an incoming incident alert from the webhook server.
+
+        This method is called by OpsWebhookServer when a webhook is received.
+        It logs the alert and makes it available for the IncidentAnalyzer
+        and RunbookExecutor (wired via OpsClaw).
+
+        Args:
+            alert: Alert dict with alert_id, source, severity, title, description.
+        """
+        alert_id = alert.get("alert_id", "unknown")
+        source = alert.get("source", "unknown")
+        severity = alert.get("severity", "warning")
+        title = alert.get("title", "")
+
+        self._operational_log.append(
+            OpsLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="incident_received",
+                entity_id=alert_id,
+                outcome="success",
+                details={
+                    "source": source,
+                    "severity": severity,
+                    "title": title,
+                },
+            )
+        )
+
+        logger.info(
+            "Incident received: %s from %s (severity: %s) — %s",
+            alert_id, source, severity, title,
+        )

@@ -13,10 +13,13 @@
  */
 
 import * as blessed from "blessed";
-import { ApprovalEngine, ApprovalMode, PendingMessage } from "./approval";
-import { AuditLogger } from "./audit";
-import { EvolutionManager } from "./evolution";
-import { DigestScheduler, type DigestBrief } from "./digest";
+import { ApprovalEngine, ApprovalMode, PendingMessage } from "./approval.js";
+import { AuditLogger } from "./audit.js";
+import { EvolutionManager } from "./evolution.js";
+import { DigestScheduler, type DigestBrief } from "./digest.js";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 
 interface ClawHealth {
   name: string;
@@ -455,21 +458,20 @@ Press H to close this help.
 
 		try {
 			const home = process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
-			// Support both host and container environments
-			const sandboxMesh = require("path").join("/sandbox", ".milimo");
-			const homeMesh = require("path").join(home, ".milimo");
-			const meshRoot = require("fs").existsSync(sandboxMesh) ? sandboxMesh : homeMesh;
-			const registryPath = require("path").join(meshRoot, "tools", this.squadId, role, "registry.json");
-			if (require("fs").existsSync(registryPath)) {
-				const data = JSON.parse(require("fs").readFileSync(registryPath, "utf-8"));
+			const sandboxMesh = join("/sandbox", ".milimo");
+			const homeMesh = join(home, ".milimo");
+			const meshRoot = existsSync(sandboxMesh) ? sandboxMesh : homeMesh;
+			const registryPath = join(meshRoot, "tools", this.squadId, role, "registry.json");
+			if (existsSync(registryPath)) {
+				const data = JSON.parse(readFileSync(registryPath, "utf-8"));
 				status.tools = Object.keys(data.tools ?? {}).length;
 				status.status = status.tools > 0 ? "active" : "idle";
 			}
 
 			// Also check heartbeats for live status
-			const heartbeatPath = require("path").join(meshRoot, "mesh", "heartbeats", `${role}.json`);
-			if (require("fs").existsSync(heartbeatPath)) {
-				const hb = JSON.parse(require("fs").readFileSync(heartbeatPath, "utf-8"));
+			const heartbeatPath = join(meshRoot, "mesh", "heartbeats", `${role}.json`);
+			if (existsSync(heartbeatPath)) {
+				const hb = JSON.parse(readFileSync(heartbeatPath, "utf-8"));
 				const lastBeat = new Date(hb.timestamp).getTime();
 				const now = Date.now();
 				if (now - lastBeat < 60000) {
@@ -586,14 +588,13 @@ Press H to close this help.
   private fetchRevenueData(): void {
     try {
       const home = process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
-      // Support both host and container environments
-      const sandboxMesh = require("path").join("/sandbox", ".milimo");
-      const homeMesh = require("path").join(home, ".milimo");
-      const meshRoot = require("fs").existsSync(sandboxMesh) ? sandboxMesh : homeMesh;
-      const summaryPath = require("path").join(meshRoot, "finance", "revenue", "weekly_summary.json");
+      const sandboxMesh = join("/sandbox", ".milimo");
+      const homeMesh = join(home, ".milimo");
+      const meshRoot = existsSync(sandboxMesh) ? sandboxMesh : homeMesh;
+      const summaryPath = join(meshRoot, "finance", "revenue", "weekly_summary.json");
 
-      if (require("fs").existsSync(summaryPath)) {
-        const data = JSON.parse(require("fs").readFileSync(summaryPath, "utf-8"));
+      if (existsSync(summaryPath)) {
+        const data = JSON.parse(readFileSync(summaryPath, "utf-8"));
         const currentWeek = data.current_week || {};
         const previousWeek = data.previous_week || {};
 

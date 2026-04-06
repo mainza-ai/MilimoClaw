@@ -470,6 +470,7 @@ class PlatformPublisher:
                 if attempt < self.MAX_RETRIES - 1:
                     wait_seconds = self.RETRY_INTERVAL_MINUTES * 60
                     logger.info("Retrying in %d seconds...", wait_seconds)
+                    time.sleep(wait_seconds)
 
         return PublishResult(
             success=False,

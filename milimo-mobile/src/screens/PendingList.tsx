@@ -23,19 +23,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../App';
 import ActionCard from '../components/ActionCard';
 import { useAuth } from '../hooks/useAuth';
-import { fetchPendingActions } from '../api/warroom';
-
-interface PendingAction {
-  id: string;
-  type: string;
-  claw_role: string;
-  action_type: string;
-  description: string;
-  confidence: number;
-  risk_level: 'low' | 'medium' | 'high';
-  created_at: string;
-  expires_at: string;
-}
+import { fetchPendingActions, approveAction, vetoAction } from '../api/warroom';
+import type { PendingAction } from '../types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'PendingList'>;
 
@@ -86,9 +75,13 @@ function PendingListScreen(): React.JSX.Element {
         {
           text: 'Approve',
           style: 'default',
-          onPress: () => {
-            // In production, call approve API and trigger biometric
-            console.log('Approving action:', actionId);
+          onPress: async () => {
+            const result = await approveAction(actionId);
+            if (result.ok) {
+              setPendingActions(prev => prev.filter(a => a.id !== actionId));
+            } else {
+              Alert.alert('Error', result.error || 'Failed to approve action');
+            }
           },
         },
       ]
@@ -104,9 +97,13 @@ function PendingListScreen(): React.JSX.Element {
         {
           text: 'Veto',
           style: 'destructive',
-          onPress: () => {
-            // In production, call veto API
-            console.log('Vetoing action:', actionId);
+          onPress: async () => {
+            const result = await vetoAction(actionId, 'Vetoed via mobile app');
+            if (result.ok) {
+              setPendingActions(prev => prev.filter(a => a.id !== actionId));
+            } else {
+              Alert.alert('Error', result.error || 'Failed to veto action');
+            }
           },
         },
       ]

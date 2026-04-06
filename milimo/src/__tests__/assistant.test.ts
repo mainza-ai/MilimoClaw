@@ -206,7 +206,7 @@ describe("assistant commands", () => {
 
       expect(mockedSpawn).toHaveBeenCalledWith(
         "openclaw",
-        ["agent", "--agent", "main"],
+        ["tui", "--session", "main"],
         { stdio: "inherit" }
       );
     });

@@ -176,3 +176,96 @@ class DependencyAuditor:
             details={"package": vuln.package},
         ))
         return action_id
+
+    # ------------------------------------------------------------------
+    # Full audit execution
+    # ------------------------------------------------------------------
+
+    def run_full_audit(self) -> AuditResult:
+        """Run a complete vulnerability audit on the repository.
+
+        Fetches Dependabot alerts and code scanning alerts from GitHub,
+        assesses fix complexity for each, and handles them appropriately:
+        - Simple fixes: batched into a security PR
+        - Breaking changes: queued for manual investigation
+        - No fix available: queued for no-fix review
+
+        Returns:
+            AuditResult with vulnerability summary.
+        """
+        logger.info("Running full dependency audit on %s", self._repo_path)
+
+        # Fetch vulnerabilities from GitHub
+        dependabot_alerts = self._github.get_dependabot_alerts()
+        code_scanning_alerts = self._github.get_code_scanning_alerts()
+
+        vulnerabilities = []
+
+        # Process Dependabot alerts
+        for alert in dependabot_alerts:
+            vuln = Vulnerability(
+                package=alert.get("package", "unknown"),
+                ecosystem=alert.get("ecosystem", "unknown"),
+                current_version=alert.get("current_version", "unknown"),
+                vulnerable_versions=alert.get("vulnerable_versions", ""),
+                patched_version=alert.get("patched_version"),
+                severity=alert.get("severity", "medium"),
+                cve_id=alert.get("cve_id"),
+                fix_complexity=alert.get("fix_complexity", "simple"),
+            )
+            vulnerabilities.append(vuln)
+
+        # Process code scanning alerts
+        for alert in code_scanning_alerts:
+            vuln = Vulnerability(
+                package=alert.get("tool", "code-scanning"),
+                ecosystem="code",
+                current_version="",
+                vulnerable_versions="",
+                patched_version=None,
+                severity=alert.get("severity", "medium"),
+                cve_id=alert.get("cve_id"),
+                fix_complexity=alert.get("fix_complexity", "simple"),
+            )
+            vulnerabilities.append(vuln)
+
+        # Count by severity
+        critical_count = sum(1 for v in vulnerabilities if v.severity == "critical")
+        high_count = sum(1 for v in vulnerabilities if v.severity == "high")
+        medium_count = sum(1 for v in vulnerabilities if v.severity == "medium")
+        low_count = sum(1 for v in vulnerabilities if v.severity == "low")
+
+        # Handle vulnerabilities based on fix complexity
+        simple_fixes = []
+        for vuln in vulnerabilities:
+            complexity = self.assess_fix_complexity(vuln)
+            if complexity == "simple":
+                simple_fixes.append(vuln)
+            elif complexity == "breaking_change":
+                self.queue_manual_investigation(vuln)
+            elif complexity == "no_fix":
+                self.queue_no_fix_review(vuln)
+
+        # Batch simple fixes into a single security PR
+        if simple_fixes:
+            self.auto_draft_security_pr(simple_fixes)
+
+        result = AuditResult(
+            vulnerabilities=vulnerabilities,
+            total_count=len(vulnerabilities),
+            critical_count=critical_count,
+            high_count=high_count,
+            medium_count=medium_count,
+            low_count=low_count,
+        )
+
+        logger.info(
+            "Dependency audit complete: %d vulnerabilities (%d critical, %d high, %d medium, %d low)",
+            result.total_count,
+            result.critical_count,
+            result.high_count,
+            result.medium_count,
+            result.low_count,
+        )
+
+        return result

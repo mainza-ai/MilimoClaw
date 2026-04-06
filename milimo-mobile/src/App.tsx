@@ -13,11 +13,14 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import LoginScreen from './screens/Login';
 import PendingListScreen from './screens/PendingList';
 import ActionDetailScreen from './screens/ActionDetail';
 import SettingsScreen from './screens/Settings';
+import { useAuth } from './hooks/useAuth';
 
 export type RootStackParamList = {
+  Login: undefined;
   PendingList: undefined;
   ActionDetail: { actionId: string };
   Settings: undefined;
@@ -26,12 +29,18 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function App(): React.JSX.Element {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return null;
+  }
+
   return (
     <SafeAreaProvider>
       <NavigationContainer>
         <StatusBar barStyle="dark-content" />
         <Stack.Navigator
-          initialRouteName="PendingList"
+          initialRouteName={isAuthenticated ? 'PendingList' : 'Login'}
           screenOptions={{
             headerStyle: {
               backgroundColor: '#1a1a2e',
@@ -42,30 +51,40 @@ function App(): React.JSX.Element {
             },
           }}
         >
-          <Stack.Screen
-            name="PendingList"
-            component={PendingListScreen}
-            options={{
-              title: 'War Room',
-              headerLargeTitle: true,
-            }}
-          />
-          <Stack.Screen
-            name="ActionDetail"
-            component={ActionDetailScreen}
-            options={{
-              title: 'Action Details',
-              headerBackTitle: 'Back',
-            }}
-          />
-          <Stack.Screen
-            name="Settings"
-            component={SettingsScreen}
-            options={{
-              title: 'Settings',
-              presentation: 'modal',
-            }}
-          />
+          {!isAuthenticated ? (
+            <Stack.Screen
+              name="Login"
+              component={LoginScreen}
+              options={{ headerShown: false }}
+            />
+          ) : (
+            <>
+              <Stack.Screen
+                name="PendingList"
+                component={PendingListScreen}
+                options={{
+                  title: 'War Room',
+                  headerLargeTitle: true,
+                }}
+              />
+              <Stack.Screen
+                name="ActionDetail"
+                component={ActionDetailScreen}
+                options={{
+                  title: 'Action Details',
+                  headerBackTitle: 'Back',
+                }}
+              />
+              <Stack.Screen
+                name="Settings"
+                component={SettingsScreen}
+                options={{
+                  title: 'Settings',
+                  presentation: 'modal',
+                }}
+              />
+            </>
+          )}
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

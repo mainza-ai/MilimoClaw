@@ -5,9 +5,12 @@
  * useAuth Hook
  *
  * Manages authentication state for the mobile app.
+ * Integrates with the War Room API for real login/logout.
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { login as apiLogin, logout as apiLogout } from '../api/warroom';
+import type { AuthTokens } from '../types';
 
 interface User {
   squadId: string;
@@ -19,6 +22,36 @@ interface AuthState {
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
+}
+
+const AUTH_STORAGE_KEY = 'milimo_user';
+
+function loadStoredUser(): User | null {
+  try {
+    const stored = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch {
+    // Storage unavailable
+  }
+  return null;
+}
+
+function storeUser(user: User): void {
+  try {
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+  } catch {
+    // Storage unavailable
+  }
+}
+
+function clearStoredUser(): void {
+  try {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+  } catch {
+    // Storage unavailable
+  }
 }
 
 export function useAuth(): AuthState & {
@@ -38,12 +71,20 @@ export function useAuth(): AuthState & {
 
   const checkExistingAuth = async () => {
     try {
-      // In production, check secure storage for existing token
-      // For now, simulate no existing auth
-      setState(prev => ({
-        ...prev,
-        loading: false,
-      }));
+      const storedUser = loadStoredUser();
+      if (storedUser) {
+        setState({
+          user: storedUser,
+          isAuthenticated: true,
+          loading: false,
+          error: null,
+        });
+      } else {
+        setState(prev => ({
+          ...prev,
+          loading: false,
+        }));
+      }
     } catch (error) {
       setState(prev => ({
         ...prev,
@@ -57,20 +98,29 @@ export function useAuth(): AuthState & {
     setState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      // In production, call auth API and store token securely
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      setState({
-        user: { squadId, deviceId },
-        isAuthenticated: true,
-        loading: false,
-        error: null,
-      });
+      const result = await apiLogin(squadId, deviceId);
+      if (result.ok && result.data) {
+        const tokens = result.data as AuthTokens;
+        const user: User = { squadId, deviceId };
+        storeUser(user);
+        setState({
+          user,
+          isAuthenticated: true,
+          loading: false,
+          error: null,
+        });
+      } else {
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error: result.error || 'Login failed',
+        }));
+      }
     } catch (error) {
       setState(prev => ({
         ...prev,
         loading: false,
-        error: 'Login failed',
+        error: (error as Error).message || 'Login failed',
       }));
     }
   }, []);
@@ -79,22 +129,18 @@ export function useAuth(): AuthState & {
     setState(prev => ({ ...prev, loading: true }));
 
     try {
-      // In production, clear secure storage
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      setState({
-        user: null,
-        isAuthenticated: false,
-        loading: false,
-        error: null,
-      });
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        loading: false,
-        error: 'Logout failed',
-      }));
+      await apiLogout();
+    } catch {
+      // API logout may fail if already logged out server-side
     }
+
+    clearStoredUser();
+    setState({
+      user: null,
+      isAuthenticated: false,
+      loading: false,
+      error: null,
+    });
   }, []);
 
   return {

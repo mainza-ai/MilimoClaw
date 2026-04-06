@@ -6,7 +6,7 @@
  */
 
 import { FastifyInstance } from "fastify";
-import { v4 as uuidv4 } from "crypto";
+import { randomUUID } from "crypto";
 
 interface PendingAction {
   id: string;
@@ -75,7 +75,7 @@ export async function pendingRoutes(fastify: FastifyInstance) {
   fastify.post("/", async (request, reply) => {
     const body = request.body as Partial<PendingAction>;
 
-    const id = uuidv4();
+    const id = randomUUID();
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour
 

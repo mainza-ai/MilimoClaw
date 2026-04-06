@@ -212,9 +212,8 @@ class FinanceScheduler:
                     )
 
             quarter_start = datetime(year, (quarter - 1) * 3 + 1, 1)
-            quarter_end = datetime(
-                year, quarter * 3, 28 if quarter in [1, 2, 3] else 31
-            )
+            quarter_end_day = {1: 31, 2: 30, 3: 30, 4: 31}[quarter]
+            quarter_end = datetime(year, quarter * 3, quarter_end_day)
 
             expenses = self.expense_tracker.get_expenses_by_period(
                 quarter_start.strftime("%Y-%m-%d"),
@@ -267,7 +266,7 @@ class FinanceScheduler:
         If in HOLD > 48 hours: add urgency flag to War Room card.
         If in HOLD > 7 days: escalate urgency flag.
         """
-        from finance.invoice_manager import Invoice
+        from .invoice_manager import Invoice
 
         approved_dir = self.fs_path / "invoices" / "approved"
 
@@ -345,9 +344,7 @@ class FinanceScheduler:
         today = datetime.now(timezone.utc)
 
         if last_daily:
-            last_daily_time = datetime.fromisoformat(
-                last_daily.replace("Z", "+00:00")
-            )
+            last_daily_time = datetime.fromisoformat(last_daily.replace("Z", "+00:00"))
             hours_since_daily = (today - last_daily_time).total_seconds() / 3600
 
             if hours_since_daily > 36:
@@ -461,7 +458,7 @@ class FinanceScheduler:
 
     def _create_mock_invoice(self, expense: Any) -> Any:
         """Create a mock invoice for approval handler."""
-        from finance.invoice_manager import Invoice
+        from .invoice_manager import Invoice
 
         return Invoice(
             invoice_id=f"exp-review-{expense.expense_id}",

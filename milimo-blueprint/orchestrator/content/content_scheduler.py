@@ -175,8 +175,9 @@ class ContentScheduler:
                 import asyncio
                 try:
                     loop = asyncio.get_running_loop()
-                    # Already in an async context — use create_task
-                    asyncio.ensure_future(self._generator.generate_daily_plan())
+                    # Already in an async context — use create_task with error callback
+                    task = loop.create_task(self._generator.generate_daily_plan())
+                    task.add_done_callback(self._handle_plan_result)
                 except RuntimeError:
                     # No running loop — create a new one (sync context)
                     loop = asyncio.new_event_loop()
@@ -206,6 +207,20 @@ class ContentScheduler:
         ))
 
         logger.info("Morning planning completed")
+
+    def _handle_plan_result(self, future) -> None:
+        """Callback for daily plan generation result — logs errors instead of swallowing them."""
+        try:
+            plan = future.result()
+            logger.info("Generated daily plan: %s", plan.plan_id)
+        except Exception as e:
+            logger.error("Daily plan generation failed: %s", e)
+            self._log.append(LogEntry(
+                action_type="daily_plan_failed",
+                entity_id=f"plan-{datetime.now(timezone.utc).date().isoformat()}",
+                outcome="failed",
+                details={"error": str(e)},
+            ))
 
     def _send_weekly_analytics_query(self) -> None:
         """

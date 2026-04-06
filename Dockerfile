@@ -95,7 +95,7 @@ RUN mkdir -p /sandbox/.openclaw-data/agents/main/agent \
 RUN npm install -g openclaw@2026.3.11
 
 # Install Python dependencies for Milimo orchestrator
-RUN pip3 install --break-system-packages pyyaml pytest
+RUN pip3 install --break-system-packages pyyaml pytest requests httpx stripe
 
 # Create Milimo plugin directory
 RUN mkdir -p /opt/milimo/dist \
@@ -186,14 +186,13 @@ RUN openclaw skills install github > /dev/null 2>&1 || true
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD openshell --version && openclaw --version && \
     python3 -c " \
-import os, time, sys; \
-hb = os.path.expanduser('~/.milimo/heartbeats/claw_build.json'); \
-exists = os.path.isfile(hb); \
-fresh = False; \
-if exists: \
-    age = time.time() - os.path.getmtime(hb); \
-    fresh = age < 90; \
-sys.exit(0 if fresh else 1) \
+import os, time, sys, glob; \
+hb_dir = os.path.expanduser('~/.milimo/mesh/heartbeats'); \
+files = glob.glob(os.path.join(hb_dir, '*.json')); \
+if not files: sys.exit(1); \
+latest = max(files, key=os.path.getmtime); \
+age = time.time() - os.path.getmtime(latest); \
+sys.exit(0 if age < 90 else 1) \
 " 2>/dev/null || exit 1
 
 # Lock openclaw.json via DAC (as root)

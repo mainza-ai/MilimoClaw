@@ -17,6 +17,9 @@ import { pendingRoutes } from "./routes/pending.js";
 import { actionRoutes } from "./routes/actions.js";
 import { statusRoutes } from "./routes/status.js";
 import { authRoutes } from "./routes/auth.js";
+import { createWebhookRoute } from "./payments/webhooks.js";
+import { TenantManager } from "./tenants/manager.js";
+import { TenantLimitsEnforcer } from "./tenants/limits.js";
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -81,6 +84,41 @@ await fastify.register(authRoutes, { prefix: "/api/v1/auth" });
 await fastify.register(pendingRoutes, { prefix: "/api/v1/pending" });
 await fastify.register(actionRoutes, { prefix: "/api/v1/pending" });
 await fastify.register(statusRoutes, { prefix: "/api/v1/status" });
+
+// Register Stripe webhook routes (must be before authenticate decorator)
+createWebhookRoute(fastify);
+
+// Shared instances for cross-module use
+const tenantManager = new TenantManager();
+const tenantLimitsEnforcer = new TenantLimitsEnforcer();
+
+// Tenant resolution middleware — scopes requests to tenants
+fastify.addHook("onRequest", async (request, reply) => {
+  // Skip middleware for public endpoints
+  const publicPaths = ["/health", "/webhooks/stripe", "/webhooks/stripe/v2", "/api/v1/auth/token"];
+  if (publicPaths.some((p) => request.url.startsWith(p))) {
+    return;
+  }
+
+  // Extract tenant from JWT or header
+  const user = request.user as { tenant_id?: string } | undefined;
+  if (user?.tenant_id) {
+    const tenant = await tenantManager.getTenant(user.tenant_id);
+    if (!tenant) {
+      return reply.code(403).send({
+        error: { code: "TENANT_NOT_FOUND", message: "Tenant not found" },
+      });
+    }
+    // Check limits
+    const alerts = tenantLimitsEnforcer.checkAlerts(tenant);
+    if (alerts.some((a) => a.severity === "critical")) {
+      return reply.code(429).send({
+        error: { code: "TENANT_LIMIT_EXCEEDED", message: "Tenant resource limits exceeded", alerts },
+      });
+    }
+    (request as any).tenant = tenant;
+  }
+});
 
 // WebSocket endpoint for real-time updates (requires JWT authentication)
 fastify.register(async function (fastify) {

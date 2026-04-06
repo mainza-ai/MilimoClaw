@@ -31,6 +31,7 @@ from .query_handler import QueryHandler
 from .report_generator import ReportGenerator
 from .signal_dispatcher import SignalDispatcher
 from .signal_processor import SignalProcessor
+from .collection_workers import CollectionWorker
 
 logger = logging.getLogger("milimo.analytics_claw")
 
@@ -146,6 +147,14 @@ class AnalyticsClaw:
 
         self.scheduler.start()
 
+        # Collection workers — real data from external platforms
+        self.collection_workers = CollectionWorker(
+            fs=self.fs,
+            operational_log=self.operational_log,
+        )
+        self._register_data_collectors()
+        self.collection_workers.start()
+
         self._started = True
 
         self.operational_log.append(
@@ -172,6 +181,9 @@ class AnalyticsClaw:
 
         if self.scheduler:
             self.scheduler.stop()
+
+        if hasattr(self, 'collection_workers') and self.collection_workers:
+            self.collection_workers.stop()
 
         if self.operational_log:
             self.operational_log.append(
@@ -364,6 +376,44 @@ class AnalyticsClaw:
                     feature_adoption_rates=[],
                     churn_correlation=[payload],
                     recommended_features=[],
+                )
+
+    def _register_data_collectors(self) -> None:
+        """Register real data collectors from environment configuration."""
+        import os
+
+        # YouTube Data API
+        yt_key = os.environ.get("YOUTUBE_API_KEY", "")
+        yt_channel = os.environ.get("YOUTUBE_CHANNEL_ID", "")
+        if yt_key and yt_channel:
+            self.collection_workers.register_youtube(
+                channel_id=yt_channel,
+                api_key=yt_key,
+                interval_hours=int(os.environ.get("YOUTUBE_COLLECTION_INTERVAL", "6")),
+            )
+
+        # Google Analytics 4
+        ga_property = os.environ.get("GA4_PROPERTY_ID", "")
+        ga_creds = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
+        if ga_property and ga_creds:
+            self.collection_workers.register_google_analytics(
+                property_id=ga_property,
+                credentials_path=ga_creds,
+                interval_hours=int(os.environ.get("GA_COLLECTION_INTERVAL", "12")),
+            )
+
+        # Generic REST collectors (configured via env vars)
+        # Pattern: COLLECTOR_{NAME}_URL, COLLECTOR_{NAME}_KEY, COLLECTOR_{NAME}_INTERVAL
+        for key, value in os.environ.items():
+            if key.startswith("COLLECTOR_") and key.endswith("_URL"):
+                name = key[len("COLLECTOR_"):-len("_URL")].lower()
+                api_key = os.environ.get(f"COLLECTOR_{name.upper()}_KEY")
+                interval = int(os.environ.get(f"COLLECTOR_{name.upper()}_INTERVAL", "24"))
+                self.collection_workers.register_generic(
+                    name=name,
+                    base_url=value,
+                    api_key=api_key,
+                    interval_hours=interval,
                 )
 
     def _now_iso(self) -> str:

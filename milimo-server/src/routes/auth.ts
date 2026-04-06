@@ -6,7 +6,7 @@
  */
 
 import { FastifyInstance } from "fastify";
-import { v4 as uuidv4 } from "crypto";
+import { randomUUID } from "crypto";
 
 // In-memory refresh token store (replace with Redis/DB in production)
 const refreshTokens = new Map<string, { userId: string; expiresAt: number }>();
@@ -48,7 +48,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       iat: Math.floor(Date.now() / 1000),
     });
 
-    const refreshToken = uuidv4();
+    const refreshToken = randomUUID();
     const userId = `${squad_id}:${device_id}`;
 
     // Store refresh token for validation
@@ -101,7 +101,7 @@ export async function authRoutes(fastify: FastifyInstance) {
 
     // Rotate: delete old refresh token, issue new one
     refreshTokens.delete(refresh_token);
-    const newRefreshToken = uuidv4();
+    const newRefreshToken = randomUUID();
     refreshTokens.set(newRefreshToken, {
       userId: stored.userId,
       expiresAt: Date.now() + REFRESH_TOKEN_TTL_MS,

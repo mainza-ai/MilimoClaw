@@ -21,33 +21,17 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 
 import type { RootStackParamList } from '../App';
 import type { RouteProp } from '@react-navigation/native';
+import { fetchActionDetails, approveAction, vetoAction } from '../api/warroom';
+import type { PendingAction } from '../types';
 
 type ActionDetailRouteProp = RouteProp<RootStackParamList, 'ActionDetail'>;
-
-interface ActionDetail {
-  id: string;
-  type: string;
-  claw_role: string;
-  action_type: string;
-  description: string;
-  payload: Record<string, unknown>;
-  confidence: number;
-  risk_level: 'low' | 'medium' | 'high';
-  created_at: string;
-  expires_at: string;
-  context?: {
-    client?: string;
-    project?: string;
-    previous_actions?: number;
-  };
-}
 
 function ActionDetailScreen(): React.JSX.Element {
   const route = useRoute<ActionDetailRouteProp>();
   const navigation = useNavigation();
   const { actionId } = route.params;
 
-  const [action, setAction] = useState<ActionDetail | null>(null);
+  const [action, setAction] = useState<PendingAction | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
@@ -58,25 +42,15 @@ function ActionDetailScreen(): React.JSX.Element {
   const loadActionDetail = async () => {
     try {
       setLoading(true);
-      // In production, fetch from API
-      const mockAction: ActionDetail = {
-        id: actionId,
-        type: 'auto_approval',
-        claw_role: 'content',
-        action_type: 'send_email',
-        description: 'Send follow-up email to client@example.com',
-        payload: {
-          to: 'client@example.com',
-          subject: 'Project Update',
-        },
-        confidence: 0.85,
-        risk_level: 'medium',
-        created_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 3600000).toISOString(),
-      };
-      setAction(mockAction);
+      const result = await fetchActionDetails(actionId);
+      if (result.ok && result.data) {
+        setAction(result.data);
+      } else {
+        Alert.alert('Error', result.error || 'Failed to load action details');
+      }
     } catch (error) {
       console.error('Failed to load action:', error);
+      Alert.alert('Error', 'Failed to load action details');
     } finally {
       setLoading(false);
     }
@@ -85,19 +59,22 @@ function ActionDetailScreen(): React.JSX.Element {
   const handleApprove = useCallback(() => {
     Alert.alert(
       'Approve Action',
-      'Biometric verification required to approve this action.',
+      'Are you sure you want to approve this action?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Verify & Approve',
+          text: 'Approve',
           onPress: async () => {
             setProcessing(true);
             try {
-              // In production, trigger biometric then call API
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              Alert.alert('Approved', 'Action has been approved', [
-                { text: 'OK', onPress: () => navigation.goBack() },
-              ]);
+              const result = await approveAction(actionId);
+              if (result.ok) {
+                Alert.alert('Approved', 'Action has been approved', [
+                  { text: 'OK', onPress: () => navigation.goBack() },
+                ]);
+              } else {
+                Alert.alert('Error', result.error || 'Failed to approve action');
+              }
             } catch (error) {
               Alert.alert('Error', 'Failed to approve action');
             } finally {
@@ -107,7 +84,7 @@ function ActionDetailScreen(): React.JSX.Element {
         },
       ]
     );
-  }, [navigation]);
+  }, [navigation, actionId]);
 
   const handleVeto = useCallback(() => {
     Alert.alert(
@@ -121,11 +98,14 @@ function ActionDetailScreen(): React.JSX.Element {
           onPress: async () => {
             setProcessing(true);
             try {
-              // In production, call veto API
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              Alert.alert('Vetoed', 'Action has been vetoed', [
-                { text: 'OK', onPress: () => navigation.goBack() },
-              ]);
+              const result = await vetoAction(actionId, 'Vetoed via mobile app');
+              if (result.ok) {
+                Alert.alert('Vetoed', 'Action has been vetoed', [
+                  { text: 'OK', onPress: () => navigation.goBack() },
+                ]);
+              } else {
+                Alert.alert('Error', result.error || 'Failed to veto action');
+              }
             } catch (error) {
               Alert.alert('Error', 'Failed to veto action');
             } finally {
@@ -135,7 +115,7 @@ function ActionDetailScreen(): React.JSX.Element {
         },
       ]
     );
-  }, [navigation]);
+  }, [navigation, actionId]);
 
   const getRiskColor = (risk: string) => {
     switch (risk) {

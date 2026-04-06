@@ -98,14 +98,15 @@ async function apiRequest(
 			body: body ? JSON.stringify(body) : undefined,
 		});
 
-    const data = await response.json();
-
     if (!response.ok) {
+      const data = await response.json().catch(() => ({ error: { message: response.statusText } }));
       return {
         ok: false,
         error: (data as any).error?.message || "Request failed",
       };
     }
+
+    const data = await response.json();
 
     return { ok: true, data };
   } catch (err) {

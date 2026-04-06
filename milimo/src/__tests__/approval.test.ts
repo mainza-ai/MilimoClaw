@@ -180,11 +180,6 @@ describe("ApprovalEngine", () => {
 
     expect(result.mode).toBe("AUTO");
   });
-});
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockedFs.statSync.mockReturnValue({ mtime: new Date() } as any);
-  });
 
   it("applies HOLD escalation for specific triggers", () => {
     const msg = createMockMessage({
@@ -237,7 +232,7 @@ describe("priority ordering (HOLD > REVIEW > AUTO)", () => {
   it("needs_approval flag triggers REVIEW when no escalation", () => {
     const msg = createMockMessage({ needs_approval: true });
     mockedFs.existsSync.mockReturnValue(false);
-    
+
     const engine = new ApprovalEngine("test-squad");
     const result = engine.evaluateAction(msg);
 
@@ -247,10 +242,11 @@ describe("priority ordering (HOLD > REVIEW > AUTO)", () => {
   it("AUTO is the default fallback", () => {
     const msg = createMockMessage({ needs_approval: false });
     mockedFs.existsSync.mockReturnValue(false);
-    
+
     const engine = new ApprovalEngine("test-squad");
     const result = engine.evaluateAction(msg);
 
     expect(result.mode).toBe("AUTO");
   });
+});
 });

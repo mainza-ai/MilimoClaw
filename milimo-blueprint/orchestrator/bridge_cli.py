@@ -338,6 +338,7 @@ def handle_health_status(args: dict[str, Any]) -> dict[str, Any]:
     try:
         from pathlib import Path
         import json
+
         home = Path.home()
         health_dir = home / ".milimo" / "health" / squad_id
         if not health_dir.exists():
@@ -455,7 +456,12 @@ def handle_morning_brief(args: dict[str, Any]) -> dict[str, Any]:
                 "auto": stats.get("auto_count", 0),
             },
             "pending_actions": [
-                {"id": a.id, "claw": a.claw, "type": a.action_type, "priority": a.priority.name}
+                {
+                    "id": a.id,
+                    "claw": a.claw,
+                    "type": a.action_type,
+                    "priority": a.priority.name,
+                }
                 for a in pending[:10]
             ],
         }
@@ -618,7 +624,9 @@ def _collect_claw_health(role: str, squad_id: str, base_dir: Path) -> dict[str, 
     if warroom_log.exists():
         try:
             claw_health["last_action"] = _get_last_action_time(role, warroom_log)
-            claw_health["actions_this_week"] = _count_actions_this_week(role, warroom_log)
+            claw_health["actions_this_week"] = _count_actions_this_week(
+                role, warroom_log
+            )
             claw_health["sparkline"] = _calculate_sparkline(role, warroom_log)
         except Exception:
             pass
@@ -661,7 +669,9 @@ def _get_last_action_time(role: str, log_file: Path) -> str | None:
                 if parts:
                     timestamp_str = parts[0]
                     try:
-                        dt = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+                        dt = datetime.fromisoformat(
+                            timestamp_str.replace("Z", "+00:00")
+                        )
                         return dt.isoformat()
                     except Exception:
                         pass
@@ -721,6 +731,7 @@ from datetime import datetime, timezone, timedelta
 # Command Registry
 # ---------------------------------------------------------------------------
 
+
 def handle_send_to_claw(args: dict[str, Any]) -> dict[str, Any]:
     """Send a typed message from the assistant to a specific claw via the mesh.
 
@@ -744,9 +755,13 @@ def handle_send_to_claw(args: dict[str, Any]) -> dict[str, Any]:
     squad_id = args.get("squad_id", "default")
 
     if not recipient_role:
-        raise RuntimeError("role is required (e.g., 'content', 'ops', 'analytics', 'finance', 'build')")
+        raise RuntimeError(
+            "role is required (e.g., 'content', 'ops', 'analytics', 'finance', 'build')"
+        )
     if not message_type:
-        raise RuntimeError("type is required (e.g., 'assistant_query', 'assistant_task')")
+        raise RuntimeError(
+            "type is required (e.g., 'assistant_query', 'assistant_task')"
+        )
 
     # Validate inputs
     if ASSISTANT_ROLE not in VALID_SENDERS:
@@ -810,7 +825,10 @@ def handle_claw_status(args: dict[str, Any]) -> dict[str, Any]:
         try:
             result["health"] = json.loads(health_file.read_text())
         except (json.JSONDecodeError, OSError):
-            result["health"] = {"status": "unknown", "error": "failed to read health file"}
+            result["health"] = {
+                "status": "unknown",
+                "error": "failed to read health file",
+            }
     else:
         result["health"] = {"status": "no_health_data"}
 
@@ -835,12 +853,14 @@ def handle_claw_status(args: dict[str, Any]) -> dict[str, Any]:
         for msg_file in sorted(inbox.glob("*.json")):
             try:
                 msg = json.loads(msg_file.read_text())
-                pending.append({
-                    "message_id": msg.get("message_id"),
-                    "sender": msg.get("sender_role"),
-                    "type": msg.get("message_type"),
-                    "timestamp": msg.get("timestamp"),
-                })
+                pending.append(
+                    {
+                        "message_id": msg.get("message_id"),
+                        "sender": msg.get("sender_role"),
+                        "type": msg.get("message_type"),
+                        "timestamp": msg.get("timestamp"),
+                    }
+                )
             except (json.JSONDecodeError, OSError):
                 pass
         result["pending_messages"] = pending
@@ -867,7 +887,9 @@ def handle_ops_active_projects(args: dict[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {"projects": [], "sandbox_exists": sandbox.exists()}
 
     if not sandbox.exists():
-        result["note"] = "Ops sandbox not initialized. Run build_init to create /sandbox/clients/"
+        result["note"] = (
+            "Ops sandbox not initialized. Run build_init to create /sandbox/clients/"
+        )
         return result
 
     # Look for client/project files
@@ -877,11 +899,13 @@ def handle_ops_active_projects(args: dict[str, Any]) -> dict[str, Any]:
             for project_file in client_dir.glob("*.json"):
                 try:
                     data = json.loads(project_file.read_text())
-                    client_data["projects"].append({
-                        "id": data.get("project_id", project_file.stem),
-                        "status": data.get("status", "unknown"),
-                        "client_id": data.get("client_id"),
-                    })
+                    client_data["projects"].append(
+                        {
+                            "id": data.get("project_id", project_file.stem),
+                            "status": data.get("status", "unknown"),
+                            "client_id": data.get("client_id"),
+                        }
+                    )
                 except (json.JSONDecodeError, OSError):
                     pass
             result["projects"].append(client_data)
@@ -890,11 +914,13 @@ def handle_ops_active_projects(args: dict[str, Any]) -> dict[str, Any]:
     for project_file in sorted(sandbox.glob("*.json")):
         try:
             data = json.loads(project_file.read_text())
-            result["projects"].append({
-                "id": data.get("project_id", project_file.stem),
-                "status": data.get("status", "unknown"),
-                "client_id": data.get("client_id"),
-            })
+            result["projects"].append(
+                {
+                    "id": data.get("project_id", project_file.stem),
+                    "status": data.get("status", "unknown"),
+                    "client_id": data.get("client_id"),
+                }
+            )
         except (json.JSONDecodeError, OSError):
             pass
 
@@ -916,13 +942,15 @@ def handle_content_pending_drafts(args: dict[str, Any]) -> dict[str, Any]:
         for draft_file in sorted(data_dir.glob("*.json")):
             try:
                 data = json.loads(draft_file.read_text())
-                result["drafts"].append({
-                    "id": data.get("draft_id", draft_file.stem),
-                    "status": data.get("status", "unknown"),
-                    "platform": data.get("platform"),
-                    "content_type": data.get("content_type"),
-                    "client_id": data.get("client_id"),
-                })
+                result["drafts"].append(
+                    {
+                        "id": data.get("draft_id", draft_file.stem),
+                        "status": data.get("status", "unknown"),
+                        "platform": data.get("platform"),
+                        "content_type": data.get("content_type"),
+                        "client_id": data.get("client_id"),
+                    }
+                )
             except (json.JSONDecodeError, OSError):
                 pass
 
@@ -930,11 +958,16 @@ def handle_content_pending_drafts(args: dict[str, Any]) -> dict[str, Any]:
     for draft_file in sorted(sandbox.glob("*.json")):
         try:
             data = json.loads(draft_file.read_text())
-            if "draft" in draft_file.stem.lower() or "content" in draft_file.stem.lower():
-                result["drafts"].append({
-                    "id": data.get("draft_id", draft_file.stem),
-                    "status": data.get("status", "unknown"),
-                })
+            if (
+                "draft" in draft_file.stem.lower()
+                or "content" in draft_file.stem.lower()
+            ):
+                result["drafts"].append(
+                    {
+                        "id": data.get("draft_id", draft_file.stem),
+                        "status": data.get("status", "unknown"),
+                    }
+                )
         except (json.JSONDecodeError, OSError):
             pass
 
@@ -961,9 +994,18 @@ def handle_build_open_prs(args: dict[str, Any]) -> dict[str, Any]:
     # Fetch open PRs
     try:
         pr_output = subprocess.run(
-            ["gh", "pr", "list", "--state", "open", "--json",
-             "number,title,author,createdAt,updatedAt,labels,url"],
-            capture_output=True, text=True, timeout=30
+            [
+                "gh",
+                "pr",
+                "list",
+                "--state",
+                "open",
+                "--json",
+                "number,title,author,createdAt,updatedAt,labels,url",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         if pr_output.returncode == 0:
             result["prs"] = json.loads(pr_output.stdout)
@@ -980,21 +1022,31 @@ def handle_build_open_prs(args: dict[str, Any]) -> dict[str, Any]:
 def handle_analytics_latest_report_summary(args: dict[str, Any]) -> dict[str, Any]:
     """Summarize the latest intelligence report from the Analytics claw."""
     reports_dir = Path("/sandbox/analytics/reports")
-    result: dict[str, Any] = {"report": None, "reports_found": [], "reports_dir_exists": reports_dir.exists()}
+    result: dict[str, Any] = {
+        "report": None,
+        "reports_found": [],
+        "reports_dir_exists": reports_dir.exists(),
+    }
 
     if not reports_dir.exists():
         result["note"] = "Analytics reports directory not found."
         return result
 
     # Find the latest report files
-    report_files = sorted(reports_dir.glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
+    report_files = sorted(
+        reports_dir.glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True
+    )
 
     for rf in report_files[:10]:
-        result["reports_found"].append({
-            "filename": rf.name,
-            "modified": datetime.fromtimestamp(rf.stat().st_mtime, tz=timezone.utc).isoformat(),
-            "size_bytes": rf.stat().st_size,
-        })
+        result["reports_found"].append(
+            {
+                "filename": rf.name,
+                "modified": datetime.fromtimestamp(
+                    rf.stat().st_mtime, tz=timezone.utc
+                ).isoformat(),
+                "size_bytes": rf.stat().st_size,
+            }
+        )
 
     # Read the latest report
     if report_files:
@@ -1038,7 +1090,9 @@ def handle_generate_sprint_plan(args: dict[str, Any]) -> dict[str, Any]:
         "requested_at": datetime.now(timezone.utc).isoformat(),
         "requested_by": "assistant",
         "status": "pending",
-        "instructions": args.get("instructions", "Generate sprint plan from current backlog"),
+        "instructions": args.get(
+            "instructions", "Generate sprint plan from current backlog"
+        ),
         "backlog_source": args.get("backlog_source", "github_issues"),
     }
 
@@ -1066,7 +1120,9 @@ def handle_run_opportunity_scoring(args: dict[str, Any]) -> dict[str, Any]:
         "requested_at": datetime.now(timezone.utc).isoformat(),
         "requested_by": "assistant",
         "status": "pending",
-        "criteria": args.get("criteria", ["revenue_potential", "client_fit", "effort_estimate"]),
+        "criteria": args.get(
+            "criteria", ["revenue_potential", "client_fit", "effort_estimate"]
+        ),
         "scope": args.get("scope", "all_opportunities"),
     }
 
@@ -1094,7 +1150,9 @@ def handle_generate_weekly_report(args: dict[str, Any]) -> dict[str, Any]:
         claw_info: dict[str, Any] = {"role": role}
 
         # Tool count
-        registry_file = Path.home() / ".milimo" / "tools" / squad_id / role / "registry.json"
+        registry_file = (
+            Path.home() / ".milimo" / "tools" / squad_id / role / "registry.json"
+        )
         if registry_file.exists():
             try:
                 reg_data = json.loads(registry_file.read_text())
@@ -1136,7 +1194,10 @@ def handle_generate_weekly_report(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_check_all_deadlines(args: dict[str, Any]) -> dict[str, Any]:
     """Check deadlines across all claws."""
-    result: dict[str, Any] = {"checked_at": datetime.now(timezone.utc).isoformat(), "deadlines": []}
+    result: dict[str, Any] = {
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "deadlines": [],
+    }
     now = datetime.now(timezone.utc)
 
     # Check Build claw sprint deadlines
@@ -1146,13 +1207,15 @@ def handle_check_all_deadlines(args: dict[str, Any]) -> dict[str, Any]:
             data = json.loads(sprint_plan.read_text())
             if data.get("status") != "empty" and data.get("deadline"):
                 deadline = datetime.fromisoformat(data["deadline"])
-                result["deadlines"].append({
-                    "claw": "build",
-                    "type": "sprint",
-                    "deadline": data["deadline"],
-                    "days_remaining": (deadline - now).days,
-                    "status": "upcoming" if deadline > now else "overdue",
-                })
+                result["deadlines"].append(
+                    {
+                        "claw": "build",
+                        "type": "sprint",
+                        "deadline": data["deadline"],
+                        "days_remaining": (deadline - now).days,
+                        "status": "upcoming" if deadline > now else "overdue",
+                    }
+                )
         except (json.JSONDecodeError, OSError, ValueError):
             pass
 
@@ -1164,14 +1227,16 @@ def handle_check_all_deadlines(args: dict[str, Any]) -> dict[str, Any]:
                 data = json.loads(draft_file.read_text())
                 if data.get("deadline"):
                     deadline = datetime.fromisoformat(data["deadline"])
-                    result["deadlines"].append({
-                        "claw": "content",
-                        "type": "draft",
-                        "draft_id": data.get("draft_id", draft_file.stem),
-                        "deadline": data["deadline"],
-                        "days_remaining": (deadline - now).days,
-                        "status": "upcoming" if deadline > now else "overdue",
-                    })
+                    result["deadlines"].append(
+                        {
+                            "claw": "content",
+                            "type": "draft",
+                            "draft_id": data.get("draft_id", draft_file.stem),
+                            "deadline": data["deadline"],
+                            "days_remaining": (deadline - now).days,
+                            "status": "upcoming" if deadline > now else "overdue",
+                        }
+                    )
             except (json.JSONDecodeError, OSError, ValueError):
                 pass
 
@@ -1183,21 +1248,25 @@ def handle_check_all_deadlines(args: dict[str, Any]) -> dict[str, Any]:
                 data = json.loads(project_file.read_text())
                 if data.get("deadline"):
                     deadline = datetime.fromisoformat(data["deadline"])
-                    result["deadlines"].append({
-                        "claw": "ops",
-                        "type": "project",
-                        "project_id": data.get("project_id", project_file.stem),
-                        "deadline": data["deadline"],
-                        "days_remaining": (deadline - now).days,
-                        "status": "upcoming" if deadline > now else "overdue",
-                    })
+                    result["deadlines"].append(
+                        {
+                            "claw": "ops",
+                            "type": "project",
+                            "project_id": data.get("project_id", project_file.stem),
+                            "deadline": data["deadline"],
+                            "days_remaining": (deadline - now).days,
+                            "status": "upcoming" if deadline > now else "overdue",
+                        }
+                    )
             except (json.JSONDecodeError, OSError, ValueError):
                 pass
 
     # Sort by urgency
     result["deadlines"].sort(key=lambda d: d.get("days_remaining", 999))
     result["total_deadlines"] = len(result["deadlines"])
-    result["overdue_count"] = sum(1 for d in result["deadlines"] if d["status"] == "overdue")
+    result["overdue_count"] = sum(
+        1 for d in result["deadlines"] if d["status"] == "overdue"
+    )
 
     return result
 
@@ -1221,16 +1290,26 @@ def handle_run_dependency_audit(args: dict[str, Any]) -> dict[str, Any]:
         try:
             pip_audit = subprocess.run(
                 ["pip", "list", "--outdated", "--format=json"],
-                capture_output=True, text=True, timeout=30, cwd=str(repo_path)
+                capture_output=True,
+                text=True,
+                timeout=30,
+                cwd=str(repo_path),
             )
             if pip_audit.returncode == 0:
                 outdated = json.loads(pip_audit.stdout)
-                audits.append({
-                    "type": "python",
-                    "outdated_count": len(outdated),
-                    "packages": outdated[:20],  # Limit output
-                })
-        except (subprocess.TimeoutExpired, FileNotFoundError, json.JSONDecodeError, OSError):
+                audits.append(
+                    {
+                        "type": "python",
+                        "outdated_count": len(outdated),
+                        "packages": outdated[:20],  # Limit output
+                    }
+                )
+        except (
+            subprocess.TimeoutExpired,
+            FileNotFoundError,
+            json.JSONDecodeError,
+            OSError,
+        ):
             audits.append({"type": "python", "error": "audit_failed"})
 
     # Node.js dependencies
@@ -1239,18 +1318,25 @@ def handle_run_dependency_audit(args: dict[str, Any]) -> dict[str, Any]:
         try:
             npm_audit = subprocess.run(
                 ["npm", "audit", "--json"],
-                capture_output=True, text=True, timeout=60, cwd=str(repo_path)
+                capture_output=True,
+                text=True,
+                timeout=60,
+                cwd=str(repo_path),
             )
             if npm_audit.returncode != 0 or npm_audit.stdout:
                 try:
                     audit_data = json.loads(npm_audit.stdout)
-                    audits.append({
-                        "type": "nodejs",
-                        "vulnerabilities": audit_data.get("vulnerabilities", {}),
-                        "metadata": audit_data.get("metadata", {}),
-                    })
+                    audits.append(
+                        {
+                            "type": "nodejs",
+                            "vulnerabilities": audit_data.get("vulnerabilities", {}),
+                            "metadata": audit_data.get("metadata", {}),
+                        }
+                    )
                 except json.JSONDecodeError:
-                    audits.append({"type": "nodejs", "raw_output": npm_audit.stdout[:500]})
+                    audits.append(
+                        {"type": "nodejs", "raw_output": npm_audit.stdout[:500]}
+                    )
         except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
             audits.append({"type": "nodejs", "error": "audit_failed"})
 
@@ -1261,7 +1347,10 @@ def handle_run_dependency_audit(args: dict[str, Any]) -> dict[str, Any]:
     # Write audit result
     audit_dir = Path("/sandbox/build/context/audit")
     audit_dir.mkdir(parents=True, exist_ok=True)
-    audit_file = audit_dir / f"dependency-audit-{datetime.now(timezone.utc).strftime('%Y%m%d')}.json"
+    audit_file = (
+        audit_dir
+        / f"dependency-audit-{datetime.now(timezone.utc).strftime('%Y%m%d')}.json"
+    )
     audit_file.write_text(json.dumps(result, indent=2))
     result["audit_path"] = str(audit_file)
 
@@ -1271,12 +1360,17 @@ def handle_run_dependency_audit(args: dict[str, Any]) -> dict[str, Any]:
 def handle_discover_tools(args: dict[str, Any]) -> dict[str, Any]:
     """Discover what tools each claw currently has deployed."""
     squad_id = args.get("squad_id", "default")
-    result: dict[str, Any] = {"claws": {}, "discovered_at": datetime.now(timezone.utc).isoformat()}
+    result: dict[str, Any] = {
+        "claws": {},
+        "discovered_at": datetime.now(timezone.utc).isoformat(),
+    }
 
     for role in ["content", "ops", "analytics", "finance", "build"]:
         claw_tools: dict[str, Any] = {"tools": [], "count": 0, "last_evolution": None}
 
-        registry_file = Path.home() / ".milimo" / "tools" / squad_id / role / "registry.json"
+        registry_file = (
+            Path.home() / ".milimo" / "tools" / squad_id / role / "registry.json"
+        )
         if registry_file.exists():
             try:
                 reg_data = json.loads(registry_file.read_text())
@@ -1294,6 +1388,72 @@ def handle_discover_tools(args: dict[str, Any]) -> dict[str, Any]:
 
     result["total_tools"] = sum(c["count"] for c in result["claws"].values())
     return result
+
+
+def handle_get_result(args: dict[str, Any]) -> dict[str, Any]:
+    """Get the result of a previously sent message from the outbox.
+
+    After sending a message via send_to_claw, use this to poll for the result.
+    Results are stored in OUTBOX_DIR/{role}/{message_id}.json and expire after 1 hour.
+
+    Args:
+        message_id: The message_id returned by send_to_claw
+        role: The claw role that processed the message (optional, will search all if not provided)
+
+    Returns:
+        The result data if found, or status indicating pending/not found
+    """
+    message_id = args.get("message_id", "")
+    role = args.get("role", "")
+
+    if not message_id:
+        raise RuntimeError("message_id is required")
+
+    mesh_dir = Path.home() / ".milimo" / "mesh"
+    outbox_dir = mesh_dir / "outbox"
+
+    if not outbox_dir.exists():
+        return {"status": "not_found", "message": "No outbox directory exists"}
+
+    roles_to_check = (
+        [role] if role else ["content", "ops", "analytics", "finance", "build"]
+    )
+
+    for check_role in roles_to_check:
+        result_file = outbox_dir / check_role / f"{message_id}.json"
+        if result_file.exists():
+            try:
+                data = json.loads(result_file.read_text())
+                expires_at = data.get("expires_at")
+                if expires_at:
+                    try:
+                        expiry_dt = datetime.fromisoformat(
+                            expires_at.replace("Z", "+00:00")
+                        )
+                        if datetime.now(timezone.utc) > expiry_dt:
+                            return {
+                                "status": "expired",
+                                "message": "Result has expired",
+                            }
+                    except ValueError:
+                        pass
+
+                return {
+                    "status": "found",
+                    "role": check_role,
+                    "message_id": message_id,
+                    "original_message": data.get("original_message"),
+                    "result": data.get("result"),
+                    "processed_at": data.get("processed_at"),
+                    "expires_at": expires_at,
+                }
+            except (json.JSONDecodeError, OSError) as e:
+                return {"status": "error", "message": f"Failed to read result: {e}"}
+
+    return {
+        "status": "pending",
+        "message": f"No result found for message_id {message_id}",
+    }
 
 
 COMMAND_HANDLERS: dict[str, Any] = {
@@ -1331,6 +1491,7 @@ COMMAND_HANDLERS: dict[str, Any] = {
     "check_all_deadlines": handle_check_all_deadlines,
     "run_dependency_audit": handle_run_dependency_audit,
     "discover_tools": handle_discover_tools,
+    "get_result": handle_get_result,
 }
 
 

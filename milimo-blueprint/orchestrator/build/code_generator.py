@@ -159,6 +159,7 @@ Provide the implementation with file paths and content."""
     ) -> list[str]:
         """Parse implementation and write files to branch."""
         files_changed: list[str] = []
+        file_contents: dict[str, str] = {}
         # Simple parsing: look for filepath markers
         lines = implementation.split("\n")
         current_file: str | None = None
@@ -168,6 +169,7 @@ Provide the implementation with file paths and content."""
             if line.startswith("--- filepath:") or line.startswith("--- end ---"):
                 if current_file and current_content:
                     files_changed.append(current_file)
+                    file_contents[current_file] = "\n".join(current_content)
                 if line.startswith("--- filepath:"):
                     current_file = line.split(":", 1)[1].strip()
                     current_content = []
@@ -181,13 +183,14 @@ Provide the implementation with file paths and content."""
         if not files_changed:
             current_file = f"fix_{datetime.now(timezone.utc).strftime('%Y%m%d')}.py"
             files_changed.append(current_file)
+            file_contents[current_file] = implementation
 
         self._github.create_branch(branch_name)
         for fname in files_changed:
             self._github.commit_file(
                 branch=branch_name,
                 file_path=fname,
-                content=implementation,
+                content=file_contents[fname],
             )
 
         self._log.append(BuildLogEntry(

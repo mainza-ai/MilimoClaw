@@ -11,7 +11,7 @@
 import Stripe from 'stripe';
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { handlePaymentSuccess, handleAccountRequirementsUpdated } from './stripe.js';
-import { generateInvoiceFromSession, renderInvoice } from './invoices.js';
+import { generateInvoiceFromSession } from './invoices.js';
 
 // ---------------------------------------------------------------------------
 

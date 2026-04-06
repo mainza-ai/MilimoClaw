@@ -87,13 +87,16 @@ class RevenueTracker:
         today_str = today.strftime("%Y-%m-%d")
 
         weekly_path = self.fs.base / "revenue" / "weekly-summary.json"
-        weekly_data = self._load_json(weekly_path, {
-            "week_total": 0,
-            "invoices_paid": 0,
-            "invoices_pending": 0,
-            "week_over_week_pct": 0.0,
-            "last_updated": None,
-        })
+        weekly_data = self._load_json(
+            weekly_path,
+            {
+                "week_total": 0,
+                "invoices_paid": 0,
+                "invoices_pending": 0,
+                "week_over_week_pct": 0.0,
+                "last_updated": None,
+            },
+        )
 
         previous_week_total = weekly_data.get("week_total", 0)
         weekly_data["week_total"] = previous_week_total + invoice.total
@@ -115,7 +118,9 @@ class RevenueTracker:
 
         week_over_week = 0.0
         if previous_week_total > 0:
-            week_over_week = ((weekly_data["week_total"] - previous_week_total) / previous_week_total) * 100
+            week_over_week = (
+                (weekly_data["week_total"] - previous_week_total) / previous_week_total
+            ) * 100
 
         self.dispatcher.send_revenue_summary(
             week_total=weekly_data["week_total"],
@@ -162,7 +167,9 @@ class RevenueTracker:
         previous_week_total = self._get_previous_week_total()
         week_over_week = 0.0
         if previous_week_total > 0:
-            week_over_week = ((week_total - previous_week_total) / previous_week_total) * 100
+            week_over_week = (
+                (week_total - previous_week_total) / previous_week_total
+            ) * 100
 
         week_start = (today - timedelta(days=today.weekday())).strftime("%Y-%m-%d")
 
@@ -177,15 +184,18 @@ class RevenueTracker:
         )
 
         weekly_path = self.fs.base / "revenue" / "weekly-summary.json"
-        self._atomic_write_summary(weekly_path, {
-            "week_start": summary.week_start,
-            "week_total": summary.week_total,
-            "week_over_week_pct": summary.week_over_week_pct,
-            "invoices_paid": summary.invoices_paid,
-            "invoices_pending": summary.invoices_pending,
-            "pipeline_value": summary.pipeline_value,
-            "last_updated": summary.last_updated,
-        })
+        self._atomic_write_summary(
+            weekly_path,
+            {
+                "week_start": summary.week_start,
+                "week_total": summary.week_total,
+                "week_over_week_pct": summary.week_over_week_pct,
+                "invoices_paid": summary.invoices_paid,
+                "invoices_pending": summary.invoices_pending,
+                "pipeline_value": summary.pipeline_value,
+                "last_updated": summary.last_updated,
+            },
+        )
 
         self.dispatcher.send_revenue_summary(
             week_total=summary.week_total,
@@ -324,6 +334,7 @@ Should the rate be adjusted? Provide:
             if "increase" in output.lower():
                 undercharging = True
                 import re
+
                 rate_match = re.search(r"\$(\d+)", output)
                 if rate_match:
                     suggested_rate = float(rate_match.group(1))
@@ -359,15 +370,18 @@ Should the rate be adjusted? Provide:
     def get_current_week_summary(self) -> RevenueSummary:
         """Read revenue/weekly-summary.json and return RevenueSummary."""
         weekly_path = self.fs.base / "revenue" / "weekly-summary.json"
-        data = self._load_json(weekly_path, {
-            "week_start": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-            "week_total": 0,
-            "week_over_week_pct": 0.0,
-            "invoices_paid": 0,
-            "invoices_pending": 0,
-            "pipeline_value": 0,
-            "last_updated": None,
-        })
+        data = self._load_json(
+            weekly_path,
+            {
+                "week_start": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                "week_total": 0,
+                "week_over_week_pct": 0.0,
+                "invoices_paid": 0,
+                "invoices_pending": 0,
+                "pipeline_value": 0,
+                "last_updated": None,
+            },
+        )
 
         return RevenueSummary(
             week_start=data.get("week_start", ""),
@@ -381,7 +395,7 @@ Should the rate be adjusted? Provide:
 
     def _load_week_invoices(self, days: int = 7) -> list[Invoice]:
         """Load all invoices paid within the last N days."""
-        from finance.invoice_manager import Invoice
+        from .invoice_manager import Invoice
 
         invoices: list[Invoice] = []
         paid_dir = self.fs.base / "invoices" / "paid"
@@ -435,7 +449,12 @@ Should the rate be adjusted? Provide:
         """Get total revenue from previous week snapshot."""
         today = datetime.now(timezone.utc)
         last_monday = today - timedelta(days=today.weekday() + 7)
-        snapshot_path = self.fs.base / "revenue" / "history" / f"{last_monday.strftime('%Y-%m-%d')}.json"
+        snapshot_path = (
+            self.fs.base
+            / "revenue"
+            / "history"
+            / f"{last_monday.strftime('%Y-%m-%d')}.json"
+        )
 
         if not snapshot_path.exists():
             return 0.0
@@ -470,11 +489,14 @@ Should the rate be adjusted? Provide:
     def _update_monthly_summary(self, invoice: Invoice) -> None:
         """Update monthly summary with payment."""
         monthly_path = self.fs.base / "revenue" / "monthly-summary.json"
-        data = self._load_json(monthly_path, {
-            "month_total": 0,
-            "invoices_paid": 0,
-            "last_updated": None,
-        })
+        data = self._load_json(
+            monthly_path,
+            {
+                "month_total": 0,
+                "invoices_paid": 0,
+                "last_updated": None,
+            },
+        )
 
         data["month_total"] = data.get("month_total", 0) + invoice.total
         data["invoices_paid"] = data.get("invoices_paid", 0) + 1
@@ -485,11 +507,14 @@ Should the rate be adjusted? Provide:
     def _update_annual_summary(self, invoice: Invoice) -> None:
         """Update annual summary with payment."""
         annual_path = self.fs.base / "revenue" / "annual-summary.json"
-        data = self._load_json(annual_path, {
-            "year_total": 0,
-            "invoices_paid": 0,
-            "last_updated": None,
-        })
+        data = self._load_json(
+            annual_path,
+            {
+                "year_total": 0,
+                "invoices_paid": 0,
+                "last_updated": None,
+            },
+        )
 
         data["year_total"] = data.get("year_total", 0) + invoice.total
         data["invoices_paid"] = data.get("invoices_paid", 0) + 1
