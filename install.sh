@@ -37,11 +37,11 @@ else
   C_GREEN='' C_BOLD='' C_DIM='' C_RED='' C_YELLOW='' C_CYAN='' C_RESET=''
 fi
 
-info()    { printf "${C_CYAN}[INFO]${C_RESET}  %s\n" "$*"; }
-warn()    { printf "${C_YELLOW}[WARN]${C_RESET}  %s\n" "$*"; }
-error()   { printf "${C_RED}[ERROR]${C_RESET} %s\n" "$*" >&2; }
-ok()      { printf "  ${C_GREEN}✓${C_RESET}  %s\n" "$*"; }
-skip()    { printf "  ${C_DIM}⊘${C_RESET}  %s\n" "$*"; }
+info() { printf "${C_CYAN}[INFO]${C_RESET}  %s\n" "$*"; }
+warn() { printf "${C_YELLOW}[WARN]${C_RESET}  %s\n" "$*"; }
+error() { printf "${C_RED}[ERROR]${C_RESET} %s\n" "$*" >&2; }
+ok() { printf "  ${C_GREEN}✓${C_RESET}  %s\n" "$*"; }
+skip() { printf "  ${C_DIM}⊘${C_RESET}  %s\n" "$*"; }
 log_step() { printf "\n${C_GREEN}${C_BOLD}>>> %s${C_RESET}\n" "$*"; }
 
 command_exists() { command -v "$1" &>/dev/null; }
@@ -49,32 +49,62 @@ command_exists() { command -v "$1" &>/dev/null; }
 # ---------------------------------------------------------------------------
 # CLI Arguments
 # ---------------------------------------------------------------------------
-NON_INTERACTIVE=false
-SOLO_MODE=true
+export NON_INTERACTIVE=false
+export SOLO_MODE=true
 OPERATOR_NAME=""
 SQUAD_NAME=""
 WARROOM_MODE="minimal"
-AUTO_INSTALL=false
+export AUTO_INSTALL=false
 UNINSTALL=false
 DRY_RUN=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --non-interactive) NON_INTERACTIVE=true; shift ;;
-    --solo) SOLO_MODE=true; shift ;;
-    --operator-name) OPERATOR_NAME="$2"; shift 2 ;;
-    --squad-name) SQUAD_NAME="$2"; shift 2 ;;
-    --warroom-mode) WARROOM_MODE="$2"; shift 2 ;;
-    --auto) AUTO_INSTALL=true; shift ;;
-    --uninstall) UNINSTALL=true; shift ;;
-    --dry-run) DRY_RUN=true; shift ;;
-    --sandbox-name) SANDBOX_NAME="$2"; shift 2 ;;
-    --gateway-container) GATEWAY_CONTAINER="$2"; shift 2 ;;
-    --version|-v)
+    --non-interactive)
+      export NON_INTERACTIVE=true
+      shift
+      ;;
+    --solo)
+      export SOLO_MODE=true
+      shift
+      ;;
+    --operator-name)
+      OPERATOR_NAME="$2"
+      shift 2
+      ;;
+    --squad-name)
+      SQUAD_NAME="$2"
+      shift 2
+      ;;
+    --warroom-mode)
+      WARROOM_MODE="$2"
+      shift 2
+      ;;
+    --auto)
+      export AUTO_INSTALL=true
+      shift
+      ;;
+    --uninstall)
+      UNINSTALL=true
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN=true
+      shift
+      ;;
+    --sandbox-name)
+      SANDBOX_NAME="$2"
+      shift 2
+      ;;
+    --gateway-container)
+      GATEWAY_CONTAINER="$2"
+      shift 2
+      ;;
+    --version | -v)
       printf "milimo-claw-installer v%s\n" "$MILIMO_VERSION"
       exit 0
       ;;
-    --help|-h)
+    --help | -h)
       printf "\n  ${C_BOLD}MilimoClaw Installer${C_RESET}  ${C_DIM}v%s${C_RESET}\n\n" "$MILIMO_VERSION"
       printf "  ${C_DIM}Usage:${C_RESET}\n"
       printf "    ./install.sh [options]\n\n"
@@ -94,7 +124,10 @@ while [[ $# -gt 0 ]]; do
       printf "    Install NemoClaw: curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash\n\n"
       exit 0
       ;;
-    *) error "Unknown option: $1"; exit 1 ;;
+    *)
+      error "Unknown option: $1"
+      exit 1
+      ;;
   esac
 done
 
@@ -135,12 +168,11 @@ fi
 # ---------------------------------------------------------------------------
 print_banner() {
   printf "\n"
-  printf "  ${C_GREEN}${C_BOLD} ███╗   ███╗███████╗███╗   ███╗ ██████╗  ██████╗${C_RESET}\n"
-  printf "  ${C_GREEN}${C_BOLD} ████╗ ████║██╔════╝████╗ ████║██╔═══██╗██╔════╝${C_RESET}\n"
-  printf "  ${C_GREEN}${C_BOLD} ██╔████╔██║█████╗  ██╔████╔██║██║   ██║██║     ${C_RESET}\n"
-  printf "  ${C_GREEN}${C_BOLD} ██║╚██╔╝██║██╔══╝  ██║╚██╔╝██║██║   ██║██║     ${C_RESET}\n"
-  printf "  ${C_GREEN}${C_BOLD} ██║ ╚═╝ ██║███████╗██║ ╚═╝ ██║╚██████╔╝╚██████╗${C_RESET}\n"
-  printf "  ${C_GREEN}${C_BOLD} ╚═╝     ╚═╝╚══════╝╚═╝     ╚═╝ ╚═════╝  ╚═════╝${C_RESET}\n"
+  printf "  ${C_GREEN}${C_BOLD}M   M  IIIII  L     IIIII  M   M   OOOO    CCCC  L     A   A   W   W${C_RESET}\n"
+  printf "  ${C_GREEN}${C_BOLD}MM MM    I    L       I    MM MM  O    O  C      L    A A A A  W W W${C_RESET}\n"
+  printf "  ${C_GREEN}${C_BOLD}M M M    I    L       I    M M M  O    O  C      L    A A A A  W W W${C_RESET}\n"
+  printf "  ${C_GREEN}${C_BOLD}M   M    I    L       I    M   M  O    O  C      L    A   A   W W W${C_RESET}\n"
+  printf "  ${C_GREEN}${C_BOLD}M   M  IIIII  LLLLL IIIII  M   M   OOOO    CCCC  LLLLL A   A    W W ${C_RESET}\n"
   printf "\n"
   printf "  ${C_DIM}Multi-agent autonomous hustle platform — v%s${C_RESET}\n" "$MILIMO_VERSION"
   printf "  ${C_DIM}Built on NVIDIA NemoClaw + OpenShell${C_RESET}\n"
@@ -353,6 +385,124 @@ deploy_to_sandbox() {
     fi
   fi
 
+  # ---- Step 6b: Initialize sandbox directories for all claws ----
+  log_step "Initializing sandbox directories"
+
+  sandbox_exec "$gateway" '
+    # Ops Claw — primary mount at /sandbox/clients
+    mkdir -p /sandbox/clients/{clients/{active,archived},projects/{active,completed},calendar,queue/{hold,review,auto},memory,context,logs,tools}
+
+    # Content Claw — primary mount at /sandbox/content
+    mkdir -p /sandbox/content/{drafts/{pending,approved,rejected},calendar,queue/{hold,review,auto},memory,context,logs,tools}
+
+    # Analytics Claw — primary mount at /sandbox/analytics
+    mkdir -p /sandbox/analytics/{reports/{daily,weekly,monthly},metrics,queue/{hold,review,auto},memory,context,logs,tools}
+
+    # Finance Claw — primary mount at /sandbox/finance
+    mkdir -p /sandbox/finance/{invoices/{draft,sent,paid,overdue},expenses,revenue,queue/{hold,review,auto},memory,context,logs,tools}
+
+    # Build Claw — primary mount at /sandbox/build
+    mkdir -p /sandbox/build/{prs/{open,merged,closed},deployments/{staging,production},tasks,docs,context,queue/{hold,review,auto},memory,logs,tools,data}
+
+    chown -R sandbox:sandbox /sandbox/clients /sandbox/content /sandbox/analytics /sandbox/finance /sandbox/build
+    echo "All sandbox directories initialized"
+  '
+  ok "Sandbox directories initialized for all 5 claws"
+
+  # ---- Step 6c: Copy blueprint to .milimo/blueprints/0.1.0/ ----
+  info "Copying blueprint to .milimo/blueprints/0.1.0/..."
+  sandbox_exec "$gateway" '
+    mkdir -p /sandbox/.milimo/blueprints/0.1.0 && \
+    cp -r /sandbox/milimo-blueprint/* /sandbox/.milimo/blueprints/0.1.0/ && \
+    chown -R sandbox:sandbox /sandbox/.milimo/blueprints && \
+    echo "Blueprint copied to .milimo/blueprints/0.1.0/"
+  '
+  ok "Blueprint copied to /sandbox/.milimo/blueprints/0.1.0/"
+
+  # ---- Step 6d: Install Python dependencies ----
+  log_step "Installing Python dependencies"
+
+  sandbox_exec "$gateway" '
+    mkdir -p /sandbox/.local/lib/python3.11/site-packages
+    pip3 install --target /sandbox/.local/lib/python3.11/site-packages \
+      --quiet \
+      pyyaml requests stripe httpx sentry-sdk typing_extensions 2>&1 | tail -3
+    echo "Python packages installed"
+  '
+  ok "Python dependencies installed (pyyaml, requests, stripe, httpx, sentry-sdk)"
+
+  # ---- Step 6e: Install gh CLI (GitHub CLI) ----
+  log_step "Installing GitHub CLI"
+
+  sandbox_exec "$gateway" '
+    # Detect architecture
+    ARCH=$(uname -m)
+    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+      GH_ARCH="arm64"
+    else
+      GH_ARCH="amd64"
+    fi
+
+    mkdir -p /sandbox/.local/bin
+    GH_VERSION="2.67.0"
+    GH_URL="https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz"
+
+    cd /tmp && curl -sL "$GH_URL" -o gh.tar.gz && tar xzf gh.tar.gz
+    cp gh_*_linux_${GH_ARCH}/bin/gh /sandbox/.local/bin/gh
+    chmod +x /sandbox/.local/bin/gh
+    rm -rf /tmp/gh*
+    echo "gh CLI installed (linux/${GH_ARCH})"
+  '
+  ok "GitHub CLI (gh) installed at /sandbox/.local/bin/gh"
+
+  # ---- Step 6f: Create milimo CLI wrapper ----
+  log_step "Creating milimo CLI wrapper"
+
+  sandbox_exec "$gateway" '
+    mkdir -p /sandbox/.local/bin
+    cat > /sandbox/.local/bin/milimo << '\''MILIMO_EOF'\''
+#!/usr/bin/env python3
+"""Milimo Claw CLI wrapper — delegates to bridge_cli.py"""
+import sys
+BLUEPRINT_PATH = "/sandbox/.milimo/blueprints/0.1.0"
+if BLUEPRINT_PATH not in sys.path:
+    sys.path.insert(0, BLUEPRINT_PATH)
+from orchestrator.bridge_cli import main
+if __name__ == "__main__":
+    main()
+MILIMO_EOF
+    chmod +x /sandbox/.local/bin/milimo
+
+    # Add to shell profiles so it'\''s in PATH
+    echo '\''export PATH=$HOME/.local/bin:$PATH'\'' >> /sandbox/.bashrc 2>/dev/null || true
+    echo '\''export PATH=$HOME/.local/bin:$PATH'\'' >> /sandbox/.profile 2>/dev/null || true
+    echo "milimo CLI wrapper created"
+  '
+  ok "milimo CLI wrapper created at /sandbox/.local/bin/milimo"
+
+  # ---- Step 6g: Fix broken .venv (recreate with sandbox Python) ----
+  log_step "Fixing Python virtual environment"
+
+  sandbox_exec "$gateway" '
+    BLUEPRINT_DIR="/sandbox/milimo-blueprint"
+    VENV_DIR="$BLUEPRINT_DIR/.venv"
+
+    # Remove broken venv (may point to host Python)
+    if [ -d "$VENV_DIR" ]; then
+      rm -rf "$VENV_DIR"
+    fi
+
+    # Create fresh venv with sandbox Python
+    python3 -m venv "$VENV_DIR"
+    source "$VENV_DIR/bin/activate"
+    pip install --quiet pyyaml requests stripe httpx sentry-sdk typing_extensions
+
+    # Verify imports
+    python3 -c "import yaml, requests, stripe, httpx, sentry_sdk; print(\"venv OK\")"
+    echo "Python venv recreated and verified"
+  '
+  ok "Python venv recreated with sandbox Python"
+
   # ---- Step 7: Fix permissions ----
   log_step "Fixing permissions"
   sandbox_exec "$gateway" '
@@ -411,7 +561,7 @@ else:
 
   reg_script=$(mktemp /tmp/milimo-register.XXXXXX)
   reg_script="${reg_script}.py"
-  cat > "$reg_script" << 'PYEOF'
+  cat >"$reg_script" <<'PYEOF'
 import json, os
 from datetime import datetime, timezone
 
@@ -481,7 +631,7 @@ run_onboarding() {
   # Write config script to a temp file to avoid quoting hell
   local config_script
   config_script=$(mktemp /tmp/milimo-config.XXXXXX)
-  cat > "$config_script" << PYEOF
+  cat >"$config_script" <<PYEOF
 import json, os
 from datetime import datetime, timezone
 

@@ -1,0 +1,362 @@
+# Sandbox Sync & Provisioning Troubleshooting
+
+**Date:** 2026-04-06
+**Status:** Active
+**Issue:** Assistant sees stale/truncated files, missing CLI tools, and broken Python environment
+
+---
+
+## Root Cause: Two Separate Environments
+
+MilimoClaw runs in **two completely separate environments** that are easy to confuse:
+
+| Environment | What It Is | How It's Managed |
+|---|---|---|
+| **Docker Container** (`MilimoClaw`) | Standalone container with baked-in blueprint | `docker exec MilimoClaw ...` |
+| **NemoClaw Sandbox** (`my-assistant`) | OpenShell/K3s-managed sandbox pod | `openshell sandbox upload/download my-assistant ...` |
+
+**Critical:** The assistant (Lucy) runs inside the **NemoClaw sandbox** (`my-assistant`), NOT the Docker container. Any fixes applied to the Docker container will NOT be visible to the assistant.
+
+---
+
+## Issue 1: Assistant Sees Truncated bridge_cli.py
+
+### Symptoms
+- Assistant reports `bridge_cli.py` is 239 lines and ends with `logger.exception("Failed to diff`
+- Host machine shows 1,878 lines — file is complete
+- Docker container shows 1,878 lines — file is complete
+- Assistant is reading from `/sandbox/milimo-blueprint/orchestrator/bridge_cli.py`
+
+### Root Cause
+The sandbox (`my-assistant`) has its own copy of the blueprint files that was deployed at an earlier point in time. Changes made to the host filesystem or Docker container do NOT automatically sync to the sandbox. The sandbox's copy was from before the Phase 2-6 fixes were applied.
+
+### Fix
+Upload the corrected file to the sandbox:
+
+```bash
+# From host machine
+openshell sandbox upload my-assistant \
+  /path/to/MilimoClaw/milimo-blueprint/orchestrator/bridge_cli.py \
+  /sandbox/milimo-blueprint/orchestrator/bridge_cli.py
+```
+
+Also copy to the blueprint version path (where the milimo CLI wrapper reads from):
+
+```bash
+openshell sandbox upload my-assistant \
+  /path/to/MilimoClaw/milimo-blueprint/orchestrator/ \
+  /sandbox/.milimo/blueprints/0.1.0/orchestrator/
+```
+
+### Verify
+```bash
+openshell sandbox download my-assistant \
+  /sandbox/milimo-blueprint/orchestrator/bridge_cli.py \
+  /tmp/verify_bridge_cli.py
+
+wc -l /tmp/verify_bridge_cli.py
+# Should show: 1878
+```
+
+---
+
+## Issue 2: milimo CLI Not Found in Sandbox
+
+### Symptoms
+- Assistant reports `milimo: command not found`
+- `milimo` CLI exists on host at `~/.local/bin/milimo` (macOS binary)
+- Not available inside the sandbox
+
+### Root Cause
+The `milimo` CLI on the host is a compiled macOS/ARM binary. It cannot run inside the Linux sandbox. The sandbox needs its own Python-based wrapper.
+
+### Fix
+Create the wrapper script inside the sandbox:
+
+```bash
+# Create locally first
+cat > /tmp/milimo-wrapper << 'SCRIPT'
+#!/usr/bin/env python3
+"""Milimo Claw CLI wrapper — delegates to bridge_cli.py"""
+import sys
+BLUEPRINT_PATH = "/sandbox/.milimo/blueprints/0.1.0"
+if BLUEPRINT_PATH not in sys.path:
+    sys.path.insert(0, BLUEPRINT_PATH)
+from orchestrator.bridge_cli import main
+if __name__ == "__main__":
+    main()
+SCRIPT
+chmod +x /tmp/milimo-wrapper
+
+# Upload to sandbox
+openshell sandbox upload my-assistant \
+  /tmp/milimo-wrapper \
+  /sandbox/.local/bin/milimo
+```
+
+Add to PATH in shell profiles:
+
+```bash
+# Upload updated .bashrc (append to existing)
+echo 'export PATH=$HOME/.local/bin:$PATH' | \
+  openshell sandbox upload my-assistant /dev/stdin /tmp/path_update.sh
+
+# Then inside sandbox, run: cat /tmp/path_update.sh >> /sandbox/.bashrc
+```
+
+### Verify
+```bash
+openshell sandbox download my-assistant /sandbox/.local/bin/milimo /tmp/verify_milimo
+head -3 /tmp/verify_milimo
+# Should show the Python wrapper script
+```
+
+---
+
+## Issue 3: gh CLI Architecture Mismatch
+
+### Symptoms
+- Assistant reports `gh` binary gives "Rosetta error" or "exec format error"
+- `gh` was uploaded but doesn't execute
+
+### Root Cause
+The sandbox runs **Linux ARM64** (aarch64). Uploading a macOS ARM binary or Linux x86-64 binary will fail. The correct binary is `gh_*_linux_arm64.tar.gz`.
+
+### Fix
+Download the correct architecture and upload:
+
+```bash
+# On host — download Linux ARM64 binary
+cd /tmp
+curl -sL https://github.com/cli/cli/releases/download/v2.67.0/gh_2.67.0_linux_arm64.tar.gz -o gh.tar.gz
+tar xzf gh.tar.gz
+
+# Verify architecture
+file gh_2.67.0_linux_arm64/bin/gh
+# Should show: ELF 64-bit LSB executable, ARM aarch64
+
+# Upload to sandbox
+openshell sandbox upload my-assistant \
+  /tmp/gh_2.67.0_linux_arm64/bin/gh \
+  /sandbox/.local/bin/gh
+```
+
+### Auto-Detect Architecture (for install.sh)
+```bash
+ARCH=$(uname -m)
+if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+  GH_ARCH="arm64"
+else
+  GH_ARCH="amd64"
+fi
+GH_URL="https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz"
+```
+
+---
+
+## Issue 4: Python Dependencies Missing in Sandbox
+
+### Symptoms
+- Python imports fail: `ModuleNotFoundError: No module named 'yaml'`
+- `requests`, `stripe`, `httpx`, `sentry_sdk` all unavailable
+- Claws run in "stub mode" because imports fail
+
+### Root Cause
+The sandbox's Python installation only has `pip`, `setuptools`, and `wheel`. No third-party packages are pre-installed. The `install.sh` script now handles this, but existing sandboxes need manual provisioning.
+
+### Fix
+Install packages into the sandbox's site-packages:
+
+```bash
+# On host — install packages to a target directory
+mkdir -p /tmp/python_packages
+pip3 install --target /tmp/python_packages \
+  pyyaml requests stripe httpx sentry-sdk typing_extensions
+
+# Remove any platform-specific .so files (macOS won't work on Linux)
+find /tmp/python_packages -name "*.so" -delete
+
+# Upload each package to sandbox
+for pkg in yaml requests stripe httpx httpcore anyio certifi idna urllib3 charset_normalizer h11 sentry_sdk typing_extensions; do
+  if [ -d "/tmp/python_packages/$pkg" ]; then
+    openshell sandbox upload my-assistant \
+      "/tmp/python_packages/$pkg" \
+      "/sandbox/.local/lib/python3.11/site-packages/$pkg"
+  fi
+done
+
+# Also upload dist-info metadata
+for pkg in pyyaml-6.0.3 requests-2.33.1 stripe-15.0.1 httpx-0.28.1 httpcore-1.0.9 anyio-4.13.0 certifi-2026.2.25 idna-3.11 urllib3-2.6.3 charset_normalizer-3.4.7 h11-0.16.0 typing_extensions-4.15.0 sentry_sdk-2.57.0; do
+  if [ -d "/tmp/python_packages/$pkg.dist-info" ]; then
+    openshell sandbox upload my-assistant \
+      "/tmp/python_packages/$pkg.dist-info" \
+      "/sandbox/.local/lib/python3.11/site-packages/$pkg.dist-info"
+  fi
+done
+```
+
+### Verify
+```bash
+openshell sandbox download my-assistant \
+  /sandbox/.local/lib/python3.11/site-packages/ \
+  /tmp/verify_packages/
+
+ls /tmp/verify_packages/ | grep -E "yaml|requests|stripe|httpx|sentry"
+# Should show: yaml, requests, stripe, httpx, sentry_sdk (+ dist-info)
+```
+
+---
+
+## Issue 5: Broken Python Virtual Environment
+
+### Symptoms
+- `.venv` points to `/opt/homebrew/opt/python@3.14/bin/python3.14` which doesn't exist in sandbox
+- `source .venv/bin/activate` fails or uses wrong Python
+- The sandbox has Python 3.11.2, not 3.14
+
+### Root Cause
+The `.venv` directory was created on the macOS host with Python 3.14 (Homebrew). When deployed to the sandbox, the symlinks and `pyvenv.cfg` still reference the host's Python path.
+
+### Fix
+Recreate the venv inside the sandbox with the sandbox's Python:
+
+```bash
+# Upload a fix script
+cat > /tmp/fix_venv.sh << 'SCRIPT'
+#!/bin/bash
+BLUEPRINT_DIR="/sandbox/milimo-blueprint"
+VENV_DIR="$BLUEPRINT_DIR/.venv"
+
+# Remove broken venv
+if [ -d "$VENV_DIR" ]; then
+    rm -rf "$VENV_DIR"
+fi
+
+# Create fresh venv with sandbox Python
+python3 -m venv "$VENV_DIR"
+source "$VENV_DIR/bin/activate"
+pip install --quiet pyyaml requests stripe httpx sentry-sdk typing_extensions
+
+# Verify
+python3 -c "import yaml, requests, stripe, httpx, sentry_sdk; print('venv OK')"
+SCRIPT
+chmod +x /tmp/fix_venv.sh
+
+# Upload and execute in sandbox
+openshell sandbox upload my-assistant /tmp/fix_venv.sh /tmp/fix_venv.sh
+# Then inside sandbox: bash /tmp/fix_venv.sh
+```
+
+---
+
+## Issue 6: Missing /sandbox/clients Directory
+
+### Symptoms
+- Ops claw reports "sandbox not initialized"
+- `/sandbox/clients/` doesn't exist
+- Ops primary mount path from blueprint is `/sandbox/clients`
+
+### Root Cause
+The `install.sh` script now creates sandbox directories, but existing sandboxes may not have been initialized with the correct directory structure.
+
+### Fix
+Create the directory structure:
+
+```bash
+# Create locally
+mkdir -p /tmp/clients_init/{clients/{active,archived},projects/{active,completed},calendar,queue/{hold,review,auto},memory,context,logs,tools}
+
+# Upload to sandbox
+openshell sandbox upload my-assistant \
+  /tmp/clients_init/ \
+  /sandbox/clients/
+```
+
+---
+
+## Issue 7: Banner Renders as Garbage Text
+
+### Symptoms
+- `install.sh` banner shows "MEMOGOE" or other garbled text instead of "MILIMOCLAW"
+
+### Root Cause
+The original banner used Unicode block-drawing characters (`███╗`, `╚═╝`, etc.) that some terminals/fonts render incorrectly.
+
+### Fix
+The banner has been replaced with plain ASCII characters. Update `install.sh` to use the ASCII-only version:
+
+```
+M   M  IIIII  L     IIIII  M   M   OOOO    CCCC  L     A   A   W   W
+MM MM    I    L       I    MM MM  O    O  C      L    A A A A  W W W
+M M M    I    L       I    M M M  O    O  C      L    A A A A  W W W
+M   M    I    L       I    M   M  O    O  C      L    A   A   W W W
+M   M  IIIII  LLLLL IIIII  M   M   OOOO    CCCC  LLLLL A   A    W W
+```
+
+---
+
+## Complete Sandbox Sync Checklist
+
+When deploying changes to an existing sandbox, run through this checklist:
+
+| # | Item | Command |
+|---|------|---------|
+| 1 | Upload corrected `bridge_cli.py` | `openshell sandbox upload my-assistant <local>/bridge_cli.py /sandbox/milimo-blueprint/orchestrator/bridge_cli.py` |
+| 2 | Upload full blueprint to `.milimo/blueprints/0.1.0/` | `openshell sandbox upload my-assistant <local>/orchestrator/ /sandbox/.milimo/blueprints/0.1.0/orchestrator/` |
+| 3 | Upload `milimo` CLI wrapper | `openshell sandbox upload my-assistant /tmp/milimo-wrapper /sandbox/.local/bin/milimo` |
+| 4 | Upload `gh` CLI (correct arch) | `openshell sandbox upload my-assistant /tmp/gh /sandbox/.local/bin/gh` |
+| 5 | Upload Python packages | Upload each package to `/sandbox/.local/lib/python3.11/site-packages/` |
+| 6 | Create `/sandbox/clients/` | Upload directory structure |
+| 7 | Fix `.venv` | Upload and run `fix_venv.sh` inside sandbox |
+| 8 | Verify all uploads | Download back and check line counts/checksums |
+
+---
+
+## Using openshell sandbox Commands
+
+The `openshell` CLI is the correct tool for interacting with NemoClaw sandboxes:
+
+```bash
+# Upload a file
+openshell sandbox upload my-assistant <local-path> <sandbox-path>
+
+# Download a file
+openshell sandbox download my-assistant <sandbox-path> <local-path>
+
+# List sandboxes
+openshell sandbox list
+
+# Get sandbox details
+openshell sandbox get my-assistant
+```
+
+**Important:** The upload/download commands handle the tar transfer automatically. No need for manual `docker cp` + `kubectl cp` pipelines.
+
+---
+
+## install.sh Now Handles All Provisioning
+
+As of 2026-04-06, `install.sh` includes these provisioning steps that were previously missing:
+
+| Step | What It Does |
+|------|-------------|
+| 6b | Initialize sandbox directories for all 5 claws |
+| 6c | Copy blueprint to `/sandbox/.milimo/blueprints/0.1.0/` |
+| 6d | Install Python dependencies (pyyaml, requests, stripe, httpx, sentry-sdk) |
+| 6e | Install `gh` CLI with auto-detected architecture (ARM64/AMD64) |
+| 6f | Create `milimo` CLI wrapper and add to PATH |
+| 6g | Recreate `.venv` with sandbox Python |
+
+Fresh installs will get all of these automatically. Existing sandboxes need manual sync using the commands above.
+
+---
+
+## Key Lessons Learned
+
+1. **Two environments, not one** — The Docker container and NemoClaw sandbox are completely separate. Fixes must be applied to the sandbox where the assistant runs.
+2. **No automatic sync** — Changes to host files or Docker containers do NOT propagate to the sandbox. Use `openshell sandbox upload/download` to sync.
+3. **Architecture matters** — Binaries must match the sandbox's architecture (Linux ARM64), not the host's (macOS ARM64).
+4. **Python venvs don't travel** — A `.venv` created on the host is useless in the sandbox. Recreate it inside the sandbox.
+5. **Python packages must be uploaded** — The sandbox has no third-party packages. Install them to a target directory and upload each one.
+6. **Verify by downloading back** — Always download files back from the sandbox to confirm uploads succeeded. The `openshell sandbox download` command is your verification tool.
+7. **install.sh is the source of truth** — All provisioning steps should be in `install.sh` so fresh installs get everything automatically.

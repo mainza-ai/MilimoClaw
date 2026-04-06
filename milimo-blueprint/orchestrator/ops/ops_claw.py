@@ -261,19 +261,31 @@ class OpsClaw:
         self._running = False
         logger.info("Ops Claw shutdown complete")
 
-    def handle_inbound(self, raw_message: dict[str, Any]) -> None:
+    def handle_inbound(self, raw_message: dict[str, Any]) -> dict[str, Any]:
+        """Route inbound message to the correct handler.
+
+        Returns:
+            Dict with handler result including status and any relevant data.
+        """
         message_type = raw_message.get("message_type")
         if not message_type:
             logger.warning("Received message without message_type")
-            return
+            return {"status": "error", "error": "No message_type", "role": "ops"}
 
         handler = self._inbound_handlers.get(message_type)
         if not handler:
             logger.warning("No handler for message type: %s", message_type)
-            return
+            return {"status": "no_handler", "message_type": message_type, "role": "ops"}
 
         try:
-            handler(raw_message)
+            result = handler(raw_message)
+            if result is None:
+                result = {
+                    "status": "processed",
+                    "message_type": message_type,
+                    "role": "ops",
+                }
+            return result
         except Exception as e:
             logger.error("Error handling message %s: %s", message_type, e)
 
@@ -287,6 +299,13 @@ class OpsClaw:
                         details={"error": str(e), "message_type": message_type},
                     )
                 )
+
+            return {
+                "status": "error",
+                "message_type": message_type,
+                "role": "ops",
+                "error": str(e),
+            }
 
     def handle_incident(self, alert: dict[str, Any]) -> None:
         """Handle an incoming incident alert — full pipeline: analyze → remediate.

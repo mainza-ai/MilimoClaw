@@ -50,7 +50,7 @@ You are NOT read-only. Through the Milimo bridge you can:
 - `check_all_deadlines` — check Ops Claw deadline status
 - `discover_tools` — list tools available in each claw's registry
 
-### Lifecycle Management (NEW)
+### Lifecycle Management
 You can now manage claw lifecycle directly from chat:
 - `launcher_status` — Check if the claw launcher is running, its PID, and all claw health statuses
 - `start_claw(role)` — Start a specific claw (content, ops, analytics, finance, build)
@@ -59,12 +59,21 @@ You can now manage claw lifecycle directly from chat:
 - `restart_all_claws` — Restart all 5 claws in sequence
 - `claw_logs(role, lines)` — Get recent log lines for debugging
 
-### Result Polling (NEW)
+### Result Polling
 Messages sent to claws can now return results:
 - `get_result(message_id)` — Poll for a result from a previously sent message
 - `send_to_claw(..., wait_for_result=true)` — Send message and wait up to 60s for result
 
 Results are stored in the outbox with 1-hour TTL. Use `wait_for_result=true` for synchronous-style operations.
+
+**Result Contents by Claw**:
+| Claw | Returns |
+|------|---------|
+| **Build** | `pipeline_started`, sprint plan status, issue execution results |
+| **Ops** | `processed`, action type, project/escalation details |
+| **Finance** | `invoice_id`, `project_id`, action (invoice_generated, hold_released) |
+| **Content** | `processed`, draft details, content metadata |
+| **Analytics** | `processed`, analysis results, anomaly detection status |
 
 ### Approve & Veto
 - `/milimo approve <id>` — approve a War Room action
@@ -83,6 +92,19 @@ The launcher now includes:
 - **Flapping detection**: Claws that restart >3 times/hour are flagged
 - **Daemon mode**: `--daemon` flag runs launcher in background with PID file
 - **Real API clients**: Vercel and Sentry integrations when tokens are configured
+
+## Startup & Health
+Before claws start, the launcher validates:
+- Required environment variables (NVIDIA_API_KEY, GITHUB_REPO, STRIPE_SECRET_KEY)
+- External client connections (Vercel, Sentry, GitHub)
+- Missing configuration alerts written to `~/.milimo/mesh/alerts/`
+
+**Health Endpoints** (port 8081):
+- `GET /health` — Full launcher status with all claw health
+- `GET /ready` — Readiness probe (returns `{ready: true}` only if all claws running)
+
+**Validation Command**:
+- `claw_launcher.py --validate-only` — Check config without starting
 
 ## War Room
 The War Room is the human oversight layer above the mesh. All approval-required
@@ -129,13 +151,31 @@ Use the bridge command `discover_tools` to see all registered tools.
 When configured with API tokens, claws use real services:
 - **Vercel**: Deployments, rollback, status monitoring
 - **Sentry**: Error tracking, release management, sourcemap uploads
-- **GitHub**: PR management, issue tracking, sprint planning
+- **GitHub**: PR management, issue tracking, sprint planning (via `gh` CLI)
 - **Stripe**: Invoice creation, payment monitoring, webhook handling
 
 Check `.env` for required tokens:
 - `VERCEL_TOKEN` — Vercel API access
 - `SENTRY_AUTH_TOKEN` — Sentry API access
 - `NVIDIA_API_KEY` — Inference for AI-powered claws
+
+## Available Tools
+The following CLI tools are available in the sandbox:
+- **milimo** (`/sandbox/.local/bin/milimo`) — All 41 bridge commands. Use `milimo --command <name>` to invoke.
+- **gh** (`/sandbox/.local/bin/gh`) — GitHub CLI for PR management, issue tracking, repo operations.
+- **Python 3** — All claws and the bridge are Python-based. Key packages: `pyyaml`, `requests`, `stripe`, `httpx`, `sentry-sdk`.
+
+## Sandbox Filesystem
+Your working directories:
+- `/sandbox/milimo-blueprint/orchestrator/` — Blueprint source code (50+ Python modules)
+- `/sandbox/.milimo/blueprints/0.1.0/orchestrator/` — Active blueprint copy (same content)
+- `/sandbox/.milimo/config.json` — Squad configuration
+- `/sandbox/.milimo/mesh/` — Mesh state, heartbeats, inbox/outbox
+- `/sandbox/clients/` — Ops Claw workspace (clients, projects, calendar, queue)
+- `/sandbox/content/` — Content Claw workspace (drafts, queue)
+- `/sandbox/analytics/` — Analytics Claw workspace (reports, metrics)
+- `/sandbox/finance/` — Finance Claw workspace (invoices, revenue, expenses)
+- `/sandbox/build/` — Build Claw workspace (prs, deployments, tasks, repo)
 
 ---
 *The milimo never stops. Work. Without working.*

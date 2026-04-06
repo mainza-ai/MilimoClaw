@@ -238,20 +238,40 @@ class BuildClaw:
     # Message handling
     # ------------------------------------------------------------------
 
-    def handle_inbound(self, message: dict[str, Any]) -> None:
-        """Route inbound message to the correct handler."""
+    def handle_inbound(self, message: dict[str, Any]) -> dict[str, Any]:
+        """Route inbound message to the correct handler.
+
+        Returns:
+            Dict with handler result including status and any relevant data.
+            This is written to the outbox for async result polling.
+        """
         msg_type = message.get("message_type", "unknown")
         handler = self._inbound_handlers.get(msg_type)
         if handler:
-            handler(message)
+            result = handler(message)
+            if result is None:
+                result = {
+                    "status": "processed",
+                    "message_type": msg_type,
+                    "role": "build",
+                }
+            return result
         else:
             logger.warning("No handler for message type: %s", msg_type)
+            return {
+                "status": "no_handler",
+                "message_type": msg_type,
+                "role": "build",
+                "error": f"No handler for message type: {msg_type}",
+            }
 
     # ------------------------------------------------------------------
     # Execution Pipeline: feature_brief → sprint plan → approval → code → PR
     # ------------------------------------------------------------------
 
-    def _handle_feature_brief_with_execution(self, message: dict[str, Any]) -> None:
+    def _handle_feature_brief_with_execution(
+        self, message: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Handle feature_brief and trigger the full execution pipeline.
 
@@ -260,7 +280,10 @@ class BuildClaw:
         2. Generate sprint plan from open GitHub issues
         3. Queue sprint plan for War Room approval
         4. Start a background watcher that polls for approval decisions
-           and triggers code generation when approved
+        and triggers code generation when approved
+
+        Returns:
+            Dict with pipeline started status
         """
         # Step 1: Log and start SLA timer
         self._dispatcher.handle_feature_brief(message)
@@ -274,6 +297,13 @@ class BuildClaw:
         )
         thread.start()
 
+        return {
+            "status": "pipeline_started",
+            "message_type": "feature_brief",
+            "role": "build",
+            "message": "Sprint planning pipeline started. Use launcher_status() to monitor progress.",
+        }
+
     def _execute_sprint_pipeline(self) -> None:
         """
         Execute the full sprint pipeline: plan → approve → code → PR.
@@ -284,7 +314,11 @@ class BuildClaw:
             # Step 2: Generate sprint plan (fetches issues, scores complexity, queues for approval)
             logger.info("Starting sprint planning pipeline")
             plan = self._issue_manager.generate_sprint_plan()
-            logger.info("Sprint plan generated: %s with %d issues", plan.plan_id, len(plan.issues))
+            logger.info(
+                "Sprint plan generated: %s with %d issues",
+                plan.plan_id,
+                len(plan.issues),
+            )
 
             if not plan.issues:
                 logger.info("No issues in sprint plan — pipeline complete")
@@ -311,13 +345,18 @@ class BuildClaw:
                 plan_path = self._fs.base / "context" / "sprint" / "current-plan.json"
                 if plan_path.exists():
                     import json
+
                     plan_data = json.loads(plan_path.read_text())
                     if plan_data.get("status") == "approved":
-                        logger.info("Sprint plan %s approved — executing issues", plan_id)
+                        logger.info(
+                            "Sprint plan %s approved — executing issues", plan_id
+                        )
                         self._execute_approved_plan(plan_data)
                         return
                     elif plan_data.get("status") == "rejected":
-                        logger.warning("Sprint plan %s rejected — pipeline aborted", plan_id)
+                        logger.warning(
+                            "Sprint plan %s rejected — pipeline aborted", plan_id
+                        )
                         return
 
                 time.sleep(poll_interval)
@@ -327,7 +366,11 @@ class BuildClaw:
                 time.sleep(poll_interval)
                 waited += poll_interval
 
-        logger.warning("Sprint plan %s approval timed out after %d seconds", plan_id, max_wait_seconds)
+        logger.warning(
+            "Sprint plan %s approval timed out after %d seconds",
+            plan_id,
+            max_wait_seconds,
+        )
 
     def _execute_approved_plan(self, plan_data: dict) -> None:
         """
@@ -346,11 +389,15 @@ class BuildClaw:
                 issue_number = issue.get("issue_number", 0)
                 logger.info(
                     "Executing issue %d/%d: #%d — %s",
-                    idx + 1, len(issues), issue_number, issue.get("title", ""),
+                    idx + 1,
+                    len(issues),
+                    issue_number,
+                    issue.get("title", ""),
                 )
 
                 # Import ComplexityScore for the code generator
                 from .issue_manager import ComplexityScore
+
                 score = ComplexityScore(
                     issue_number=issue_number,
                     issue_title=issue.get("title", ""),
@@ -363,8 +410,11 @@ class BuildClaw:
                 result = self._code_gen.resolve_issue(score)
                 logger.info(
                     "Issue #%d resolved: %s (tests: %d passing, %d failing, %d attempts)",
-                    issue_number, result.status, result.tests_passing,
-                    result.tests_failing, result.attempts,
+                    issue_number,
+                    result.status,
+                    result.tests_passing,
+                    result.tests_failing,
+                    result.attempts,
                 )
 
                 if result.status == "ready_for_pr":
@@ -372,11 +422,15 @@ class BuildClaw:
                     pr = self._pr_manager.open_pr(result)
                     logger.info(
                         "PR created for issue #%d: %s (review_action: %s)",
-                        issue_number, pr.pr_id, pr.review_action_id,
+                        issue_number,
+                        pr.pr_id,
+                        pr.review_action_id,
                     )
 
             except Exception as e:
-                logger.error("Failed to execute issue %s: %s", issue.get("issue_number"), e)
+                logger.error(
+                    "Failed to execute issue %s: %s", issue.get("issue_number"), e
+                )
 
     def handle_approval_decision(
         self,
@@ -401,7 +455,9 @@ class BuildClaw:
     @property
     def approval_handler(self) -> BuildApprovalHandler:
         # Support both _approval_handler (startup) and _approval (MVR fixture)
-        handler = getattr(self, "_approval_handler", None) or getattr(self, "_approval", None)
+        handler = getattr(self, "_approval_handler", None) or getattr(
+            self, "_approval", None
+        )
         if handler is None:
             raise RuntimeError("BuildClaw not started — call startup() first")
         return handler

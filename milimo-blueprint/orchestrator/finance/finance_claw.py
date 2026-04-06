@@ -129,9 +129,13 @@ class FinanceClaw:
 
         # Validate Stripe configuration
         import os
-        stripe_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY")
+
+        stripe_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get(
+            "STRIPE_API_KEY"
+        )
         if not stripe_key:
             import logging
+
             logging.getLogger("milimo.finance").warning(
                 "STRIPE_SECRET_KEY or STRIPE_API_KEY not set — Finance Claw will use mock Stripe client"
             )
@@ -267,13 +271,16 @@ class FinanceClaw:
 
         self._initialized = False
 
-    def handle_inbound(self, raw_message: dict) -> None:
+    def handle_inbound(self, raw_message: dict) -> dict:
         """
         Handle an inbound message.
 
         Route inbound message to correct handler.
         Log receipt to operational.log.
         Catch all exceptions — never crash on bad input.
+
+        Returns:
+            Dict with handler result including status and any relevant data.
         """
         message_type = raw_message.get("message_type", "")
         sender_role = raw_message.get("sender_role", "")
@@ -293,11 +300,18 @@ class FinanceClaw:
         if operational_log:
             operational_log.append(receipt_entry)
 
+        result = {
+            "status": "processed",
+            "message_type": message_type,
+            "role": "finance",
+        }
+
         try:
             if message_type == "pricing_query":
                 pricing_engine = self._components.get("pricing_engine")
                 if pricing_engine:
                     pricing_engine.handle_pricing_query(payload)
+                    result["action"] = "pricing_query_handled"
 
             elif message_type == "project_complete":
                 invoice_manager = self._components.get("invoice_manager")
@@ -312,6 +326,10 @@ class FinanceClaw:
                         delivered_at=delivered_at,
                     )
 
+                    result["invoice_id"] = invoice.invoice_id
+                    result["project_id"] = project_id
+                    result["action"] = "invoice_generated"
+
                     approval_handler = self._components.get("approval_handler")
                     if approval_handler:
                         approval_handler.queue_invoice_review(invoice)
@@ -322,15 +340,19 @@ class FinanceClaw:
                 if payment_monitor:
                     payment_id = payload.get("payment_id", "")
                     payment_monitor.release_hold(payment_id, payload)
+                    result["payment_id"] = payment_id
+                    result["action"] = "hold_released"
                     if operational_log:
-                        operational_log.append(FinanceLogEntry(
-                            timestamp=datetime.now(timezone.utc).isoformat(),
-                            action_type="hold_released",
-                            entity_id=payment_id,
-                            amount=None,
-                            outcome="success",
-                            details={"reason": payload.get("reason", "")},
-                        ))
+                        operational_log.append(
+                            FinanceLogEntry(
+                                timestamp=datetime.now(timezone.utc).isoformat(),
+                                action_type="hold_released",
+                                entity_id=payment_id,
+                                amount=None,
+                                outcome="success",
+                                details={"reason": payload.get("reason", "")},
+                            )
+                        )
 
             elif message_type == "review_approve":
                 # War Room approved a financial action
@@ -338,15 +360,21 @@ class FinanceClaw:
                 if approval_handler:
                     action_id = payload.get("action_id", "")
                     approval_handler.process_approval(action_id, payload)
+                    result["action_id"] = action_id
+                    result["action"] = "review_approved"
                     if operational_log:
-                        operational_log.append(FinanceLogEntry(
-                            timestamp=datetime.now(timezone.utc).isoformat(),
-                            action_type="review_approved",
-                            entity_id=action_id,
-                            amount=None,
-                            outcome="success",
-                            details={"approver": payload.get("approver", "war_room")},
-                        ))
+                        operational_log.append(
+                            FinanceLogEntry(
+                                timestamp=datetime.now(timezone.utc).isoformat(),
+                                action_type="review_approved",
+                                entity_id=action_id,
+                                amount=None,
+                                outcome="success",
+                                details={
+                                    "approver": payload.get("approver", "war_room")
+                                },
+                            )
+                        )
 
             elif message_type == "review_reject":
                 # War Room rejected a financial action
@@ -354,17 +382,22 @@ class FinanceClaw:
                 if approval_handler:
                     action_id = payload.get("action_id", "")
                     approval_handler.process_rejection(action_id, payload)
+                    result["action_id"] = action_id
+                    result["action"] = "review_rejected"
                     if operational_log:
-                        operational_log.append(FinanceLogEntry(
-                            timestamp=datetime.now(timezone.utc).isoformat(),
-                            action_type="review_rejected",
-                            entity_id=action_id,
-                            amount=None,
-                            outcome="rejected",
-                            details={"reason": payload.get("reason", "")},
-                        ))
+                        operational_log.append(
+                            FinanceLogEntry(
+                                timestamp=datetime.now(timezone.utc).isoformat(),
+                                action_type="review_rejected",
+                                entity_id=action_id,
+                                amount=None,
+                                outcome="rejected",
+                                details={"reason": payload.get("reason", "")},
+                            )
+                        )
 
             else:
+                result["status"] = "unknown_type"
                 if operational_log:
                     unknown_entry = FinanceLogEntry(
                         timestamp=datetime.now(timezone.utc).isoformat(),
@@ -377,6 +410,8 @@ class FinanceClaw:
                     operational_log.append(unknown_entry)
 
         except Exception as e:
+            result["status"] = "error"
+            result["error"] = str(e)
             if operational_log:
                 error_entry = FinanceLogEntry(
                     timestamp=datetime.now(timezone.utc).isoformat(),
@@ -387,6 +422,8 @@ class FinanceClaw:
                     details={"error": str(e), "sender": sender_role},
                 )
                 operational_log.append(error_entry)
+
+        return result
 
     def get_component(self, name: str) -> Any:
         """Get a component by name."""

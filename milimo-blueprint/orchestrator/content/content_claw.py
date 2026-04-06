@@ -139,7 +139,8 @@ class ContentClaw:
         # 4. Content generator
         self._generator = ContentGenerator(
             privacy_router=self._privacy_router or PrivacyRouter(),
-            tool_registry=self._tool_registry or ToolRegistry(self._base_path / "tools"),
+            tool_registry=self._tool_registry
+            or ToolRegistry(self._base_path / "tools"),
             operational_log=self._operational_log,
             fs=self._fs,
             war_room=self._war_room,
@@ -237,24 +238,40 @@ class ContentClaw:
     # Inbound message routing
     # ------------------------------------------------------------------
 
-    def handle_inbound(self, raw_message: dict[str, Any]) -> None:
-        """Route inbound message to correct handler."""
+    def handle_inbound(self, raw_message: dict[str, Any]) -> dict[str, Any]:
+        """Route inbound message to correct handler.
+
+        Returns:
+            Dict with handler result including status and any relevant data.
+        """
         if not self._started:
             logger.warning("ContentClaw not started, cannot handle message")
-            return
+            return {"status": "error", "error": "claw_not_started", "role": "content"}
 
         message_type = raw_message.get("message_type", "")
         sender = raw_message.get("sender_role", "unknown")
 
         logger.debug("Received %s from %s", message_type, sender)
 
+        result = {
+            "status": "processed",
+            "message_type": message_type,
+            "role": "content",
+        }
+
         handler = self._inbound_handlers.get(message_type)
         if not handler:
             logger.warning("No handler for message type: %s", message_type)
-            return
+            return {
+                "status": "no_handler",
+                "message_type": message_type,
+                "role": "content",
+            }
 
         try:
-            handler(raw_message)
+            handler_result = handler(raw_message)
+            if handler_result:
+                result.update(handler_result)
 
             if self._operational_log:
                 self._operational_log.append(
@@ -271,6 +288,8 @@ class ContentClaw:
 
         except Exception as e:
             logger.error("Error handling message %s: %s", message_type, e)
+            result["status"] = "error"
+            result["error"] = str(e)
 
             if self._operational_log:
                 self._operational_log.append(
@@ -285,11 +304,15 @@ class ContentClaw:
                     )
                 )
 
+        return result
+
     def _register_inbound_handlers(self) -> None:
         """Register all inbound message type handlers."""
         self._inbound_handlers["project_brief"] = self._handle_project_brief
         self._inbound_handlers["performance_intel"] = self._handle_performance_intel
-        self._inbound_handlers["client_health_signal"] = self._handle_client_health_signal
+        self._inbound_handlers["client_health_signal"] = (
+            self._handle_client_health_signal
+        )
         self._inbound_handlers["revision_request"] = self._handle_revision_request
         self._inbound_handlers["content_performance_response"] = (
             self._handle_content_performance_response
@@ -422,7 +445,10 @@ class ContentClaw:
         if self._mesh_sender:
             self._mesh_sender(message)
         else:
-            logger.warning("No mesh sender configured, message dropped: %s", message.get("message_type"))
+            logger.warning(
+                "No mesh sender configured, message dropped: %s",
+                message.get("message_type"),
+            )
 
     # ------------------------------------------------------------------
     # Properties

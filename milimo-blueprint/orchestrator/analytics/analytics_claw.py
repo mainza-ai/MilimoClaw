@@ -87,7 +87,10 @@ class AnalyticsClaw:
 
         validation = self.fs.validate()
         if not validation.valid:
-            logger.error("Filesystem validation failed: %s", validation.missing_dirs + validation.missing_files)
+            logger.error(
+                "Filesystem validation failed: %s",
+                validation.missing_dirs + validation.missing_files,
+            )
             raise RuntimeError("Analytics filesystem validation failed")
 
         log_path = self.fs.get_log_path("operational.log")
@@ -182,7 +185,7 @@ class AnalyticsClaw:
         if self.scheduler:
             self.scheduler.stop()
 
-        if hasattr(self, 'collection_workers') and self.collection_workers:
+        if hasattr(self, "collection_workers") and self.collection_workers:
             self.collection_workers.stop()
 
         if self.operational_log:
@@ -200,16 +203,26 @@ class AnalyticsClaw:
         self._started = False
         logger.info("AnalyticsClaw stopped")
 
-    def handle_inbound(self, raw_message: dict[str, Any]) -> None:
-        """Route inbound message to correct handler."""
+    def handle_inbound(self, raw_message: dict[str, Any]) -> dict[str, Any]:
+        """Route inbound message to correct handler.
+
+        Returns:
+            Dict with handler result including status and any relevant data.
+        """
         if not self._started:
             logger.warning("AnalyticsClaw not started, cannot handle message")
-            return
+            return {"status": "error", "error": "claw_not_started", "role": "analytics"}
 
         message_type = raw_message.get("message_type", "")
         sender = raw_message.get("sender_role", "unknown")
 
         logger.debug("Received %s from %s", message_type, sender)
+
+        result = {
+            "status": "processed",
+            "message_type": message_type,
+            "role": "analytics",
+        }
 
         try:
             handler_map = {
@@ -224,9 +237,12 @@ class AnalyticsClaw:
 
             handler = handler_map.get(message_type)
             if handler:
-                handler(raw_message)
+                handler_result = handler(raw_message)
+                if handler_result:
+                    result.update(handler_result)
             else:
                 logger.warning("Unknown message type: %s", message_type)
+                result["status"] = "unknown_type"
 
             if self.operational_log:
                 self.operational_log.append(
@@ -242,6 +258,8 @@ class AnalyticsClaw:
 
         except Exception as e:
             logger.error("Failed to handle %s: %s", message_type, e)
+            result["status"] = "error"
+            result["error"] = str(e)
 
             if self.operational_log:
                 self.operational_log.append(
@@ -258,14 +276,22 @@ class AnalyticsClaw:
                     )
                 )
 
+        return result
+
     def _handle_performance_signal(self, message: dict[str, Any]) -> None:
         """Handle performance_signal from Content Claw."""
         if self.signal_processor:
             self.signal_processor.handle_performance_signal(message)
 
-            content_baselines = self.baseline_manager.load_content_baselines() if self.baseline_manager else {}
+            content_baselines = (
+                self.baseline_manager.load_content_baselines()
+                if self.baseline_manager
+                else {}
+            )
             if content_baselines and self.anomaly_detector:
-                anomaly = self.anomaly_detector.check_content_signal(message, content_baselines)
+                anomaly = self.anomaly_detector.check_content_signal(
+                    message, content_baselines
+                )
                 if anomaly:
                     self.anomaly_detector.save_anomaly(anomaly)
                     self.anomaly_detector.dispatch_alert(anomaly)
@@ -284,7 +310,9 @@ class AnalyticsClaw:
                 client_id=client_id,
                 health_score=health_score,
                 risk_factors=payload.get("health_factors", []),
-                recommended_action=payload.get("recommended_action", "Schedule client check-in"),
+                recommended_action=payload.get(
+                    "recommended_action", "Schedule client check-in"
+                ),
             )
 
     def _handle_client_onboarded(self, message: dict[str, Any]) -> None:
@@ -297,9 +325,15 @@ class AnalyticsClaw:
         if self.signal_processor:
             self.signal_processor.handle_revenue_summary(message)
 
-            revenue_baselines = self.baseline_manager.load_revenue_baseline() if self.baseline_manager else {}
+            revenue_baselines = (
+                self.baseline_manager.load_revenue_baseline()
+                if self.baseline_manager
+                else {}
+            )
             if revenue_baselines and self.anomaly_detector:
-                anomaly = self.anomaly_detector.check_revenue_signal(message, revenue_baselines)
+                anomaly = self.anomaly_detector.check_revenue_signal(
+                    message, revenue_baselines
+                )
                 if anomaly:
                     self.anomaly_detector.save_anomaly(anomaly)
                     self.anomaly_detector.dispatch_alert(anomaly)
@@ -309,9 +343,15 @@ class AnalyticsClaw:
         if self.signal_processor:
             self.signal_processor.handle_shipping_summary(message)
 
-            delivery_baselines = self.baseline_manager.load_delivery_baseline() if self.baseline_manager else {}
+            delivery_baselines = (
+                self.baseline_manager.load_delivery_baseline()
+                if self.baseline_manager
+                else {}
+            )
             if delivery_baselines and self.anomaly_detector:
-                anomaly = self.anomaly_detector.check_delivery_signal(message, delivery_baselines)
+                anomaly = self.anomaly_detector.check_delivery_signal(
+                    message, delivery_baselines
+                )
                 if anomaly:
                     self.anomaly_detector.save_anomaly(anomaly)
                     self.anomaly_detector.dispatch_alert(anomaly)
@@ -338,12 +378,16 @@ class AnalyticsClaw:
                     response_data=response.data if response.data else {},
                 )
 
-    def _dispatch_alert_from_processor(self, message_type: str, target_claw: str, payload: dict) -> None:
+    def _dispatch_alert_from_processor(
+        self, message_type: str, target_claw: str, payload: dict
+    ) -> None:
         """Dispatch alert from signal processor (e.g., client_health_alert when score < 6.0)."""
         if self.signal_dispatcher:
             self.signal_dispatcher._send(message_type, target_claw, payload)
 
-    def _dispatch_anomaly_alert(self, message_type: str, target_claw: str, payload: dict) -> None:
+    def _dispatch_anomaly_alert(
+        self, message_type: str, target_claw: str, payload: dict
+    ) -> None:
         """Dispatch anomaly alert via signal dispatcher."""
         if self.signal_dispatcher:
             if message_type == "revenue_anomaly":
@@ -361,7 +405,9 @@ class AnalyticsClaw:
                     recommended_action=payload.get("recommended_action", ""),
                 )
 
-    def _dispatch_opportunity(self, message_type: str, target_claw: str, payload: dict) -> None:
+    def _dispatch_opportunity(
+        self, message_type: str, target_claw: str, payload: dict
+    ) -> None:
         """Dispatch opportunity via signal dispatcher."""
         if self.signal_dispatcher:
             if message_type == "performance_intel":
@@ -406,9 +452,11 @@ class AnalyticsClaw:
         # Pattern: COLLECTOR_{NAME}_URL, COLLECTOR_{NAME}_KEY, COLLECTOR_{NAME}_INTERVAL
         for key, value in os.environ.items():
             if key.startswith("COLLECTOR_") and key.endswith("_URL"):
-                name = key[len("COLLECTOR_"):-len("_URL")].lower()
+                name = key[len("COLLECTOR_") : -len("_URL")].lower()
                 api_key = os.environ.get(f"COLLECTOR_{name.upper()}_KEY")
-                interval = int(os.environ.get(f"COLLECTOR_{name.upper()}_INTERVAL", "24"))
+                interval = int(
+                    os.environ.get(f"COLLECTOR_{name.upper()}_INTERVAL", "24")
+                )
                 self.collection_workers.register_generic(
                     name=name,
                     base_url=value,
@@ -419,4 +467,5 @@ class AnalyticsClaw:
     def _now_iso(self) -> str:
         """Return current ISO timestamp."""
         from datetime import datetime, timezone
+
         return datetime.now(timezone.utc).isoformat()
