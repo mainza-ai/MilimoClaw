@@ -738,7 +738,20 @@ def handle_send_to_claw(args: dict[str, Any]) -> dict[str, Any]:
     The assistant (Lucy) uses this to instruct or query claws. All messages
     are sent with REVIEW priority so the operator must approve before the
     claw acts on them.
+
+    Args:
+        role: Recipient claw role (content, ops, analytics, finance, build)
+        type: Message type (assistant_query, assistant_task)
+        payload: Message payload
+        squad_id: Squad ID (default: "default")
+        wait_for_result: If True, wait up to 60s for result (default: False)
+        result_timeout: Max seconds to wait for result (default: 60)
+
+    Returns:
+        Dict with delivery status and optional result if wait_for_result=True
     """
+    import time
+
     from .contracts import (
         ClawMessage,
         ContractValidator,
@@ -753,6 +766,8 @@ def handle_send_to_claw(args: dict[str, Any]) -> dict[str, Any]:
     message_type = args.get("type", "")
     payload = args.get("payload", {})
     squad_id = args.get("squad_id", "default")
+    wait_for_result = args.get("wait_for_result", False)
+    result_timeout = args.get("result_timeout", 60)
 
     if not recipient_role:
         raise RuntimeError(
@@ -796,7 +811,7 @@ def handle_send_to_claw(args: dict[str, Any]) -> dict[str, Any]:
 
     result = mesh.send_message(message)
 
-    return {
+    response = {
         "delivered": result.delivered,
         "message_id": result.message_id,
         "reason": result.reason,
@@ -804,6 +819,26 @@ def handle_send_to_claw(args: dict[str, Any]) -> dict[str, Any]:
         "recipient": recipient_role,
         "message_type": message_type,
     }
+
+    if wait_for_result and result.delivered:
+        start_time = time.time()
+        while time.time() - start_time < result_timeout:
+            result_data = handle_get_result(
+                {
+                    "message_id": result.message_id,
+                    "role": recipient_role,
+                }
+            )
+            if result_data.get("status") == "found":
+                response["result"] = result_data.get("result")
+                response["result_status"] = "complete"
+                return response
+            time.sleep(2)
+
+        response["result_status"] = "timeout"
+        response["result_message"] = f"No result after {result_timeout}s"
+
+    return response
 
 
 def handle_claw_status(args: dict[str, Any]) -> dict[str, Any]:
@@ -1456,6 +1491,287 @@ def handle_get_result(args: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# ---------------------------------------------------------------------------
+# Claw Lifecycle Commands (Phase 4)
+# ---------------------------------------------------------------------------
+
+
+def handle_start_claw(args: dict[str, Any]) -> dict[str, Any]:
+    """Start a specific claw role via the launcher.
+
+    Args:
+        role: The claw role to start (content, ops, analytics, finance, build)
+
+    Returns:
+        Dict with started status and role info
+    """
+    import subprocess
+    import os
+
+    role = args.get("role", "")
+    if not role:
+        raise RuntimeError("role is required")
+
+    valid_roles = ["content", "ops", "analytics", "finance", "build"]
+    if role not in valid_roles:
+        raise RuntimeError(
+            f"Invalid role '{role}'. Must be one of: {', '.join(valid_roles)}"
+        )
+
+    mesh_dir = Path.home() / ".milimo" / "mesh"
+    launcher_pid_file = mesh_dir / "launcher.pid"
+    blueprint_path = Path("/sandbox/.milimo/blueprints/0.1.0")
+
+    if not launcher_pid_file.exists():
+        raise RuntimeError("Launcher not running. Start the launcher first.")
+
+    launcher_pid = int(launcher_pid_file.read_text().strip())
+
+    try:
+        os.kill(launcher_pid, 0)
+    except ProcessLookupError:
+        raise RuntimeError(f"Launcher (PID {launcher_pid}) is not running")
+
+    hb_file = mesh_dir / "heartbeats" / f"{role}.json"
+    if hb_file.exists():
+        try:
+            hb = json.loads(hb_file.read_text())
+            timestamp = hb.get("timestamp", "")
+            if timestamp:
+                from datetime import datetime, timezone
+
+                hb_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                age = (datetime.now(timezone.utc) - hb_time).total_seconds()
+                if age < 90:
+                    return {
+                        "status": "already_running",
+                        "role": role,
+                        "message": f"{role} claw is already running (heartbeat {age:.0f}s old)",
+                    }
+        except Exception:
+            pass
+
+    subprocess.run(
+        [
+            "python3",
+            str(blueprint_path / "orchestrator" / "claw_launcher.py"),
+            "--role",
+            role,
+        ],
+        check=False,
+        capture_output=True,
+    )
+
+    import time
+
+    for _ in range(10):
+        time.sleep(1)
+        if hb_file.exists():
+            return {
+                "status": "started",
+                "role": role,
+                "message": f"{role} claw started successfully",
+            }
+
+    return {
+        "status": "pending",
+        "role": role,
+        "message": f"{role} claw start initiated, waiting for heartbeat",
+    }
+
+
+def handle_stop_claw(args: dict[str, Any]) -> dict[str, Any]:
+    """Stop a specific claw role.
+
+    Args:
+        role: The claw role to stop
+
+    Returns:
+        Dict with stopped status
+    """
+    role = args.get("role", "")
+    if not role:
+        raise RuntimeError("role is required")
+
+    mesh_dir = Path.home() / ".milimo" / "mesh"
+    hb_file = mesh_dir / "heartbeats" / f"{role}.json"
+
+    if not hb_file.exists():
+        return {
+            "status": "not_running",
+            "role": role,
+            "message": f"{role} claw is not running",
+        }
+
+    hb = json.loads(hb_file.read_text())
+    pid = hb.get("pid")
+
+    if pid:
+        try:
+            import os
+            import signal
+
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        except Exception as e:
+            logger.warning("Failed to kill %s process: %s", role, e)
+
+    hb_file.unlink(missing_ok=True)
+
+    return {
+        "status": "stopped",
+        "role": role,
+        "message": f"{role} claw stopped",
+        "previous_pid": pid,
+    }
+
+
+def handle_restart_claw(args: dict[str, Any]) -> dict[str, Any]:
+    """Restart a specific claw role.
+
+    Args:
+        role: The claw role to restart
+
+    Returns:
+        Dict with restart status
+    """
+    import time
+
+    role = args.get("role", "")
+    if not role:
+        raise RuntimeError("role is required")
+
+    handle_stop_claw({"role": role})
+
+    time.sleep(2)
+
+    return handle_start_claw({"role": role})
+
+
+def handle_restart_all_claws(args: dict[str, Any]) -> dict[str, Any]:
+    """Restart all claws.
+
+    Returns:
+        Dict with restart status for each claw
+    """
+    import time
+
+    roles = ["content", "ops", "analytics", "finance", "build"]
+    results = {}
+
+    for role in roles:
+        handle_stop_claw({"role": role})
+
+    time.sleep(2)
+
+    for role in roles:
+        results[role] = handle_start_claw({"role": role})
+
+    return {
+        "status": "completed",
+        "results": results,
+        "message": "All claws restarted",
+    }
+
+
+def handle_claw_logs(args: dict[str, Any]) -> dict[str, Any]:
+    """Get recent log lines for a specific claw.
+
+    Args:
+        role: The claw role
+        lines: Number of lines to return (default 50)
+
+    Returns:
+        Dict with log lines
+    """
+    role = args.get("role", "")
+    if not role:
+        raise RuntimeError("role is required")
+
+    lines = args.get("lines", 50)
+
+    mesh_dir = Path.home() / ".milimo" / "mesh"
+    log_file = mesh_dir / "logs" / "launcher.log"
+
+    if not log_file.exists():
+        return {
+            "role": role,
+            "lines": [],
+            "message": "No log file found",
+        }
+
+    try:
+        all_lines = log_file.read_text().splitlines()
+        role_lines = [l for l in all_lines if f".{role}]" in l or f" {role} " in l]
+        recent_lines = role_lines[-lines:] if len(role_lines) > lines else role_lines
+
+        return {
+            "role": role,
+            "lines": recent_lines,
+            "total_lines": len(role_lines),
+            "returned": len(recent_lines),
+        }
+    except Exception as e:
+        raise RuntimeError(f"Failed to read logs: {e}")
+
+
+def handle_launcher_status(args: dict[str, Any]) -> dict[str, Any]:
+    """Get the current launcher status.
+
+    Returns:
+        Dict with launcher status, PID, and claw statuses
+    """
+    import os
+
+    mesh_dir = Path.home() / ".milimo" / "mesh"
+    launcher_pid_file = mesh_dir / "launcher.pid"
+
+    status = {
+        "launcher_running": False,
+        "launcher_pid": None,
+        "claws": {},
+    }
+
+    pid = None
+    if launcher_pid_file.exists():
+        try:
+            pid = int(launcher_pid_file.read_text().strip())
+            os.kill(pid, 0)
+            status["launcher_running"] = True
+            status["launcher_pid"] = pid
+        except ProcessLookupError:
+            status["launcher_running"] = False
+            status["launcher_pid"] = pid
+        except Exception:
+            pass
+
+    roles = ["content", "ops", "analytics", "finance", "build"]
+    for role in roles:
+        hb_file = mesh_dir / "heartbeats" / f"{role}.json"
+        if hb_file.exists():
+            try:
+                hb = json.loads(hb_file.read_text())
+                timestamp = hb.get("timestamp", "")
+                if timestamp:
+                    from datetime import datetime, timezone
+
+                    hb_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                    age = (datetime.now(timezone.utc) - hb_time).total_seconds()
+                    status["claws"][role] = {
+                        "status": "running" if age < 90 else "stale",
+                        "pid": hb.get("pid"),
+                        "uptime_seconds": hb.get("uptime_seconds"),
+                        "heartbeat_age_seconds": round(age, 1),
+                    }
+            except Exception:
+                status["claws"][role] = {"status": "unknown"}
+        else:
+            status["claws"][role] = {"status": "stopped"}
+
+    return status
+
+
 COMMAND_HANDLERS: dict[str, Any] = {
     "evolution_status": handle_evolution_status,
     "blueprint_info": handle_blueprint_info,
@@ -1492,6 +1808,12 @@ COMMAND_HANDLERS: dict[str, Any] = {
     "run_dependency_audit": handle_run_dependency_audit,
     "discover_tools": handle_discover_tools,
     "get_result": handle_get_result,
+    "start_claw": handle_start_claw,
+    "stop_claw": handle_stop_claw,
+    "restart_claw": handle_restart_claw,
+    "restart_all_claws": handle_restart_all_claws,
+    "claw_logs": handle_claw_logs,
+    "launcher_status": handle_launcher_status,
 }
 
 

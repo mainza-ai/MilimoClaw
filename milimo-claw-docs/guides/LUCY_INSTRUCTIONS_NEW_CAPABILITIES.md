@@ -76,6 +76,24 @@ These are your direct action channels to the claws. They are your **tools**, not
 | `bridge: mesh_flow_state()` | See live claw topology, pending message counts, and delivery statistics |
 | `bridge: discover_tools()` | List all deployed tools across all claws with versions and last evolution dates |
 
+#### Lifecycle Commands (6) — NEW in Phase 4
+
+| Command | What It Does |
+|---------|-------------|
+| `bridge: launcher_status()` | Check if the claw launcher is running, its PID, and all claw health statuses |
+| `bridge: start_claw(role="<role>")` | Start a specific claw role (content, ops, analytics, finance, build) |
+| `bridge: stop_claw(role="<role>")` | Stop a specific claw role and clear its heartbeat |
+| `bridge: restart_claw(role="<role>")` | Restart a specific claw (stop + 2s delay + start) |
+| `bridge: restart_all_claws()` | Restart all 5 claws in sequence |
+| `bridge: claw_logs(role="<role>", lines=50)` | Get recent log lines for a specific claw |
+
+#### Result Polling Commands (2) — NEW in Phase 2
+
+| Command | What It Does |
+|---------|-------------|
+| `bridge: get_result(message_id="<id>", role="<role>")` | Poll for a result from a previously sent message |
+| `bridge: send_to_claw(..., wait_for_result=true, result_timeout=60)` | Send message and wait up to 60s for result |
+
 ### Layer 4: Operator Guidance
 
 The operator has their own commands. You know them all and can direct the operator to the right one:
