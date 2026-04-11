@@ -161,9 +161,101 @@ Check `.env` for required tokens:
 
 ## Available Tools
 The following CLI tools are available in the sandbox:
-- **milimo** (`/sandbox/.local/bin/milimo`) — All 41 bridge commands. Use `milimo --command <name>` to invoke.
+- **milimo** (`/sandbox/.local/bin/milimo`) — Bridge to all claw operations. Use `milimo --command <name> --args '{"key": "value"}'` to invoke.
 - **gh** (`/sandbox/.local/bin/gh`) — GitHub CLI for PR management, issue tracking, repo operations.
 - **Python 3** — All claws and the bridge are Python-based. Key packages: `pyyaml`, `requests`, `stripe`, `httpx`, `sentry-sdk`.
+
+### Complete Bridge Command Reference (41 commands)
+You have access to ALL of these commands via the bridge. Do NOT ask the operator to run them manually — you can invoke them yourself.
+
+**Evolution & Blueprint Management:**
+| Command | Description | Args |
+|---------|-------------|------|
+| `evolution_status` | Last tool built by each claw | `{}` |
+| `blueprint_info` | Current blueprint metadata | `{}` |
+| `blueprint_list` | List all available blueprints | `{}` |
+| `blueprint_diff` | Compare blueprints | `{"from": "v1", "to": "v2"}` |
+| `blueprint_export` | Export blueprint to file | `{"path": "/tmp/bp.json"}` |
+| `blueprint_rollback` | Rollback to previous blueprint | `{"version": "0.0.9"}` |
+| `tool_registry` | List tools in registry | `{}` |
+
+**Marketplace:**
+| Command | Description | Args |
+|---------|-------------|------|
+| `marketplace_search` | Search for tools | `{"query": "email"}` |
+| `marketplace_download` | Download a tool | `{"tool_id": "abc123"}` |
+| `marketplace_publish` | Publish a tool | `{"tool_path": "/path/to/tool"}` |
+
+**Mesh & Health:**
+| Command | Description | Args |
+|---------|-------------|------|
+| `mesh_flow_state` | Current mesh message flow | `{}` |
+| `health_status` | Aggregate health from all claws | `{}` |
+| `collect_health` | Collect health from claws | `{}` |
+| `provenance_verify` | Verify claw provenance | `{}` |
+| `provenance_keygen` | Generate provenance keys | `{}` |
+
+**Revenue & Digests:**
+| Command | Description | Args |
+|---------|-------------|------|
+| `revenue_summary` | Revenue and invoice summary | `{}` |
+| `morning_brief` | Generate morning brief | `{}` |
+| `evening_wrap` | Generate evening wrap | `{}` |
+
+**Deep Work Mode:**
+| Command | Description | Args |
+|---------|-------------|------|
+| `activate_deep_work` | Start deep work mode | `{"duration_minutes": 120}` |
+| `resume_deep_work` | Resume interrupted deep work | `{}` |
+| `deep_work_status` | Check deep work status | `{}` |
+
+**Claw Communication:**
+| Command | Description | Args |
+|---------|-------------|------|
+| `squad_config` | Get squad configuration | `{}` |
+| `send_to_claw` | Send message to a claw | `{"role": "build", "message_type": "brief", "payload": {...}}` |
+| `get_result` | Poll for message result | `{"message_id": "abc123"}` |
+| `discover_tools` | List tools per claw | `{}` |
+
+**Claw Status:**
+| Command | Description | Args |
+|---------|-------------|------|
+| `claw_status` | Status of one claw | `{"role": "build"}` |
+| `ops_active_projects` | Ops claw project list | `{}` |
+| `content_pending_drafts` | Content claw drafts | `{}` |
+| `build_open_prs` | Build claw open PRs | `{}` |
+| `analytics_latest_report_summary` | Latest analytics report | `{}` |
+
+**Actions & Planning:**
+| Command | Description | Args |
+|---------|-------------|------|
+| `generate_sprint_plan` | Create sprint plan | `{"sprint_name": "Sprint 1"}` |
+| `run_opportunity_scoring` | Score opportunities | `{}` |
+| `generate_weekly_report` | Generate weekly report | `{}` |
+| `check_all_deadlines` | Check all deadlines | `{}` |
+| `run_dependency_audit` | Audit dependencies | `{}` |
+
+**Lifecycle Management:**
+| Command | Description | Args |
+|---------|-------------|------|
+| `launcher_status` | Check launcher PID and status | `{}` |
+| `start_claw` | Start a claw | `{"role": "build"}` |
+| `stop_claw` | Stop a claw | `{"role": "build"}` |
+| `restart_claw` | Restart a claw | `{"role": "build"}` |
+| `restart_all_claws` | Restart all claws | `{}` |
+| `claw_logs` | Get recent logs | `{"role": "build", "lines": 100}` |
+
+**How to invoke commands:**
+```bash
+milimo --command <name> --args '{"key": "value"}'
+```
+
+Or via Python bridge directly:
+```python
+python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/bridge_cli.py --command <name> --args '{"key": "value"}'
+```
+
+**Important:** When asked to start a claw or check claw status, use these commands directly. Do NOT ask the operator to do it manually.
 
 ## Sandbox Filesystem
 Your working directories:

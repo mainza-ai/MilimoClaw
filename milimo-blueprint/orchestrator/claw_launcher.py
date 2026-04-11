@@ -1283,8 +1283,17 @@ def main() -> None:
     # Daemonize if requested
     if args.daemon:
         if LAUNCHER_PID_FILE.exists():
-            print("Launcher already running. Use --stop first.")
-            sys.exit(1)
+            try:
+                pid = int(LAUNCHER_PID_FILE.read_text().strip())
+                os.kill(pid, 0)
+                print("Launcher already running. Use --stop first.")
+                sys.exit(1)
+            except (ProcessLookupError, ValueError, OSError):
+                logger.warning(
+                    "Stale PID file found (PID %s), cleaning up",
+                    LAUNCHER_PID_FILE.read_text().strip(),
+                )
+                LAUNCHER_PID_FILE.unlink(missing_ok=True)
         _daemonize()
 
     # Create launcher

@@ -351,6 +351,102 @@ Fresh installs will get all of these automatically. Existing sandboxes need manu
 
 ---
 
+## Issue 7: Claws Don't Start (Missing Environment Variables)
+
+### Symptoms
+- `launcher_status` shows claws as "stopped"
+- Build claw specifically shows "missing NVIDIA_API_KEY & GITHUB_REPO"
+- Launcher logs show `No module named 'requests'` for all claws
+- All claws run in "stub mode" instead of full mode
+
+### Root Cause
+The sandbox's shell environment does NOT inherit from the host. The `install.sh` script deploys files but the launcher runs in a fresh process without the API keys from `.env`.
+
+Additionally, Python packages installed via `pip3 install --target` are not in Python's default search path.
+
+### Fix
+`install.sh` now includes three new provisioning steps (6h, 6i, 6j):
+
+1. **Step 6h — Environment Variable Injection**
+   - Reads `.env` from project root
+   - Extracts relevant vars (NVIDIA_API_KEY, GITHUB_TOKEN, GITHUB_REPO, STRIPE_SECRET_KEY, VERCEL_TOKEN, SENTRY_AUTH_TOKEN)
+   - Appends `export` statements to `/sandbox/.bashrc` and `/sandbox/.profile`
+   - Also adds `PYTHONPATH` and `PATH` entries
+
+2. **Step 6i — Python .pth File**
+   - Creates `/usr/local/lib/python3.11/dist-packages/milimo-local.pth`
+   - Contains `/sandbox/.local/lib/python3.11/site-packages`
+   - Makes Python aware of packages installed via `--target`
+
+3. **Step 6j — PID File Cleanup**
+   - Removes stale `launcher.pid` from previous runs
+   - Prevents "Launcher already running" crash loops
+
+### Manual Fix (if sandbox already exists)
+```bash
+# Source the updated bashrc and restart the launcher
+docker exec openshell-cluster-nemoclaw kubectl exec -n openshell my-assistant -- bash -c '
+source /sandbox/.bashrc
+
+# Stop old launcher
+pkill -f "claw_launcher" 2>/dev/null || true
+sleep 2
+
+# Remove stale PID file
+rm -f /sandbox/.milimo/mesh/launcher.pid
+
+# Start fresh with env vars
+cd /sandbox/.milimo/blueprints/0.1.0/orchestrator
+nohup python3 claw_launcher.py --all --heartbeat-interval 30 --poll-interval 5 --verbose > /sandbox/.milimo/mesh/logs/launcher.log 2>&1 &
+'
+```
+
+### Verification
+```bash
+# Check env vars are set
+docker exec openshell-cluster-nemoclaw kubectl exec -n openshell my-assistant -- bash -c 'source /sandbox/.bashrc; echo $GITHUB_REPO'
+
+# Check Python can import packages
+docker exec openshell-cluster-nemoclaw kubectl exec -n openshell my-assistant -- python3 -c "import requests; print('OK')"
+
+# Check launcher status
+docker exec openshell-cluster-nemoclaw kubectl exec -n openshell my-assistant -- bash -c 'source /sandbox/.bashrc; /sandbox/.local/bin/milimo --command launcher_status'
+```
+
+---
+
+## Issue 8: gh CLI Not Found (Wrong PATH)
+
+### Symptoms
+- Build claw fails with: `gh CLI not found. Install with: brew install gh...`
+- `which gh` returns nothing
+- `ls /sandbox/.local/bin/gh` shows the file exists
+
+### Root Cause
+The `gh` binary is installed at `/sandbox/.local/bin/gh`, but the launcher's PATH only includes `/root/.local/bin` (which resolves to `/root/.local/bin`, not `/sandbox/.local/bin`).
+
+### Fix
+The environment variable injection (Step 6h) now includes:
+```bash
+export PATH=/sandbox/.local/bin:$PATH
+```
+
+This ensures all tools installed to `/sandbox/.local/bin/` are discoverable.
+
+### Required .env Variables
+For all claws to function properly, ensure your `.env` contains:
+
+| Variable | Required By | Format |
+|----------|-------------|--------|
+| `NVIDIA_API_KEY` | All claws | `nvapi-xxx` |
+| `GITHUB_TOKEN` | Build Claw | `ghp_xxx` |
+| `GITHUB_REPO` | Build Claw | `owner/repo` (NOT full URL) |
+| `STRIPE_SECRET_KEY` | Finance Claw | `sk_test_xxx` |
+| `VERCEL_TOKEN` | Build Claw (optional) | `vcp_xxx` |
+| `SENTRY_AUTH_TOKEN` | Build Claw (optional) | `sntryu_xxx` |
+
+---
+
 ## Key Lessons Learned
 
 1. **Two environments, not one** — The Docker container and NemoClaw sandbox are completely separate. Fixes must be applied to the sandbox where the assistant runs.
@@ -360,3 +456,6 @@ Fresh installs will get all of these automatically. Existing sandboxes need manu
 5. **Python packages must be uploaded** — The sandbox has no third-party packages. Install them to a target directory and upload each one.
 6. **Verify by downloading back** — Always download files back from the sandbox to confirm uploads succeeded. The `openshell sandbox download` command is your verification tool.
 7. **install.sh is the source of truth** — All provisioning steps should be in `install.sh` so fresh installs get everything automatically.
+8. **Env vars must be explicitly injected** — The sandbox doesn't inherit host env vars. Use `install.sh` Step 6h to inject them into shell profiles.
+9. **Python needs .pth files** — Packages installed to non-standard locations need a `.pth` file for discovery.
+10. **PATH must include /sandbox/.local/bin** — Tools installed via `install.sh` go to `/sandbox/.local/bin/`, not `/root/.local/bin/`.

@@ -6,6 +6,8 @@ exports.handleSlashCommand = handleSlashCommand;
 const index_js_1 = require("../index.js");
 const init_js_1 = require("./init.js");
 const approval_js_1 = require("../warroom/approval.js");
+const node_fs_1 = require("node:fs");
+const node_path_1 = require("node:path");
 function handleSlashCommand(ctx, api) {
     const parts = ctx.args?.trim().split(/\s+/) ?? [];
     const subcommand = parts[0] ?? "";
@@ -183,11 +185,9 @@ function slashRole(api) {
     return { text: details.join("\n") };
 }
 function slashFinals() {
-    const fs = require("node:fs");
-    const fpath = require("node:path");
     const home = process.env["HOME"] ?? process.env["USERPROFILE"] ?? "/tmp";
-    const finalsPath = fpath.join(home, ".milimo", "finals-mode.json");
-    if (!fs.existsSync(finalsPath)) {
+    const finalsPath = (0, node_path_1.join)(home, ".milimo", "finals-mode.json");
+    if (!(0, node_fs_1.existsSync)(finalsPath)) {
         return {
             text: [
                 "**📚 Finals Mode:** Inactive",
@@ -200,7 +200,7 @@ function slashFinals() {
         };
     }
     try {
-        const raw = fs.readFileSync(finalsPath, "utf-8");
+        const raw = (0, node_fs_1.readFileSync)(finalsPath, "utf-8");
         const state = JSON.parse(raw);
         if (!state.active) {
             return {
@@ -297,18 +297,16 @@ function slashHealth(api) {
     if (!state) {
         return { text: "**❌ Error:** Not initialized. Run `openclaw milimo init` first." };
     }
-    const fs = require("node:fs");
-    const fpath = require("node:path");
     const home = process.env["HOME"] ?? process.env["USERPROFILE"] ?? "/tmp";
     const lines = ["**🦀 Claw Health Summary**", ""];
     const claws = state.meshMembers.length > 0 ? state.meshMembers : [state.clawRole];
     for (const claw of claws) {
-        const registryPath = fpath.join(home, ".milimo", "tools", state.squadName, claw, "registry.json");
+        const registryPath = (0, node_path_1.join)(home, ".milimo", "tools", state.squadName, claw, "registry.json");
         let status = "○";
         let tools = 0;
         try {
-            if (fs.existsSync(registryPath)) {
-                const data = JSON.parse(fs.readFileSync(registryPath, "utf-8"));
+            if ((0, node_fs_1.existsSync)(registryPath)) {
+                const data = JSON.parse((0, node_fs_1.readFileSync)(registryPath, "utf-8"));
                 tools = Object.keys(data.tools ?? {}).length;
                 status = tools > 0 ? "●" : "○";
             }
@@ -326,16 +324,14 @@ function slashEvolution(api) {
     if (!state) {
         return { text: "**❌ Error:** Not initialized. Run `openclaw milimo init` first." };
     }
-    const fs = require("node:fs");
-    const fpath = require("node:path");
     const home = process.env["HOME"] ?? process.env["USERPROFILE"] ?? "/tmp";
     const lines = ["**🔧 Evolution Log**", ""];
     const claws = state.meshMembers.length > 0 ? state.meshMembers : [state.clawRole];
     for (const claw of claws) {
-        const registryPath = fpath.join(home, ".milimo", "tools", state.squadName, claw, "registry.json");
+        const registryPath = (0, node_path_1.join)(home, ".milimo", "tools", state.squadName, claw, "registry.json");
         try {
-            if (fs.existsSync(registryPath)) {
-                const data = JSON.parse(fs.readFileSync(registryPath, "utf-8"));
+            if ((0, node_fs_1.existsSync)(registryPath)) {
+                const data = JSON.parse((0, node_fs_1.readFileSync)(registryPath, "utf-8"));
                 const tools = data.tools ?? {};
                 const toolNames = Object.keys(tools);
                 if (toolNames.length === 0) {

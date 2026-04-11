@@ -47,6 +47,8 @@ network_policies:
           - allow: { method: "*", path: "/**" }
     binaries:
       - { path: /usr/local/bin/openclaw }
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   # ── Social Publishing APIs ──────────────────────────────────────────
   instagram_api:
@@ -61,6 +63,9 @@ network_policies:
           - allow: { method: POST, path: "/**/media" }
           - allow: { method: POST, path: "/**/media_publish" }
           - allow: { method: GET, path: "/**/insights" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   twitter_api:
     name: twitter_api
@@ -73,6 +78,9 @@ network_policies:
         rules:
           - allow: { method: POST, path: "/2/tweets" }
           - allow: { method: GET, path: "/2/tweets/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   linkedin_api:
     name: linkedin_api
@@ -85,6 +93,9 @@ network_policies:
         rules:
           - allow: { method: POST, path: "/v2/ugcPosts" }
           - allow: { method: GET, path: "/v2/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   tiktok_api:
     name: tiktok_api
@@ -96,6 +107,9 @@ network_policies:
         tls: terminate
         rules:
           - allow: { method: POST, path: "/v2/post/publish/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   # ── Stock Assets & SEO ──────────────────────────────────────────────
   unsplash_api:
@@ -108,54 +122,69 @@ network_policies:
         tls: terminate
         rules:
           - allow: { method: GET, path: "/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   pexels_api:
     name: pexels_api
     endpoints:
-    - host: api.pexels.com
-      port: 443
-      protocol: rest
-      enforcement: enforce
-      tls: terminate
-    rules:
-    - allow: { method: GET, path: "/**" }
+      - host: api.pexels.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   # ── Facebook Publishing API ────────────────────────────────────────
   facebook_api:
     name: facebook_api
     endpoints:
-    - host: graph.facebook.com
-      port: 443
-      protocol: rest
-      enforcement: enforce
-      tls: terminate
-    rules:
-    - allow: { method: POST, path: "/**/feed" }
-    - allow: { method: POST, path: "/**/photos" }
-    - allow: { method: GET, path: "/**/insights" }
+      - host: graph.facebook.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: POST, path: "/**/feed" }
+          - allow: { method: POST, path: "/**/photos" }
+          - allow: { method: GET, path: "/**/insights" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   # ── Trend & Research APIs (read-only) ───────────────────────────────
   google_trends_api:
     name: google_trends_api
     endpoints:
-    - host: trends.google.com
-      port: 443
-      protocol: rest
-      enforcement: enforce
-      tls: terminate
-    rules:
-    - allow: { method: GET, path: "/**" }
+      - host: trends.google.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   buzzsumo_api:
     name: buzzsumo_api
     endpoints:
-    - host: api.buzzsumo.com
-      port: 443
-      protocol: rest
-      enforcement: enforce
-      tls: terminate
-    rules:
-    - allow: { method: GET, path: "/**" }
+      - host: api.buzzsumo.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   # ── Optional: Buffer Scheduling API ─────────────────────────────────
   # Uncomment to enable Buffer integration for scheduled publishing

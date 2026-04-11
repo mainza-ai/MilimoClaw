@@ -141,11 +141,13 @@ function validateOperatorName(name) {
     }
     return { valid: true };
 }
+const node_crypto_1 = require("node:crypto");
 function generateMeshSecret() {
     const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    const bytes = (0, node_crypto_1.randomBytes)(32);
     let secret = "";
     for (let i = 0; i < 32; i++) {
-        secret += chars.charAt(Math.floor(Math.random() * chars.length));
+        secret += chars.charAt(bytes[i] % chars.length);
     }
     return secret;
 }

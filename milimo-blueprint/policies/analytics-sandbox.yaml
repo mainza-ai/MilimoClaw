@@ -44,6 +44,8 @@ network_policies:
           - allow: { method: "*", path: "/**" }
     binaries:
       - { path: /usr/local/bin/openclaw }
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   # ── Platform Analytics (READ-ONLY) ──────────────────────────────────
   google_analytics:
@@ -57,6 +59,9 @@ network_policies:
         rules:
           - allow: { method: GET, path: "/**" }
           - allow: { method: POST, path: "/v1beta/**:runReport" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   meta_insights:
     name: meta_insights
@@ -69,6 +74,9 @@ network_policies:
         rules:
           - allow: { method: GET, path: "/**/insights" }
           - allow: { method: GET, path: "/**/analytics" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   twitter_analytics:
     name: twitter_analytics
@@ -81,6 +89,9 @@ network_policies:
         rules:
           - allow: { method: GET, path: "/2/tweets/**/metrics" }
           - allow: { method: GET, path: "/2/users/**/tweets" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   # ── Market Research ─────────────────────────────────────────────────
   google_trends:
@@ -93,6 +104,9 @@ network_policies:
         tls: terminate
         rules:
           - allow: { method: GET, path: "/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   semrush_api:
     name: semrush_api
@@ -104,3 +118,6 @@ network_policies:
         tls: terminate
         rules:
           - allow: { method: GET, path: "/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }

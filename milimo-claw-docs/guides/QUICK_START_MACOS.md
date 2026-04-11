@@ -1,4 +1,6 @@
-> ⚠️ **DEPRECATED** — Superseded by the setup steps in [README.md](../../README.md). Use the NemocLaw-based flow instead.
+> ⚠️ **DEPRECATED** — Superseded by the setup steps in [README.md](../../README.md). Use the NemoClaw sandbox-based flow instead.
+>
+> **Important:** The MilimoClaw Docker container (`docker run milimo-claw`) is NOT required for the system to function. The recommended architecture runs claws inside the NemoClaw sandbox (`my-assistant`) where Lucy can communicate with them. See the NemoClaw installation flow in the main README.
 >
 > Kept for historical reference only.
 
@@ -6,7 +8,9 @@
 
 # Milimo Claw — Quick Start Guide (macOS Docker)
 
-> Get Milimo Claw running on macOS using Docker with cloud inference.
+> **ARCHITECTURE NOTE:** This guide describes the standalone Docker container approach. The recommended setup uses NemoClaw sandboxes instead — see [README.md](../../README.md) for the current installation flow.
+
+---
 
 ---
 

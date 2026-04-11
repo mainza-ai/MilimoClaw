@@ -21,6 +21,7 @@
 
 - **macOS** (Apple Silicon) or **Linux** with Docker
 - **Node.js** 22+
+- **Python 3.11+**
 - **NVIDIA API Key** — get one at [build.nvidia.com](https://build.nvidia.com/)
 - **GitHub Personal Access Token** (for Build Claw) — [github.com/settings/tokens](https://github.com/settings/tokens)
 
@@ -31,20 +32,23 @@
 export NVIDIA_API_KEY=nvapi-your-key
 curl -fsSL https://www.nemoclaw.sh | bash
 
-# 2. Install Milimo Claw
+# 2. Clone and configure environment
+git clone https://github.com/mainza-ai/MilimoClaw.git
+cd MilimoClaw
+cp .env.example .env
+# Edit .env and add your API keys (NVIDIA_API_KEY, GITHUB_TOKEN, GITHUB_REPO, etc.)
+
+# 3. Install Milimo Claw
 ./install.sh --solo --operator-name "your-name" --squad-name "your-squad" --non-interactive
 
-# 3. Connect NemocLaw assistant
+# 4. Connect NemoClaw assistant
 nemoclaw my-assistant connect
-
-# 4. Run Milimo onboarding inside the sandbox
-openclaw milimo onboard
 
 # 5. Open the chat UI (approve device if prompted)
 openclaw tui
 # If needed: openclaw devices approve --latest
 
-# 6. Start the assistant with Telegram (optional)
+# 6. (Optional) Start with Telegram bot
 export TELEGRAM_BOT_TOKEN=your-token
 nemoclaw start
 ```
@@ -98,6 +102,15 @@ Milimo Claw runs on top of the NemoClaw stack, inheriting its security sandbox (
 - **Privacy router** — sensitive data (finance, source code, client contacts) never leaves the device
 - **Self-evolving** — claws build and deploy new tools weekly through a backtested evolution pipeline
 - **Blueprint versioning** — every claw's state is a versioned, forkable artifact
+
+### Two Deployment Models
+
+| Model | Description | When to Use |
+|-------|-------------|-------------|
+| **NemoClaw Sandbox** | Claws run inside `my-assistant` sandbox, accessible to Lucy via mesh | **Recommended** — Default setup |
+| **Docker Compose** | Each claw runs in its own container (`docker-compose up`) | Alternative for isolated deployments |
+
+**Important:** The `MilimoClaw` Docker container and the `my-assistant` NemoClaw sandbox are **completely separate environments**. Lucy runs in the sandbox and can only communicate with claws running there. The standalone Docker container is not needed for normal operation.
 
 For full technical details, see [milimo-claw-docs/ARCHITECTURE.md](milimo-claw-docs/ARCHITECTURE.md).
 

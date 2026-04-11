@@ -47,6 +47,9 @@ network_policies:
         enforcement: enforce
         rules:
           - allow: { method: "*", path: "/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   # ── Payment Processors (restricted) ─────────────────────────────────
   stripe_api:
@@ -66,6 +69,9 @@ network_policies:
           # Invoice generation (not payment execution)
           - allow: { method: POST, path: "/v1/invoices" }
           - allow: { method: POST, path: "/v1/invoices/*/send" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   paypal_api:
     name: paypal_api
@@ -82,6 +88,9 @@ network_policies:
           # Invoice generation
           - allow: { method: POST, path: "/v2/invoicing/invoices" }
           - allow: { method: POST, path: "/v2/invoicing/invoices/*/send" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   # ── Accounting ──────────────────────────────────────────────────────
   quickbooks_api:
@@ -96,6 +105,9 @@ network_policies:
           - allow: { method: GET, path: "/**" }
           - allow: { method: POST, path: "/**/invoice" }
           - allow: { method: POST, path: "/**/expense" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   wave_api:
     name: wave_api
@@ -107,3 +119,6 @@ network_policies:
         tls: terminate
         rules:
           - allow: { method: POST, path: "/graphql/public" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }

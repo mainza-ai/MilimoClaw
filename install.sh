@@ -503,6 +503,86 @@ MILIMO_EOF
   '
   ok "Python venv recreated with sandbox Python"
 
+  # ---- Step 6h: Inject environment variables into sandbox ----
+  log_step "Injecting environment variables"
+  info "Reading .env and injecting into sandbox shell profiles..."
+
+  # Read .env from project root and extract relevant vars
+  ENV_FILE="$ROOT_DIR/.env"
+  if [ ! -f "$ENV_FILE" ]; then
+    warn ".env file not found at $ENV_FILE — skipping env injection"
+  else
+    # Extract vars we need (skip comments and empty lines)
+    ENV_VARS=$(
+      grep -E "^(NVIDIA_API_KEY|BUILD_CLAW_NVIDIA_API_KEY|GITHUB_TOKEN|GH_TOKEN|GITHUB_REPO|STRIPE_SECRET_KEY|VERCEL_TOKEN|SENTRY_AUTH_TOKEN|STRIPE_WEBHOOK_SECRET|VERCEL_PROJECT_ID|VERCEL_TEAM_ID)=" "$ENV_FILE" 2>/dev/null || true
+    )
+
+    if [ -z "$ENV_VARS" ]; then
+      warn "No relevant environment variables found in .env"
+    else
+      # Build the export block for sandbox .bashrc and .profile
+      sandbox_exec "$gateway" "
+# Remove old Milimo env block from .bashrc
+sed -i.bak '/# milimo-env begin/,/# milimo-env end/d' /sandbox/.bashrc 2>/dev/null || true
+sed -i.bak '/# milimo-env begin/,/# milimo-env end/d' /sandbox/.profile 2>/dev/null || true
+
+# Append new env block
+cat >> /sandbox/.bashrc << 'MILIMO_ENV_EOF'
+# milimo-env begin
+$(echo "$ENV_VARS" | while read -r line; do echo "export $line"; done)
+export PYTHONPATH=/sandbox/.local/lib/python3.11/site-packages:\$PYTHONPATH
+export PATH=/sandbox/.local/bin:\$PATH
+# milimo-env end
+MILIMO_ENV_EOF
+
+cat >> /sandbox/.profile << 'MILIMO_ENV_EOF'
+# milimo-env begin
+$(echo "$ENV_VARS" | while read -r line; do echo "export $line"; done)
+export PYTHONPATH=/sandbox/.local/lib/python3.11/site-packages:\$PYTHONPATH
+export PATH=/sandbox/.local/bin:\$PATH
+# milimo-env end
+MILIMO_ENV_EOF
+
+echo 'Environment variables injected'
+"
+      ok "Environment variables injected into /sandbox/.bashrc and /sandbox/.profile"
+    fi
+  fi
+
+  # ---- Step 6i: Create Python .pth file for package discovery ----
+  log_step "Configuring Python package path"
+  sandbox_exec "$gateway" '
+# Create .pth file so Python finds packages installed via --target
+PTH_DIR="/usr/local/lib/python3.11/dist-packages"
+mkdir -p "$PTH_DIR"
+echo "/sandbox/.local/lib/python3.11/site-packages" > "$PTH_DIR/milimo-local.pth"
+echo "Created milimo-local.pth"
+'
+  ok "Python .pth file created — packages at /sandbox/.local/lib/python3.11/site-packages now discoverable"
+
+  # ---- Step 6j: Cleanup stale PID files ----
+  log_step "Cleaning stale PID files"
+  sandbox_exec "$gateway" '
+# Remove stale launcher PID file (persistent volumes retain old PIDs)
+LAUNCHER_PID="/sandbox/.milimo/mesh/launcher.pid"
+if [ -f "$LAUNCHER_PID" ]; then
+    OLD_PID=$(cat "$LAUNCHER_PID" 2>/dev/null)
+    if [ -n "$OLD_PID" ]; then
+        if kill -0 "$OLD_PID" 2>/dev/null; then
+            echo "Launcher PID $OLD_PID is still running — not removing"
+        else
+            rm -f "$LAUNCHER_PID"
+            echo "Removed stale launcher PID file (was PID $OLD_PID)"
+        fi
+    fi
+fi
+
+# Remove stale heartbeat files older than 5 minutes
+find /sandbox/.milimo/mesh/heartbeats -name "*.json" -mmin +5 -delete 2>/dev/null || true
+echo "Cleanup complete"
+'
+  ok "Stale PID files cleaned"
+
   # ---- Step 7: Fix permissions ----
   log_step "Fixing permissions"
   sandbox_exec "$gateway" '
@@ -650,7 +730,14 @@ plugin_config = {
     "operatorName": operator,
     "warRoomMode": warroom,
     "onboardedAt": now,
-    "activeClaws": ["content", "ops", "analytics", "finance", "build"]
+    "activeClaws": ["content", "ops", "analytics", "finance", "build"],
+    # Assistant config for assistant_setup.py
+    "assistant": {
+        "name": "Lucy",
+        "creature": "a claw",
+        "vibe": "sharp and unhurried",
+        "emoji": "🦀"
+    }
 }
 
 # Orchestrator format (nested — for Python code)
@@ -673,7 +760,14 @@ orchestrator_config = {
     "war_room": { "mode": warroom },
     "mesh": { "enabled": False, "secret": None },
     "blueprint_dir": "/sandbox/milimo-blueprint",
-    "activeClaws": ["content", "ops", "analytics", "finance", "build"]
+    "activeClaws": ["content", "ops", "analytics", "finance", "build"],
+    # Assistant config for assistant_setup.py
+    "assistant": {
+        "name": "Lucy",
+        "creature": "a claw",
+        "vibe": "sharp and unhurried",
+        "emoji": "🦀"
+    }
 }
 
 # Write plugin config to /root/.milimo (plugin reads as root)

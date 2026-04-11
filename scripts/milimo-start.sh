@@ -168,6 +168,17 @@ PYAUTOPAIR
 }
 
 echo 'Setting up Milimo Claw...'
+
+# Clean up stale launcher PID file from previous runs (persistent volumes survive restarts)
+LAUNCHER_PID_FILE="$HOME/.milimo/mesh/launcher.pid"
+if [ -f "$LAUNCHER_PID_FILE" ]; then
+  PID="$(cat "$LAUNCHER_PID_FILE" 2>/dev/null)"
+  if [ -n "$PID" ] && ! kill -0 "$PID" 2>/dev/null; then
+    echo "[launcher] Removing stale PID file (old PID: $PID)"
+    rm -f "$LAUNCHER_PID_FILE"
+  fi
+fi
+
 openclaw doctor --fix >/dev/null 2>&1 || true
 openclaw models set nvidia/nemotron-3-super-120b-a12b >/dev/null 2>&1 || true
 write_auth_profile

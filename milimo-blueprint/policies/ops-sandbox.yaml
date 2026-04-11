@@ -44,6 +44,8 @@ network_policies:
           - allow: { method: "*", path: "/**" }
     binaries:
       - { path: /usr/local/bin/openclaw }
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   # ── Email APIs ──────────────────────────────────────────────────────
   sendgrid:
@@ -57,6 +59,9 @@ network_policies:
         rules:
           - allow: { method: POST, path: "/v3/mail/send" }
           - allow: { method: GET, path: "/v3/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   gmail_api:
     name: gmail_api
@@ -68,6 +73,9 @@ network_policies:
         tls: terminate
         rules:
           - allow: { method: "*", path: "/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   outlook:
     name: outlook
@@ -80,6 +88,9 @@ network_policies:
         rules:
           - allow: { method: "*", path: "/v1.0/me/messages/**" }
           - allow: { method: "*", path: "/v1.0/me/sendMail" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   # ── Scheduling & PM ─────────────────────────────────────────────────
   calendly:
@@ -92,6 +103,9 @@ network_policies:
         tls: terminate
         rules:
           - allow: { method: "*", path: "/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   notion_api:
     name: notion_api
@@ -103,6 +117,9 @@ network_policies:
         tls: terminate
         rules:
           - allow: { method: "*", path: "/v1/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
 
   # ── Messaging (Telegram — inherited from base) ─────────────────────
   telegram:
@@ -116,3 +133,6 @@ network_policies:
         rules:
           - allow: { method: GET, path: "/bot*/**" }
           - allow: { method: POST, path: "/bot*/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }

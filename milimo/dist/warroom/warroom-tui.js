@@ -48,10 +48,12 @@ exports.startWarRoom = startWarRoom;
  * - 3 second polling interval
  */
 const blessed = __importStar(require("blessed"));
-const approval_1 = require("./approval");
-const audit_1 = require("./audit");
-const evolution_1 = require("./evolution");
-const digest_1 = require("./digest");
+const approval_js_1 = require("./approval.js");
+const audit_js_1 = require("./audit.js");
+const evolution_js_1 = require("./evolution.js");
+const digest_js_1 = require("./digest.js");
+const node_fs_1 = require("node:fs");
+const node_path_1 = require("node:path");
 class WarRoomTUI {
     screen;
     leftPanel;
@@ -92,11 +94,11 @@ class WarRoomTUI {
         this.squadId = options.squadId;
         this.operatorId = options.operatorId ?? "local-operator";
         this.blueprintDir = options.blueprintDir ?? process.cwd();
-        this.engine = new approval_1.ApprovalEngine(this.squadId, options.tier ?? "free");
-        this.audit = new audit_1.AuditLogger(this.squadId);
-        this.evolution = new evolution_1.EvolutionManager(this.squadId);
+        this.engine = new approval_js_1.ApprovalEngine(this.squadId, options.tier ?? "free");
+        this.audit = new audit_js_1.AuditLogger(this.squadId);
+        this.evolution = new evolution_js_1.EvolutionManager(this.squadId);
         if (options.digestConfig) {
-            this.digestScheduler = new digest_1.DigestScheduler({
+            this.digestScheduler = new digest_js_1.DigestScheduler({
                 config: {
                     ...options.digestConfig,
                     squad_id: this.squadId,
@@ -415,20 +417,19 @@ Press H to close this help.
         };
         try {
             const home = process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
-            // Support both host and container environments
-            const sandboxMesh = require("path").join("/sandbox", ".milimo");
-            const homeMesh = require("path").join(home, ".milimo");
-            const meshRoot = require("fs").existsSync(sandboxMesh) ? sandboxMesh : homeMesh;
-            const registryPath = require("path").join(meshRoot, "tools", this.squadId, role, "registry.json");
-            if (require("fs").existsSync(registryPath)) {
-                const data = JSON.parse(require("fs").readFileSync(registryPath, "utf-8"));
+            const sandboxMesh = (0, node_path_1.join)("/sandbox", ".milimo");
+            const homeMesh = (0, node_path_1.join)(home, ".milimo");
+            const meshRoot = (0, node_fs_1.existsSync)(sandboxMesh) ? sandboxMesh : homeMesh;
+            const registryPath = (0, node_path_1.join)(meshRoot, "tools", this.squadId, role, "registry.json");
+            if ((0, node_fs_1.existsSync)(registryPath)) {
+                const data = JSON.parse((0, node_fs_1.readFileSync)(registryPath, "utf-8"));
                 status.tools = Object.keys(data.tools ?? {}).length;
                 status.status = status.tools > 0 ? "active" : "idle";
             }
             // Also check heartbeats for live status
-            const heartbeatPath = require("path").join(meshRoot, "mesh", "heartbeats", `${role}.json`);
-            if (require("fs").existsSync(heartbeatPath)) {
-                const hb = JSON.parse(require("fs").readFileSync(heartbeatPath, "utf-8"));
+            const heartbeatPath = (0, node_path_1.join)(meshRoot, "mesh", "heartbeats", `${role}.json`);
+            if ((0, node_fs_1.existsSync)(heartbeatPath)) {
+                const hb = JSON.parse((0, node_fs_1.readFileSync)(heartbeatPath, "utf-8"));
                 const lastBeat = new Date(hb.timestamp).getTime();
                 const now = Date.now();
                 if (now - lastBeat < 60000) {
@@ -533,13 +534,12 @@ Press H to close this help.
     fetchRevenueData() {
         try {
             const home = process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
-            // Support both host and container environments
-            const sandboxMesh = require("path").join("/sandbox", ".milimo");
-            const homeMesh = require("path").join(home, ".milimo");
-            const meshRoot = require("fs").existsSync(sandboxMesh) ? sandboxMesh : homeMesh;
-            const summaryPath = require("path").join(meshRoot, "finance", "revenue", "weekly_summary.json");
-            if (require("fs").existsSync(summaryPath)) {
-                const data = JSON.parse(require("fs").readFileSync(summaryPath, "utf-8"));
+            const sandboxMesh = (0, node_path_1.join)("/sandbox", ".milimo");
+            const homeMesh = (0, node_path_1.join)(home, ".milimo");
+            const meshRoot = (0, node_fs_1.existsSync)(sandboxMesh) ? sandboxMesh : homeMesh;
+            const summaryPath = (0, node_path_1.join)(meshRoot, "finance", "revenue", "weekly_summary.json");
+            if ((0, node_fs_1.existsSync)(summaryPath)) {
+                const data = JSON.parse((0, node_fs_1.readFileSync)(summaryPath, "utf-8"));
                 const currentWeek = data.current_week || {};
                 const previousWeek = data.previous_week || {};
                 const weekRevenue = parseFloat(currentWeek.total_revenue) || 0.0;
