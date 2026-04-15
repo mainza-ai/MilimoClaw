@@ -217,11 +217,14 @@ class BuildClaw:
             "feature_brief": self._handle_feature_brief_with_execution,
             "retention_signals": self._dispatcher.handle_retention_signals,
             "behavior_query_response": self._dispatcher.handle_behavior_query_response,
+            "assistant_query": self._handle_assistant_query,
+            "assistant_task": self._handle_assistant_task,
         }
 
         # Update MVR test aliases after component initialization
         self._github = self._github_client
         self._code_generator = self._code_gen
+        self._vercel = self._vercel_client
 
         # Start scheduler
         self._scheduler.start()
@@ -237,6 +240,50 @@ class BuildClaw:
     # ------------------------------------------------------------------
     # Message handling
     # ------------------------------------------------------------------
+
+    def _handle_assistant_query(self, message: dict) -> dict:
+        """Handle read-only query from the assistant (Lucy).
+
+        Returns status information about the build claw.
+        """
+        payload = message.get("payload", {})
+        query = payload.get("query", "")
+
+        logger.info("Assistant query received: %s", query)
+
+        return {
+            "status": "ok",
+            "role": "build",
+            "message_type": "assistant_query",
+            "response": {
+                "status": "running",
+                "squad_id": self._squad_id,
+            },
+        }
+
+    def _handle_assistant_task(self, message: dict) -> dict:
+        """Handle task assignment from the assistant (Lucy).
+
+        Executes a task described in the payload.
+        """
+        payload = message.get("payload", {})
+        task_description = payload.get("task_description", "")
+        deadline = payload.get("deadline")
+
+        logger.info(
+            "Assistant task received: %s (deadline: %s)", task_description, deadline
+        )
+
+        # For now, acknowledge receipt and queue for execution
+        # In a full implementation, this would parse the task and route to appropriate handlers
+        return {
+            "status": "queued",
+            "role": "build",
+            "message_type": "assistant_task",
+            "task_description": task_description,
+            "deadline": deadline,
+            "message": f"Task '{task_description[:50]}...' received and queued for execution.",
+        }
 
     def handle_inbound(self, message: dict[str, Any]) -> dict[str, Any]:
         """Route inbound message to the correct handler.

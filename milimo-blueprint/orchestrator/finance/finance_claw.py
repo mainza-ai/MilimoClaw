@@ -10,8 +10,11 @@ Called by the NemoClaw blueprint orchestrator on sandbox startup.
 """
 
 from datetime import datetime, timezone
+import logging
 from pathlib import Path
 from typing import Any, Protocol
+
+logger = logging.getLogger("milimo.finance")
 
 from .finance_init import (
     FinanceFilesystemInit,
@@ -311,7 +314,7 @@ class FinanceClaw:
                 pricing_engine = self._components.get("pricing_engine")
                 if pricing_engine:
                     pricing_engine.handle_pricing_query(payload)
-                    result["action"] = "pricing_query_handled"
+                result["action"] = "pricing_query_handled"
 
             elif message_type == "project_complete":
                 invoice_manager = self._components.get("invoice_manager")
@@ -396,6 +399,26 @@ class FinanceClaw:
                             )
                         )
 
+            elif message_type == "assistant_query":
+                result["claw"] = "finance"
+                result["components"] = {
+                    "pricing_engine": self._components.get("pricing_engine")
+                    is not None,
+                    "invoice_manager": self._components.get("invoice_manager")
+                    is not None,
+                    "payment_monitor": self._components.get("payment_monitor")
+                    is not None,
+                    "revenue_tracker": self._components.get("revenue_tracker")
+                    is not None,
+                }
+                self._send_assistant_response(raw_message, result)
+
+            elif message_type == "assistant_task":
+                result["claw"] = "finance"
+                result["task_type"] = payload.get("task_type", "unknown")
+                result["status"] = "accepted"
+                self._send_assistant_response(raw_message, result)
+
             else:
                 result["status"] = "unknown_type"
                 if operational_log:
@@ -433,3 +456,25 @@ class FinanceClaw:
     def is_initialized(self) -> bool:
         """Check if the Finance Claw is initialized."""
         return self._initialized
+
+    def _send_assistant_response(
+        self, message: dict[str, Any], result: dict[str, Any]
+    ) -> None:
+        """Send response back to assistant via mesh gateway."""
+        from datetime import datetime, timezone
+        import uuid
+
+        try:
+            self.gateway.send(
+                message_type="assistant_response",
+                recipient_role="assistant",
+                sender_role="finance",
+                payload={
+                    "original_message_id": message.get("message_id"),
+                    "response": result,
+                },
+                message_id=uuid.uuid4().hex[:12],
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            )
+        except Exception as e:
+            logger.warning("Failed to send assistant response: %s", e)

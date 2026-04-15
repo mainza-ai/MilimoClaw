@@ -133,7 +133,9 @@ class ContentClaw:
 
         # 3. Brand voice
         self._voice_manager = BrandVoiceManager(
-            voice_dir=self._base_path / "brand" / "voice-profiles",
+            fs=self._fs,
+            operational_log=self._operational_log,
+            privacy_router=self._privacy_router,
         )
 
         # 4. Content generator
@@ -317,10 +319,12 @@ class ContentClaw:
         self._inbound_handlers["content_performance_response"] = (
             self._handle_content_performance_response
         )
+        self._inbound_handlers["assistant_query"] = self._handle_assistant_query
+        self._inbound_handlers["assistant_task"] = self._handle_assistant_task
 
-    # ------------------------------------------------------------------
-    # Inbound handlers
-    # ------------------------------------------------------------------
+        # ------------------------------------------------------------------
+        # Inbound handlers
+        # ------------------------------------------------------------------
 
     def _handle_project_brief(self, message: dict[str, Any]) -> None:
         """
@@ -473,6 +477,80 @@ class ContentClaw:
     def approval_handler(self) -> ContentApprovalHandler | None:
         """Approval handler instance."""
         return self._approval_handler
+
+    def _handle_assistant_query(self, message: dict[str, Any]) -> None:
+        """
+        Handle assistant_query from Lucy.
+        Returns current status and state of the Content Claw.
+        """
+        sender = message.get("sender_role", "unknown")
+        logger.info("Assistant query from %s", sender)
+
+        result = {
+            "claw": "content",
+            "status": "online" if self._started else "offline",
+            "components": {
+                "filesystem": self._fs is not None,
+                "generator": self._generator is not None,
+                "voice_manager": self._voice_manager is not None,
+                "scheduler": self._scheduler is not None,
+                "publisher": self._publisher is not None,
+            },
+            "pending_work": {
+                "drafts": len(list((self._base_path / "drafts").glob("*.json")))
+                if self._base_path
+                else 0,
+            },
+        }
+        self._log_and_respond(message, result)
+
+    def _handle_assistant_task(self, message: dict[str, Any]) -> None:
+        """
+        Handle assistant_task from Lucy.
+        Executes content-related tasks requested by the assistant.
+        """
+        payload = message.get("payload", {})
+        task_type = payload.get("task_type", "unknown")
+        logger.info("Assistant task '%s' received", task_type)
+
+        result = {
+            "claw": "content",
+            "task_type": task_type,
+            "status": "accepted",
+            "message": f"Task '{task_type}' queued for processing",
+        }
+
+        if task_type == "generate_draft":
+            brief_data = payload.get("brief", {})
+            if self._generator and self._brief_manager:
+                result["status"] = "queued"
+                result["message"] = "Draft generation queued"
+            else:
+                result["status"] = "error"
+                result["message"] = "Content generator not initialized"
+
+        self._log_and_respond(message, result)
+
+    def _log_and_respond(self, message: dict[str, Any], result: dict[str, Any]) -> None:
+        """Log action and send response via mesh."""
+        self._operational_log.append(
+            LogEntry(
+                action_type="assistant_message",
+                entity_id=message.get("message_type", "unknown"),
+                outcome="success",
+                details=result,
+            )
+        )
+        if self._mesh_sender:
+            self._mesh_sender({
+                "sender_role": "content",
+                "recipient_role": "assistant",
+                "message_type": "assistant_response",
+                "payload": {
+                    "original_message_id": message.get("message_id"),
+                    "response": result,
+                },
+            })
 
     @property
     def publisher(self) -> PlatformPublisher | None:

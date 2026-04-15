@@ -461,7 +461,7 @@ def verify_setup() -> dict[str, bool]:
         "template_exists": template_found,
         "system_prompt_installed": SYSTEM_PROMPT_DEST.exists(),
         "agent_config_exists": AGENT_CONFIG_DEST.exists(),
-        "bridge_cli_exists": Path("milimo-blueprint/orchestrator/bridge_cli.py").exists(),
+        "bridge_cli_exists": (BLUEPRINT_BASE / "orchestrator" / "bridge_cli.py").exists(),
         "workspace_identity_exists": IDENTITY_FILE.exists(),
         "workspace_user_exists": USER_FILE.exists(),
         "bootstrap_removed": not BOOTSTRAP_FILE.exists(),

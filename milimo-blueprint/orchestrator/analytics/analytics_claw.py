@@ -233,6 +233,8 @@ class AnalyticsClaw:
                 "shipping_summary": self._handle_shipping_summary,
                 "content_performance_query": self._handle_content_performance_query,
                 "behavior_query": self._handle_behavior_query,
+                "assistant_query": self._handle_assistant_query,
+                "assistant_task": self._handle_assistant_task,
             }
 
             handler = handler_map.get(message_type)
@@ -463,6 +465,48 @@ class AnalyticsClaw:
                     api_key=api_key,
                     interval_hours=interval,
                 )
+
+    def _handle_assistant_query(self, message: dict[str, Any]) -> dict[str, Any]:
+        """Handle assistant_query from Lucy."""
+        result = {
+            "claw": "analytics",
+            "status": "online" if self._started else "offline",
+            "components": {
+                "baseline_manager": self.baseline_manager is not None,
+                "anomaly_detector": self.anomaly_detector is not None,
+                "opportunity_scorer": self.opportunity_scorer is not None,
+                "report_generator": self.report_generator is not None,
+            },
+        }
+        self._send_assistant_response(message, result)
+        return result
+
+    def _handle_assistant_task(self, message: dict[str, Any]) -> dict[str, Any]:
+        """Handle assistant_task from Lucy."""
+        payload = message.get("payload", {})
+        task_type = payload.get("task_type", "unknown")
+        result = {
+            "claw": "analytics",
+            "task_type": task_type,
+            "status": "accepted",
+        }
+        self._send_assistant_response(message, result)
+        return result
+
+    def _send_assistant_response(
+        self, message: dict[str, Any], result: dict[str, Any]
+    ) -> None:
+        """Send response back to assistant via mesh."""
+        if self.mesh_sender:
+            self.mesh_sender({
+                "sender_role": "analytics",
+                "recipient_role": "assistant",
+                "message_type": "assistant_response",
+                "payload": {
+                    "original_message_id": message.get("message_id"),
+                    "response": result,
+                },
+            })
 
     def _now_iso(self) -> str:
         """Return current ISO timestamp."""

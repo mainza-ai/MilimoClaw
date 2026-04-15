@@ -66,7 +66,16 @@ RESTART_WINDOW_SECONDS = 3600
 UNHEALTHY_THRESHOLD = 90
 RESTART_BACKOFF_MAX = 60
 RESULT_TTL_SECONDS = 3600
-HEALTH_PORT = 8081
+
+# Health ports per claw (unique to avoid conflicts)
+HEALTH_PORTS = {
+    "content": 8081,
+    "ops": 8082,
+    "analytics": 8083,
+    "finance": 8084,
+    "build": 8085,
+}
+DEFAULT_HEALTH_PORT = 8081
 
 # Required environment variables for each claw
 REQUIRED_ENV_VARS = {
@@ -231,9 +240,9 @@ def print_startup_summary(launcher: "ClawLauncher") -> None:
         )
 
     print("-" * 60)
-    print(f"\n  Health Endpoint: http://localhost:{HEALTH_PORT}/health")
-    print(f"  Log File: {LAUNCHER_LOG_FILE}")
-    print(f"  PID File: {LAUNCHER_PID_FILE}")
+    print(f"\n Health Endpoint: http://localhost:{DEFAULT_HEALTH_PORT}/health")
+    print(f" Log File: {LAUNCHER_LOG_FILE}")
+    print(f" PID File: {LAUNCHER_PID_FILE}")
     print("\n" + "=" * 60 + "\n")
 
 
@@ -292,7 +301,7 @@ class HealthHandler(BaseHTTPRequestHandler):
 
 
 def start_health_server(
-    launcher: "ClawLauncher", port: int = HEALTH_PORT
+    launcher: "ClawLauncher", port: int = DEFAULT_HEALTH_PORT
 ) -> threading.Thread:
     """Start the HTTP health endpoint in a background thread."""
 
@@ -1196,7 +1205,7 @@ def main() -> None:
     parser.add_argument(
         "--health-port",
         type=int,
-        default=HEALTH_PORT,
+        default=DEFAULT_HEALTH_PORT,
         help="Port for HTTP health endpoint",
     )
     args = parser.parse_args()

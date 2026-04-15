@@ -358,6 +358,8 @@ class OpsClaw:
         self._inbound_handlers["invoice_ready"] = self._handle_invoice_ready
         self._inbound_handlers["payment_overdue"] = self._handle_payment_overdue
         self._inbound_handlers["brief_acknowledged"] = self._handle_brief_acknowledged
+        self._inbound_handlers["assistant_query"] = self._handle_assistant_query
+        self._inbound_handlers["assistant_task"] = self._handle_assistant_task
 
     def _register_approval_handlers(self) -> None:
         """Register default approval thresholds for ops actions.
@@ -559,6 +561,49 @@ class OpsClaw:
                     )
 
         return execute
+
+    def _handle_assistant_query(self, message: dict[str, Any]) -> None:
+        """Handle assistant_query from Lucy."""
+        result = {
+            "claw": "ops",
+            "status": "online" if self._running else "offline",
+            "components": {
+                "intake_manager": self._intake_manager is not None,
+                "project_manager": self._project_manager is not None,
+                "scheduler": self._scheduler is not None,
+                "health_scorer": self._health_scorer is not None,
+            },
+            "clients": len(list((self._base_path / "clients").glob("*")))
+            if self._base_path
+            else 0,
+        }
+        self._send_assistant_response(message, result)
+
+    def _handle_assistant_task(self, message: dict[str, Any]) -> None:
+        """Handle assistant_task from Lucy."""
+        payload = message.get("payload", {})
+        task_type = payload.get("task_type", "unknown")
+        result = {
+            "claw": "ops",
+            "task_type": task_type,
+            "status": "accepted",
+        }
+        self._send_assistant_response(message, result)
+
+    def _send_assistant_response(
+        self, message: dict[str, Any], result: dict[str, Any]
+    ) -> None:
+        """Send response back to assistant."""
+        if self._mesh_gateway:
+            self._mesh_gateway.send({
+                "sender_role": "ops",
+                "recipient_role": "assistant",
+                "message_type": "assistant_response",
+                "payload": {
+                    "original_message_id": message.get("message_id"),
+                    "response": result,
+                },
+            })
 
     @property
     def is_running(self) -> bool:
