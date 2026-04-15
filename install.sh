@@ -405,9 +405,17 @@ deploy_to_sandbox() {
     mkdir -p /sandbox/build/{prs/{open,merged,closed},deployments/{staging,production},tasks,docs,context,queue/{hold,review,auto},memory,logs,tools,data}
 
     chown -R sandbox:sandbox /sandbox/clients /sandbox/content /sandbox/analytics /sandbox/finance /sandbox/build
+
+    # Fix log directory permissions (Issue #6: logs may be owned by root)
+    for d in /sandbox/clients/logs /sandbox/content/logs /sandbox/analytics/logs /sandbox/finance/logs /sandbox/build/logs; do
+      mkdir -p "$d"
+      chown -R sandbox:sandbox "$d"
+      chmod -R 755 "$d"
+    done
+
     echo "All sandbox directories initialized"
   '
-  ok "Sandbox directories initialized for all 5 claws"
+  ok "Sandbox directories initialized for all 5 claws (with log permissions fixed)"
 
   # ---- Step 6c: Copy blueprint to .milimo/blueprints/0.1.0/ ----
   info "Copying blueprint to .milimo/blueprints/0.1.0/..."
@@ -608,29 +616,59 @@ echo "Cleanup complete"
   '
   ok "Permissions fixed"
 
-  # ---- Step 8: Fix template search path in assistant_setup.py ----
-  info "Fixing assistant template search path..."
+  # ---- Step 8: Verify critical file sync ----
+  info "Verifying critical files are synced to all sandbox locations..."
   sandbox_exec "$gateway" '
-    python3 -c "
-path = \"/sandbox/milimo-blueprint/orchestrator/assistant_setup.py\"
-import os
-if os.path.exists(path):
-    with open(path) as f:
-        lines = f.readlines()
-    new_lines = []
-    for line in lines:
-        new_lines.append(line)
-        if \"_TEMPLATE_CANDIDATES = [\" in line:
-            new_lines.append(\"    # 0. Bundled with orchestrator (sandbox deployment)\n\")
-            new_lines.append(\"    Path(__file__).resolve().parent / \\\"templates\\\" / \\\"assistant_system_prompt.md\\\",\n\")
-    with open(path, \"w\") as f:
-        f.writelines(new_lines)
-    print(\"Template search path fixed\")
-else:
-    print(\"assistant_setup.py not found, skipping\")
-"
+    ERRORS=0
+
+    # Verify orchestrator files exist in primary location
+    for claw in ops analytics content finance build; do
+      f="/sandbox/milimo-blueprint/orchestrator/${claw}/${claw}_claw.py"
+      if [ ! -f "$f" ]; then
+        echo "MISSING: $f"
+        ERRORS=$((ERRORS + 1))
+      fi
+    done
+
+    # Verify mesh_config.yaml exists and has assistant types under message_types
+    MC="/sandbox/milimo-blueprint/mesh_config.yaml"
+    if [ ! -f "$MC" ]; then
+      echo "MISSING: $MC"
+      ERRORS=$((ERRORS + 1))
+    else
+      # Verify assistant message types are properly nested (not at root level)
+      if grep -q "^assistant_query:" "$MC"; then
+        echo "YAML ERROR: assistant_query at root level (should be under message_types)"
+        ERRORS=$((ERRORS + 1))
+      fi
+      if grep -q "^assistant_task:" "$MC"; then
+        echo "YAML ERROR: assistant_task at root level (should be under message_types)"
+        ERRORS=$((ERRORS + 1))
+      fi
+      if grep -q "  assistant_query:" "$MC" && grep -q "  assistant_task:" "$MC"; then
+        echo "mesh_config OK: assistant types properly nested under message_types"
+      fi
+    fi
+
+    # Verify blueprints copy is in sync
+    BP="/sandbox/.milimo/blueprints/0.1.0"
+    if [ -d "$BP/orchestrator" ]; then
+      for claw in ops analytics content finance build; do
+        f="$BP/orchestrator/${claw}/${claw}_claw.py"
+        if [ ! -f "$f" ]; then
+          echo "MISSING (blueprints copy): $f"
+          ERRORS=$((ERRORS + 1))
+        fi
+      done
+    fi
+
+    if [ $ERRORS -eq 0 ]; then
+      echo "All critical files verified"
+    else
+      echo "WARNING: $ERRORS files missing or misconfigured"
+    fi
   '
-  ok "Template search path fixed"
+  ok "Critical file sync verified"
 
   # ---- Step 9: Register plugin in openclaw.json ----
   log_step "Registering plugin"
