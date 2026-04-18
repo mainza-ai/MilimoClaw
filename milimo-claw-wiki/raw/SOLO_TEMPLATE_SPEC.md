@@ -1,0 +1,1 @@
+../../milimo-claw-docs/reference/MILIMO_CLAW_SOLO_TEMPLATE_SPEC_V2.md

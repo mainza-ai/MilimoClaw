@@ -1,0 +1,238 @@
+{
+  "main": {
+    "id": "41ca9baa2079865f",
+    "type": "split",
+    "children": [
+      {
+        "id": "17c608a1309e4743",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "c23c4dfa99ace214",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Welcome.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Welcome"
+            }
+          }
+        ]
+      },
+      {
+        "id": "488343d6831e017f",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "1e805db6e9f977a1",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Graph view"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "3feb036056202c5a",
+    "type": "split",
+    "children": [
+      {
+        "id": "58ffa064017b95b2",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "d14abadc06e592dc",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "168fc1e1f4be48a5",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "d383a414cfe03d31",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 200
+  },
+  "right": {
+    "id": "e10b12bffde906cb",
+    "type": "split",
+    "children": [
+      {
+        "id": "3b1fdc1164db568f",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "0ab1b9ad634b30e8",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "e5e0768d50d4ee74",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "5501e227df2c6ea6",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "03a5002d61f4cf14",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "6bc64014dc77aa85",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "1e805db6e9f977a1",
+  "lastOpenFiles": [
+    "wiki/troubleshooting/common-issues.md",
+    "wiki/architecture/assistant-system.md",
+    "Welcome.md",
+    "wiki/modules/evolution/marketplace-manager.md",
+    "wiki/modules/evolution/sandbox-runner.md",
+    "wiki/modules/evolution/evolution-integration.md",
+    "wiki/modules/evolution/tool-generator.md",
+    "wiki/lib/lib-modules.md",
+    "wiki/tui/warroom-modules.md",
+    "wiki/modules/ops/ops-claw.md",
+    "wiki/modules/finance/finance-claw.md",
+    "wiki/modules/content/content-claw.md",
+    "wiki/modules/build/build-claw.md",
+    "wiki/modules/analytics/analytics-claw.md",
+    "wiki/modules/mesh/mesh-relay.md",
+    "wiki/modules/mesh/mesh-failover.md",
+    "wiki/modules/mesh/mesh-encryption.md",
+    "wiki/modules/mesh",
+    "wiki/modules/infrastructure/bridge-cli.md",
+    "wiki/modules/evolution/tool-proposal.md",
+    "wiki/modules/evolution/tool-validator.md",
+    "wiki/modules/evolution/tool-builder.md",
+    "wiki/modules/infrastructure/inference-client.md",
+    "wiki/modules/infrastructure",
+    "wiki/modules/build/github-client.md",
+    "wiki/evolution/pattern-detection.md",
+    "wiki/scripts/development-scripts.md",
+    "wiki/claws/analytics-claw.md",
+    "wiki/onboard",
+    "wiki/mesh",
+    "wiki/lib",
+    "wiki/cli",
+    "wiki/tui",
+    "wiki/modules/coordination",
+    "wiki/modules/evolution",
+    "wiki/scripts"
+  ]
+}
