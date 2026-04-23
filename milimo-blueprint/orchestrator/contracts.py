@@ -44,7 +44,7 @@ VALID_ROLES = {"content", "ops", "analytics", "finance", "build"}
 ASSISTANT_ROLE = "assistant"
 VALID_SENDERS = VALID_ROLES | {ASSISTANT_ROLE}
 # War room is a valid recipient but not a sender role
-VALID_RECIPIENTS = VALID_ROLES | {"war_room"}
+VALID_RECIPIENTS = VALID_ROLES | {"war_room", "assistant"}
 
 # Valid message types
 VALID_MESSAGE_TYPES = {
@@ -141,7 +141,12 @@ MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
         "sender_roles": ["content"],
         "recipient_roles": ["ops"],
         "required_payload": ["project_id", "published_urls"],
-        "optional_payload": ["brief_id", "client_id", "performance_baseline", "completed_at"],
+        "optional_payload": [
+            "brief_id",
+            "client_id",
+            "performance_baseline",
+            "completed_at",
+        ],
         "frequency": "on_event",
         "priority": "AUTO",
     },
@@ -159,7 +164,13 @@ MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
     "performance_signal": {
         "sender_roles": ["content"],
         "recipient_roles": ["analytics"],
-        "required_payload": ["post_id", "platform", "engagement_data", "publish_time", "content_type"],
+        "required_payload": [
+            "post_id",
+            "platform",
+            "engagement_data",
+            "publish_time",
+            "content_type",
+        ],
         "optional_payload": ["client_id"],
         "frequency": "on_event",
         "priority": "AUTO",
@@ -168,7 +179,11 @@ MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
     "brief_acknowledged": {
         "sender_roles": ["content"],
         "recipient_roles": ["ops"],
-        "required_payload": ["project_id", "estimated_first_draft_time", "acknowledged_at"],
+        "required_payload": [
+            "project_id",
+            "estimated_first_draft_time",
+            "acknowledged_at",
+        ],
         "frequency": "on_event",
         "sla_minutes": 5,
         "priority": "REVIEW",
@@ -195,7 +210,12 @@ MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
         "sender_roles": ["finance"],
         "recipient_roles": ["war_room"],
         "required_payload": ["week_revenue"],
-        "optional_payload": ["week_over_week_pct", "invoices_paid", "invoices_pending", "last_updated"],
+        "optional_payload": [
+            "week_over_week_pct",
+            "invoices_paid",
+            "invoices_pending",
+            "last_updated",
+        ],
         "frequency": "on_change",
         "priority": "AUTO",
     },
@@ -323,7 +343,12 @@ MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
         "sender_roles": ["ops"],
         "recipient_roles": ["content", "build"],
         "required_payload": ["project_id", "client_id", "scope", "deadline"],
-        "optional_payload": ["tone_requirements", "platform_targets", "budget", "brief_text"],
+        "optional_payload": [
+            "tone_requirements",
+            "platform_targets",
+            "budget",
+            "brief_text",
+        ],
         "frequency": "on_event",
         "priority": "REVIEW",
     },

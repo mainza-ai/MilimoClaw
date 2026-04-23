@@ -4,7 +4,7 @@
 
 **Sources**: `milimo-blueprint/orchestrator/claw_launcher.py`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #architecture #startup
 
@@ -113,6 +113,7 @@ class ProcessSupervisor:
 | All | `NVIDIA_API_KEY` |
 | Finance | `STRIPE_SECRET_KEY` |
 | Build | `GITHUB_REPO` |
+| Assistant | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ID` |
 
 ### Optional Integration Vars
 
@@ -126,7 +127,7 @@ class ProcessSupervisor:
 
 ## HTTP Health Endpoint
 
-Default port: 8081
+Default port: 8081 (content). Each claw gets its own: content=8081, ops=8082, analytics=8083, finance=8084, build=8085, assistant=8086.
 
 ### Endpoints
 
@@ -141,13 +142,14 @@ Default port: 8081
 {
   "running": true,
   "launcher_pid": 12345,
-  "timestamp": "2026-04-14T12:00:00Z",
+  "timestamp": "2026-04-23T12:00:00Z",
   "claws": {
     "content": {"status": "running", "uptime_seconds": 3600, "restarts": 0},
     "ops": {"status": "running", "uptime_seconds": 3600, "restarts": 0},
     "analytics": {"status": "running", "uptime_seconds": 3600, "restarts": 0},
     "finance": {"status": "running", "uptime_seconds": 3600, "restarts": 0},
-    "build": {"status": "running", "uptime_seconds": 3600, "restarts": 0}
+    "build": {"status": "running", "uptime_seconds": 3600, "restarts": 0},
+    "assistant": {"status": "running", "uptime_seconds": 3600, "restarts": 0}
   }
 }
 ```
@@ -213,7 +215,7 @@ Removes expired results every 5 minutes (TTL: 1 hour)
 
 ## Dependencies
 
-- [[content-claw]], [[ops-claw]], [[analytics-claw]], [[finance-claw]], [[build-claw]] — Claw instances
+- [[content-claw]], [[ops-claw]], [[analytics-claw]], [[finance-claw]], [[build-claw]], [[assistant-lucy]] — Claw instances
 - [[mesh-coordinator]] — Message routing
 - [[privacy-router]] — Inference client
 

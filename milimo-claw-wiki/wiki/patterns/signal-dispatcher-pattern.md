@@ -16,6 +16,7 @@ Each claw implements its own SignalDispatcher:
 | Finance | `FinanceSignalDispatcher` | `finance/signal_dispatcher.py` |
 | Analytics | `AnalyticsSignalDispatcher` | `analytics/signal_dispatcher.py` |
 | Build | `BuildSignalDispatcher` | `build/signal_dispatcher.py` |
+| Assistant | `LucyAssistant` (dispatch methods) | `assistant/lucy.py` |
 
 ## Common Behaviors
 
@@ -84,7 +85,7 @@ except Exception as e:
 
 ## Relationships
 
-- Used by: All claws for inter-claw communication
+- Used by: All 6 claws for inter-claw communication
 - Depends on: `MeshGateway` protocol
 - Logs to: `OperationalLog` for each claw
 

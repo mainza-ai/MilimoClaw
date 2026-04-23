@@ -21,6 +21,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -60,6 +61,7 @@ class BuildClaw:
         github_client: Any,
         sentry_client: Any | None = None,
         vercel_client: Any | None = None,
+        mesh_gateway: Any | None = None,
         base_path: Path | None = None,
     ) -> None:
         self._squad_id = squad_id
@@ -67,6 +69,7 @@ class BuildClaw:
         self._github_client = github_client
         self._sentry_client = sentry_client
         self._vercel_client = vercel_client
+        self._mesh_gateway = mesh_gateway
         self._base_path = base_path
 
         # Components (initialized in startup)
@@ -116,6 +119,7 @@ class BuildClaw:
         self._dispatcher = BuildSignalDispatcher(
             fs=self._fs,
             operational_log=self._log,
+            mesh_gateway=self._mesh_gateway,
             squad_id=self._squad_id,
         )
 
@@ -241,6 +245,28 @@ class BuildClaw:
     # Message handling
     # ------------------------------------------------------------------
 
+    def _send_assistant_response(self, original_message: dict, result: dict) -> None:
+        """Send a response back to the assistant (Lucy) via the mesh gateway."""
+        if self._mesh_gateway is None:
+            logger.warning(
+                "BuildClaw: cannot send assistant response — no mesh gateway"
+            )
+            return
+        try:
+            self._mesh_gateway.send(
+                {
+                    "message_id": original_message.get("message_id", ""),
+                    "message_type": result.get("message_type", "assistant_response"),
+                    "sender_role": "build",
+                    "recipient_role": "assistant",
+                    "payload": result,
+                    "squad_id": self._squad_id,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+        except Exception as e:
+            logger.error("BuildClaw: failed to send assistant response: %s", e)
+
     def _handle_assistant_query(self, message: dict) -> dict:
         """Handle read-only query from the assistant (Lucy).
 
@@ -251,7 +277,7 @@ class BuildClaw:
 
         logger.info("Assistant query received: %s", query)
 
-        return {
+        result = {
             "status": "ok",
             "role": "build",
             "message_type": "assistant_query",
@@ -260,6 +286,8 @@ class BuildClaw:
                 "squad_id": self._squad_id,
             },
         }
+        self._send_assistant_response(message, result)
+        return result
 
     def _handle_assistant_task(self, message: dict) -> dict:
         """Handle task assignment from the assistant (Lucy).
@@ -276,7 +304,7 @@ class BuildClaw:
 
         # For now, acknowledge receipt and queue for execution
         # In a full implementation, this would parse the task and route to appropriate handlers
-        return {
+        result = {
             "status": "queued",
             "role": "build",
             "message_type": "assistant_task",
@@ -284,6 +312,8 @@ class BuildClaw:
             "deadline": deadline,
             "message": f"Task '{task_description[:50]}...' received and queued for execution.",
         }
+        self._send_assistant_response(message, result)
+        return result
 
     def handle_inbound(self, message: dict[str, Any]) -> dict[str, Any]:
         """Route inbound message to the correct handler.

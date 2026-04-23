@@ -34,10 +34,28 @@ process:
   run_as_group: sandbox
 
 network_policies:
-  # ── LOCAL Inference ONLY ────────────────────────────────────────────
-  # ⚠️ CRITICAL: No cloud inference endpoints for the Finance Claw.
-  # Financial data NEVER leaves the device. The NIM local endpoint
-  # is the only inference route available.
+  # ── Cloud Inference (development) ──────────────────────────────────
+  # During development, all claws route inference through NVIDIA cloud endpoints.
+  # Production: switch to nim_local only — financial data must never leave device.
+  nvidia_cloud:
+    name: nvidia_cloud
+    endpoints:
+      - host: integrate.api.nvidia.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+    rules:
+      - allow: { method: POST, path: "/v1/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
+
+  # ── LOCAL Inference (production target) ─────────────────────────────
+  # ⚠️ PRODUCTION TARGET: Switch to nim_local only for Finance Claw.
+  # Financial data NEVER leaves the device in production. The NIM local
+  # endpoint is the only inference route allowed in production.
+  # During dev, nvidia_cloud above is used instead.
   nim_local:
     name: nim_local
     endpoints:

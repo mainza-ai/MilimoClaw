@@ -1,12 +1,12 @@
 # Solo Founder Template
 
-**Summary**: Solo operator template with all 5 claws for single-machine deployment.
+**Summary**: Solo operator template with all 6 claws for single-machine deployment.
 
 **Sources**:
 - `raw/SOLO_TEMPLATE_SPEC.md`
 - `milimo-blueprint/templates/solo-founder.yaml`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #templates #solo #founder
 
@@ -14,7 +14,7 @@
 
 ## Overview
 
-The solo-founder template is the primary template for development and testing. It includes all 5 claws running on a single operator's machine.
+The solo-founder template is the primary template for development and testing. It includes all 6 claws running on a single operator's machine.
 
 ## Configuration
 
@@ -22,13 +22,14 @@ The solo-founder template is the primary template for development and testing. I
 # solo-founder.yaml
 template_id: solo-founder
 name: Solo Founder
-description: Full 5-claw setup for solo operators
+  description: Full 6-claw setup for solo operators
 claws:
   - content
   - ops
   - analytics
   - finance
   - build
+  - assistant
 ```
 
 ## Evolution Schedule
@@ -63,6 +64,7 @@ When enabled, per-claw behavior:
 | Analytics | Passive collection | New experiments |
 | Finance | Invoice sends, payment monitoring | New project initiations |
 | Build | Issue triage, error monitoring | New PRs, deploys |
+| Assistant | Query responses, digest delivery | Proactive notifications |
 
 ## Approval Thresholds
 

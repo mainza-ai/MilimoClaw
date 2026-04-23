@@ -51,7 +51,7 @@ BLUEPRINT_PATH = Path("/sandbox/.milimo/blueprints/0.1.0")
 if BLUEPRINT_PATH.exists() and str(BLUEPRINT_PATH) not in sys.path:
     sys.path.insert(0, str(BLUEPRINT_PATH))
 
-ALL_ROLES = ["content", "ops", "analytics", "finance", "build"]
+ALL_ROLES = ["content", "ops", "analytics", "finance", "build", "assistant"]
 SQUAD_ID = os.environ.get("SQUAD_ID", "zulu")
 MESH_DIR = Path.home() / ".milimo" / "mesh"
 HEARTBEAT_DIR = MESH_DIR / "heartbeats"
@@ -60,6 +60,98 @@ OUTBOX_DIR = MESH_DIR / "outbox"
 ALERTS_DIR = MESH_DIR / "alerts"
 LAUNCHER_PID_FILE = MESH_DIR / "launcher.pid"
 LAUNCHER_LOG_FILE = MESH_DIR / "logs" / "launcher.log"
+
+
+class RealMeshGateway:
+    """MeshGateway implementation using MeshCoordinator.
+
+    Canonical 6-arg send interface matching FinanceClaw's MeshGateway Protocol.
+    Shared across all claws — instantiated once in ClawLauncher.
+    """
+
+    def __init__(self) -> None:
+        from orchestrator.mesh import MeshCoordinator
+
+        mesh_dir = str(MESH_DIR)
+        config_path = BLUEPRINT_PATH / "mesh_config.yaml"
+        if config_path.exists():
+            self._mesh = MeshCoordinator.from_config_file(
+                str(config_path), squad_id=SQUAD_ID, mesh_dir=mesh_dir
+            )
+        else:
+            self._mesh = MeshCoordinator.from_dict(
+                {}, squad_id=SQUAD_ID, mesh_dir=mesh_dir
+            )
+        for claw_role in ALL_ROLES:
+            self._mesh.register_claw(claw_role, address=f"local://{claw_role}")
+
+    def send(
+        self,
+        message_type: str,
+        recipient_role: str,
+        sender_role: str,
+        payload: dict,
+        message_id: str,
+        timestamp: str,
+    ) -> bool:
+        from orchestrator.contracts import ClawMessage
+
+        msg = ClawMessage(
+            sender_role=sender_role,
+            recipient_role=recipient_role,
+            message_type=message_type,
+            payload=payload,
+            squad_id=SQUAD_ID,
+        )
+        result = self._mesh.send_message(msg)
+        if not result.delivered:
+            logger.warning("RealMeshGateway: send failed: %s", result.reason)
+        return result.delivered
+
+
+class DictMeshGatewayAdapter:
+    """Adapts RealMeshGateway to the 1-dict-arg send(message: dict) -> bool interface.
+
+    Used by OpsClaw and BuildClaw's signal dispatchers which call
+    gateway.send(message_dict) with a single dict argument.
+    """
+
+    def __init__(self, gateway: RealMeshGateway, sender_role: str) -> None:
+        self._gateway = gateway
+        self._sender_role = sender_role
+
+    def send(self, message: dict[str, Any]) -> bool:
+        return self._gateway.send(
+            message_type=message.get("message_type", "unknown"),
+            recipient_role=message.get("recipient_role", "unknown"),
+            sender_role=message.get("sender_role", self._sender_role),
+            payload=message.get("payload", {}),
+            message_id=message.get("message_id", ""),
+            timestamp=message.get("timestamp", ""),
+        )
+
+
+class CallableMeshSenderAdapter:
+    """Adapts RealMeshGateway to the Callable[[dict], None] interface.
+
+    Used by ContentClaw and AnalyticsClaw which accept
+    mesh_sender: Callable[[dict], None].
+    """
+
+    def __init__(self, gateway: RealMeshGateway, sender_role: str) -> None:
+        self._gateway = gateway
+        self._sender_role = sender_role
+
+    def __call__(self, message: dict[str, Any]) -> None:
+        self._gateway.send(
+            message_type=message.get("message_type", "unknown"),
+            recipient_role=message.get("recipient_role", "unknown"),
+            sender_role=message.get("sender_role", self._sender_role),
+            payload=message.get("payload", {}),
+            message_id=message.get("message_id", ""),
+            timestamp=message.get("timestamp", ""),
+        )
+
 
 MAX_RESTART_THRESHOLD = 3
 RESTART_WINDOW_SECONDS = 3600
@@ -74,6 +166,7 @@ HEALTH_PORTS = {
     "analytics": 8083,
     "finance": 8084,
     "build": 8085,
+    "assistant": 8086,
 }
 DEFAULT_HEALTH_PORT = 8081
 
@@ -84,6 +177,7 @@ REQUIRED_ENV_VARS = {
     "analytics": ["NVIDIA_API_KEY"],
     "finance": ["NVIDIA_API_KEY", "STRIPE_SECRET_KEY"],
     "build": ["NVIDIA_API_KEY", "GITHUB_REPO"],
+    "assistant": ["NVIDIA_API_KEY"],
 }
 
 # Optional environment variables for enhanced functionality
@@ -752,6 +846,9 @@ class ClawLauncher:
         INBOX_DIR.mkdir(parents=True, exist_ok=True)
         OUTBOX_DIR.mkdir(parents=True, exist_ok=True)
 
+        self._mesh_gateway = RealMeshGateway()
+        logger.info("ClawLauncher: shared RealMeshGateway initialized")
+
     def start_role(self, role: str) -> ClawComponents | None:
         """Start a single claw role."""
         with self._lock:
@@ -988,9 +1085,13 @@ class ClawLauncher:
             github_client=github_client,
             vercel_client=vercel_client,
             sentry_client=sentry_client,
+            mesh_gateway=DictMeshGatewayAdapter(self._mesh_gateway, "build"),
             base_path=BASE,
         )
         claw.startup()
+        logger.info(
+            "ClawLauncher: BuildClaw using RealMeshGateway via DictMeshGatewayAdapter"
+        )
 
         heartbeat = HeartbeatEmitter("build", self.heartbeat_interval)
         heartbeat.start()
@@ -1024,13 +1125,18 @@ class ClawLauncher:
                     api_key=os.environ.get("NVIDIA_API_KEY"),
                     api_base=os.environ.get("NVIDIA_API_BASE"),
                 )
+                mesh_sender = CallableMeshSenderAdapter(self._mesh_gateway, "content")
                 claw = ContentClaw(
                     squad_id=SQUAD_ID,
                     inference_client=inference,
+                    mesh_sender=mesh_sender,
                     base_path=Path("/sandbox/content"),
                 )
                 claw.startup()
                 poller._message_handler = claw.handle_inbound
+                logger.info(
+                    "ClawLauncher: ContentClaw using RealMeshGateway via CallableMeshSenderAdapter"
+                )
 
             elif role == "ops":
                 from orchestrator.ops.ops_claw import OpsClaw
@@ -1040,13 +1146,18 @@ class ClawLauncher:
                     api_key=os.environ.get("NVIDIA_API_KEY"),
                     api_base=os.environ.get("NVIDIA_API_BASE"),
                 )
+                mesh_gateway = DictMeshGatewayAdapter(self._mesh_gateway, "ops")
                 claw = OpsClaw(
                     squad_id=SQUAD_ID,
                     inference_client=inference,
+                    mesh_gateway=mesh_gateway,
                     base_path=Path("/sandbox/ops"),
                 )
                 claw.startup()
                 poller._message_handler = claw.handle_inbound
+                logger.info(
+                    "ClawLauncher: OpsClaw using RealMeshGateway via DictMeshGatewayAdapter"
+                )
 
             elif role == "analytics":
                 from orchestrator.analytics.analytics_claw import AnalyticsClaw
@@ -1056,13 +1167,18 @@ class ClawLauncher:
                     api_key=os.environ.get("NVIDIA_API_KEY"),
                     api_base=os.environ.get("NVIDIA_API_BASE"),
                 )
+                mesh_sender = CallableMeshSenderAdapter(self._mesh_gateway, "analytics")
                 claw = AnalyticsClaw(
                     squad_id=SQUAD_ID,
                     inference_client=inference,
+                    mesh_sender=mesh_sender,
                     base_path=Path("/sandbox/analytics"),
                 )
                 claw.startup()
                 poller._message_handler = claw.handle_inbound
+                logger.info(
+                    "ClawLauncher: AnalyticsClaw using RealMeshGateway via CallableMeshSenderAdapter"
+                )
 
             elif role == "finance":
                 from orchestrator.finance.finance_claw import FinanceClaw
@@ -1079,65 +1195,55 @@ class ClawLauncher:
                     currency=os.environ.get("STRIPE_CURRENCY", "usd"),
                 )
 
-                # Real MeshGateway using MeshCoordinator
-                class RealMeshGateway:
-                    """MeshGateway implementation using MeshCoordinator."""
-
-                    def __init__(self):
-                        from orchestrator.mesh import MeshCoordinator
-
-                        mesh_dir = str(MESH_DIR)
-                        config_path = BLUEPRINT_PATH / "mesh_config.yaml"
-                        if config_path.exists():
-                            self._mesh = MeshCoordinator.from_config_file(
-                                str(config_path), squad_id=SQUAD_ID, mesh_dir=mesh_dir
-                            )
-                        else:
-                            self._mesh = MeshCoordinator.from_dict(
-                                {}, squad_id=SQUAD_ID, mesh_dir=mesh_dir
-                            )
-                        for claw_role in ALL_ROLES:
-                            self._mesh.register_claw(
-                                claw_role, address=f"local://{claw_role}"
-                            )
-
-                    def send(
-                        self,
-                        message_type: str,
-                        recipient_role: str,
-                        sender_role: str,
-                        payload: dict,
-                        message_id: str,
-                        timestamp: str,
-                    ) -> bool:
-                        from orchestrator.contracts import ClawMessage
-
-                        msg = ClawMessage(
-                            sender_role=sender_role,
-                            recipient_role=recipient_role,
-                            message_type=message_type,
-                            payload=payload,
-                            squad_id=SQUAD_ID,
-                        )
-                        result = self._mesh.send_message(msg)
-                        if not result.delivered:
-                            logger.warning(
-                                "RealMeshGateway: send failed: %s", result.reason
-                            )
-                        return result.delivered
-
-                gateway = RealMeshGateway()
-                logger.info("ClawLauncher: FinanceClaw using RealMeshGateway")
-
                 claw = FinanceClaw(
                     squad_id=SQUAD_ID,
                     inference_client=inference,
                     stripe_client=stripe,
-                    gateway=gateway,
+                    gateway=self._mesh_gateway,
                     base_path=Path("/sandbox/finance"),
                 )
                 claw.startup()
                 poller._message_handler = claw.handle_inbound
+                logger.info("ClawLauncher: FinanceClaw using shared RealMeshGateway")
+
+            elif role == "assistant":
+                from orchestrator.assistant.lucy import LucyAssistant, TelegramBridge
+
+                telegram_bridge = None
+                tg_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+                tg_chat_id = os.environ.get("TELEGRAM_ID")
+                if tg_token and tg_chat_id:
+                    telegram_bridge = TelegramBridge(
+                        bot_token=tg_token,
+                        chat_id=tg_chat_id,
+                    )
+                    logger.info("ClawLauncher: TelegramBridge configured for assistant")
+                else:
+                    logger.warning(
+                        "ClawLauncher: TELEGRAM_BOT_TOKEN/TELEGRAM_ID not set"
+                        " — assistant running without Telegram"
+                    )
+
+                claw = LucyAssistant(
+                    squad_id=SQUAD_ID,
+                    mesh_gateway=self._mesh_gateway,
+                    telegram_bridge=telegram_bridge,
+                    base_path=Path("/sandbox/.milimo/assistant"),
+                )
+                claw.startup()
+                poller._message_handler = claw.handle_inbound
+                logger.info("ClawLauncher: LucyAssistant using shared RealMeshGateway")
+
+                if telegram_bridge:
+                    import threading
+
+                    tg_thread = threading.Thread(
+                        target=claw.telegram_poll_loop, daemon=True
+                    )
+                    tg_thread.start()
+                    logger.info(
+                        "ClawLauncher: Telegram poll loop started for assistant"
+                    )
 
         except ImportError as e:
             logger.warning(

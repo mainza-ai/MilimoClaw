@@ -41,6 +41,7 @@ logger = logging.getLogger("milimo.tool_builder")
 # Import ToolGenerator for actual code generation
 try:
     from .tool_generator import ToolGenerator, ToolSpec, GenerationResult
+
     TOOL_GENERATOR_AVAILABLE = True
 except ImportError:
     TOOL_GENERATOR_AVAILABLE = False
@@ -51,6 +52,7 @@ except ImportError:
 # Import ToolSandbox for isolated testing
 try:
     from .tool_sandbox import ToolSandbox, SandboxConfig
+
     TOOL_SANDBOX_AVAILABLE = True
 except ImportError:
     TOOL_SANDBOX_AVAILABLE = False
@@ -60,6 +62,7 @@ except ImportError:
 # Import PrivacyRouter for inference routing
 try:
     from .privacy_router import PrivacyRouter, InferenceBackend
+
     PRIVACY_ROUTER_AVAILABLE = True
 except ImportError:
     PRIVACY_ROUTER_AVAILABLE = False
@@ -68,7 +71,12 @@ except ImportError:
 
 # Import SandboxRunner for isolated backtesting
 try:
-    from .evolution.sandbox_runner import SandboxRunner, BacktestResult as SandboxBacktestResult, _meets_threshold
+    from .evolution.sandbox_runner import (
+        SandboxRunner,
+        BacktestResult as SandboxBacktestResult,
+        _meets_threshold,
+    )
+
     SANDBOX_RUNNER_AVAILABLE = True
 except ImportError:
     SANDBOX_RUNNER_AVAILABLE = False
@@ -112,6 +120,7 @@ class BuiltTool:
         proposal_data = data.get("proposal", {})
         if isinstance(proposal_data, dict):
             from .tool_proposal import ToolProposal
+
             data["proposal"] = ToolProposal.from_dict(proposal_data)
         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
 
@@ -164,12 +173,14 @@ class ToolBuilder:
         backtest_window_weeks: int = 4,
         staging_dir: str | None = None,
         blueprint_dir: str | Path | None = None,
+        inference_client: Any | None = None,
     ) -> None:
         self.claw_role = claw_role
         self.squad_id = squad_id
         self.min_improvement_percent = min_improvement_percent
         self.backtest_window_weeks = backtest_window_weeks
         self.blueprint_dir = Path(blueprint_dir) if blueprint_dir else None
+        self._inference_client = inference_client
 
         if staging_dir:
             self._staging_dir = Path(staging_dir)
@@ -183,8 +194,13 @@ class ToolBuilder:
             template_dir = self.blueprint_dir / "prompts" / "tool-generation"
             if template_dir.exists():
                 assert ToolGenerator is not None
-                self._tool_generator = ToolGenerator(template_dir=template_dir)
-                logger.info("ToolGenerator initialized with templates from %s", template_dir)
+                self._tool_generator = ToolGenerator(
+                    template_dir=template_dir,
+                    inference_client=self._inference_client,
+                )
+                logger.info(
+                    "ToolGenerator initialized with templates from %s", template_dir
+                )
 
     def build(
         self,
@@ -272,7 +288,9 @@ class ToolBuilder:
             tool=tool,
             backtest=backtest,
             passed=backtest.passed,
-            failure_reason="" if backtest.passed else (
+            failure_reason=""
+            if backtest.passed
+            else (
                 f"Improvement {backtest.improvement_percent:.1f}% below "
                 f"threshold {self.min_improvement_percent:.1f}%"
             ),
@@ -358,7 +376,15 @@ class ToolBuilder:
             try:
                 # Cast tool_type to valid literal
                 tool_type = proposal.tool_type
-                valid_types = ("classifier", "predictor", "optimizer", "detector", "generator", "transformer", "aggregator")
+                valid_types = (
+                    "classifier",
+                    "predictor",
+                    "optimizer",
+                    "detector",
+                    "generator",
+                    "transformer",
+                    "aggregator",
+                )
                 if tool_type not in valid_types:
                     tool_type = "classifier"  # Default fallback
 
@@ -374,8 +400,14 @@ class ToolBuilder:
                     name=proposal.tool_name,
                     tool_type=tool_type,  # type: ignore[arg-type]
                     description=f"Generated for pattern: {proposal.trigger_pattern.pattern_type}",
-                    input_schema={"type": "object", "properties": {"action_data": {"type": "object"}}},
-                    output_schema={"type": "object", "properties": {"result": {"type": "object"}}},
+                    input_schema={
+                        "type": "object",
+                        "properties": {"action_data": {"type": "object"}},
+                    },
+                    output_schema={
+                        "type": "object",
+                        "properties": {"result": {"type": "object"}},
+                    },
                     pattern_description=proposal.trigger_pattern.trigger_description,
                     frequency=getattr(proposal.trigger_pattern, "frequency", 1),
                     time_period="7 days",
@@ -415,7 +447,9 @@ class ToolBuilder:
                     logger.info("Generated tool code via privacy router inference")
                     return code
             except Exception as e:
-                logger.warning("Privacy router inference failed: %s, falling back to skeleton", e)
+                logger.warning(
+                    "Privacy router inference failed: %s, falling back to skeleton", e
+                )
 
         # Final fallback: generate skeleton code
         return self._generate_skeleton_code(proposal)
@@ -433,7 +467,11 @@ class ToolBuilder:
         Returns:
             Generated code or None if inference fails
         """
-        if not PRIVACY_ROUTER_AVAILABLE or PrivacyRouter is None or InferenceBackend is None:
+        if (
+            not PRIVACY_ROUTER_AVAILABLE
+            or PrivacyRouter is None
+            or InferenceBackend is None
+        ):
             return None
 
         if self.blueprint_dir is None:
@@ -475,9 +513,11 @@ class ToolBuilder:
 
             # Call local NIM inference endpoint
             code = self._call_nim_inference(prompt, proposal)
-            
+
             if code and self._validate_syntax(code):
-                logger.info("Generated tool code via NIM inference (%d chars)", len(code))
+                logger.info(
+                    "Generated tool code via NIM inference (%d chars)", len(code)
+                )
                 return code
 
             return None
@@ -528,16 +568,13 @@ class ToolBuilder:
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are a Python code generator. Generate only valid Python code with no explanations or markdown. Include proper type hints and docstrings. The code should implement an 'apply' function that takes action_data: dict and returns a result dict."
+                    "content": "You are a Python code generator. Generate only valid Python code with no explanations or markdown. Include proper type hints and docstrings. The code should implement an 'apply' function that takes action_data: dict and returns a result dict.",
                 },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
+                {"role": "user", "content": prompt},
             ],
             "temperature": 0.3,
             "max_tokens": 2048,
-            "stop": ["```", "---", "Explanation:", "Note:"]
+            "stop": ["```", "---", "Explanation:", "Note:"],
         }
 
         try:
@@ -547,7 +584,7 @@ class ToolBuilder:
                 url,
                 data=data,
                 headers={"Content-Type": "application/json"},
-                method="POST"
+                method="POST",
             )
 
             with urllib.request.urlopen(req, timeout=60) as response:
@@ -562,11 +599,17 @@ class ToolBuilder:
 
             return None
 
-        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as e:
+        except (
+            urllib.error.URLError,
+            urllib.error.HTTPError,
+            json.JSONDecodeError,
+        ) as e:
             logger.warning("NIM inference call failed: %s", e)
             return None
 
-    def _call_gateway_inference(self, prompt: str, proposal: ToolProposal) -> str | None:
+    def _call_gateway_inference(
+        self, prompt: str, proposal: ToolProposal
+    ) -> str | None:
         """
         Call OpenShell gateway for inference as fallback.
 
@@ -663,7 +706,10 @@ class ToolBuilder:
             stripped = line.strip()
             if stripped.startswith("# ") and not in_code:
                 # Check if this is a docstring or explanation
-                if any(word in stripped.lower() for word in ["here", "this code", "the following", "example"]):
+                if any(
+                    word in stripped.lower()
+                    for word in ["here", "this code", "the following", "example"]
+                ):
                     continue
 
             # Start capturing after we see function/class definitions
@@ -769,16 +815,12 @@ class ToolBuilder:
     ) -> float:
         """Compute the baseline metric value from historical actions."""
         if metric_target == "approval_rate":
-            approved = sum(
-                1 for a in actions if a.outcome in ("approved", "auto")
-            )
+            approved = sum(1 for a in actions if a.outcome in ("approved", "auto"))
             return approved / max(len(actions), 1)
 
         # Check if metric exists in action metrics
         values = [
-            a.metrics[metric_target]
-            for a in actions
-            if metric_target in a.metrics
+            a.metrics[metric_target] for a in actions if metric_target in a.metrics
         ]
         if values:
             return sum(values) / len(values)

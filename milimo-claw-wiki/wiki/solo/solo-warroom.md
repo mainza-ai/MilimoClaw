@@ -4,12 +4,13 @@ Single-operator action queue with prioritized processing.
 
 ## Purpose
 
-Manages a unified action queue for all five claws. Merges all claw queues into one view with HOLD > REVIEW > AUTO priority ordering.
+Manages a unified action queue for all six claws. Merges all claw queues into one view with VETO > HOLD > REVIEW > AUTO priority ordering.
 
 ## Priority Ordering
 
 | Priority | Value | Meaning |
 |----------|-------|---------|
+| VETO | 0 | Any squad member can block; requires unanimous approval |
 | HOLD | 1 | Requires immediate attention |
 | REVIEW | 2 | Needs operator decision |
 | AUTO | 3 | Executed automatically |
@@ -20,7 +21,7 @@ Manages a unified action queue for all five claws. Merges all claw queues into o
 |--------|---------|
 | `PENDING` | Awaiting decision |
 | `APPROVED` | Approved by operator |
-| `BLOCKED` | Vetoed by operator |
+| `BLOCKED` | Vetoed by operator or squad member |
 | `AUTO_EXECUTED` | Executed automatically |
 
 ## Main Functions

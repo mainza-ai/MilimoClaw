@@ -55,32 +55,32 @@ network_policies:
       - { path: /usr/bin/python3.11 }
       - { path: /sandbox/.local/bin/milimo }
 
-# ── GitHub API ───────────────────────────────────────────────────────
-github_api:
-  name: github_api
-  endpoints:
-  - host: api.github.com
-    port: 443
-    protocol: rest
-    enforcement: enforce
-    tls: terminate
-    rules:
-    - allow: { method: "*", path: "/**" }
-  - host: github.com
-    port: 443
-    protocol: rest
-    enforcement: enforce
-    tls: terminate
-    rules:
-    - allow: { method: GET, path: "/**" }
-    - allow: { method: POST, path: "/**" }
-  binaries:
-  - { path: /usr/bin/gh }
-  - { path: /usr/bin/git }
-  - { path: /sandbox/.local/bin/gh }
-  - { path: /usr/local/bin/node }
-  - { path: /usr/bin/python3 }
-  - { path: /sandbox/.local/bin/milimo }
+  # ── GitHub API ───────────────────────────────────────────────────────
+  github_api:
+    name: github_api
+    endpoints:
+    - host: api.github.com
+      port: 443
+      protocol: rest
+      enforcement: enforce
+      tls: terminate
+      rules:
+      - allow: { method: "*", path: "/**" }
+    - host: github.com
+      port: 443
+      protocol: rest
+      enforcement: enforce
+      tls: terminate
+      rules:
+      - allow: { method: GET, path: "/**" }
+      - allow: { method: POST, path: "/**" }
+    binaries:
+    - { path: /usr/bin/gh }
+    - { path: /usr/bin/git }
+    - { path: /sandbox/.local/bin/gh }
+    - { path: /usr/local/bin/node }
+    - { path: /usr/bin/python3 }
+    - { path: /sandbox/.local/bin/milimo }
 
   # ── Deployment: Vercel ───────────────────────────────────────────────
   vercel_api:
@@ -125,6 +125,23 @@ github_api:
           - allow: { method: "*", path: "/**" }
     binaries:
       - { path: /usr/bin/python3 }
+      - { path: /sandbox/.local/bin/milimo }
+
+  # ── Messaging: Telegram Bot API ──────────────────────────────────────
+  telegram_api:
+    name: telegram_api
+    endpoints:
+      - host: api.telegram.org
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/bot*/**" }
+          - allow: { method: POST, path: "/bot*/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /usr/bin/python3.11 }
       - { path: /sandbox/.local/bin/milimo }
 
   # ── Package Registries ───────────────────────────────────────────────

@@ -5,7 +5,7 @@
 **Sources**:
 - `milimo-blueprint/templates/`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #templates #squads
 
@@ -15,11 +15,11 @@
 
 | Template | Claws | Category | Description |
 |----------|-------|----------|-------------|
-| [[solo-founder]] | All 5 | Founder | Full setup for solo operators |
+| [[solo-founder]] | All 6 | Founder | Full setup for solo operators |
 | `content-agency` | Content + Ops + Analytics | Creative | Content-focused business |
 | `design-studio` | Content + Ops + Finance | Creative | Design-focused business |
 | `event-promotion` | Content + Ops + Analytics | Creative | Event-focused business |
-| `freelance-collective` | Ops + Analytics + Finance | Commerce | Freelance coordination |
+| `freelance-collective` | Content + Ops + Analytics + Finance | Commerce | Freelance coordination |
 | `ai-micro-saas` | Build + Ops + Analytics + Finance | Tech | SaaS development |
 | `campus-ai-tool` | Build + Content + Ops | Tech | University-focused tools |
 
@@ -29,12 +29,12 @@
 
 ### Solo Founder
 
-**Claws**: Content, Ops, Analytics, Finance, Build
+**Claws**: Content, Ops, Analytics, Finance, Build, Assistant
 
 **Use Case**: Single operator running all business functions.
 
 **Key Features**:
-- All 5 claws active
+- All 6 claws active
 - Staggered evolution schedule
 - Deep Work mode support
 - Full War Room access
@@ -85,15 +85,16 @@
 
 ### Freelance Collective
 
-**Claws**: Ops, Analytics, Finance
+**Claws**: Content, Ops, Analytics, Finance
 
 **Use Case**: Coordinating freelance professionals.
 
 **Key Features**:
+- Portfolio and marketing materials via Content
 - Project coordination via Ops
 - Performance tracking
 - Financial management
-- No content or build claws
+- No build claw
 
 ---
 

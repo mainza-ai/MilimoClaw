@@ -42,7 +42,6 @@ services:
     volumes:
       - milimo-mesh:/sandbox/.milimo/mesh
       - milimo-sandbox:/sandbox
-      - milimo-build:/sandbox/build
     command: >
       python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/claw_launcher.py
       --role build
@@ -75,7 +74,6 @@ services:
     volumes:
       - milimo-mesh:/sandbox/.milimo/mesh
       - milimo-sandbox:/sandbox
-      - milimo-content:/sandbox/content
     command: >
       python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/claw_launcher.py
       --role content
@@ -108,7 +106,6 @@ services:
     volumes:
       - milimo-mesh:/sandbox/.milimo/mesh
       - milimo-sandbox:/sandbox
-      - milimo-ops:/sandbox/ops
     ports:
       - "8080:8080"  # Webhook server
     command: >
@@ -147,7 +144,6 @@ services:
     volumes:
       - milimo-mesh:/sandbox/.milimo/mesh
       - milimo-sandbox:/sandbox
-      - milimo-analytics:/sandbox/analytics
     command: >
       python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/claw_launcher.py
       --role analytics
@@ -183,7 +179,6 @@ services:
     volumes:
       - milimo-mesh:/sandbox/.milimo/mesh
       - milimo-sandbox:/sandbox
-      - milimo-finance:/sandbox/finance
     command: >
       python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/claw_launcher.py
       --role finance
@@ -200,16 +195,45 @@ services:
       - milimo-network
 
 # ---------------------------------------------------------------------------
+# Assistant Claw — Lucy, the conversational coordinator (Telegram bridge)
+# ---------------------------------------------------------------------------
+  assistant-claw:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: milimo-assistant-claw
+    restart: unless-stopped
+    environment:
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - NVIDIA_API_BASE=${NVIDIA_API_BASE:-https://integrate.api.nvidia.com/v1}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_ID=${TELEGRAM_ID}
+      - SQUAD_ID=${SQUAD_ID:-zulu}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - milimo-mesh:/sandbox/.milimo/mesh
+      - milimo-sandbox:/sandbox
+    command: >
+      python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/claw_launcher.py
+      --role assistant
+      --heartbeat-interval 30
+      --poll-interval 5
+      --verbose
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import os; p = os.path.expanduser('~/.milimo/mesh/heartbeats/assistant.json'); assert os.path.exists(p), 'no heartbeat'"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - milimo-network
+
+# ---------------------------------------------------------------------------
 # Volumes — Persistent data across container restarts
 # ---------------------------------------------------------------------------
 volumes:
-  milimo-mesh:       # Shared mesh (heartbeats, inboxes, topology)
-  milimo-sandbox:    # Shared sandbox filesystem
-  milimo-build:      # Build Claw workspace
-  milimo-content:    # Content Claw workspace
-  milimo-ops:        # Ops Claw workspace
-  milimo-analytics:  # Analytics Claw workspace
-  milimo-finance:    # Finance Claw workspace
+  milimo-mesh: # Shared mesh (heartbeats, inboxes, topology)
+  milimo-sandbox: # Shared sandbox filesystem (all claws write to own subdirs)
 
 # ---------------------------------------------------------------------------
 # Network — Shared network for inter-claw communication

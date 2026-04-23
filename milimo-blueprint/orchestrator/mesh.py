@@ -45,6 +45,7 @@ from .gateway_adapter import (
     ConnectionState,
 )
 from .privacy_router import PrivacyRouter, RoutingDecision, InferenceBackend
+from .mesh_encryption import MessageEncryption, HAS_CRYPTOGRAPHY
 
 logger = logging.getLogger("milimo.mesh")
 
@@ -124,6 +125,19 @@ class MeshCoordinator:
         self._gateway: GatewayAdapter | None = None
         self._gateway_role: str = ""
 
+        # Initialize message encryption (if mesh_secret configured and cryptography available)
+        self._encryption: MessageEncryption | None = None
+        if mesh_config and mesh_config.mesh_secret and HAS_CRYPTOGRAPHY:
+            try:
+                self._encryption = MessageEncryption(mesh_config.mesh_secret)
+                logger.info("Message encryption enabled (AES-256-GCM)")
+            except Exception as e:
+                logger.warning("Failed to initialize message encryption: %s", e)
+        elif mesh_config and mesh_config.mesh_secret and not HAS_CRYPTOGRAPHY:
+            logger.warning(
+                "mesh_secret set but cryptography library not installed — messages unencrypted"
+            )
+
         # Message queue directory (for file-based fallback and persistence)
         if mesh_dir:
             self._mesh_dir = Path(mesh_dir)
@@ -164,7 +178,12 @@ class MeshCoordinator:
                 else:
                     mesh_config.transport_mode = "file"
 
-        return cls(validator=validator, squad_id=squad_id, mesh_dir=mesh_dir, mesh_config=mesh_config)
+        return cls(
+            validator=validator,
+            squad_id=squad_id,
+            mesh_dir=mesh_dir,
+            mesh_config=mesh_config,
+        )
 
     @classmethod
     def from_dict(
@@ -187,7 +206,12 @@ class MeshCoordinator:
         else:
             mesh_config.transport_mode = "file"
 
-        return cls(validator=validator, squad_id=squad_id, mesh_dir=mesh_dir, mesh_config=mesh_config)
+        return cls(
+            validator=validator,
+            squad_id=squad_id,
+            mesh_dir=mesh_dir,
+            mesh_config=mesh_config,
+        )
 
     @property
     def squad_id(self) -> str:
@@ -206,7 +230,10 @@ class MeshCoordinator:
     @property
     def gateway_connected(self) -> bool:
         """Check if gateway adapter is connected."""
-        return self._gateway is not None and self._gateway.state == ConnectionState.CONNECTED
+        return (
+            self._gateway is not None
+            and self._gateway.state == ConnectionState.CONNECTED
+        )
 
     # ── Gateway Management ─────────────────────────────────────────────
 
@@ -243,7 +270,11 @@ class MeshCoordinator:
         connected = self._gateway.connect()
 
         if connected:
-            logger.info("Gateway connected as %s (mode: %s)", role, self._mesh_config.transport_mode)
+            logger.info(
+                "Gateway connected as %s (mode: %s)",
+                role,
+                self._mesh_config.transport_mode,
+            )
         else:
             logger.warning("Gateway connection failed for role %s", role)
 
@@ -282,11 +313,7 @@ class MeshCoordinator:
 
     def get_online_claws(self) -> list[str]:
         """Return list of claw roles that are currently online."""
-        return [
-            role
-            for role, node in self._nodes.items()
-            if node.status == "online"
-        ]
+        return [role for role, node in self._nodes.items() if node.status == "online"]
 
     # ── Message Routing ───────────────────────────────────────────────
 
@@ -361,7 +388,9 @@ class MeshCoordinator:
         else:
             return self._send_via_file(message, needs_approval)
 
-    def _send_via_gateway(self, message: ClawMessage, needs_approval: bool) -> DeliveryResult:
+    def _send_via_gateway(
+        self, message: ClawMessage, needs_approval: bool
+    ) -> DeliveryResult:
         """Send message through gateway adapter."""
         from .gateway_adapter import SendResult
 
@@ -376,17 +405,26 @@ class MeshCoordinator:
             "needs_approval": needs_approval,
         }
 
+        if self._encryption and message.sender_role and message.recipient_role:
+            msg_dict = self._encryption.encrypt_message(
+                msg_dict, message.sender_role, message.recipient_role
+            )
+
         assert self._gateway is not None, "Gateway must be connected"
         result: SendResult = self._gateway.send(msg_dict)
 
         return DeliveryResult(
             delivered=result.success,
-            reason="Message sent via gateway" if result.success else result.error_message,
+            reason="Message sent via gateway"
+            if result.success
+            else result.error_message,
             message_id=message.message_id,
             requires_approval=result.requires_approval,
         )
 
-    def _send_via_file(self, message: ClawMessage, needs_approval: bool) -> DeliveryResult:
+    def _send_via_file(
+        self, message: ClawMessage, needs_approval: bool
+    ) -> DeliveryResult:
         """Send message via file-based queue (fallback)."""
         self._write_message(message, needs_approval)
 
@@ -414,7 +452,10 @@ class MeshCoordinator:
         messages: list[dict[str, Any]] = []
         for msg_file in sorted(inbox.glob("*.json")):
             try:
-                messages.append(json.loads(msg_file.read_text()))
+                raw = json.loads(msg_file.read_text())
+                if self._encryption and raw.get("encrypted"):
+                    raw = self._encryption.decrypt_message(raw)
+                messages.append(raw)
             except (json.JSONDecodeError, OSError):
                 logger.warning("Could not read message: %s", msg_file)
         return messages
@@ -506,8 +547,7 @@ class MeshCoordinator:
         (target / filename).write_text(json.dumps(warroom_msg, indent=2))
 
         logger.info(
-            "Message %s routed to War Room for approval "
-            "(original recipient: %s)",
+            "Message %s routed to War Room for approval (original recipient: %s)",
             message.message_id,
             message.recipient_role,
         )
@@ -531,6 +571,11 @@ class MeshCoordinator:
             "timestamp": message.timestamp,
             "needs_approval": needs_approval,
         }
+
+        if self._encryption and message.sender_role and message.recipient_role:
+            msg_data = self._encryption.encrypt_message(
+                msg_data, message.sender_role, message.recipient_role
+            )
 
         if message.recipient_role == "war_room":
             target = self._mesh_dir / "inbox" / "war_room"

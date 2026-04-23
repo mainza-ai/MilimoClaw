@@ -6,7 +6,7 @@
 - `milimo/src/warroom/warroom-tui.ts`
 - `raw/AGENTS.md`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #coordination #warroom #tui
 
@@ -141,6 +141,7 @@ milimo squad finals-mode --duration 2weeks --resume-date 2026-05-12
 | Analytics | Passive data collection | New experiments, opportunity scoring |
 | Finance | Invoice sends, payment monitoring | New project initiations |
 | Build | Issue triage, error monitoring | New PRs, deploys, code generation |
+| Assistant | Query responses, digest delivery | Proactive notifications, outbound queries |
 
 ### Auto-Response (Ops Claw)
 
@@ -154,3 +155,4 @@ milimo squad finals-mode --duration 2weeks --resume-date 2026-05-12
 - [[ops-claw]] — Ops actions
 - [[finance-claw]] — Finance actions
 - [[build-claw]] — Build actions
+- [[assistant-lucy]] — Assistant actions

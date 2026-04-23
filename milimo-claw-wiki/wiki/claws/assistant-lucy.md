@@ -3,10 +3,11 @@
 **Summary**: Conversational assistant that bridges users to all claws — the primary user interface for MilimoClaw.
 
 **Sources**:
+- `milimo-blueprint/orchestrator/assistant/lucy.py`
 - `milimo-blueprint/orchestrator/templates/assistant_system_prompt.md`
 - `milimo-blueprint/policies/assistant-sandbox.yaml`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #claw #assistant #lucy
 
@@ -92,12 +93,40 @@ Lucy has broader network access than other claws:
 | API | Purpose |
 |-----|---------|
 | NVIDIA NIM | Inference for conversation |
+| Telegram Bot API | User messaging interface |
 | GitHub API | Repository and PR information |
 | Vercel API | Deployment status |
 | Sentry API | Error tracking |
 | Stripe API | Payment status (read-only) |
 
 ## Implementation
+
+### Runtime Coordinator (lucy.py)
+
+The `LucyAssistant` class in `milimo-blueprint/orchestrator/assistant/lucy.py` is the runtime coordinator that manages Lucy's lifecycle:
+
+**Key Classes**:
+
+| Class | Purpose |
+|-------|---------|
+| `TelegramBridge` | Polls Telegram Bot API for user messages, sends responses |
+| `PendingQuery` | Tracks dispatched queries awaiting claw responses (with TTL) |
+| `LucyAssistant` | Main coordinator: startup, shutdown, dispatch, telegram integration |
+
+**Key Methods**:
+
+| Method | Purpose |
+|--------|---------|
+| `startup()` | Initialize Telegram bridge, connect to mesh |
+| `shutdown()` | Graceful cleanup of all resources |
+| `handle_inbound(message)` | Route incoming mesh messages to handlers |
+| `dispatch_query(target, query)` | Send assistant_query to a specific claw |
+| `dispatch_task(target, task)` | Send assistant_task to a specific claw |
+| `process_telegram_message(text)` | Parse user input and route to appropriate claw |
+| `telegram_poll_loop()` | Background loop polling Telegram for new messages |
+| `cleanup_expired()` | Remove expired pending queries past TTL |
+
+**Silent Response Handling**: When a claw returns an empty or None response, Lucy returns a diagnostic dict with `status`, `role`, and `message_type` fields instead of propagating silence.
 
 ### System Prompt
 

@@ -412,12 +412,14 @@ class FinanceClaw:
                     is not None,
                 }
                 self._send_assistant_response(raw_message, result)
+                return result
 
             elif message_type == "assistant_task":
                 result["claw"] = "finance"
                 result["task_type"] = payload.get("task_type", "unknown")
                 result["status"] = "accepted"
                 self._send_assistant_response(raw_message, result)
+                return result
 
             else:
                 result["status"] = "unknown_type"

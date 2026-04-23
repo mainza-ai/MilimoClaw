@@ -52,11 +52,11 @@ The Design Studio template is a 3-claw configuration emphasizing creative work, 
 
 ```yaml
 trigger: invoice_over_1000
-action: HOLD
-message: "High-value invoice requires unanimous squad sign-off."
+action: VETO
+message: "High-value invoice requires unanimous squad approval."
 ```
 
-Invoices over $1000 require consensus before sending.
+Invoices over $1000 require unanimous squad approval (VETO mode) before sending.
 
 ---
 

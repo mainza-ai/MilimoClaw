@@ -280,26 +280,32 @@ class AnalyticsClaw:
 
         return result
 
-    def _handle_performance_signal(self, message: dict[str, Any]) -> None:
-        """Handle performance_signal from Content Claw."""
+    def _handle_performance_signal(self, message: dict[str, Any]) -> dict[str, Any]:
         if self.signal_processor:
             self.signal_processor.handle_performance_signal(message)
 
-            content_baselines = (
-                self.baseline_manager.load_content_baselines()
-                if self.baseline_manager
-                else {}
+        content_baselines = (
+            self.baseline_manager.load_content_baselines()
+            if self.baseline_manager
+            else {}
+        )
+        anomaly_detected = False
+        if content_baselines and self.anomaly_detector:
+            anomaly = self.anomaly_detector.check_content_signal(
+                message, content_baselines
             )
-            if content_baselines and self.anomaly_detector:
-                anomaly = self.anomaly_detector.check_content_signal(
-                    message, content_baselines
-                )
-                if anomaly:
-                    self.anomaly_detector.save_anomaly(anomaly)
-                    self.anomaly_detector.dispatch_alert(anomaly)
+            if anomaly:
+                self.anomaly_detector.save_anomaly(anomaly)
+                self.anomaly_detector.dispatch_alert(anomaly)
+                anomaly_detected = True
+        return {
+            "status": "processed",
+            "role": "analytics",
+            "message_type": "performance_signal",
+            "anomaly_detected": anomaly_detected,
+        }
 
-    def _handle_client_health_signal(self, message: dict[str, Any]) -> None:
-        """Handle client_health_signal from Ops Claw."""
+    def _handle_client_health_signal(self, message: dict[str, Any]) -> dict[str, Any]:
         payload = message.get("payload", {})
         client_id = payload.get("client_id", "")
         health_score = payload.get("health_score", 10)
@@ -307,6 +313,7 @@ class AnalyticsClaw:
         if self.signal_processor:
             self.signal_processor.handle_client_health_signal(message)
 
+        alert_sent = False
         if health_score < 6.0 and self.signal_dispatcher:
             self.signal_dispatcher.send_client_health_alert(
                 client_id=client_id,
@@ -316,50 +323,83 @@ class AnalyticsClaw:
                     "recommended_action", "Schedule client check-in"
                 ),
             )
+            alert_sent = True
+        return {
+            "status": "processed",
+            "role": "analytics",
+            "message_type": "client_health_signal",
+            "client_id": client_id,
+            "alert_sent": alert_sent,
+        }
 
-    def _handle_client_onboarded(self, message: dict[str, Any]) -> None:
-        """Handle client_onboarded from Ops Claw."""
+    def _handle_client_onboarded(self, message: dict[str, Any]) -> dict[str, Any]:
         if self.signal_processor:
             self.signal_processor.handle_client_onboarded(message)
+            return {
+                "status": "processed",
+                "role": "analytics",
+                "message_type": "client_onboarded",
+            }
+        return {
+            "status": "skipped",
+            "role": "analytics",
+            "message_type": "client_onboarded",
+            "reason": "no_signal_processor",
+        }
 
-    def _handle_revenue_summary(self, message: dict[str, Any]) -> None:
-        """Handle revenue_summary from Finance Claw."""
+    def _handle_revenue_summary(self, message: dict[str, Any]) -> dict[str, Any]:
         if self.signal_processor:
             self.signal_processor.handle_revenue_summary(message)
 
-            revenue_baselines = (
-                self.baseline_manager.load_revenue_baseline()
-                if self.baseline_manager
-                else {}
+        revenue_baselines = (
+            self.baseline_manager.load_revenue_baseline()
+            if self.baseline_manager
+            else {}
+        )
+        anomaly_detected = False
+        if revenue_baselines and self.anomaly_detector:
+            anomaly = self.anomaly_detector.check_revenue_signal(
+                message, revenue_baselines
             )
-            if revenue_baselines and self.anomaly_detector:
-                anomaly = self.anomaly_detector.check_revenue_signal(
-                    message, revenue_baselines
-                )
-                if anomaly:
-                    self.anomaly_detector.save_anomaly(anomaly)
-                    self.anomaly_detector.dispatch_alert(anomaly)
+            if anomaly:
+                self.anomaly_detector.save_anomaly(anomaly)
+                self.anomaly_detector.dispatch_alert(anomaly)
+                anomaly_detected = True
+        return {
+            "status": "processed",
+            "role": "analytics",
+            "message_type": "revenue_summary",
+            "anomaly_detected": anomaly_detected,
+        }
 
-    def _handle_shipping_summary(self, message: dict[str, Any]) -> None:
-        """Handle shipping_summary from Build Claw."""
+    def _handle_shipping_summary(self, message: dict[str, Any]) -> dict[str, Any]:
         if self.signal_processor:
             self.signal_processor.handle_shipping_summary(message)
 
-            delivery_baselines = (
-                self.baseline_manager.load_delivery_baseline()
-                if self.baseline_manager
-                else {}
+        delivery_baselines = (
+            self.baseline_manager.load_delivery_baseline()
+            if self.baseline_manager
+            else {}
+        )
+        anomaly_detected = False
+        if delivery_baselines and self.anomaly_detector:
+            anomaly = self.anomaly_detector.check_delivery_signal(
+                message, delivery_baselines
             )
-            if delivery_baselines and self.anomaly_detector:
-                anomaly = self.anomaly_detector.check_delivery_signal(
-                    message, delivery_baselines
-                )
-                if anomaly:
-                    self.anomaly_detector.save_anomaly(anomaly)
-                    self.anomaly_detector.dispatch_alert(anomaly)
+            if anomaly:
+                self.anomaly_detector.save_anomaly(anomaly)
+                self.anomaly_detector.dispatch_alert(anomaly)
+                anomaly_detected = True
+        return {
+            "status": "processed",
+            "role": "analytics",
+            "message_type": "shipping_summary",
+            "anomaly_detected": anomaly_detected,
+        }
 
-    def _handle_content_performance_query(self, message: dict[str, Any]) -> None:
-        """Handle content_performance_query from other claws."""
+    def _handle_content_performance_query(
+        self, message: dict[str, Any]
+    ) -> dict[str, Any]:
         if self.query_handler:
             response = self.query_handler.handle(message)
             if self.signal_dispatcher:
@@ -368,9 +408,19 @@ class AnalyticsClaw:
                     requesting_claw=message.get("sender_role", ""),
                     response_data=response.data if response.data else {},
                 )
+            return {
+                "status": "processed",
+                "role": "analytics",
+                "message_type": "content_performance_query",
+            }
+        return {
+            "status": "skipped",
+            "role": "analytics",
+            "message_type": "content_performance_query",
+            "reason": "no_query_handler",
+        }
 
-    def _handle_behavior_query(self, message: dict[str, Any]) -> None:
-        """Handle behavior_query from other claws."""
+    def _handle_behavior_query(self, message: dict[str, Any]) -> dict[str, Any]:
         if self.query_handler:
             response = self.query_handler.handle(message)
             if self.signal_dispatcher:
@@ -379,6 +429,17 @@ class AnalyticsClaw:
                     requesting_claw=message.get("sender_role", ""),
                     response_data=response.data if response.data else {},
                 )
+            return {
+                "status": "processed",
+                "role": "analytics",
+                "message_type": "behavior_query",
+            }
+        return {
+            "status": "skipped",
+            "role": "analytics",
+            "message_type": "behavior_query",
+            "reason": "no_query_handler",
+        }
 
     def _dispatch_alert_from_processor(
         self, message_type: str, target_claw: str, payload: dict
@@ -498,15 +559,17 @@ class AnalyticsClaw:
     ) -> None:
         """Send response back to assistant via mesh."""
         if self.mesh_sender:
-            self.mesh_sender({
-                "sender_role": "analytics",
-                "recipient_role": "assistant",
-                "message_type": "assistant_response",
-                "payload": {
-                    "original_message_id": message.get("message_id"),
-                    "response": result,
-                },
-            })
+            self.mesh_sender(
+                {
+                    "sender_role": "analytics",
+                    "recipient_role": "assistant",
+                    "message_type": "assistant_response",
+                    "payload": {
+                        "original_message_id": message.get("message_id"),
+                        "response": result,
+                    },
+                }
+            )
 
     def _now_iso(self) -> str:
         """Return current ISO timestamp."""

@@ -1,12 +1,12 @@
 # Approval Thresholds
 
-**Summary**: REVIEW/HOLD/AUTO approval modes for all claw actions.
+**Summary**: VETO/HOLD/REVIEW/AUTO approval modes for all claw actions.
 
 **Sources**:
 - `raw/AGENTS.md`
 - `milimo-blueprint/templates/solo-founder.yaml`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #coordination #approvals #war-room
 
@@ -20,13 +20,15 @@ Every claw action has an approval threshold that determines whether it requires 
 
 | Mode | Description | War Room Queue |
 |------|-------------|----------------|
-| **REVIEW** | Requires operator approval before execution | Yellow priority |
+| **VETO** | Any squad member can block; requires unanimous approval to proceed | Red priority (top) |
 | **HOLD** | Requires explicit operator release (blocks until released) | Red priority (top) |
+| **REVIEW** | Requires operator approval before execution | Yellow priority |
 | **AUTO** | Executed automatically, logged for morning digest | Logged only |
 
 ## Priority Order
 
 ```
+🔴 VETO — Any squad member can block; requires unanimous approval (always on top)
 🔴 HOLD — Requires explicit operator release (always on top)
 🟡 REVIEW — Requires operator decision before execution
 ✓ AUTO — Executed, logged for morning digest
@@ -109,6 +111,17 @@ Every claw action has an approval threshold that determines whether it requires 
 
 ---
 
+## Assistant Claw Thresholds
+
+| Action | Mode | Notes |
+|--------|------|-------|
+| Query dispatch | AUTO | Automatic routing |
+| Task dispatch | AUTO | Automatic routing |
+| Response delivery | AUTO | Automatic response |
+| Proactive notification | REVIEW | User-facing notification |
+
+---
+
 ## Two-Stage Approval Systems
 
 ### Finance Invoice
@@ -176,3 +189,4 @@ Production deployment
 - [[ops-claw]] — Ops thresholds
 - [[finance-claw]] — Finance thresholds
 - [[build-claw]] — Build thresholds
+- [[assistant-lucy]] — Assistant thresholds

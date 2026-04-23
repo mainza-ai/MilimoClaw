@@ -13,7 +13,7 @@ Each role blueprint extends the base NemoClaw blueprint with claw-specific confi
 ## Required Fields
 
 Every claw role blueprint must define:
-- `role` — content | ops | analytics | finance | build
+- `role` — content | ops | analytics | finance | build | assistant
 - `display_name` — Human-readable name
 - `description` — What this claw does
 - `filesystem_mount` — Primary sandbox directory
@@ -31,6 +31,7 @@ Every claw role blueprint must define:
 | `analytics` | Intelligence and reporting |
 | `finance` | Invoicing and pricing |
 | `build` | Engineering and deployment |
+| `assistant` | User interface and coordination |
 
 ## Filesystem Rules
 

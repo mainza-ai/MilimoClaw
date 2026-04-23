@@ -42,7 +42,15 @@ logger = logging.getLogger("milimo.tool_generator")
 # ---------------------------------------------------------------------------
 
 
-ToolType = Literal["classifier", "predictor", "optimizer", "detector", "generator", "transformer", "aggregator"]
+ToolType = Literal[
+    "classifier",
+    "predictor",
+    "optimizer",
+    "detector",
+    "generator",
+    "transformer",
+    "aggregator",
+]
 
 
 @dataclass
@@ -104,7 +112,9 @@ class PromptBuilder:
             self._template_dir = Path(template_dir)
         else:
             # Default to prompts/tool-generation relative to this file
-            self._template_dir = Path(__file__).parent.parent / "prompts" / "tool-generation"
+            self._template_dir = (
+                Path(__file__).parent.parent / "prompts" / "tool-generation"
+            )
 
     def build_prompt(self, spec: ToolSpec) -> str:
         """Build a prompt for the given tool specification."""
@@ -141,38 +151,60 @@ class PromptBuilder:
 
         if spec.tool_type == "classifier":
             # Extract target classes from output schema
-            target_classes = spec.output_schema.get("properties", {}).get("predicted_class", {})
+            target_classes = spec.output_schema.get("properties", {}).get(
+                "predicted_class", {}
+            )
             if "enum" in target_classes:
                 vars_dict["target_classes"] = str(target_classes["enum"])
             else:
                 vars_dict["target_classes"] = "[]"
-            vars_dict["performance_impact"] = spec.metadata.get("performance_impact", "unknown")
+            vars_dict["performance_impact"] = spec.metadata.get(
+                "performance_impact", "unknown"
+            )
 
         elif spec.tool_type == "predictor":
             vars_dict["target_value"] = spec.metadata.get("target_value", "value")
-            vars_dict["correlation_coefficient"] = str(spec.metadata.get("correlation", 0.0))
+            vars_dict["correlation_coefficient"] = str(
+                spec.metadata.get("correlation", 0.0)
+            )
             vars_dict["sample_size"] = str(spec.metadata.get("sample_size", 0))
 
         elif spec.tool_type == "optimizer":
-            vars_dict["optimization_target"] = spec.metadata.get("optimization_target", "target")
+            vars_dict["optimization_target"] = spec.metadata.get(
+                "optimization_target", "target"
+            )
             vars_dict["constraints"] = json.dumps(spec.metadata.get("constraints", {}))
-            vars_dict["baseline_performance"] = str(spec.metadata.get("baseline_performance", 0))
-            vars_dict["optimization_potential"] = str(spec.metadata.get("optimization_potential", 0))
+            vars_dict["baseline_performance"] = str(
+                spec.metadata.get("baseline_performance", 0)
+            )
+            vars_dict["optimization_potential"] = str(
+                spec.metadata.get("optimization_potential", 0)
+            )
 
         elif spec.tool_type == "detector":
-            vars_dict["detection_target"] = spec.metadata.get("detection_target", "anomaly")
+            vars_dict["detection_target"] = spec.metadata.get(
+                "detection_target", "anomaly"
+            )
             vars_dict["min_true_positive_rate"] = str(spec.metadata.get("min_tpr", 0.8))
-            vars_dict["max_false_positive_rate"] = str(spec.metadata.get("max_fpr", 0.1))
+            vars_dict["max_false_positive_rate"] = str(
+                spec.metadata.get("max_fpr", 0.1)
+            )
 
         elif spec.tool_type == "generator":
             vars_dict["content_type"] = spec.metadata.get("content_type", "content")
-            vars_dict["style_constraints"] = json.dumps(spec.metadata.get("style_constraints", {}))
-            vars_dict["quality_metric"] = spec.metadata.get("quality_metric", "approval_rate")
+            vars_dict["style_constraints"] = json.dumps(
+                spec.metadata.get("style_constraints", {})
+            )
+            vars_dict["quality_metric"] = spec.metadata.get(
+                "quality_metric", "approval_rate"
+            )
             vars_dict["approval_rate"] = str(spec.metadata.get("approval_rate", 0.0))
 
         # Add test input example if available
         if spec.test_cases:
-            vars_dict["test_input_example"] = json.dumps(spec.test_cases[0].get("input", {}), indent=4)
+            vars_dict["test_input_example"] = json.dumps(
+                spec.test_cases[0].get("input", {}), indent=4
+            )
         else:
             vars_dict["test_input_example"] = "{}"
 
@@ -196,9 +228,19 @@ class CodeValidator:
     """Validates generated tool code for security and correctness."""
 
     FORBIDDEN_IMPORTS = {
-        "subprocess", "os.system", "eval", "exec", "compile",
-        "socket", "urllib", "requests", "httpx", "aiohttp",
-        "pickle", "shelve", "marshal",
+        "subprocess",
+        "os.system",
+        "eval",
+        "exec",
+        "compile",
+        "socket",
+        "urllib",
+        "requests",
+        "httpx",
+        "aiohttp",
+        "pickle",
+        "shelve",
+        "marshal",
     }
 
     FORBIDDEN_PATTERNS = [
@@ -231,7 +273,9 @@ class CodeValidator:
 
         # Check code length
         if len(code) > config.max_code_length:
-            issues.append(f"Code exceeds maximum length: {len(code)} > {config.max_code_length}")
+            issues.append(
+                f"Code exceeds maximum length: {len(code)} > {config.max_code_length}"
+            )
 
         # Check for forbidden patterns
         for pattern in self.FORBIDDEN_PATTERNS:
@@ -240,7 +284,10 @@ class CodeValidator:
 
         # Check for type hints
         if config.require_type_hints:
-            if "def run(" in code and ": " not in code.split("def run(")[1].split(")")[0]:
+            if (
+                "def run(" in code
+                and ": " not in code.split("def run(")[1].split(")")[0]
+            ):
                 if "->" not in code.split("def run(")[1].split("\n")[0]:
                     issues.append("Missing type hints for run function")
 
@@ -269,7 +316,9 @@ class CodeTester:
     def __init__(self, timeout_seconds: int = 5):
         self._timeout = timeout_seconds
 
-    def test(self, code: str, test_cases: list[dict[str, Any]]) -> tuple[bool, list[str]]:
+    def test(
+        self, code: str, test_cases: list[dict[str, Any]]
+    ) -> tuple[bool, list[str]]:
         """
         Run test cases against generated code.
 
@@ -319,13 +368,19 @@ print(json.dumps(result))
                     # Validate output
                     if validation == "exact":
                         if output != expected:
-                            failures.append(f"Test {i}: Output mismatch. Expected {expected}, got {output}")
+                            failures.append(
+                                f"Test {i}: Output mismatch. Expected {expected}, got {output}"
+                            )
                     elif validation == "partial":
                         for key, value in expected.items():
                             if key not in output:
-                                failures.append(f"Test {i}: Missing key '{key}' in output")
+                                failures.append(
+                                    f"Test {i}: Missing key '{key}' in output"
+                                )
                             elif output[key] != value:
-                                failures.append(f"Test {i}: Key '{key}' mismatch. Expected {value}, got {output[key]}")
+                                failures.append(
+                                    f"Test {i}: Key '{key}' mismatch. Expected {value}, got {output[key]}"
+                                )
                     # schema_only: just check it's valid JSON (already done)
 
                 except subprocess.TimeoutExpired:
@@ -358,11 +413,13 @@ class ToolGenerator:
         self,
         config: GenerationConfig | None = None,
         template_dir: str | Path | None = None,
+        inference_client: Any | None = None,
     ):
         self._config = config or GenerationConfig()
         self._prompt_builder = PromptBuilder(template_dir)
         self._validator = CodeValidator()
         self._tester = CodeTester()
+        self._inference_client = inference_client
 
     def generate(self, spec: ToolSpec) -> GenerationResult:
         """
@@ -433,12 +490,30 @@ class ToolGenerator:
         """
         Call LLM for code generation.
 
-        This is a placeholder that should be integrated with
-        NemoClaw's inference routing. For now, generates a
-        template-based implementation.
+        Routes through NemoClaw's NvidiaInferenceClient when available,
+        otherwise falls back to template-based generation.
         """
-        # In production, this would route through NemoClaw's inference
-        # For now, generate a template implementation
+        if self._inference_client is not None:
+            try:
+                result = self._inference_client.complete(
+                    prompt=prompt,
+                    data_type="source_code_generation",
+                    system_prompt=(
+                        "You are a Python tool code generator for an AI squad system. "
+                        "Generate only valid Python code. Include type hints and docstrings. "
+                        "The tool must expose a `run(input_data: dict) -> dict` function."
+                    ),
+                )
+                if result:
+                    return result
+                logger.warning(
+                    "Inference client returned empty, falling back to template"
+                )
+            except Exception as e:
+                logger.warning(
+                    "Inference call failed: %s — falling back to template", e
+                )
+
         return self._generate_template_code(prompt, tool_type)
 
     def _generate_template_code(self, prompt: str, tool_type: str) -> str:
@@ -450,36 +525,36 @@ class ToolGenerator:
             return textwrap.dedent('''
                 """
                 Generated Classifier Tool
-                
+
                 Generated by Milimo Claw Self-Evolution Engine
                 """
-                
+
                 from typing import TypedDict, Literal
                 from dataclasses import dataclass
-                
-                
+
+
                 class Input(TypedDict):
                     text: str
-                
-                
+
+
                 class Output(TypedDict):
                     predicted_class: str
                     confidence: float
                     reasoning: str
-                
-                
+
+
                 def run(input_data: Input) -> Output:
                     """
                     Classify the input text.
-                    
+
                     Args:
                         input_data: Input containing text to classify
-                        
+
                     Returns:
                         Classification result with confidence score
                     """
                     text = input_data.get("text", "").lower()
-                    
+
                     # Simple rule-based classification
                     if any(word in text for word in ["urgent", "asap", "deadline"]):
                         return {
@@ -499,8 +574,8 @@ class ToolGenerator:
                             "confidence": 0.70,
                             "reasoning": "No special indicators detected"
                         }
-                
-                
+
+
                 if __name__ == "__main__":
                     result = run({"text": "This is urgent, please respond ASAP"})
                     print(result)
@@ -510,37 +585,37 @@ class ToolGenerator:
             return textwrap.dedent('''
                 """
                 Generated Predictor Tool
-                
+
                 Generated by Milimo Claw Self-Evolution Engine
                 """
-                
+
                 from typing import TypedDict
-                
-                
+
+
                 class Input(TypedDict):
                     historical_values: list[float]
                     context: dict
-                
-                
+
+
                 class Output(TypedDict):
                     predicted_value: float
                     confidence_interval: tuple[float, float]
                     confidence: float
                     feature_importance: dict[str, float]
-                
-                
+
+
                 def run(input_data: Input) -> Output:
                     """
                     Predict future value based on historical data.
-                    
+
                     Args:
                         input_data: Historical values and context
-                        
+
                     Returns:
                         Prediction with confidence interval
                     """
                     values = input_data.get("historical_values", [0.0])
-                    
+
                     if not values:
                         return {
                             "predicted_value": 0.0,
@@ -548,11 +623,11 @@ class ToolGenerator:
                             "confidence": 0.0,
                             "feature_importance": {}
                         }
-                    
+
                     # Simple moving average prediction
                     avg = sum(values[-5:]) / min(len(values), 5)
                     std = (sum((v - avg) ** 2 for v in values[-5:]) / min(len(values), 5)) ** 0.5
-                    
+
                     return {
                         "predicted_value": round(avg, 2),
                         "confidence_interval": (round(avg - 1.96 * std, 2), round(avg + 1.96 * std, 2)),
@@ -565,44 +640,44 @@ class ToolGenerator:
             return textwrap.dedent('''
                 """
                 Generated Detector Tool
-                
+
                 Generated by Milimo Claw Self-Evolution Engine
                 """
-                
+
                 from typing import TypedDict, Literal
-                
+
                 Severity = Literal["low", "medium", "high", "critical"]
-                
-                
+
+
                 class Input(TypedDict):
                     metrics: dict[str, float]
                     threshold_config: dict[str, float]
-                
-                
+
+
                 class Output(TypedDict):
                     detected: bool
                     severity: Severity
                     confidence: float
                     indicators: list[str]
                     remediation: str
-                
-                
+
+
                 def run(input_data: Input) -> Output:
                     """
                     Detect anomalies in metrics.
-                    
+
                     Args:
                         input_data: Metrics and threshold configuration
-                        
+
                     Returns:
                         Detection result with severity and remediation
                     """
                     metrics = input_data.get("metrics", {})
                     thresholds = input_data.get("threshold_config", {})
-                    
+
                     indicators = []
                     max_severity: Severity = "low"
-                    
+
                     for metric, value in metrics.items():
                         threshold = thresholds.get(metric, float('inf'))
                         if value > threshold:
@@ -613,7 +688,7 @@ class ToolGenerator:
                                 max_severity = "high"
                             elif value > threshold * 1.2:
                                 max_severity = "medium"
-                    
+
                     return {
                         "detected": len(indicators) > 0,
                         "severity": max_severity,
@@ -628,20 +703,20 @@ class ToolGenerator:
             return textwrap.dedent(f'''
                 """
                 Generated {tool_type.title()} Tool
-                
+
                 Generated by Milimo Claw Self-Evolution Engine
                 """
-                
+
                 from typing import Any, dict
-                
-                
+
+
                 def run(input_data: dict[str, Any]) -> dict[str, Any]:
                     """
                     Process input and return result.
-                    
+
                     Args:
                         input_data: Input data
-                        
+
                     Returns:
                         Processing result
                     """
@@ -652,14 +727,14 @@ class ToolGenerator:
     def _extract_code(self, response: str) -> str:
         """Extract Python code from LLM response."""
         # Check for markdown code blocks
-        code_block_pattern = r'```python\s*\n(.*?)\n```'
+        code_block_pattern = r"```python\s*\n(.*?)\n```"
         matches = re.findall(code_block_pattern, response, re.DOTALL)
 
         if matches:
             return matches[0]
 
         # Check for any code block
-        code_block_pattern = r'```\s*\n(.*?)\n```'
+        code_block_pattern = r"```\s*\n(.*?)\n```"
         matches = re.findall(code_block_pattern, response, re.DOTALL)
 
         if matches:

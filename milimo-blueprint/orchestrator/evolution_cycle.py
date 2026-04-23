@@ -100,13 +100,17 @@ class EvolutionConfig:
             cycle_interval_days=schedule.get("cycle_interval_days", 7),
             window_days=observation.get("window_days", 7),
             minimum_actions=observation.get("minimum_actions", 20),
-            cross_signal_lookback_days=observation.get("cross_signal_lookback_days", 14),
+            cross_signal_lookback_days=observation.get(
+                "cross_signal_lookback_days", 14
+            ),
             min_confidence=detection.get("minimum_confidence", 0.6),
             max_patterns=detection.get("max_patterns_per_cycle", 5),
             backtest_window_weeks=building.get("backtest_window_weeks", 4),
             min_improvement_percent=building.get("minimum_improvement_percent", 5.0),
             max_tools_per_claw=deployment.get("max_tools_per_claw", 30),
-            require_proposal_approval=deployment.get("require_proposal_approval", False),
+            require_proposal_approval=deployment.get(
+                "require_proposal_approval", False
+            ),
             notify_war_room=log_config.get("notify_war_room", True),
         )
 
@@ -168,6 +172,7 @@ class EvolutionCycle:
         log_dir: str | None = None,
         registry_dir: str | None = None,
         config: EvolutionConfig | None = None,
+        inference_client: Any | None = None,
     ) -> None:
         self.squad_id = squad_id
         self.claw_role = claw_role
@@ -196,6 +201,7 @@ class EvolutionCycle:
             squad_id=squad_id,
             min_improvement_percent=self.config.min_improvement_percent,
             backtest_window_weeks=self.config.backtest_window_weeks,
+            inference_client=inference_client,
         )
         self.tool_registry = ToolRegistry(
             squad_id=squad_id,
@@ -273,9 +279,7 @@ class EvolutionCycle:
         )
 
         # Validate permissions
-        policy_path = (
-            self.blueprint_dir / "policies" / f"{self.claw_role}-sandbox.yaml"
-        )
+        policy_path = self.blueprint_dir / "policies" / f"{self.claw_role}-sandbox.yaml"
         if policy_path.exists():
             policy = load_sandbox_policy(policy_path)
             valid, reason = validate_permissions(proposal, policy)
@@ -421,7 +425,9 @@ class EvolutionScheduler:
         """Unregister a claw's evolution cycle."""
         self._cycles.pop(claw_role, None)
 
-    def trigger(self, claw_role: str | None = None, dry_run: bool = False) -> list[CycleResult]:
+    def trigger(
+        self, claw_role: str | None = None, dry_run: bool = False
+    ) -> list[CycleResult]:
         """
         Manually trigger evolution cycles.
 

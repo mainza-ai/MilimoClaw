@@ -64,13 +64,13 @@ class OpsClaw:
         self,
         squad_id: str,
         inference_client: Any,
-        mesh_gateway: MeshGateway | None = None,
+        mesh_gateway: MeshGateway,
         base_path: Path | None = None,
     ):
         self._squad_id = squad_id
         self._inference_client = inference_client
         self._base_path = base_path or BASE
-        self._mesh_gateway = mesh_gateway or MockMeshGateway()
+        self._mesh_gateway = mesh_gateway
 
         self._fs: OpsFilesystemInit | None = None
         self._operational_log: OpsOperationalLog | None = None
@@ -87,7 +87,9 @@ class OpsClaw:
         self._runbook_executor: RunbookExecutor | None = None
         self._webhook_server: OpsWebhookServer | None = None
 
-        self._inbound_handlers: dict[str, Callable[[dict[str, Any]], None]] = {}
+        self._inbound_handlers: dict[
+            str, Callable[[dict[str, Any]], dict[str, Any]]
+        ] = {}
         self._approval_handlers: dict[str, Callable[[str, dict[str, Any]], None]] = {}
 
         self._running = False
@@ -375,15 +377,37 @@ class OpsClaw:
         # Log that approval system is active
         logger.info("Ops Claw approval handlers registered")
 
-    def _handle_deliverable_complete(self, message: dict[str, Any]) -> None:
+    def _handle_deliverable_complete(self, message: dict[str, Any]) -> dict[str, Any]:
         if self._project_manager:
             self._project_manager.handle_deliverable_complete(message)
+            return {
+                "status": "processed",
+                "role": "ops",
+                "message_type": "deliverable_complete",
+            }
+        return {
+            "status": "skipped",
+            "role": "ops",
+            "message_type": "deliverable_complete",
+            "reason": "no_project_manager",
+        }
 
-    def _handle_deploy_complete(self, message: dict[str, Any]) -> None:
+    def _handle_deploy_complete(self, message: dict[str, Any]) -> dict[str, Any]:
         if self._project_manager:
             self._project_manager.handle_deploy_complete(message)
+            return {
+                "status": "processed",
+                "role": "ops",
+                "message_type": "deploy_complete",
+            }
+        return {
+            "status": "skipped",
+            "role": "ops",
+            "message_type": "deploy_complete",
+            "reason": "no_project_manager",
+        }
 
-    def _handle_pricing_response(self, message: dict[str, Any]) -> None:
+    def _handle_pricing_response(self, message: dict[str, Any]) -> dict[str, Any]:
         project_id = message.get("project_id") or message.get("query_id", "").replace(
             "query_", "project_"
         )
@@ -405,8 +429,14 @@ class OpsClaw:
                 floor_price=floor_price,
                 ceiling_price=ceiling_price,
             )
+        return {
+            "status": "processed",
+            "role": "ops",
+            "message_type": "pricing_response",
+            "project_id": project_id,
+        }
 
-    def _handle_invoice_ready(self, message: dict[str, Any]) -> None:
+    def _handle_invoice_ready(self, message: dict[str, Any]) -> dict[str, Any]:
         invoice_id = message.get("invoice_id")
         client_id = message.get("client_id")
         amount = message.get("amount")
@@ -417,8 +447,14 @@ class OpsClaw:
                 entity_id=invoice_id or "unknown",
                 content_preview=f"Invoice {invoice_id} for ${amount} ready for client {client_id}",
             )
+        return {
+            "status": "processed",
+            "role": "ops",
+            "message_type": "invoice_ready",
+            "invoice_id": invoice_id,
+        }
 
-    def _handle_payment_overdue(self, message: dict[str, Any]) -> None:
+    def _handle_payment_overdue(self, message: dict[str, Any]) -> dict[str, Any]:
         invoice_id = message.get("invoice_id")
         client_id = message.get("client_id")
         days_overdue = message.get("days_overdue", 0)
@@ -439,8 +475,14 @@ class OpsClaw:
                     "amount": amount,
                 },
             )
+        return {
+            "status": "processed",
+            "role": "ops",
+            "message_type": "payment_overdue",
+            "invoice_id": invoice_id,
+        }
 
-    def _handle_brief_acknowledged(self, message: dict[str, Any]) -> None:
+    def _handle_brief_acknowledged(self, message: dict[str, Any]) -> dict[str, Any]:
         project_id = message.get("project_id")
         estimated_time = message.get("estimated_first_draft_time")
 
@@ -454,6 +496,12 @@ class OpsClaw:
                     details={"estimated_time": estimated_time},
                 )
             )
+        return {
+            "status": "processed",
+            "role": "ops",
+            "message_type": "brief_acknowledged",
+            "project_id": project_id,
+        }
 
     def handle_approval_decision(
         self, action_id: str, decision: str, edited_content: str | None = None
@@ -562,7 +610,7 @@ class OpsClaw:
 
         return execute
 
-    def _handle_assistant_query(self, message: dict[str, Any]) -> None:
+    def _handle_assistant_query(self, message: dict[str, Any]) -> dict[str, Any]:
         """Handle assistant_query from Lucy."""
         result = {
             "claw": "ops",
@@ -578,8 +626,9 @@ class OpsClaw:
             else 0,
         }
         self._send_assistant_response(message, result)
+        return result
 
-    def _handle_assistant_task(self, message: dict[str, Any]) -> None:
+    def _handle_assistant_task(self, message: dict[str, Any]) -> dict[str, Any]:
         """Handle assistant_task from Lucy."""
         payload = message.get("payload", {})
         task_type = payload.get("task_type", "unknown")
@@ -589,21 +638,24 @@ class OpsClaw:
             "status": "accepted",
         }
         self._send_assistant_response(message, result)
+        return result
 
     def _send_assistant_response(
         self, message: dict[str, Any], result: dict[str, Any]
     ) -> None:
         """Send response back to assistant."""
         if self._mesh_gateway:
-            self._mesh_gateway.send({
-                "sender_role": "ops",
-                "recipient_role": "assistant",
-                "message_type": "assistant_response",
-                "payload": {
-                    "original_message_id": message.get("message_id"),
-                    "response": result,
-                },
-            })
+            self._mesh_gateway.send(
+                {
+                    "sender_role": "ops",
+                    "recipient_role": "assistant",
+                    "message_type": "assistant_response",
+                    "payload": {
+                        "original_message_id": message.get("message_id"),
+                        "response": result,
+                    },
+                }
+            )
 
     @property
     def is_running(self) -> bool:

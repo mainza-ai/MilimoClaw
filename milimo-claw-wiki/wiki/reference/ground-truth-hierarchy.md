@@ -6,7 +6,7 @@
 - `raw/AGENTS.md`
 - `CLAUDE.md`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #reference #hierarchy #authority
 
@@ -38,6 +38,7 @@ Ground truth for each claw:
 | Analytics Claw | `milimo-claw-docs/reference/MILIMO_CLAW_ANALYTICS_CLAW_SPEC.md` |
 | Finance Claw | `milimo-claw-docs/reference/MILIMO_CLAW_FINANCE_CLAW_SPEC.md` |
 | Build Claw | `milimo-claw-docs/reference/MILIMO_CLAW_BUILD_CLAW_SPEC.md` |
+| Assistant (Lucy) | `milimo-blueprint/orchestrator/assistant/lucy.py` |
 | Solo Template | `milimo-claw-docs/reference/MILIMO_CLAW_SOLO_TEMPLATE_SPEC_V2.md` |
 
 All symlinked in `raw/` folder for wiki reference.

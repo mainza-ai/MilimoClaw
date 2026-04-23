@@ -2,7 +2,7 @@
 
 **Summary**: Master table of contents for the MilimoClaw knowledge base.
 
-**Last updated**: 2026-04-17
+**Last updated**: 2026-04-23
 
 **Tags**: #index #navigation
 
@@ -15,9 +15,9 @@
 | [[#Architecture]] | System design and isolation model | 10 |
 | [[#Claws]] | Individual claw documentation | 6 |
 | [[#Coordination]] | Message contracts and War Room | 5 |
-| [[#Evolution]] | Self-evolution system | 3 |
+| [[#Evolution]] | Self-evolution system | 8 |
 | [[#Development]] | Conventions and testing | 3 |
-| [[#Troubleshooting]] | Common issues and fixes | 3 |
+| [[#Troubleshooting]] | Common issues and fixes | 4 |
 | [[#Reference]] | Quick reference tables | 4 |
 | [[#Configuration]] | Configuration files and schemas | 4 |
 | [[#Solo]] | Solo system modules | 6 |
@@ -25,7 +25,7 @@
 | [[#Patterns]] | Cross-cutting implementation patterns | 1 |
 | [[#Security]] | Provenance and attestation modules | 3 |
 | [[#Operations]] | Health, metrics, and monitoring modules | 4 |
-| [[#Scripts]] | Installation and service scripts | 2 |
+| [[#Scripts]] | Installation and service scripts | 3 |
 
 ---
 
@@ -35,7 +35,7 @@ System architecture and design documentation.
 
 | Page | Description | Status |
 |------|-------------|--------|
-| [[system-overview]] | Seven-layer architecture overview | ✓ |
+| [[system-overview]] | Eight-layer architecture overview | ✓ |
 | [[sandbox-isolation]] | Landlock, seccomp, and filesystem isolation | ✓ |
 | [[inter-claw-communication]] | Typed message contracts and routing | ✓ |
 | [[mesh-coordinator]] | Inter-sandbox gateway and policies | ✓ |
@@ -64,19 +64,17 @@ Documentation for each autonomous agent in the mesh.
 
 Detailed documentation for each code module:
 
-**[[content-claw|Content]]**: content-init • content-generator • brief-manager • brand-voice • platform-publisher • content-scheduler • [[performance-monitor]]
+**[[content-claw|Content]]**: content-init • content-generator • brief-manager • brand-voice • platform-publisher • content-scheduler • [[performance-monitor]] • [[publish-scheduler]]
 
-**[[ops-claw|Ops]]**: ops-init • intake-manager • project-manager • health-scorer • ops-scheduler • [[comms-manager]] • [[scope-monitor]]
+**[[ops-claw|Ops]]**: ops-init • intake-manager • project-manager • health-scorer • ops-scheduler • [[comms-manager]] • [[scope-monitor]] • [[incident-analyzer]] • [[runbook-executor]] • [[webhook-server]]
 
 **[[analytics-claw|Analytics]]**: analytics-init • signal-processor • anomaly-detector • opportunity-scorer • report-generator • [[baseline-manager]] • [[query-handler]] • [[forward-projector]] • [[collection-workers]] • [[data-collectors]]
 
 **[[finance-claw|Finance]]**: finance-init • pricing-engine • invoice-manager • payment-monitor • revenue-tracker • [[payment-risk-scorer]] • [[expense-tracker]] • [[stripe-client]]
 
-**[[build-claw|Build]]**: build-init • issue-manager • code-generator • pr-manager • deploy-manager • error-monitor • [[sentry-client]] • [[vercel-client]]
+**[[build-claw|Build]]**: build-init • issue-manager • code-generator • pr-manager • deploy-manager • error-monitor
 
-**[[ops-claw|Ops]]**: ops-init • intake-manager • project-manager • health-scorer • ops-scheduler • [[comms-manager]] • [[scope-monitor]] • [[incident-analyzer]] • [[runbook-executor]] • [[webhook-server]]
-
-**[[content-claw|Content]]**: content-init • content-generator • brief-manager • brand-voice • platform-publisher • content-scheduler • [[performance-monitor]] • [[publish-scheduler]]
+**[[assistant-lucy|Assistant]]**: lucy.py (TelegramBridge • PendingQuery • LucyAssistant)
 
 ---
 
@@ -131,6 +129,7 @@ Common issues and fixes.
 | [[common-issues]] | Frequently encountered problems | ✓ |
 | [[issues-and-fixes]] | Comprehensive audit of past fixes | ✓ |
 | [[sandbox-sync]] | Sandbox synchronization issues | ✓ |
+| [[claw-silent-responses]] | Claws returning blank output | ✓ |
 
 ---
 
@@ -153,7 +152,7 @@ Squad templates and configuration.
 
 | Page | Description | Status |
 |------|-------------|--------|
-| [[solo-founder]] | Solo operator template (all 5 claws) | ✓ |
+| [[solo-founder]] | Solo operator template (all 6 claws) | ✓ |
 | [[template-overview]] | All available squad templates | ✓ |
 | [[ai-micro-saas]] | 4-claw AI SaaS squad (Build+Ops+Analytics+Finance) | ✓ |
 | [[campus-ai-tool]] | 3-claw campus utilities squad | ✓ |
@@ -246,6 +245,7 @@ Installation and service management scripts.
 |------|-------------|--------|
 | [[installation-scripts]] | One-command installer | ✓ |
 | [[service-scripts]] | Service management scripts | ✓ |
+| [[development-scripts]] | Debug and coverage scripts | ✓ |
 
 ---
 
@@ -253,14 +253,14 @@ Installation and service management scripts.
 
 | Metric | Value |
 |--------|-------|
-| Total pages | 149+ |
+| Total pages | 150+ |
 | Architecture pages | 10 |
 | Claw pages | 6 |
 | Module pages | 75+ |
 | Coordination pages | 5 |
 | Evolution pages | 8 |
 | Development pages | 3 |
-| Troubleshooting pages | 3 |
+| Troubleshooting pages | 4 |
 | Reference pages | 4 |
 | Configuration pages | 4 |
 | Solo pages | 6 |

@@ -88,7 +88,7 @@ class ContentClaw:
         self._scheduler: ContentScheduler | None = None
 
         # Handler registries
-        self._inbound_handlers: dict[str, Callable[[dict[str, Any]], None]] = {}
+        self._inbound_handlers: dict[str, Callable[[dict[str, Any]], Any]] = {}
 
         self._started = False
 
@@ -326,14 +326,7 @@ class ContentClaw:
         # Inbound handlers
         # ------------------------------------------------------------------
 
-    def _handle_project_brief(self, message: dict[str, Any]) -> None:
-        """
-        Handle project_brief from Ops Claw.
-
-        1. Receive and store the brief
-        2. Acknowledge within 5-minute SLA
-        3. Schedule draft generation
-        """
+    def _handle_project_brief(self, message: dict[str, Any]) -> dict[str, Any]:
         if self._brief_manager:
             brief = self._brief_manager.receive_brief(message)
             self._brief_manager.acknowledge_brief(brief.brief_id)
@@ -344,42 +337,81 @@ class ContentClaw:
                 brief.project_id,
                 brief.client_id,
             )
+            return {
+                "status": "processed",
+                "role": "content",
+                "message_type": "project_brief",
+                "brief_id": brief.brief_id,
+                "project_id": brief.project_id,
+            }
+        return {
+            "status": "skipped",
+            "role": "content",
+            "message_type": "project_brief",
+            "reason": "no_brief_manager",
+        }
 
-    def _handle_performance_intel(self, message: dict[str, Any]) -> None:
-        """
-        Handle performance_intel from Analytics Claw.
-
-        Stores the intelligence feed for morning planning reference.
-        """
+    def _handle_performance_intel(self, message: dict[str, Any]) -> dict[str, Any]:
         if self._scheduler:
             self._scheduler.handle_analytics_intel(message)
+            return {
+                "status": "processed",
+                "role": "content",
+                "message_type": "performance_intel",
+            }
+        return {
+            "status": "skipped",
+            "role": "content",
+            "message_type": "performance_intel",
+            "reason": "no_scheduler",
+        }
 
-    def _handle_client_health_signal(self, message: dict[str, Any]) -> None:
-        """
-        Handle client_health_signal from Analytics Claw.
-
-        Adjusts content priority for at-risk clients.
-        """
+    def _handle_client_health_signal(self, message: dict[str, Any]) -> dict[str, Any]:
         if self._scheduler:
             self._scheduler.handle_client_health_signal(message)
+            return {
+                "status": "processed",
+                "role": "content",
+                "message_type": "client_health_signal",
+            }
+        return {
+            "status": "skipped",
+            "role": "content",
+            "message_type": "client_health_signal",
+            "reason": "no_scheduler",
+        }
 
-    def _handle_revision_request(self, message: dict[str, Any]) -> None:
-        """
-        Handle revision_request from Ops Claw.
-
-        Loads original draft, creates revision context, queues re-generation.
-        """
+    def _handle_revision_request(self, message: dict[str, Any]) -> dict[str, Any]:
         if self._brief_manager:
             self._brief_manager.handle_revision_request(message)
+            return {
+                "status": "processed",
+                "role": "content",
+                "message_type": "revision_request",
+            }
+        return {
+            "status": "skipped",
+            "role": "content",
+            "message_type": "revision_request",
+            "reason": "no_brief_manager",
+        }
 
-    def _handle_content_performance_response(self, message: dict[str, Any]) -> None:
-        """
-        Handle content_performance_response from Analytics Claw.
-
-        Response to a content_performance_query sent during weekly planning.
-        """
+    def _handle_content_performance_response(
+        self, message: dict[str, Any]
+    ) -> dict[str, Any]:
         if self._scheduler:
             self._scheduler.handle_analytics_intel(message)
+            return {
+                "status": "processed",
+                "role": "content",
+                "message_type": "content_performance_response",
+            }
+        return {
+            "status": "skipped",
+            "role": "content",
+            "message_type": "content_performance_response",
+            "reason": "no_scheduler",
+        }
 
     # ------------------------------------------------------------------
     # Approval decisions (called by War Room)
@@ -478,7 +510,7 @@ class ContentClaw:
         """Approval handler instance."""
         return self._approval_handler
 
-    def _handle_assistant_query(self, message: dict[str, Any]) -> None:
+    def _handle_assistant_query(self, message: dict[str, Any]) -> dict[str, Any]:
         """
         Handle assistant_query from Lucy.
         Returns current status and state of the Content Claw.
@@ -503,8 +535,9 @@ class ContentClaw:
             },
         }
         self._log_and_respond(message, result)
+        return result
 
-    def _handle_assistant_task(self, message: dict[str, Any]) -> None:
+    def _handle_assistant_task(self, message: dict[str, Any]) -> dict[str, Any]:
         """
         Handle assistant_task from Lucy.
         Executes content-related tasks requested by the assistant.
@@ -530,6 +563,7 @@ class ContentClaw:
                 result["message"] = "Content generator not initialized"
 
         self._log_and_respond(message, result)
+        return result
 
     def _log_and_respond(self, message: dict[str, Any], result: dict[str, Any]) -> None:
         """Log action and send response via mesh."""
@@ -542,15 +576,17 @@ class ContentClaw:
             )
         )
         if self._mesh_sender:
-            self._mesh_sender({
-                "sender_role": "content",
-                "recipient_role": "assistant",
-                "message_type": "assistant_response",
-                "payload": {
-                    "original_message_id": message.get("message_id"),
-                    "response": result,
-                },
-            })
+            self._mesh_sender(
+                {
+                    "sender_role": "content",
+                    "recipient_role": "assistant",
+                    "message_type": "assistant_response",
+                    "payload": {
+                        "original_message_id": message.get("message_id"),
+                        "response": result,
+                    },
+                }
+            )
 
     @property
     def publisher(self) -> PlatformPublisher | None:

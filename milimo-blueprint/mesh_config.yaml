@@ -3,6 +3,11 @@
 
 mesh_version: "0.1.0"
 
+# Mesh encryption key — when set, all inter-claw messages are encrypted with AES-256-GCM.
+# Generate with: python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+# Leave empty to disable encryption (messages stored as plaintext JSON).
+mesh_secret: ""
+
 message_matrix:
   content:
     ops: [deliverable, deliverable_complete]

@@ -1,12 +1,12 @@
 # System Overview
 
-**Summary**: Seven-layer architecture of MilimoClaw multi-agent system.
+**Summary**: Eight-layer architecture of MilimoClaw multi-agent system.
 
 **Sources**:
 - `raw/ARCHITECTURE.md`
 - `raw/AGENTS.md`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #architecture #overview
 
@@ -14,7 +14,7 @@
 
 ## Architecture Layers
 
-MilimoClaw has seven architectural layers, each with specific responsibilities:
+MilimoClaw has eight architectural layers, each with specific responsibilities:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -135,6 +135,25 @@ Execution environment.
 - **Docker**: Container runtime
 - **Landlock**: Filesystem isolation
 - **seccomp**: Syscall filtering
+
+### 8. Runtime Layer
+
+Execution environment.
+
+- **NemoClaw**: NVIDIA sandbox runtime
+- **OpenShell**: Inter-sandbox communication
+- **Docker**: Container runtime
+- **Landlock**: Filesystem isolation
+- **seccomp**: Syscall filtering
+
+## Assistant (Lucy)
+
+The [[assistant-lucy]] is the conversational interface that bridges users to all claws. While not a dedicated layer, Lucy operates across the Operator and Coordination layers:
+
+- **User Interface**: Natural language interaction via Telegram
+- **Message Routing**: Dispatches `assistant_query` and `assistant_task` to appropriate claws
+- **Silent Responses**: Returns diagnostic output when claws return empty results
+- **Runtime Coordination**: Implemented in `assistant/lucy.py` as `LucyAssistant` class
 
 ## Data Flow
 

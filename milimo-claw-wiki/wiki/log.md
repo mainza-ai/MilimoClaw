@@ -2,7 +2,7 @@
 
 **Summary**: Append-only record of all wiki operations.
 
-**Last updated**: 2026-04-17
+**Last updated**: 2026-04-23
 
 **Tags**: #log #meta
 
@@ -23,11 +23,66 @@ Each entry follows this format:
 
 ---
 
-## 2026-04-15
+## 2026-04-23
 
-### 2026-04-17 — Completeness Check Fixes
+### 2026-04-23 — P10 Wiki Consistency Audit Fixes
 
-**Pages**: 9 new pages
+**Pages**: 16 pages modified
+**Source**: Wiki audit — 16 inconsistencies found across architecture, coordination, templates, and reference pages
+**Changes**:
+- Fixed `system-overview.md` — "seven layers" → "eight layers", added Assistant/Lucy section
+- Fixed `index.md` — "Seven-layer" → "Eight-layer", fixed page count mismatches (Evolution 3→8, Scripts 2→3, Troubleshooting 3→4), removed duplicate module lists, added assistant module line, updated solo-founder to 6 claws
+- Fixed `approval-thresholds.md` — Added VETO mode to Approval Modes table and Priority Order, added Assistant Claw Thresholds section
+- Fixed `contracts.md` — Added VETO to Priority Levels, added `assistant` to Valid Recipients
+- Fixed `solo-warroom.md` — Added VETO to Priority Ordering, "five claws" → "six claws"
+- Fixed `template-overview.md` — Freelance Collective 3→4 claws (added Content), solo-founder 5→6 claws
+- Fixed `design-studio.md` — High-value invoice escalation HOLD → VETO (consistent with VETO mode definition)
+- Fixed `solo-founder.md` — "5 claws" → "6 claws" (3 occurrences), added Assistant to Deep Work table, added assistant to claws list and YAML
+- Fixed `claw-schema.md` — Added `assistant` to Valid Roles
+- Fixed `ground-truth-hierarchy.md` — Added Assistant (Lucy) spec entry
+- Fixed `assistant-lucy.md` — Added Runtime Coordinator section (LucyAssistant, TelegramBridge, PendingQuery), added Telegram Bot API to network access
+- Fixed `war-room.md` — Added assistant row to Deep Work table, added [[assistant-lucy]] to related pages
+- Fixed `claw-launcher.md` — Added assistant to health endpoint JSON, added assistant env vars, added [[assistant-lucy]] to dependencies, fixed port description
+- Fixed `signal-dispatcher.md` — "5 claws" → "6 claws"
+- Fixed `signal-dispatcher-pattern.md` — Added Assistant row to Implementation table
+- Fixed `improvement-plan.md` — Updated audit date and next audit line
+- Updated all stale dates (2026-04-14 → 2026-04-23) on 8 pages
+
+**Notes**:
+- All 16 wiki inconsistencies from P10 audit resolved
+- VETO mode now documented in all 3 pages that used it without definition
+- Assistant (Lucy) now reflected across all wiki pages
+- P1-P10 implementation complete (P9 skipped per user request)
+
+---
+
+## 2026-04-18
+
+### 2026-04-18 04:30 — Claw Silent Response Fixes
+
+**Pages**: 1 new page, 3 pages modified
+**Source**: MilimoClaw claw diagnostic investigation
+**Changes**:
+- Created `troubleshooting/claw-silent-responses.md` — Troubleshooting guide for claws returning blank output
+- Fixed `content_claw.py` — Handler return types and explicit returns
+- Fixed `build_claw.py` — Added mesh_sender and _send_assistant_response
+- Fixed `finance_claw.py` — Added explicit return statements
+- Updated `index.md` — Added claw-silent-responses to Troubleshooting section
+- Updated `log.md` — Added this entry
+
+**Notes**:
+- 3 claws (content, finance, build) were returning blank output due to missing return statements in handlers
+- Root cause: handlers returned `None` instead of `dict[str, Any]`
+- All 5 claws now properly return diagnostic output
+- NemoClaw sandbox rebuilt with fixes applied
+- Model set to minimaxai/minimax-m2.7 via NEMOCLAW_MODEL env var
+- Total wiki pages: 150+
+
+---
+
+### 2026-04-17 10:00 — Evolution Module Documentation
+
+**Pages**: 4 new pages
 **Source**: Comprehensive completeness audit
 **Changes**:
 - Created `modules/build/github-client.md` — GitHub API client

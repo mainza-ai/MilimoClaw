@@ -6,7 +6,7 @@
 - `raw/AGENTS.md`
 - `raw/SOLO_TEMPLATE_SPEC.md`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #coordination #sequencing #rules
 

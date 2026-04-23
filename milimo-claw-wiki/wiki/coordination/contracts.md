@@ -4,7 +4,7 @@
 
 **Sources**: `milimo-blueprint/orchestrator/contracts.py`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #coordination #contracts
 
@@ -70,7 +70,7 @@ class ValidationResult:
 `content`, `ops`, `analytics`, `finance`, `build`, `assistant`
 
 ### Recipients
-`content`, `ops`, `analytics`, `finance`, `build`, `war_room`
+`content`, `ops`, `analytics`, `finance`, `build`, `assistant`, `war_room`
 
 ---
 
@@ -128,6 +128,7 @@ class ValidationResult:
 
 | Priority | Description | War Room Behavior |
 |----------|-------------|-------------------|
+| `VETO` | Any squad member can block; requires unanimous approval | Red priority, blocks all |
 | `AUTO` | Automatic, logged | Visible in morning digest |
 | `REVIEW` | Requires approval | Queued for operator review |
 | `HOLD` | Blocks until released | Requires explicit release |
