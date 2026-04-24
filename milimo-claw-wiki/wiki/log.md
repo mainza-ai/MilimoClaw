@@ -2,7 +2,7 @@
 
 **Summary**: Append-only record of all wiki operations.
 
-**Last updated**: 2026-04-23
+**Last updated**: 2026-04-24
 
 **Tags**: #log #meta
 
@@ -22,6 +22,32 @@ Each entry follows this format:
 ```
 
 ---
+
+## 2026-04-24
+
+### 2026-04-24 — P12 Model Propagation + Doc Audit (104 Instances)
+
+**Pages**: Welcome.md + 55 doc files + 10 code files modified
+**Source**: Comprehensive audit of model propagation chain + doc consistency
+**Changes**:
+- Fixed Python fallback defaults from `nemotron-4-340b-instruct` → `nemotron-3-super-120b-a12b` (5 files)
+- Fixed Dockerfile build-arg fallback model
+- Fixed milimo-start.sh model overwrite on restart (check before writing)
+- Added NEMOCLAW_MODEL env var to all 6 docker-compose services
+- Added NEMOCLAW_MODEL to K8s main container via secretKeyRef
+- Added model/endpointUrl fields to MilimoConfig + propagated from loadNemoClawConfig()
+- loadNemoClawConfig now reads NEMOCLAW_MODEL env var first
+- Fixed install.sh: added assistant to activeClaws, mkdir, chown, verification loops, claws dict, onboarding msg
+- Fixed assistant.ts: resolve script path from ~/.milimo/blueprints instead of relative CWD
+- Fixed non-interactive onboard error (was silent, now exit code 1)
+- Fixed 5→6 claws across 32 milimo-claw-docs files (~80 edits)
+- Fixed Cloud Nemotron → NEMOCLAW_MODEL across 23 milimo-claw-docs files (58 edits)
+- Fixed hardcoded model refs in docs/ (3 files, 6 instances)
+- Fixed wiki Welcome.md: Five→Six Claws, added assistant row, updated ASCII diagram
+- Fixed ARCHITECTURE.md: seven→eight layers, NEMOCLAW_MODEL in privacy router diagram
+- Fixed PRIVACY_AND_SECURITY.md: assistant in filesystem + network isolation tables
+- Fixed claw specs: added assistant to cannot-read sections (5 specs)
+**Notes**: Commit 72955d4 on develop. 82 files changed, 2068 insertions, 1679 deletions.
 
 ## 2026-04-23
 
