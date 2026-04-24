@@ -6,7 +6,7 @@
 - `milimo-blueprint/orchestrator/mesh.py`
 - `raw/ARCHITECTURE.md`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #architecture #mesh #coordination #routing
 
@@ -20,29 +20,34 @@ The Mesh Coordinator is the central hub for all inter-claw communication. It rou
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        MESH COORDINATOR                         │
-│                                                                 │
-│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐  │
-│  │ Content  │    │   Ops    │    │Analytics │    │ Finance  │  │
-│  │   Claw   │    │   Claw   │    │   Claw   │    │   Claw   │  │
-│  └────┬─────┘    └────┬─────┘    └────┬─────┘    └────┬─────┘  │
-│       │               │               │               │        │
-│       └───────────────┴───────────────┴───────────────┘        │
-│                               │                                 │
-│                        ┌──────┴──────┐                         │
-│                        │    MESH     │                         │
-│                        │  COORDINATOR│                         │
-│                        │             │                         │
-│                        │ - Routing   │                         │
-│                        │ - Validate  │                         │
-│                        │ - Policy    │                         │
-│                        │ - Queue     │                         │
-│                        └──────┬──────┘                         │
-│                               │                                 │
-│                        ┌──────┴──────┐                         │
-│                        │  Build Claw │                         │
-│                        │ (Tech squads)│                        │
-│                        └─────────────┘                         │
+│ MESH COORDINATOR │
+│ │
+│ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ │
+│ │ Content │ │ Ops │ │Analytics │ │ Finance │ │
+│ │ Claw │ │ Claw │ │ Claw │ │ Claw │ │
+│ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ │
+│ │ │ │ │ │
+│ └───────────────┴───────────────┴───────────────┘ │
+│ │ │
+│ ┌──────┴──────┐ │
+│ │ MESH │ │
+│ │ COORDINATOR│ │
+│ │ │ │
+│ │ - Routing │ │
+│ │ - Validate │ │
+│ │ - Policy │ │
+│ │ - Queue │ │
+│ └──────┬──────┘ │
+│ │ │
+│ ┌────────┴────────┐ │
+│ │ Build Claw │ │
+│ │ (Tech squads) │ │
+│ └────────┬────────┘ │
+│ │ │
+│ ┌────────┴────────┐ │
+│ │ Assistant Claw │ │
+│ │ (Operator bridge)│ │
+│ └─────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -118,15 +123,16 @@ Manages inbox directories for each claw.
 ```
 /sandbox/.milimo/mesh/
 ├── inbox/
-│   ├── content/
-│   ├── ops/
-│   ├── analytics/
-│   ├── finance/
-│   └── build/
+│ ├── content/
+│ ├── ops/
+│ ├── analytics/
+│ ├── finance/
+│ ├── build/
+│ └── assistant/
 ├── outbox/
 ├── heartbeats/
 └── logs/
-    └── launcher.log
+└── launcher.log
 ```
 
 ## Message Flow
@@ -209,3 +215,4 @@ Claws not emitting heartbeats for 90+ seconds are marked unhealthy.
 - [[message-contracts]] — Contract schemas
 - [[sandbox-isolation]] — Isolation details
 - [[war-room]] — Human oversight interface
+- [[assistant-lucy]] — Assistant Claw (Lucy)

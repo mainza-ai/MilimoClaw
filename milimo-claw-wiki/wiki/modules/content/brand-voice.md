@@ -59,7 +59,7 @@ class BrandVoiceManager:
 
 ## Privacy Routing
 
-Voice adaptation routes to **Local NIM**:
+Voice adaptation routes to **Local NIM (NEMOCLAW_MODEL)**:
 - Trained on client data
 - Never sent to cloud
 - `data_type: "style_calibration"`

@@ -1,6 +1,14 @@
 # Solo Deep Work
 
-Focused work mode for solo founders — hot-reloads claw policies.
+**Summary**: Focused work mode for solo founders that hot-reloads claw policies to reduce interruptions.
+
+**Sources**: `milimo-blueprint/orchestrator/solo_deep_work.py`
+
+**Last updated**: 2026-04-23
+
+**Tags**: #solo #deep-work #policy
+
+---
 
 ## Purpose
 
@@ -25,6 +33,7 @@ Activates deep work mode that reduces interruptions. Hot-reloads each claw's pol
 | Analytics | `passive` |
 | Finance | `invoices_only` |
 | Build | `issues_only` |
+| Assistant | `queries_only` |
 
 ## Main Functions
 
@@ -80,6 +89,7 @@ milimo squad finals-mode --resume
 - Uses: [[solo-init]] — Configuration loading
 - Modifies: Claw policy files
 - Notifies: War Room — Status changes
+- Related: [[assistant-lucy]] — Assistant deep work policy
 
 ## Source
 

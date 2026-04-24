@@ -41,7 +41,7 @@ const DEFAULT_CONFIG = {
         vibe: "sharp and unhurried",
         emoji: "🦀",
     },
-    activeClaws: ["content", "ops", "analytics", "finance", "build"],
+    activeClaws: ["content", "ops", "analytics", "finance", "build", "assistant"],
 };
 let configCache = null;
 function clearCache() {
@@ -234,7 +234,7 @@ function isNemoClawOnboarded() {
     return loadNemoClawConfig() !== null;
 }
 exports.TEMPLATE_CLAW_MAP = {
-    "solo-founder": ["content", "ops", "analytics", "finance", "build"],
+    "solo-founder": ["content", "ops", "analytics", "finance", "build", "assistant"],
     "content-agency": ["content", "ops", "analytics"],
     "design-studio": ["content", "ops", "finance"],
     "event-promotion": ["content", "ops", "analytics"],
@@ -243,6 +243,6 @@ exports.TEMPLATE_CLAW_MAP = {
     "campus-ai-tool": ["build", "content", "ops"],
 };
 function getActiveClawsForTemplate(templateName) {
-    return exports.TEMPLATE_CLAW_MAP[templateName] ?? ["content", "ops", "analytics", "finance", "build"];
+    return exports.TEMPLATE_CLAW_MAP[templateName] ?? ["content", "ops", "analytics", "finance", "build", "assistant"];
 }
 //# sourceMappingURL=config.js.map

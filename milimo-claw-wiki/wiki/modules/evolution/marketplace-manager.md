@@ -157,7 +157,7 @@ snapshot = BlueprintSnapshot(
 ## Related Pages
 
 - [[claw-launcher]] — Claw startup and blueprint loading
-- [[blueprint-manager]] — Blueprint snapshot management
+- `blueprint_manager.py` — BlueprintSnapshot definition (see Also below)
 
 ## See Also
 

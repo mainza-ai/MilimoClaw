@@ -1,18 +1,18 @@
 # Milimo Claw — Docker Compose
 #
 # Multi-service orchestration for the Milimo Claw system.
-# Starts all 5 claws, the mesh coordinator, and the bridge CLI.
+# Starts all 6 claws with shared mesh coordination.
 #
 # Usage:
-#   docker-compose up -d
-#   docker-compose logs -f build-claw
-#   docker-compose down
+# docker compose up -d
+# docker compose logs -f build-claw
+# docker compose down
 #
 # Required environment variables (set in .env or pass via --env-file):
-#   NVIDIA_API_KEY     — NVIDIA NIM API key
-#   GITHUB_TOKEN       — GitHub personal access token
-#   GITHUB_REPO        — Repository in owner/repo format
-#   SQUAD_ID           — Squad identifier (default: zulu)
+# NVIDIA_API_KEY — NVIDIA NIM API key
+# GITHUB_TOKEN — GitHub personal access token
+# GITHUB_REPO — Repository in owner/repo format
+# SQUAD_ID — Squad identifier (default: zulu)
 
 services:
   # ---------------------------------------------------------------------------
@@ -41,7 +41,6 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - milimo-mesh:/sandbox/.milimo/mesh
-      - milimo-sandbox:/sandbox
     command: >
       python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/claw_launcher.py
       --role build
@@ -73,7 +72,6 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - milimo-mesh:/sandbox/.milimo/mesh
-      - milimo-sandbox:/sandbox
     command: >
       python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/claw_launcher.py
       --role content
@@ -105,9 +103,8 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - milimo-mesh:/sandbox/.milimo/mesh
-      - milimo-sandbox:/sandbox
     ports:
-      - "8080:8080"  # Webhook server
+      - "8090:8080"
     command: >
       python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/claw_launcher.py
       --role ops
@@ -143,7 +140,6 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - milimo-mesh:/sandbox/.milimo/mesh
-      - milimo-sandbox:/sandbox
     command: >
       python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/claw_launcher.py
       --role analytics
@@ -178,7 +174,6 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - milimo-mesh:/sandbox/.milimo/mesh
-      - milimo-sandbox:/sandbox
     command: >
       python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/claw_launcher.py
       --role finance
@@ -194,9 +189,9 @@ services:
     networks:
       - milimo-network
 
-# ---------------------------------------------------------------------------
-# Assistant Claw — Lucy, the conversational coordinator (Telegram bridge)
-# ---------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
+  # Assistant Claw — Lucy, the conversational coordinator (Telegram bridge)
+  # ---------------------------------------------------------------------------
   assistant-claw:
     build:
       context: .
@@ -212,7 +207,6 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - milimo-mesh:/sandbox/.milimo/mesh
-      - milimo-sandbox:/sandbox
     command: >
       python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/claw_launcher.py
       --role assistant
@@ -233,7 +227,6 @@ services:
 # ---------------------------------------------------------------------------
 volumes:
   milimo-mesh: # Shared mesh (heartbeats, inboxes, topology)
-  milimo-sandbox: # Shared sandbox filesystem (all claws write to own subdirs)
 
 # ---------------------------------------------------------------------------
 # Network — Shared network for inter-claw communication

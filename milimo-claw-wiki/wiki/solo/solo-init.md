@@ -1,6 +1,14 @@
 # Solo Init
 
-Solo Founder Template Loader — loads and validates `solo-founder.yaml`.
+**Summary**: Solo Founder Template Loader that loads and validates `solo-founder.yaml` with filesystem mount automation.
+
+**Sources**: `milimo-blueprint/orchestrator/solo_init.py`
+
+**Last updated**: 2026-04-23
+
+**Tags**: #solo #init #template #validation
+
+---
 
 ## Purpose
 
@@ -31,11 +39,11 @@ Every `solo-founder.yaml` must define:
 |---------|-----------------|
 | `template` | name, display_name, category, description, squad_size, claws_active |
 | `operator_policy` | squad_lead, approval_modes |
-| `filesystem` | content, ops, analytics, finance, build |
+| `filesystem` | content, ops, analytics, finance, build, assistant |
 | `inference` | routing_overrides, cost_guard |
 | `war_room` | operator, mode, queue_priority, digest_schedule |
 | `evolution` | cycle_day, schedule, per_claw |
-| `network_egress` | content, ops, analytics, finance, build |
+| `network_egress` | content, ops, analytics, finance, build, assistant |
 | `deep_work_mode` | alias, on_activate, auto_response_template |
 
 ## Locked Routes

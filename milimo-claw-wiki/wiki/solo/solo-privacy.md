@@ -1,6 +1,14 @@
 # Solo Privacy
 
-Inference routing with locked routes and cost guard.
+**Summary**: Inference routing with locked routes and cost guard for solo operator mode.
+
+**Sources**: `milimo-blueprint/orchestrator/solo_privacy.py`
+
+**Last updated**: 2026-04-23
+
+**Tags**: #solo #privacy #routing #cost-guard
+
+---
 
 ## Purpose
 
@@ -58,8 +66,8 @@ def check_budget() -> (allowed, is_alert):
 
 | Value | Meaning |
 |-------|---------|
-| `CLOUD` | NVIDIA Cloud Nemotron 120B |
-| `LOCAL` | Local NIM on RTX |
+| `CLOUD` | Cloud (NEMOCLAW_MODEL) |
+| `LOCAL` | Local NIM (NEMOCLAW_MODEL) on RTX |
 | `VLLM` | Local vLLM |
 
 ## Main Functions

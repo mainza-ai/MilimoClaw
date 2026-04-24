@@ -37,6 +37,7 @@ EVOLUTION_THRESHOLDS = {
     "analytics": "min_data_weeks",
     "finance": "min_invoices",
     "build": "min_prs_merged",
+    "assistant": "min_assisted_tasks",
 }
 
 DEFAULT_EVOLUTION_SCHEDULE = {
@@ -47,6 +48,7 @@ DEFAULT_EVOLUTION_SCHEDULE = {
     "analytics_evolution": "02:25",
     "build": "02:35",
     "finance": "03:00",
+    "assistant": "03:15",
 }
 
 CLAW_SCHEDULE_KEYS = {
@@ -55,6 +57,7 @@ CLAW_SCHEDULE_KEYS = {
     "analytics": "analytics_evolution",
     "finance": "finance",
     "build": "build",
+    "assistant": "assistant",
 }
 
 # Additional thresholds for Content Claw

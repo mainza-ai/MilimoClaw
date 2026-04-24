@@ -136,7 +136,7 @@ class RealtimeBridge {
                 }
             }
         }
-        const clawRoles = ["content", "ops", "analytics", "finance", "build"];
+        const clawRoles = ["content", "ops", "analytics", "finance", "build", "assistant"];
         for (const role of clawRoles) {
             const registryPath = (0, node_path_1.join)(baseDir, "tools", this.squadId, role, "registry.json");
             if ((0, node_fs_1.existsSync)(registryPath)) {
@@ -307,7 +307,7 @@ class RealtimeBridge {
     getClawStatuses() {
         const home = (0, node_os_1.homedir)();
         const baseDir = (0, node_path_1.join)(home, ".milimo");
-        const clawRoles = ["content", "ops", "analytics", "finance", "build"];
+        const clawRoles = ["content", "ops", "analytics", "finance", "build", "assistant"];
         const statuses = {};
         for (const role of clawRoles) {
             let status = "idle";

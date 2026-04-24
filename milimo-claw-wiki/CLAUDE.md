@@ -105,7 +105,8 @@ milimo-claw-wiki/
     │   ├── ops/           # Ops Claw modules
     │   ├── analytics/     # Analytics Claw modules
     │   ├── finance/       # Finance Claw modules
-    │   └── build/         # Build Claw modules
+    │   ├── build/         # Build Claw modules
+ │   └── assistant/ # Assistant Claw modules
     │
     ├── coordination/      # Cross-claw coordination
     │   ├── message-contracts.md

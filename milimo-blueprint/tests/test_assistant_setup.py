@@ -15,7 +15,9 @@ from pathlib import Path
 import pytest
 
 # Import the module under test
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "milimo-blueprint" / "orchestrator"))
+sys.path.insert(
+    0, str(Path(__file__).parent.parent.parent / "milimo-blueprint" / "orchestrator")
+)
 from assistant_setup import (
     AssistantConfig,
     TEMPLATE_CLAW_MAP,
@@ -104,13 +106,14 @@ class TestTemplateClawMap:
     """Tests for TEMPLATE_CLAW_MAP."""
 
     def test_solo_founder_has_all_claws(self) -> None:
-        """solo-founder should have all 5 claws."""
+        """solo-founder should have all 6 claws."""
         assert TEMPLATE_CLAW_MAP["solo-founder"] == [
             "content",
             "ops",
             "analytics",
             "finance",
             "build",
+            "assistant",
         ]
 
     def test_content_agency_has_three_claws(self) -> None:
@@ -127,11 +130,20 @@ class TestTemplateClawMap:
 
     def test_freelance_collective_has_correct_claws(self) -> None:
         """freelance-collective should have ops, analytics, finance."""
-        assert TEMPLATE_CLAW_MAP["freelance-collective"] == ["ops", "analytics", "finance"]
+        assert TEMPLATE_CLAW_MAP["freelance-collective"] == [
+            "ops",
+            "analytics",
+            "finance",
+        ]
 
     def test_ai_micro_saas_has_correct_claws(self) -> None:
         """ai-micro-saas should have build, ops, analytics, finance."""
-        assert TEMPLATE_CLAW_MAP["ai-micro-saas"] == ["build", "ops", "analytics", "finance"]
+        assert TEMPLATE_CLAW_MAP["ai-micro-saas"] == [
+            "build",
+            "ops",
+            "analytics",
+            "finance",
+        ]
 
     def test_campus_ai_tool_has_correct_claws(self) -> None:
         """campus-ai-tool should have build, content, ops."""
@@ -156,7 +168,10 @@ class TestLoadAssistantConfig:
     """Tests for load_assistant_config function."""
 
     def test_loads_name_creature_vibe_emoji_correctly(
-        self, temp_config_dir: Path, sample_config: dict, monkeypatch: pytest.MonkeyPatch
+        self,
+        temp_config_dir: Path,
+        sample_config: dict,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Should read all assistant fields from config.json."""
         config_path = temp_config_dir / "config.json"
@@ -199,7 +214,12 @@ class TestLoadAssistantConfig:
         """Should raise ValueError when assistant.name is empty."""
         config_without_name = {
             "squadName": "test-squad",
-            "assistant": {"name": "", "creature": "a claw", "vibe": "sharp", "emoji": "🦀"},
+            "assistant": {
+                "name": "",
+                "creature": "a claw",
+                "vibe": "sharp",
+                "emoji": "🦀",
+            },
         }
         config_path = temp_config_dir / "config.json"
         config_path.write_text(json.dumps(config_without_name), encoding="utf-8")
@@ -421,7 +441,11 @@ class TestVerifySetup:
     """Tests for verify_setup function."""
 
     def test_returns_all_true_after_successful_setup(
-        self, temp_config_dir: Path, sample_config: dict, sample_template: Path, monkeypatch: pytest.MonkeyPatch
+        self,
+        temp_config_dir: Path,
+        sample_config: dict,
+        sample_template: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """All checks should pass after successful setup."""
         config_path = temp_config_dir / "config.json"
@@ -437,8 +461,12 @@ class TestVerifySetup:
 
         monkeypatch.setattr(assistant_setup, "MILIMO_CONFIG_PATH", config_path)
         monkeypatch.setattr(assistant_setup, "TEMPLATE_PATH", sample_template)
-        monkeypatch.setattr(assistant_setup, "SYSTEM_PROMPT_DEST", agents_dir / "system.md")
-        monkeypatch.setattr(assistant_setup, "AGENT_CONFIG_DEST", agents_dir / "config.yaml")
+        monkeypatch.setattr(
+            assistant_setup, "SYSTEM_PROMPT_DEST", agents_dir / "system.md"
+        )
+        monkeypatch.setattr(
+            assistant_setup, "AGENT_CONFIG_DEST", agents_dir / "config.yaml"
+        )
 
         results = verify_setup()
 
@@ -457,7 +485,10 @@ class TestActiveClawsPerTemplate:
     @pytest.mark.parametrize(
         "template_name,expected_claws",
         [
-            ("solo-founder", ["content", "ops", "analytics", "finance", "build"]),
+            (
+                "solo-founder",
+                ["content", "ops", "analytics", "finance", "build", "assistant"],
+            ),
             ("content-agency", ["content", "ops", "analytics"]),
             ("design-studio", ["content", "ops", "finance"]),
             ("event-promotion", ["content", "ops", "analytics"]),

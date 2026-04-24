@@ -5,7 +5,7 @@
 **Sources**:
 - `milimo-blueprint/orchestrator/inference_client.py`
 
-**Last updated**: 2026-04-17
+**Last updated**: 2026-04-24
 
 **Tags**: #module #inference #ai #nvidia
 
@@ -35,14 +35,15 @@ class NvidiaInferenceClient:
 **Environment Variables**:
 - `NVIDIA_API_KEY` — API key for NVIDIA NIM
 - `NVIDIA_API_BASE` — Base URL (default: https://integrate.api.nvidia.com/v1)
+- `NEMOCLAW_MODEL` — Primary inference model (set during `nemoclaw onboard`, required)
 - `INFERENCE_FALLBACK` — Comma-separated fallback models
 
 ---
 
 ## Fallback Chain
 
-Default fallback order:
-1. `nvidia/nemotron-4-340b-instruct`
+Default fallback order (model from `NEMOCLAW_MODEL` env var, set during `nemoclaw onboard`):
+1. `NEMOCLAW_MODEL`
 2. `meta/llama-3.3-70b-instruct`
 3. `mistralai/mixtral-8x22b-instruct-v0.1`
 
@@ -56,13 +57,13 @@ Different categories use different models and temperatures:
 
 | Category | Model | Temperature |
 |----------|-------|-------------|
-| `source_code_generation` | nemotron-340b | 0.1 |
-| `code_review` | nemotron-340b | 0.1 |
-| `pr_description_generation` | nemotron-340b | 0.3 |
-| `changelog_generation` | nemotron-340b | 0.7 |
-| `content_draft` | nemotron-340b | 0.7 |
-| `sentiment_analysis` | nemotron-340b | 0.1 |
-| `general` | nemotron-340b | 0.5 |
+| `source_code_generation` | NEMOCLAW_MODEL | 0.1 |
+| `code_review` | NEMOCLAW_MODEL | 0.1 |
+| `pr_description_generation` | NEMOCLAW_MODEL | 0.3 |
+| `changelog_generation` | NEMOCLAW_MODEL | 0.7 |
+| `content_draft` | NEMOCLAW_MODEL | 0.7 |
+| `sentiment_analysis` | NEMOCLAW_MODEL | 0.1 |
+| `general` | NEMOCLAW_MODEL | 0.5 |
 
 ---
 

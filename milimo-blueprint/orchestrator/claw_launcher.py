@@ -851,6 +851,7 @@ class ClawLauncher:
 
     def start_role(self, role: str) -> ClawComponents | None:
         """Start a single claw role."""
+        self._running = True
         with self._lock:
             if role in self._components and self._components[role].is_alive():
                 logger.warning("ClawLauncher: %s already running", role)
@@ -936,7 +937,7 @@ class ClawLauncher:
         threading.Thread(target=delayed_restart, daemon=True).start()
 
     def start_all(self) -> None:
-        """Start all 5 claw roles."""
+        """Start all 6 claw roles."""
         self._running = True
         self._monitor.set_active_roles(ALL_ROLES)
         self._monitor.set_restart_callback(self._monitor_restart_callback)
@@ -1379,8 +1380,8 @@ def main() -> None:
         launcher.restart_role(args.restart)
         return
 
-    # Validate environment before starting
-    env_result = validate_environment()
+    # Validate environment before starting (only check current role's vars)
+    env_result = validate_environment(role=args.role)
     if not env_result["valid"]:
         print("\n❌ Missing required environment variables:")
         for item in env_result["missing_required"]:

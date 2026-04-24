@@ -208,7 +208,7 @@ export class RealtimeBridge {
       }
     }
 
-    const clawRoles = ["content", "ops", "analytics", "finance", "build"];
+    const clawRoles = ["content", "ops", "analytics", "finance", "build", "assistant"];
     for (const role of clawRoles) {
       const registryPath = join(baseDir, "tools", this.squadId, role, "registry.json");
       if (existsSync(registryPath)) {
@@ -401,7 +401,7 @@ export class RealtimeBridge {
   private getClawStatuses(): Record<string, { status: string; tool_count: number }> {
     const home = homedir();
     const baseDir = join(home, ".milimo");
-    const clawRoles = ["content", "ops", "analytics", "finance", "build"];
+    const clawRoles = ["content", "ops", "analytics", "finance", "build", "assistant"];
     const statuses: Record<string, { status: string; tool_count: number }> = {};
 
     for (const role of clawRoles) {

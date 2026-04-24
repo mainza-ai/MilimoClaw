@@ -27,6 +27,7 @@ logger = logging.getLogger("milimo.ops.runbook_executor")
 @dataclass
 class RunbookResult:
     """Result of a runbook execution."""
+
     runbook_name: str
     success: bool
     steps_executed: int = 0
@@ -62,14 +63,26 @@ class RunbookExecutor:
         self._runbooks: dict[str, dict[str, Any]] = {
             "restart_service": {
                 "name": "Restart Service",
-                "description": "Restart a failing service",
+                "description": "Restart a failing sandbox",
                 "steps": [
-                    {"action": "log", "message": "Initiating service restart"},
-                    {"action": "shell", "command": "docker ps --format '{{.Names}}'", "capture": True},
-                    {"action": "shell", "command": "docker restart $(docker ps -q --filter 'status=unhealthy') 2>/dev/null || true", "capture": True},
+                    {"action": "log", "message": "Initiating sandbox restart"},
+                    {
+                        "action": "shell",
+                        "command": "nemoclaw list 2>/dev/null || true",
+                        "capture": True,
+                    },
+                    {
+                        "action": "shell",
+                        "command": "nemoclaw $(nemoclaw list 2>/dev/null | head -1 | awk '{print $1}') rebuild 2>/dev/null || true",
+                        "capture": True,
+                    },
                     {"action": "wait", "seconds": 10},
-                    {"action": "shell", "command": "docker ps --format '{{.Names}} {{.Status}}'", "capture": True},
-                    {"action": "log", "message": "Service restart complete"},
+                    {
+                        "action": "shell",
+                        "command": "nemoclaw list 2>/dev/null || true",
+                        "capture": True,
+                    },
+                    {"action": "log", "message": "Sandbox restart complete"},
                 ],
             },
             "clear_cache": {
@@ -77,21 +90,45 @@ class RunbookExecutor:
                 "description": "Clear application caches and temporary files",
                 "steps": [
                     {"action": "log", "message": "Initiating cache clear"},
-                    {"action": "shell", "command": "du -sh /tmp 2>/dev/null || true", "capture": True},
-                    {"action": "shell", "command": "find /tmp -type f -mtime +1 -delete 2>/dev/null || true", "capture": True},
-                    {"action": "shell", "command": "df -h / 2>/dev/null || true", "capture": True},
+                    {
+                        "action": "shell",
+                        "command": "du -sh /tmp 2>/dev/null || true",
+                        "capture": True,
+                    },
+                    {
+                        "action": "shell",
+                        "command": "find /tmp -type f -mtime +1 -delete 2>/dev/null || true",
+                        "capture": True,
+                    },
+                    {
+                        "action": "shell",
+                        "command": "df -h / 2>/dev/null || true",
+                        "capture": True,
+                    },
                     {"action": "log", "message": "Cache clear complete"},
                 ],
             },
             "scale_up": {
                 "name": "Scale Up",
-                "description": "Scale up service instances",
+                "description": "Scale up sandbox capacity",
                 "steps": [
                     {"action": "log", "message": "Initiating scale up"},
-                    {"action": "shell", "command": "docker compose ps 2>/dev/null || true", "capture": True},
-                    {"action": "shell", "command": "docker compose up -d --scale build-claw=2 2>/dev/null || true", "capture": True},
+                    {
+                        "action": "shell",
+                        "command": "nemoclaw list 2>/dev/null || true",
+                        "capture": True,
+                    },
+                    {
+                        "action": "shell",
+                        "command": "nemoclaw build-claw rebuild 2>/dev/null || true",
+                        "capture": True,
+                    },
                     {"action": "wait", "seconds": 15},
-                    {"action": "shell", "command": "docker compose ps 2>/dev/null || true", "capture": True},
+                    {
+                        "action": "shell",
+                        "command": "nemoclaw list 2>/dev/null || true",
+                        "capture": True,
+                    },
                     {"action": "log", "message": "Scale up complete"},
                 ],
             },
@@ -100,8 +137,15 @@ class RunbookExecutor:
                 "description": "Rollback to the previous deployment",
                 "steps": [
                     {"action": "log", "message": "Initiating rollback"},
-                    {"action": "shell", "command": "git log --oneline -5 2>/dev/null || true", "capture": True},
-                    {"action": "log", "message": "Rollback requires manual confirmation — queued for review"},
+                    {
+                        "action": "shell",
+                        "command": "git log --oneline -5 2>/dev/null || true",
+                        "capture": True,
+                    },
+                    {
+                        "action": "log",
+                        "message": "Rollback requires manual confirmation — queued for review",
+                    },
                 ],
             },
             "investigate": {
@@ -110,10 +154,26 @@ class RunbookExecutor:
                 "steps": [
                     {"action": "log", "message": "Starting investigation"},
                     {"action": "shell", "command": "uptime", "capture": True},
-                    {"action": "shell", "command": "free -m 2>/dev/null || true", "capture": True},
-                    {"action": "shell", "command": "df -h 2>/dev/null || true", "capture": True},
-                    {"action": "shell", "command": "docker stats --no-stream 2>/dev/null || true", "capture": True},
-                    {"action": "shell", "command": "tail -100 /var/log/syslog 2>/dev/null || true", "capture": True},
+                    {
+                        "action": "shell",
+                        "command": "free -m 2>/dev/null || true",
+                        "capture": True,
+                    },
+                    {
+                        "action": "shell",
+                        "command": "df -h 2>/dev/null || true",
+                        "capture": True,
+                    },
+                    {
+                        "action": "shell",
+                        "command": "nemoclaw list 2>/dev/null || true",
+                        "capture": True,
+                    },
+                    {
+                        "action": "shell",
+                        "command": "tail -100 /var/log/syslog 2>/dev/null || true",
+                        "capture": True,
+                    },
                     {"action": "log", "message": "Investigation data collected"},
                 ],
             },
@@ -163,7 +223,9 @@ class RunbookExecutor:
             action = step.get("action", "")
             try:
                 if action == "shell":
-                    cmd_output = self._run_shell_command(step.get("command", ""), step.get("capture", False))
+                    cmd_output = self._run_shell_command(
+                        step.get("command", ""), step.get("capture", False)
+                    )
                     output_parts.append(f"[{action}] {cmd_output}")
                 elif action == "wait":
                     time.sleep(step.get("seconds", 1))
@@ -199,22 +261,27 @@ class RunbookExecutor:
 
         self._execution_history.append(result)
 
-        self._log.append(OpsLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="runbook_executed",
-            entity_id=runbook_name,
-            outcome="success" if success else "partial",
-            details={
-                "steps_executed": steps_executed,
-                "steps_failed": steps_failed,
-                "duration_seconds": result.duration_seconds,
-                "context": context,
-            },
-        ))
+        self._log.append(
+            OpsLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="runbook_executed",
+                entity_id=runbook_name,
+                outcome="success" if success else "partial",
+                details={
+                    "steps_executed": steps_executed,
+                    "steps_failed": steps_failed,
+                    "duration_seconds": result.duration_seconds,
+                    "context": context,
+                },
+            )
+        )
 
         logger.info(
             "Runbook %s complete: %d steps, %d failed, %.1fs",
-            runbook_name, steps_executed, steps_failed, duration,
+            runbook_name,
+            steps_executed,
+            steps_failed,
+            duration,
         )
 
         return result
@@ -278,7 +345,9 @@ class RunbookExecutor:
         except Exception as e:
             return f"ERROR: {e}"
 
-    def handle_incident_with_remediation(self, alert: dict[str, Any], analysis: Any) -> RunbookResult:
+    def handle_incident_with_remediation(
+        self, alert: dict[str, Any], analysis: Any
+    ) -> RunbookResult:
         """
         Analyze an incident and automatically execute the matched runbook.
 
@@ -291,7 +360,11 @@ class RunbookExecutor:
         Returns:
             RunbookResult from the executed runbook.
         """
-        runbook_name = analysis.runbook_match if hasattr(analysis, "runbook_match") else "investigate"
+        runbook_name = (
+            analysis.runbook_match
+            if hasattr(analysis, "runbook_match")
+            else "investigate"
+        )
 
         # Auto-execute only for non-destructive runbooks
         auto_execute_runbooks = {"restart_service", "clear_cache", "investigate"}
@@ -299,27 +372,32 @@ class RunbookExecutor:
         if runbook_name in auto_execute_runbooks:
             logger.info(
                 "Auto-executing runbook %s for alert %s (severity: %s)",
-                runbook_name, alert.get("alert_id"), alert.get("severity"),
+                runbook_name,
+                alert.get("alert_id"),
+                alert.get("severity"),
             )
             return self.execute_runbook(runbook_name, context=alert)
         else:
             logger.info(
                 "Runbook %s requires manual approval for alert %s — queuing for review",
-                runbook_name, alert.get("alert_id"),
+                runbook_name,
+                alert.get("alert_id"),
             )
             # Queue for War Room review
             if self._dispatcher and hasattr(self._dispatcher, "_operational_log"):
-                self._dispatcher._operational_log.append(OpsLogEntry(
-                    timestamp=datetime.now(timezone.utc).isoformat(),
-                    action_type="runbook_queued_for_review",
-                    entity_id=alert.get("alert_id", "unknown"),
-                    outcome="success",
-                    details={
-                        "runbook": runbook_name,
-                        "severity": alert.get("severity"),
-                        "alert_source": alert.get("source"),
-                    },
-                ))
+                self._dispatcher._operational_log.append(
+                    OpsLogEntry(
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        action_type="runbook_queued_for_review",
+                        entity_id=alert.get("alert_id", "unknown"),
+                        outcome="success",
+                        details={
+                            "runbook": runbook_name,
+                            "severity": alert.get("severity"),
+                            "alert_source": alert.get("source"),
+                        },
+                    )
+                )
             return RunbookResult(
                 runbook_name=runbook_name,
                 success=False,

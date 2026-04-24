@@ -5,7 +5,7 @@
 **Sources**:
 - `milimo-blueprint/policies/`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #policies #sandbox #security
 
@@ -76,6 +76,7 @@ Each claw has full access to its own mount:
 | Analytics | `/sandbox/analytics` |
 | Finance | `/sandbox/finance` |
 | Build | `/sandbox/build` |
+| Assistant | `/sandbox/.openclaw` |
 
 ### Read-Only Cross-Mounts
 

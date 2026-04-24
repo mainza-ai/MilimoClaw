@@ -6,7 +6,7 @@
 - `milimo-blueprint/orchestrator/privacy_router.py`
 - `raw/AGENTS.md`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #architecture #privacy #inference #routing
 
@@ -14,7 +14,7 @@
 
 ## Overview
 
-The Privacy Router intercepts **every inference call** in MilimoClaw. It determines whether the data is sensitive and routes accordingly — sensitive data to local NIM, non-sensitive to cloud APIs.
+The Privacy Router intercepts **every inference call** in MilimoClaw. It determines whether the data is sensitive and routes accordingly — sensitive data to local NIM (NEMOCLAW_MODEL), non-sensitive to cloud APIs.
 
 ## Purpose
 
@@ -46,8 +46,8 @@ The Privacy Router intercepts **every inference call** in MilimoClaw. It determi
 │         │                                                      │
 │         ▼                                                      │
 │  ┌──────────────┐                                             │
-│  │  Local NIM   │                                             │
-│  │  (RTX GPU)   │                                             │
+│ │ Local NIM │ │
+│ │ (NEMOCLAW_MODEL) │ │
 │  └──────────────┘                                             │
 └────────────────────────────────────────────────────────────────┘
 ```
@@ -77,6 +77,7 @@ By claw:
 | Analytics | Performance synthesis, predictive models, opportunity scoring |
 | Finance | **ALL financial data** — locked, no exceptions in production |
 | Build | Source code, API keys, architecture decisions, code review |
+| Assistant | Conversation context, user preferences, dispatch routing logic |
 
 ### Routing Rules
 
@@ -125,12 +126,12 @@ def route_inference_dev(data_type: str) -> str:
 
 ## Production Routing
 
-In production, the privacy router enforces local NIM for sensitive data:
+In production, the privacy router enforces local NIM (NEMOCLAW_MODEL) for sensitive data:
 
 ```python
 def route_inference_prod(data_type: str) -> str:
     if data_type in SENSITIVE_TYPES:
-        logger.info(f"Routing sensitive data to local NIM: {data_type}")
+        logger.info(f"Routing sensitive data to local NIM (NEMOCLAW_MODEL): {data_type}")
         return "local_nim"
     return "cloud_api"
 ```
@@ -144,9 +145,9 @@ def route_inference_prod(data_type: str) -> str:
 MILIMO_DEV_MODE=true  # All inference to cloud
 
 # Production mode
-MILIMO_DEV_MODE=false  # Sensitive data to local NIM
-NVIDIA_API_KEY=nvapi-xxx  # Cloud API key
-LOCAL_NIM_ENDPOINT=http://localhost:8000  # Local NIM
+MILIMO_DEV_MODE=false # Sensitive data to local NIM (NEMOCLAW_MODEL)
+NVIDIA_API_KEY=nvapi-xxx # Cloud API key
+LOCAL_NIM_ENDPOINT=http://localhost:8000 # Local NIM (NEMOCLAW_MODEL)
 ```
 
 ### Privacy Policy File
@@ -178,7 +179,7 @@ routing:
   non_sensitive: cloud_api
 
 fallback:
-  - cloud_api  # Fallback if local NIM unavailable
+- cloud_api # Fallback if local NIM (NEMOCLAW_MODEL) unavailable
 ```
 
 ## Auditing
@@ -208,11 +209,11 @@ Weekly reports include:
 
 ## Error Handling
 
-### Local NIM Unavailable
+### Local NIM (NEMOCLAW_MODEL) Unavailable
 
 ```python
 def handle_nim_unavailable(prompt, data_type):
-    """Fallback when local NIM is down."""
+    """Fallback when local NIM (NEMOCLAW_MODEL) is down."""
     if data_type in SENSITIVE_TYPES:
         # Block rather than send to cloud
         raise PrivacyError(f"Cannot route sensitive data to cloud: {data_type}")
@@ -244,3 +245,4 @@ def check_budget():
 - [[finance-claw]] — Finance Claw (all sensitive)
 - [[build-claw]] — Build Claw sensitive types
 - [[evolution-cycle]] — Evolution inference routing
+- [[assistant-lucy]] — Assistant Claw sensitive types

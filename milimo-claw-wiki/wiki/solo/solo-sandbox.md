@@ -1,6 +1,14 @@
 # Solo Sandbox
 
-Creates filesystem mounts and generates NemoClaw-compatible sandbox policies.
+**Summary**: Creates filesystem mounts and generates NemoClaw-compatible sandbox policies for each claw.
+
+**Sources**: `milimo-blueprint/orchestrator/solo_sandbox.py`
+
+**Last updated**: 2026-04-23
+
+**Tags**: #solo #sandbox #policy #isolation
+
+---
 
 ## Purpose
 
@@ -66,6 +74,7 @@ security:
 | Analytics | analytics_synthesis |
 | Finance | financial_data (locked to local) |
 | Build | source_code (locked to local) |
+| Assistant | conversation_context, dispatch_routing (local) |
 
 ## Directory Creation
 
@@ -87,12 +96,14 @@ File mapping:
 - `analytics` → `analytics-sandbox.yaml`
 - `finance` → `finance-sandbox.yaml`
 - `build` → `build-sandbox.yaml`
+- `assistant` → `assistant-sandbox.yaml`
 
 ## Relationships
 
 - Uses: [[solo-init]] — Configuration and paths
 - Generates: Policy YAML files
 - Creates: Sandbox directories
+- Related: [[assistant-lucy]] — Assistant sandbox configuration
 
 ## Source
 

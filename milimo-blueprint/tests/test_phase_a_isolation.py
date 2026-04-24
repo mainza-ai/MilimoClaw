@@ -2,18 +2,18 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""
-Phase A — Shared Mount Verification and Sandbox Isolation Tests
+"""2: Phase A — Shared Mount Verification and Sandbox Isolation Tests
 
 These tests MUST ALL PASS before any other MVR tests run.
 They verify:
-1. All five sandbox mounts exist and are correctly configured
-2. weekly-intelligence.json is readable by all five claws
+1. All six sandbox mounts exist and are correctly configured
+2. weekly-intelligence.json is readable by all six claws
 3. Cross-sandbox reads correctly fail (isolation enforcement)
 
 If any test in this file fails: fix sandbox policy configuration
 before proceeding to Phase B, C, D, E, or F tests.
 """
+
 import json
 import tempfile
 from pathlib import Path
@@ -31,17 +31,21 @@ SANDBOX_ROOTS = {
     "analytics": Path("/sandbox/analytics"),
     "finance": Path("/sandbox/finance"),
     "build": Path("/sandbox/build"),
+    "assistant": Path("/sandbox/.milimo/assistant"),
 }
 
 FALLBACK_ROOTS = {
-    role: Path.home() / ".milimo" / "sandboxes" / role
-    for role in SANDBOX_ROOTS
+    role: Path.home() / ".milimo" / "sandboxes" / role for role in SANDBOX_ROOTS
 }
 
 SHARED_REPORT_PATH = Path("/sandbox/analytics/reports/weekly-intelligence.json")
 SHARED_REPORT_FALLBACK = (
-    Path.home() / ".milimo" / "sandboxes" / "analytics" /
-    "reports" / "weekly-intelligence.json"
+    Path.home()
+    / ".milimo"
+    / "sandboxes"
+    / "analytics"
+    / "reports"
+    / "weekly-intelligence.json"
 )
 
 VALID_REPORT_CONTENT = {
@@ -55,7 +59,7 @@ VALID_REPORT_CONTENT = {
     "delivery": {},
     "opportunities": [],
     "anomalies": [],
-    "forward_projections": {}
+    "forward_projections": {},
 }
 
 POLICY_DIR = Path(__file__).parent.parent / "policies"
@@ -83,6 +87,7 @@ def _load_sandbox_policy(claw_role: str) -> dict[str, Any]:
     Imports from orchestrator.solo_sandbox as per spec requirements.
     """
     from orchestrator.solo_sandbox import load_sandbox_policy as _load_policy
+
     return _load_policy(claw_role)
 
 
@@ -93,6 +98,7 @@ def _get_read_only_mounts(policy: dict[str, Any]) -> list[Path]:
     Imports from orchestrator.solo_sandbox as per spec requirements.
     """
     from orchestrator.solo_sandbox import get_read_only_mounts as _get_mounts
+
     return _get_mounts(policy)
 
 
@@ -103,12 +109,14 @@ def _get_all_accessible_mounts(policy: dict[str, Any]) -> list[Path]:
     Imports from orchestrator.solo_sandbox as per spec requirements.
     """
     from orchestrator.solo_sandbox import get_all_accessible_mounts as _get_all
+
     return _get_all(policy)
 
 
 # ---------------------------------------------------------------------------
 # A1 — All five sandbox mounts exist and are isolated (skip in dev mode)
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="module")
 def ensure_sandbox_dirs():
@@ -152,6 +160,7 @@ def test_a1_build_sandbox_exists(ensure_sandbox_dirs):
 # A2 — Write test file to shared report location
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="module")
 def written_report() -> Path:
     """
@@ -162,10 +171,7 @@ def written_report() -> Path:
     report_path = _resolve_shared_report()
     report_path.parent.mkdir(parents=True, exist_ok=True)
 
-    report_path.write_text(
-        json.dumps(VALID_REPORT_CONTENT, indent=2),
-        encoding="utf-8"
-    )
+    report_path.write_text(json.dumps(VALID_REPORT_CONTENT, indent=2), encoding="utf-8")
     yield report_path
 
     report_path.write_text("{}", encoding="utf-8")
@@ -183,6 +189,7 @@ def test_a2_write_report_to_analytics(written_report):
 # ---------------------------------------------------------------------------
 # A3-A6 — All four non-Analytics claws can read the shared report
 # ---------------------------------------------------------------------------
+
 
 def _read_report_as_claw(claw_role: str, report_path: Path) -> dict:
     """
@@ -209,8 +216,7 @@ def _read_report_as_claw(claw_role: str, report_path: Path) -> dict:
 
     if not declared:
         declared = any(
-            "/sandbox/analytics/reports" in str(mount)
-            for mount in read_only_mounts
+            "/sandbox/analytics/reports" in str(mount) for mount in read_only_mounts
         )
 
     assert declared, (
@@ -265,10 +271,8 @@ def test_a6_build_claw_can_read_report(written_report):
 # A7-A8 — Cross-sandbox isolation: reads that MUST FAIL
 # ---------------------------------------------------------------------------
 
-def _assert_cross_sandbox_read_blocked(
-    reading_claw: str,
-    blocked_path: Path
-) -> None:
+
+def _assert_cross_sandbox_read_blocked(reading_claw: str, blocked_path: Path) -> None:
     """
     Assert that reading_claw does NOT have the blocked_path in its
     declared read_only or read_write mounts.
@@ -303,8 +307,7 @@ def test_a7_content_cannot_read_clients_sandbox():
     Cross-sandbox isolation must be enforced.
     """
     _assert_cross_sandbox_read_blocked(
-        reading_claw="content",
-        blocked_path=Path("/sandbox/clients")
+        reading_claw="content", blocked_path=Path("/sandbox/clients")
     )
 
 
@@ -314,12 +317,12 @@ def test_a8_finance_cannot_read_build_sandbox():
     Cross-sandbox isolation must be enforced.
     """
     _assert_cross_sandbox_read_blocked(
-        reading_claw="finance",
-        blocked_path=Path("/sandbox/build")
+        reading_claw="finance", blocked_path=Path("/sandbox/build")
     )
 
 
 # Bonus isolation checks — not in spec A1-A8 but verify full isolation
+
 
 def test_isolation_ops_cannot_read_finance():
     """Ops Claw cannot read Finance sandbox."""
@@ -359,6 +362,7 @@ def test_isolation_content_cannot_read_build():
 # ---------------------------------------------------------------------------
 # Helper function tests
 # ---------------------------------------------------------------------------
+
 
 class TestSandboxPolicyHelpers:
     """Tests for sandbox policy helper functions."""

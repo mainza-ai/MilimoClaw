@@ -59,6 +59,7 @@ CLAW_ON_ACTIVATE_MAP = {
     "analytics": "passive",
     "finance": "invoices_only",
     "build": "issues_only",
+    "assistant": "passive",
 }
 
 

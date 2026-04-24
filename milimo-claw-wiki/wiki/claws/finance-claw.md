@@ -104,7 +104,7 @@ If Stage 1 approval triggers transmission: CRITICAL BUG.
 ## Privacy Considerations
 
 **ALL financial data is sensitive**. In production:
-- All inference calls route to local NIM
+- All inference calls route to local NIM (NEMOCLAW_MODEL)
 - No financial data sent to cloud APIs
 - `revenue_summary` contains totals only — no line items, client names, or invoice IDs
 

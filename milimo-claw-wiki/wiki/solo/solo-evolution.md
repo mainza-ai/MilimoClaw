@@ -1,6 +1,14 @@
 # Solo Evolution
 
-Weekly self-evolution scheduler for solo founders.
+**Summary**: Weekly self-evolution scheduler for solo founders with staggered timing and activity thresholds.
+
+**Sources**: `milimo-blueprint/orchestrator/solo_evolution.py`
+
+**Last updated**: 2026-04-23
+
+**Tags**: #solo #evolution #scheduler
+
+---
 
 ## Purpose
 
@@ -19,6 +27,7 @@ Default staggered timing (Sunday):
 | Analytics evolution | 02:25 |
 | Build | 02:35 |
 | Finance | 03:00 |
+| Assistant | 03:15 |
 
 ## Activity Thresholds
 
@@ -31,6 +40,7 @@ Each claw must meet minimum activity before evolving:
 | Analytics | min_data_weeks | 2 |
 | Finance | min_invoices | 3 |
 | Build | min_prs_merged | 3 |
+| Assistant | min_queries_dispatched | 15 |
 
 ### Content Claw Additional Thresholds
 
@@ -89,6 +99,7 @@ next_run = now + timedelta(days=days_until)
 - Uses: [[evolution-config]] — Global settings
 - Uses: [[evolution-cycle]] — Execution logic
 - Related: [[solo-init]] — Configuration loading
+- Related: [[assistant-lucy]] — Assistant evolution cycle
 
 ## Source
 

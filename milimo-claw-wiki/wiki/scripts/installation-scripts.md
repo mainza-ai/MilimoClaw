@@ -31,7 +31,7 @@ cd /path/to/MilimoClaw
 
 | Option | Description |
 |--------|-------------|
-| `--solo` | Solo mode (all 5 claws active) [default] |
+| `--solo` | Solo mode (all 6 claws active) [default] |
 | `--operator-name <name>` | Operator name (default: $USER) |
 | `--squad-name <name>` | Squad name (default: milimo-squad) |
 | `--warroom-mode <mode>` | War Room mode: full, minimal, disabled |

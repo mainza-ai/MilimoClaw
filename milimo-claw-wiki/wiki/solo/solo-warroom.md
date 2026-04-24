@@ -1,6 +1,14 @@
 # Solo War Room
 
-Single-operator action queue with prioritized processing.
+**Summary**: Single-operator action queue with prioritized processing and VETO > HOLD > REVIEW > AUTO ordering.
+
+**Sources**: `milimo-blueprint/orchestrator/solo_warroom.py`
+
+**Last updated**: 2026-04-23
+
+**Tags**: #solo #warroom #queue #approval
+
+---
 
 ## Purpose
 

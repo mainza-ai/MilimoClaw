@@ -7,6 +7,7 @@ export interface OnboardOptions {
     solo?: boolean;
     operator?: string;
     warRoomMode?: "full" | "minimal" | "disabled";
+    noSandbox?: boolean;
     logger: PluginLogger;
     pluginConfig: MilimoConfig;
 }

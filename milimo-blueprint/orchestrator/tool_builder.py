@@ -532,15 +532,15 @@ class ToolBuilder:
 
         Supports multiple backends:
         1. NeMo Microservice (nemo-ms) on localhost:8000
-        2. Local NIM container on localhost:8000
+        2. Local NIM (NEMOCLAW_MODEL) container on localhost:8000
         3. OpenShell gateway sandbox
 
-        Args:
-            prompt: The inference prompt
-            proposal: The tool proposal for context
+            Args:
+                prompt: The inference prompt
+                proposal: The tool proposal for context
 
-        Returns:
-            Generated Python code or None on failure
+            Returns:
+                Generated Python code or None on failure
         """
         import json
         import os
@@ -549,7 +549,7 @@ class ToolBuilder:
 
         # Check for NIM endpoint configuration
         nim_endpoint = os.environ.get("NIM_ENDPOINT", "http://localhost:8000")
-        nim_model = os.environ.get("NIM_MODEL", "nvidia/nemotron-4-340b-instruct")
+        nim_model = os.environ.get("NEMOCLAW_MODEL", "nvidia/nemotron-4-340b-instruct")
 
         # Check if NIM is available
         try:
@@ -633,7 +633,9 @@ class ToolBuilder:
             request_file = gateway_dir / f"request_{proposal.tool_name}.json"
             request_data = {
                 "type": "inference_request",
-                "model": "nemotron",
+                "model": os.environ.get(
+                    "NEMOCLAW_MODEL", "nvidia/nemotron-4-340b-instruct"
+                ),
                 "prompt": prompt,
                 "parameters": {
                     "temperature": 0.3,

@@ -301,6 +301,17 @@ See [[log]] for complete operation history.
 - [[improvement-plan]] — Prioritized roadmap for closing documentation gaps
 - [[log]] — Append-only operation history
 
+## Claw Reference
+
+All 6 claws in the MilimoClaw mesh:
+
+- [[content-claw]] — Creative content generation
+- [[ops-claw]] — Client lifecycle and delivery
+- [[analytics-claw]] — Intelligence and reports
+- [[finance-claw]] — Invoicing and pricing
+- [[build-claw]] — Engineering and deploys
+- [[assistant-lucy]] — Conversational user interface
+
 ---
 
 ## External Sources

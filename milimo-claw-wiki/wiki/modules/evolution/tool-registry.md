@@ -5,7 +5,7 @@
 **Sources**:
 - `milimo-blueprint/orchestrator/tool_registry.py`
 
-**Last updated**: 2026-04-15
+**Last updated**: 2026-04-23
 
 **Tags**: #module #evolution #registry
 
@@ -40,7 +40,7 @@ class ToolRegistry:
 
 **Parameters**:
 - `squad_id` — Squad identifier
-- `claw_role` — Claw role (content, ops, analytics, finance, build)
+- `claw_role` — Claw role (content, ops, analytics, finance, build, assistant)
 - `registry_dir` — Custom registry location (optional)
 - `max_tools` — Maximum tools to retain (default: 30)
 

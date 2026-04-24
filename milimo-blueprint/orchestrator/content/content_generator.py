@@ -6,7 +6,7 @@
 Milimo Claw — Content Generator
 
 Core draft generation engine for the Content Claw. Generates content
-using Nemotron via privacy router, applies active evolution tools,
+using NEMOCLAW_MODEL via privacy router, applies active evolution tools,
 and writes processed drafts to the pending directory.
 
 Usage:
@@ -77,7 +77,9 @@ class Draft:
     variant_b: str | None = None
     voice_profile_used: str | None = None
     tools_applied: list[str] = field(default_factory=list)
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_at: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
     status: Literal["pending", "approved", "rejected", "published"] = "pending"
 
     def to_dict(self) -> dict[str, Any]:
@@ -98,7 +100,9 @@ class ContentPlan:
     clients: list[str]
     briefs: list[str]
     estimated_times: dict[str, str]
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_at: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -113,7 +117,7 @@ class ContentGenerator:
     """
     Core draft generation engine for the Content Claw.
 
-    Generates content using Nemotron via privacy router.
+    Generates content using NEMOCLAW_MODEL via privacy router.
     Applies active evolution tools in sequence.
     Writes drafts to /sandbox/content/drafts/pending/.
     """
@@ -194,18 +198,20 @@ class ContentGenerator:
         draft_path.parent.mkdir(parents=True, exist_ok=True)
         draft_path.write_text(json.dumps(draft.to_dict(), indent=2))
 
-        self._log.append(LogEntry(
-            action_type="draft_generated",
-            entity_id=draft_id,
-            outcome="success",
-            platform=platform,
-            client_id=context.client_id,
-            details={
-                "content_type": content_type,
-                "tools_applied": draft.tools_applied,
-                "routing_backend": routing.backend.value,
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="draft_generated",
+                entity_id=draft_id,
+                outcome="success",
+                platform=platform,
+                client_id=context.client_id,
+                details={
+                    "content_type": content_type,
+                    "tools_applied": draft.tools_applied,
+                    "routing_backend": routing.backend.value,
+                },
+            )
+        )
 
         logger.info("Draft %s written to %s", draft_id, draft_path)
         return draft
@@ -240,13 +246,15 @@ class ContentGenerator:
         draft_path = self._fs.get_draft_path("pending", draft.draft_id)
         draft_path.write_text(json.dumps(draft.to_dict(), indent=2))
 
-        self._log.append(LogEntry(
-            action_type="brief_draft_generated",
-            entity_id=draft.draft_id,
-            outcome="success",
-            client_id=context.client_id,
-            details={"brief_id": brief_id},
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="brief_draft_generated",
+                entity_id=draft.draft_id,
+                outcome="success",
+                client_id=context.client_id,
+                details={"brief_id": brief_id},
+            )
+        )
 
         return draft
 
@@ -273,7 +281,12 @@ class ContentGenerator:
                 for p in brief_data.get("platform_targets", []):
                     platforms.add(p)
 
-        intelligence_path = self._fs.BASE / "intelligence" / "analytics-feed" / "weekly-intelligence.json"
+        intelligence_path = (
+            self._fs.BASE
+            / "intelligence"
+            / "analytics-feed"
+            / "weekly-intelligence.json"
+        )
         performance_hints = None
         if intelligence_path.exists():
             performance_hints = json.loads(intelligence_path.read_text())
@@ -295,12 +308,14 @@ class ContentGenerator:
         plan_path.parent.mkdir(parents=True, exist_ok=True)
         plan_path.write_text(json.dumps(plan.to_dict(), indent=2))
 
-        self._log.append(LogEntry(
-            action_type="daily_plan_generated",
-            entity_id=plan_id,
-            outcome="success",
-            details={"brief_count": len(active_briefs)},
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="daily_plan_generated",
+                entity_id=plan_id,
+                outcome="success",
+                details={"brief_count": len(active_briefs)},
+            )
+        )
 
         return plan
 
@@ -364,9 +379,15 @@ class ContentGenerator:
 
         return None
 
-    async def _call_inference(self, prompt: str, routing: RoutingDecision, data_type: str = "general") -> str:
+    async def _call_inference(
+        self, prompt: str, routing: RoutingDecision, data_type: str = "general"
+    ) -> str:
         """Call the inference backend via the injected NvidiaInferenceClient."""
-        logger.debug("Calling inference backend: %s (data_type=%s)", routing.backend.value, data_type)
+        logger.debug(
+            "Calling inference backend: %s (data_type=%s)",
+            routing.backend.value,
+            data_type,
+        )
 
         try:
             if self._inference_client is not None:
@@ -380,6 +401,7 @@ class ContentGenerator:
             else:
                 # Fallback: create a client on-demand (not ideal but functional)
                 from orchestrator.inference_client import NvidiaInferenceClient
+
                 client = NvidiaInferenceClient()
                 result = client.complete(
                     prompt=prompt,
@@ -413,12 +435,14 @@ class ContentGenerator:
                     draft.draft_id,
                     e,
                 )
-                self._log.append(LogEntry(
-                    action_type="tool_error",
-                    entity_id=draft.draft_id,
-                    outcome="failed",
-                    details={"tool": tool_name, "error": str(e)},
-                ))
+                self._log.append(
+                    LogEntry(
+                        action_type="tool_error",
+                        entity_id=draft.draft_id,
+                        outcome="failed",
+                        details={"tool": tool_name, "error": str(e)},
+                    )
+                )
 
         return draft
 
@@ -500,11 +524,15 @@ class ContentGenerator:
         - If variant_b exists: [Compare A/B] link
         """
         if not self._war_room:
-            logger.warning("No War Room client configured, cannot queue draft %s", draft.draft_id)
+            logger.warning(
+                "No War Room client configured, cannot queue draft %s", draft.draft_id
+            )
             return ""
 
         client_desc = draft.client_id or "own content"
-        summary = f"Draft ready: {draft.platform} {draft.content_type} for {client_desc}"
+        summary = (
+            f"Draft ready: {draft.platform} {draft.content_type} for {client_desc}"
+        )
 
         draft_ready_message = {
             "message_type": "draft_ready",
@@ -525,7 +553,7 @@ class ContentGenerator:
             },
         }
 
-        if self._war_room and hasattr(self._war_room, 'send_message'):
+        if self._war_room and hasattr(self._war_room, "send_message"):
             self._war_room.send_message(draft_ready_message)
             logger.debug("Sent draft_ready message for draft %s", draft.draft_id)
 
@@ -550,15 +578,19 @@ class ContentGenerator:
             payload=payload,
         )
 
-        logger.info("Draft %s queued for review as action %s", draft.draft_id, action.id)
+        logger.info(
+            "Draft %s queued for review as action %s", draft.draft_id, action.id
+        )
 
-        self._log.append(LogEntry(
-            action_type="draft_queued_for_review",
-            entity_id=draft.draft_id,
-            outcome="success",
-            platform=draft.platform,
-            client_id=draft.client_id,
-            details={"action_id": action.id, "brief_id": draft.brief_id},
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="draft_queued_for_review",
+                entity_id=draft.draft_id,
+                outcome="success",
+                platform=draft.platform,
+                client_id=draft.client_id,
+                details={"action_id": action.id, "brief_id": draft.brief_id},
+            )
+        )
 
         return action.id

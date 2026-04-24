@@ -6,7 +6,7 @@
 - `milimo-blueprint/policies/*.yaml`
 - [[sandbox-isolation]]
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #policies #network #egress
 

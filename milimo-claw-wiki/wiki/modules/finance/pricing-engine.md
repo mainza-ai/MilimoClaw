@@ -58,7 +58,7 @@ class PricingEngine:
 
 ## Privacy Routing
 
-Scope estimation routes to **Local NIM**:
+Scope estimation routes to **Local NIM (NEMOCLAW_MODEL)**:
 - `data_type: "scope_cost_estimation"`
 - Contains project and client context
 - Never sent to cloud in production

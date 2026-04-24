@@ -83,7 +83,7 @@ Ideal for:
 ## Related Pages
 
 - [[template-overview]] — All available squad templates
-- [[solo-founder]] — Solo operator template (all 5 claws)
+- [[solo-founder]] — Solo operator template (all 6 claws)
 - [[build-claw]] — Engineering claw
 - [[ops-claw]] — Operations claw
 - [[analytics-claw]] — Intelligence claw

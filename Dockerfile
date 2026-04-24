@@ -21,10 +21,13 @@ RUN npm install && npm run build
 # ---------------------------------------------------------------------------
 FROM node:22-slim
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
 ENV HOME=/sandbox
 
 # Install system dependencies (required by OpenShell and Milimo orchestrator)
+# distro packages are pinned by release, not version
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
@@ -39,11 +42,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install GitHub CLI (gh) — required by the OpenClaw GitHub skill
+# gh is pinned by apt repo, not version string
+# hadolint ignore=DL3008
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
-    && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-    && apt-get update && apt-get install -y gh \
-    && rm -rf /var/lib/apt/lists/*
+&& chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+&& apt-get update && apt-get install -y --no-install-recommends gh \
+&& rm -rf /var/lib/apt/lists/*
 
 # Install OpenShell CLI binary (from NVIDIA OpenShell releases)
 # This is the security sandbox runtime — provides Landlock, seccomp, netns.
@@ -95,7 +100,9 @@ RUN mkdir -p /sandbox/.openclaw-data/agents/main/agent \
 RUN npm install -g openclaw@2026.3.11
 
 # Install Python dependencies for Milimo orchestrator
-RUN pip3 install --break-system-packages pyyaml pytest requests httpx stripe
+# pip packages pinned by requirements in production; cache OK in build
+# hadolint ignore=DL3013,DL3042,DL3059
+RUN pip3 install --no-cache-dir --break-system-packages pyyaml pytest requests httpx stripe
 
 # Create Milimo plugin directory
 RUN mkdir -p /opt/milimo/dist \
@@ -115,11 +122,14 @@ RUN npm install --omit=dev
 
 # Set up Milimo blueprints for local resolution
 RUN mkdir -p /sandbox/.milimo/blueprints/0.1.0 \
-    && cp -r /opt/milimo-blueprint/* /sandbox/.milimo/blueprints/0.1.0/ \
-    && chown -R sandbox:sandbox /sandbox/.milimo
+&& cp -r /opt/milimo-blueprint/* /sandbox/.milimo/blueprints/0.1.0/ \
+&& mkdir -p /sandbox/.milimo/mesh/heartbeats \
+&& mkdir -p /sandbox/.milimo/mesh/inboxes \
+&& mkdir -p /sandbox/.milimo/mesh/alerts \
+&& chown -R sandbox:sandbox /sandbox/.milimo
 
 # Build args for config that varies per deployment.
-ARG MILIMO_MODEL=nvidia/nemotron-3-super-120b-a12b
+ARG MILIMO_MODEL=${NEMOCLAW_MODEL:-nvidia/nemotron-4-340b-instruct}
 ARG CHAT_UI_URL=http://127.0.0.1:18789
 ARG MILIMO_BUILD_ID=default
 
@@ -175,12 +185,10 @@ path = os.path.expanduser('~/.openclaw/openclaw.json'); \
 json.dump(config, open(path, 'w'), indent=2); \
 os.chmod(path, 0o600)"
 
-# Install Milimo plugin into OpenClaw (as the sandbox user)
+# Install Milimo plugin into OpenClaw (as the sandbox user) + GitHub skill
 RUN openclaw doctor --fix > /dev/null 2>&1 || true \
-    && openclaw plugins install /opt/milimo > /dev/null 2>&1 || true
-
-# Install OpenClaw GitHub skill (requires gh CLI)
-RUN openclaw skills install github > /dev/null 2>&1 || true
+&& openclaw plugins install /opt/milimo > /dev/null 2>&1 || true \
+&& openclaw skills install github > /dev/null 2>&1 || true
 
 # Health check — verifies sandbox runtime AND Milimo Claw heartbeat
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
@@ -203,5 +211,5 @@ RUN chown root:root /sandbox/.openclaw \
     && chmod 444 /sandbox/.openclaw/openclaw.json
 USER sandbox
 
-ENTRYPOINT ["/bin/bash"]
+ENTRYPOINT []
 CMD []

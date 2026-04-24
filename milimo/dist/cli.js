@@ -24,10 +24,11 @@ function registerCliCommands(ctx, api) {
         .command("onboard")
         .description("Interactive setup: configure squad, template, role, and War Room")
         .option("--squad <name>", "Squad name")
-        .option("--role <role>", "Claw role: content, ops, analytics, finance, build")
+        .option("--role <role>", "Claw role: content, ops, analytics, finance, build, assistant")
         .option("--template <template>", "Squad template (e.g., solo-founder, content-agency)")
         .option("--solo", "Initialize as a solo operator (no mesh)", false)
         .option("--operator <name>", "Operator name")
+        .option("--no-sandbox", "Skip automatic NemoClaw sandbox creation", false)
         .option("--war-room-mode <mode>", "War Room mode: full, minimal, disabled", "full")
         .action(async (opts) => {
         await (0, onboard_js_1.cliOnboard)({ ...opts, logger, pluginConfig });
@@ -37,7 +38,7 @@ function registerCliCommands(ctx, api) {
         .command("init")
         .description("Initialize a new squad or join an existing mesh")
         .option("--squad <name>", "Squad name")
-        .option("--role <role>", "Claw role: content, ops, analytics, finance, build")
+        .option("--role <role>", "Claw role: content, ops, analytics, finance, build, assistant")
         .option("--template <template>", "Squad template to use (e.g., content-agency, design-studio)")
         .option("--solo", "Initialize as a solo operator (no mesh)", false)
         .option("--assistant-name <name>", "Assistant name", "Nova")

@@ -114,7 +114,7 @@ AI inference and data routing.
 
 - **Privacy Router**: Routes based on sensitivity
 - **Sensitivity Classifier**: Labels data types
-- **Inference Routing**: Cloud vs local NIM
+- **Inference Routing**: Cloud vs local NIM (NEMOCLAW_MODEL)
 - **Model Selection**: Category-based model choice
 
 ### 7. Blueprint Layer
@@ -136,15 +136,6 @@ Execution environment.
 - **Landlock**: Filesystem isolation
 - **seccomp**: Syscall filtering
 
-### 8. Runtime Layer
-
-Execution environment.
-
-- **NemoClaw**: NVIDIA sandbox runtime
-- **OpenShell**: Inter-sandbox communication
-- **Docker**: Container runtime
-- **Landlock**: Filesystem isolation
-- **seccomp**: Syscall filtering
 
 ## Assistant (Lucy)
 

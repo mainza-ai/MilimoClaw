@@ -54,6 +54,52 @@ Each entry follows this format:
 - Assistant (Lucy) now reflected across all wiki pages
 - P1-P10 implementation complete (P9 skipped per user request)
 
+### 2026-04-23 — P11 Deep Wiki Consistency Audit Fixes
+
+**Pages**: 25 pages modified
+**Source**: Deep audit — 69 issues found (P10 audit missed many 5-claw references)
+**Changes**:
+- Fixed `sandbox-isolation.md` — "all five" → "all six", added Assistant to mount tree and egress table, added assistant-lucy link
+- Fixed `mesh-coordinator.md` — Added Assistant to architecture diagram and inbox directory, added assistant-lucy link
+- Fixed `privacy-router.md` — Added Assistant to sensitive data types table and SENSITIVE_TYPES dict, added assistant-lucy link
+- Fixed `system-overview.md` — Removed duplicate "### 8. Runtime Layer" section (lines 139-147)
+- Fixed `claw-silent-responses.md` — "All 5 claws" → "All 6 claws"
+- Fixed `issues-and-fixes.md` — "All 5 claws" → "All 5 non-assistant claws" (semantic fix), added assistant port 8086 to HEALTH_PORTS
+- Fixed `improvement-plan.md` — "signal_dispatcher.py (x5 claws)" → "(x4 claws) + lucy.py (Assistant)"
+- Fixed `ai-micro-saas.md` — "all 5 claws" → "all 6 claws"
+- Fixed `installation-scripts.md` — "all 5 claws active" → "all 6 claws active", added Assistant mount to directory structure
+- Fixed `evolution-integration.md` — "for all 5 claws" → "for all 6 claws", "Register all 5 claw" → "Register all 6 claw", added assistant to registered claws and status JSON
+- Fixed `evolution-cycle.md` — Added Assistant to schedule, thresholds, and evolution tools tables; fixed [[blueprint-manager]] → [[tool-registry]] broken link
+- Fixed `tool-registry.md` — Added assistant to claw_role parameter
+- Fixed `solo-sandbox.md` — Added Assistant to inference routes and policy file mapping tables
+- Fixed `solo-deep-work.md` — Added Assistant to default claw activation table
+- Fixed `solo-evolution.md` — Added Assistant to schedule and activity thresholds tables
+- Fixed `solo-init.md` — Added assistant to filesystem and network_egress required fields
+- Fixed `policy-overview.md` — Added Assistant to mount table
+- Fixed `file-structure.md` — Added assistant-claw.yaml to roles directory
+- Fixed `solo-founder.md` — Added .openclaw/ to filesystem structure, added [[assistant-lucy]] to related pages
+- Fixed `signal-dispatcher-pattern.md` — Added Summary/Sources/Last updated/Tags format headers
+- Fixed `solo-sandbox.md`, `solo-deep-work.md`, `solo-evolution.md`, `solo-init.md`, `solo-privacy.md`, `solo-warroom.md` — Added Summary/Sources/Last updated/Tags format headers per CLAUDE.md standard
+- Fixed `CLAUDE.md` — Added assistant/ modules directory to folder structure
+- Updated 13 pages with stale dates (2026-04-14 → 2026-04-23)
+- Updated `index.md` — Added Claw Reference section with all 6 claws
+- Updated `log.md` — This entry
+
+**Notes**:
+- All 69 issues from deep audit resolved across 8 categories (A through H)
+- Category A: 10 explicit "5 claws" references → "6 claws" (or "5 non-assistant" where semantically correct)
+- Category B: 26 tables/diagrams/lists updated with Assistant row
+- Category C: Duplicate "### 8. Runtime Layer" section removed from system-overview.md
+- Category D: Broken [[blueprint-manager]] link fixed → [[tool-registry]]
+- Category E: CLAUDE.md folder structure updated with assistant/ module directory
+- Category F: 13 stale dates updated from 2026-04-14 to 2026-04-23
+- Category G: 7 solo/pattern pages brought up to CLAUDE.md format standard
+- Category H: log.md line 76 "5" → "6" fixed
+- The assistant mount is `/sandbox/.openclaw/` (not `/sandbox/assistant/`)
+- The assistant health port is 8086
+- issues-and-fixes.md uses "5 non-assistant claws" because the assistant was the message sender, not a recipient needing handlers
+
+
 ---
 
 ## 2026-04-18
@@ -73,7 +119,7 @@ Each entry follows this format:
 **Notes**:
 - 3 claws (content, finance, build) were returning blank output due to missing return statements in handlers
 - Root cause: handlers returned `None` instead of `dict[str, Any]`
-- All 5 claws now properly return diagnostic output
+- All 6 claws now properly return diagnostic output
 - NemoClaw sandbox rebuilt with fixes applied
 - Model set to minimaxai/minimax-m2.7 via NEMOCLAW_MODEL env var
 - Total wiki pages: 150+
@@ -416,6 +462,19 @@ Each entry follows this format:
 | LINK | Adding/updating wiki-links |
 | AUDIT | Lint and audit operation |
 | SYNC | Synchronizing with source changes |
+
+---
+
+### 2026-04-23 15:30 — SYNC
+
+**Pages**: mesh-coordinator.md, privacy-router.md, system-overview.md, sandbox-isolation.md, solo-privacy.md, claw-schema.md, pricing-engine.md, brand-voice.md, tool-generation.md, finance-claw.md
+**Source**: P11 batch — Assistant Claw integration + NEMOCLAW_MODEL normalization
+**Changes**:
+- Added Assistant Claw to mesh-coordinator.md architecture diagram and inbox directory
+- Updated all "Local NIM" display references to "Local NIM (NEMOCLAW_MODEL)" across privacy-router.md, sandbox-isolation.md, system-overview.md, solo-privacy.md, claw-schema.md, pricing-engine.md, brand-voice.md, tool-generation.md, finance-claw.md
+- Updated "NVIDIA Cloud Nemotron 120B" to "Cloud (NEMOCLAW_MODEL)" in solo-privacy.md, claw-schema.md
+
+**Notes**: Config keys (local_nim, local-nim) preserved unchanged — they are backend categories, not display labels
 
 ---
 

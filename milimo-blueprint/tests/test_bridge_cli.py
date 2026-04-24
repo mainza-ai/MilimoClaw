@@ -386,7 +386,7 @@ class TestBridgeCLIDeepWorkCommands:
         response = run_bridge_cli("activate_deep_work", args)
         assert response["success"] is True
         policy_changes = response["data"]["policy_changes"]
-        assert len(policy_changes) == 5
+        assert len(policy_changes) == 6
         for change in policy_changes:
             assert "claw" in change
             assert "previous" in change

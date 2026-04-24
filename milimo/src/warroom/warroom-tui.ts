@@ -408,7 +408,7 @@ Press H to close this help.
     lines.push(` Squad: ${this.squadId}`);
     lines.push("");
 
-    const clawRoles = ["content", "ops", "analytics", "finance", "build"];
+    const clawRoles = ["content", "ops", "analytics", "finance", "build", "assistant"];
 
     for (const role of clawRoles) {
       const health = this.getClawHealth(role);

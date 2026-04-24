@@ -46,7 +46,7 @@ Core functionality modules that appear in specs but lack wiki pages.
 | [[baseline-manager]] | baseline_manager.py | Analytics baselines - referenced in anomaly detection |
 | [[query-handler]] | query_handler.py | Analytics query processing - 2-minute SLA documented in spec |
 | [[forward-projector]] | forward_projector.py | Revenue projections - part of weekly intelligence |
-| [[signal-dispatcher-pattern]] | signal_dispatcher.py (x5 claws) | Generic pattern for inter-claw messaging |
+| [[signal-dispatcher-pattern]] | signal_dispatcher.py (x4 claws) + lucy.py (Assistant) | Generic pattern for inter-claw messaging |
 | [[performance-monitor]] | performance_monitor.py | Content performance tracking |
 | [[comms-manager]] | comms_manager.py | Client communications - core Ops functionality |
 | [[scope-monitor]] | scope_monitor.py | Scope creep detection - critical for Ops |

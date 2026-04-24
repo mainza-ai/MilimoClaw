@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import fcntl
 import json
+import os
 import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -75,50 +76,51 @@ REQUIRED_FILES: dict[str, Any] = {
 # Enhancement: Inference fallback chain (from oh-my-openagent session recovery)
 # If the primary inference model fails, fall back through this chain.
 INFERENCE_FALLBACK_CHAIN: list[str] = [
-    "nemotron-120b",  # Primary — cloud Nemotron 120B
-    "claude-sonnet-4-6",  # Fallback 1
-    "gemini-3.1-pro",  # Fallback 2
+    os.environ.get("NEMOCLAW_MODEL", "nvidia/nemotron-4-340b-instruct"),
+    "claude-sonnet-4-6",
+    "gemini-3.1-pro",
 ]
 
-# Enhancement: Category-based model selection (from OmO category system)
+_NEMOCLAW_MODEL = os.environ.get("NEMOCLAW_MODEL", "nvidia/nemotron-4-340b-instruct")
+
 BUILD_CATEGORIES: dict[str, dict[str, Any]] = {
     "code_generation": {
-        "model": "nemotron-120b",
+        "model": _NEMOCLAW_MODEL,
         "temperature": 0.1,
         "data_type": "source_code_generation",
     },
     "code_review": {
-        "model": "nemotron-120b",
+        "model": _NEMOCLAW_MODEL,
         "temperature": 0.1,
         "data_type": "code_review",
     },
     "pr_description_generation": {
-        "model": "nemotron-120b",
+        "model": _NEMOCLAW_MODEL,
         "temperature": 0.3,
         "data_type": "pr_description_generation",
     },
     "issue_complexity_scoring": {
-        "model": "nemotron-120b",
+        "model": _NEMOCLAW_MODEL,
         "temperature": 0.2,
         "data_type": "issue_complexity_scoring",
     },
     "changelog_generation": {
-        "model": "nemotron-120b",
+        "model": _NEMOCLAW_MODEL,
         "temperature": 0.7,
         "data_type": "changelog_generation",
     },
     "api_documentation_generation": {
-        "model": "nemotron-120b",
+        "model": _NEMOCLAW_MODEL,
         "temperature": 0.3,
         "data_type": "api_documentation_generation",
     },
     "devlog_draft_generation": {
-        "model": "nemotron-120b",
+        "model": _NEMOCLAW_MODEL,
         "temperature": 0.7,
         "data_type": "devlog_draft_generation",
     },
     "dependency_audit": {
-        "model": "nemotron-120b",
+        "model": _NEMOCLAW_MODEL,
         "temperature": 0.1,
         "data_type": "dependency_vulnerability_analysis",
     },
@@ -211,7 +213,9 @@ class BuildFilesystemInit:
     ) -> Path:
         valid_statuses = ("drafted", "approved", "merged")
         if status not in valid_statuses:
-            raise ValueError(f"Invalid PR status: {status!r}. Must be one of {valid_statuses}")
+            raise ValueError(
+                f"Invalid PR status: {status!r}. Must be one of {valid_statuses}"
+            )
         return self.base / "prs" / status / f"{pr_id}.json"
 
     def get_deploy_path(
@@ -221,7 +225,9 @@ class BuildFilesystemInit:
     ) -> Path:
         valid_statuses = ("pending", "history")
         if status not in valid_statuses:
-            raise ValueError(f"Invalid deploy status: {status!r}. Must be one of {valid_statuses}")
+            raise ValueError(
+                f"Invalid deploy status: {status!r}. Must be one of {valid_statuses}"
+            )
         return self.base / "deployments" / status / f"{deploy_id}.json"
 
     def get_error_pattern_path(self, pattern_id: str) -> Path:
@@ -248,6 +254,7 @@ class BuildFilesystemInit:
                 json.dump(data, f, indent=2, default=str)
                 f.flush()
                 import os
+
                 os.fsync(f.fileno())
             Path(tmp_path).rename(path)
         except Exception:
@@ -313,6 +320,7 @@ class BuildOperationalLog:
             return []
 
         from datetime import timedelta
+
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
         entries: list[BuildLogEntry] = []
 

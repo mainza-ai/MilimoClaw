@@ -4,7 +4,7 @@
 
 **Sources**: Project filesystem scan
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #reference #structure #files
 
@@ -124,6 +124,7 @@ milimo-blueprint/
 │
 ├── roles/                     # Claw role definitions
 │   ├── analytics-claw.yaml
+│   ├── assistant-claw.yaml
 │   ├── build-claw.yaml
 │   ├── content-claw.yaml
 │   ├── finance-claw.yaml

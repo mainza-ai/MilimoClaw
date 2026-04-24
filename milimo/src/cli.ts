@@ -39,35 +39,37 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
 
   // ── openclaw milimo onboard ───────────────────────────────────────
   milimo
-    .command("onboard")
-    .description("Interactive setup: configure squad, template, role, and War Room")
-    .option("--squad <name>", "Squad name")
-    .option("--role <role>", "Claw role: content, ops, analytics, finance, build")
-    .option("--template <template>", "Squad template (e.g., solo-founder, content-agency)")
-    .option("--solo", "Initialize as a solo operator (no mesh)", false)
-    .option("--operator <name>", "Operator name")
-    .option(
-      "--war-room-mode <mode>",
-      "War Room mode: full, minimal, disabled",
-      "full" as const,
-    )
-    .action(async (opts: {
-      squad?: string;
-      role?: string;
-      template?: string;
-      solo: boolean;
-      operator?: string;
-      warRoomMode: "full" | "minimal" | "disabled";
-    }) => {
-      await cliOnboard({ ...opts, logger, pluginConfig });
-    });
+  .command("onboard")
+  .description("Interactive setup: configure squad, template, role, and War Room")
+  .option("--squad <name>", "Squad name")
+  .option("--role <role>", "Claw role: content, ops, analytics, finance, build, assistant")
+  .option("--template <template>", "Squad template (e.g., solo-founder, content-agency)")
+  .option("--solo", "Initialize as a solo operator (no mesh)", false)
+  .option("--operator <name>", "Operator name")
+  .option("--no-sandbox", "Skip automatic NemoClaw sandbox creation", false)
+  .option(
+    "--war-room-mode <mode>",
+    "War Room mode: full, minimal, disabled",
+    "full" as const,
+  )
+  .action(async (opts: {
+    squad?: string;
+    role?: string;
+    template?: string;
+    solo: boolean;
+    operator?: string;
+    noSandbox: boolean;
+    warRoomMode: "full" | "minimal" | "disabled";
+  }) => {
+    await cliOnboard({ ...opts, logger, pluginConfig });
+  });
 
   // ── openclaw milimo init ──────────────────────────────────────────
   milimo
     .command("init")
     .description("Initialize a new squad or join an existing mesh")
     .option("--squad <name>", "Squad name")
-    .option("--role <role>", "Claw role: content, ops, analytics, finance, build")
+    .option("--role <role>", "Claw role: content, ops, analytics, finance, build, assistant")
     .option("--template <template>", "Squad template to use (e.g., content-agency, design-studio)")
     .option("--solo", "Initialize as a solo operator (no mesh)", false)
     .option("--assistant-name <name>", "Assistant name", "Nova")

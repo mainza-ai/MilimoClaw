@@ -30,7 +30,7 @@ class EvolutionIntegration:
     """
     Integrates the Evolution Cycle with the rest of the Milimo Claw system.
 
-    - Registers evolution cycles for all 5 claws
+    - Registers evolution cycles for all 6 claws
     - Uses real inference client (not mock)
     - Reads performance metrics from MetricsCollector
     - Runs on a configurable schedule (default: weekly)
@@ -90,8 +90,8 @@ class EvolutionIntegration:
 
         self._running = True
 
-        # Register all 5 claws by default
-        for role in ["build", "content", "ops", "analytics", "finance"]:
+        # Register all 6 claws by default
+        for role in ["build", "content", "ops", "analytics", "finance", "assistant"]:
             self.register_claw(role)
 
         # Check if any cycles should run immediately (missed during downtime)
@@ -138,7 +138,7 @@ class EvolutionIntegration:
         summary = {}
         metrics_base = Path.home() / ".milimo" / "metrics"
 
-        for role in ["build", "content", "ops", "analytics", "finance"]:
+        for role in ["build", "content", "ops", "analytics", "finance", "assistant"]:
             collector = MetricsCollector(claw_role=role, metrics_dir=metrics_base / role)
             summary[role] = collector.get_summary(lookback_hours=self.interval_days * 24)
 

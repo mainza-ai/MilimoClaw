@@ -116,7 +116,7 @@ Hello, this is Mainza
 Conduct a tests to ensure all claws are functioning
 ```
 
-All 5 claws should now return proper diagnostic output.
+All 6 claws should now return proper diagnostic output.
 
 ## Prevention
 

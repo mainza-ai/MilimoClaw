@@ -38,6 +38,7 @@ const ROLE_DESCRIPTIONS: Record<ClawRole, string> = {
   analytics: "Intelligence layer — performance, trends, opportunities",
   finance: "Financial ops — invoicing, pricing, margin tracking",
   build: "Engineering — code, PRs, deploys, monitoring (tech squads)",
+  assistant: "AI helper — scheduling, research, cross-claw coordination, operator support",
   solo: "All claws active on this machine (solo mode)",
 };
 
@@ -47,7 +48,7 @@ export function getRoleDescription(role: ClawRole): string {
 
 export function discoverTemplates(blueprintDir: string): TemplateDiscovery[] {
   const templatesDir = path.join(blueprintDir, "templates");
-  
+
   if (!fs.existsSync(templatesDir)) {
     return [];
   }
@@ -174,7 +175,7 @@ export function getBuiltInTemplates(): TemplateDiscovery[] {
       id: "solo-founder",
       name: "solo-founder",
       displayName: "Solo Founder",
-      description: "All 5 claws on one machine. One operator. The full product.",
+      description: "All 6 claws on one machine. One operator. The full product.",
       category: "solo",
       path: "",
       squadSize: 1,

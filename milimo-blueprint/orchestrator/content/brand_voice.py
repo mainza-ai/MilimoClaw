@@ -54,8 +54,12 @@ class VoiceProfile:
     sentence_length: str = "medium"
     example_approved_posts: list[str] = field(default_factory=list)
     example_rejected_posts: list[str] = field(default_factory=list)
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    last_updated: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_at: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
+    last_updated: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -72,10 +76,10 @@ class VoiceProfile:
 
 class BrandVoiceManager:
     """
-    Manages brand voice profiles for clients.
+        Manages brand voice profiles for clients.
 
-    Voice profiles are stored in /sandbox/content/brand/voice-profiles/.
-    Style calibration inference always routes to Local NIM.
+        Voice profiles are stored in /sandbox/content/brand/voice-profiles/.
+    Style calibration inference always routes to Local NIM (NEMOCLAW_MODEL).
     """
 
     def __init__(
@@ -144,16 +148,18 @@ class BrandVoiceManager:
 
         self._save_profile(profile)
 
-        self._log.append(LogEntry(
-            action_type="voice_profile_created",
-            entity_id=profile_id,
-            outcome="success",
-            client_id=client_id,
-            details={
-                "tone_descriptors": tone_descriptors,
-                "sentence_length": sentence_length,
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="voice_profile_created",
+                entity_id=profile_id,
+                outcome="success",
+                client_id=client_id,
+                details={
+                    "tone_descriptors": tone_descriptors,
+                    "sentence_length": sentence_length,
+                },
+            )
+        )
 
         logger.info("Created voice profile %s for client %s", profile_id, client_id)
 
@@ -179,23 +185,27 @@ class BrandVoiceManager:
         profile.example_approved_posts.append(approved_post)
 
         if len(profile.example_approved_posts) > MAX_APPROVED_EXAMPLES:
-            profile.example_approved_posts = profile.example_approved_posts[-MAX_APPROVED_EXAMPLES:]
+            profile.example_approved_posts = profile.example_approved_posts[
+                -MAX_APPROVED_EXAMPLES:
+            ]
 
         profile = self._recalibrate_profile(profile)
         profile.last_updated = datetime.now(timezone.utc).isoformat()
 
         self._save_profile(profile)
 
-        self._log.append(LogEntry(
-            action_type="voice_profile_updated",
-            entity_id=profile.profile_id,
-            outcome="success",
-            client_id=client_id,
-            details={
-                "update_type": "approval",
-                "approved_count": len(profile.example_approved_posts),
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="voice_profile_updated",
+                entity_id=profile.profile_id,
+                outcome="success",
+                client_id=client_id,
+                details={
+                    "update_type": "approval",
+                    "approved_count": len(profile.example_approved_posts),
+                },
+            )
+        )
 
         logger.debug("Updated voice profile for %s with approved post", client_id)
 
@@ -226,24 +236,28 @@ class BrandVoiceManager:
         profile.example_rejected_posts.append(rejected_entry)
 
         if len(profile.example_rejected_posts) > MAX_REJECTED_EXAMPLES:
-            profile.example_rejected_posts = profile.example_rejected_posts[-MAX_REJECTED_EXAMPLES:]
+            profile.example_rejected_posts = profile.example_rejected_posts[
+                -MAX_REJECTED_EXAMPLES:
+            ]
 
         profile = self._recalibrate_profile(profile)
         profile.last_updated = datetime.now(timezone.utc).isoformat()
 
         self._save_profile(profile)
 
-        self._log.append(LogEntry(
-            action_type="voice_profile_updated",
-            entity_id=profile.profile_id,
-            outcome="success",
-            client_id=client_id,
-            details={
-                "update_type": "rejection",
-                "rejected_count": len(profile.example_rejected_posts),
-                "reason": reason,
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="voice_profile_updated",
+                entity_id=profile.profile_id,
+                outcome="success",
+                client_id=client_id,
+                details={
+                    "update_type": "rejection",
+                    "rejected_count": len(profile.example_rejected_posts),
+                    "reason": reason,
+                },
+            )
+        )
 
         logger.debug("Updated voice profile for %s with rejected post", client_id)
 
@@ -269,16 +283,18 @@ class BrandVoiceManager:
 
         rewritten = self._apply_voice_inference(content, profile)
 
-        self._log.append(LogEntry(
-            action_type="voice_applied",
-            entity_id=profile.profile_id,
-            outcome="success",
-            client_id=client_id,
-            details={
-                "original_length": len(content),
-                "rewritten_length": len(rewritten),
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="voice_applied",
+                entity_id=profile.profile_id,
+                outcome="success",
+                client_id=client_id,
+                details={
+                    "original_length": len(content),
+                    "rewritten_length": len(rewritten),
+                },
+            )
+        )
 
         logger.debug("Applied voice profile for %s", client_id)
 
@@ -311,9 +327,17 @@ class BrandVoiceManager:
     def _extract_tone_descriptors(self, brief_tone: str) -> list[str]:
         """Extract tone descriptors from brief."""
         common_tones = [
-            "professional", "casual", "friendly", "formal",
-            "warm", "direct", "playful", "serious",
-            "approachable", "authoritative", "empathetic",
+            "professional",
+            "casual",
+            "friendly",
+            "formal",
+            "warm",
+            "direct",
+            "playful",
+            "serious",
+            "approachable",
+            "authoritative",
+            "empathetic",
         ]
 
         found = []
@@ -357,7 +381,11 @@ class BrandVoiceManager:
 
         if "concise" in brief_lower or "brief" in brief_lower or "short" in brief_lower:
             return "short"
-        if "detailed" in brief_lower or "comprehensive" in brief_lower or "long" in brief_lower:
+        if (
+            "detailed" in brief_lower
+            or "comprehensive" in brief_lower
+            or "long" in brief_lower
+        ):
             return "long"
 
         return "medium"
@@ -375,7 +403,9 @@ class BrandVoiceManager:
             )
 
         if len(profile.example_approved_posts) >= 3:
-            approved_lengths = [len(p.split()) for p in profile.example_approved_posts[-3:]]
+            approved_lengths = [
+                len(p.split()) for p in profile.example_approved_posts[-3:]
+            ]
             avg_length = sum(approved_lengths) / len(approved_lengths)
 
             if avg_length < 10:
@@ -399,7 +429,9 @@ class BrandVoiceManager:
                 decision.backend.value if decision else "no router",
             )
 
-        tone_prefix = ", ".join(profile.tone_descriptors[:2]) if profile.tone_descriptors else ""
+        tone_prefix = (
+            ", ".join(profile.tone_descriptors[:2]) if profile.tone_descriptors else ""
+        )
         if tone_prefix:
             return f"[{tone_prefix}] {content}"
 

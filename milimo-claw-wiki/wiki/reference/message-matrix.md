@@ -6,7 +6,7 @@
 - `raw/AGENTS.md`
 - [[message-contracts]]
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #reference #messages #matrix
 

@@ -545,7 +545,7 @@ def handle_collect_health(args: dict[str, Any]) -> dict[str, Any]:
         base_dir = home / ".milimo"
 
         result: dict[str, Any] = {}
-        claw_roles = ["content", "ops", "analytics", "finance", "build"]
+        claw_roles = ["content", "ops", "analytics", "finance", "build", "assistant"]
 
         for role in claw_roles:
             claw_health = _collect_claw_health(role, squad_id, base_dir)
@@ -740,7 +740,7 @@ def handle_send_to_claw(args: dict[str, Any]) -> dict[str, Any]:
     claw acts on them.
 
     Args:
-        role: Recipient claw role (content, ops, analytics, finance, build)
+        role: Recipient claw role (content, ops, analytics, finance, build, assistant)
         type: Message type (assistant_query, assistant_task)
         payload: Message payload
         squad_id: Squad ID (default: "default")
@@ -771,7 +771,7 @@ def handle_send_to_claw(args: dict[str, Any]) -> dict[str, Any]:
 
     if not recipient_role:
         raise RuntimeError(
-            "role is required (e.g., 'content', 'ops', 'analytics', 'finance', 'build')"
+            "role is required (e.g., 'content', 'ops', 'analytics', 'finance', 'build', 'assistant')"
         )
     if not message_type:
         raise RuntimeError(
@@ -806,7 +806,7 @@ def handle_send_to_claw(args: dict[str, Any]) -> dict[str, Any]:
         mesh = MeshCoordinator.from_dict({}, squad_id=squad_id, mesh_dir=str(mesh_dir))
 
     # Register all known claws so the mesh knows who exists
-    for claw_role in ["content", "ops", "analytics", "finance", "build"]:
+    for claw_role in ["content", "ops", "analytics", "finance", "build", "assistant"]:
         mesh.register_claw(claw_role, address=f"local://{claw_role}")
 
     result = mesh.send_message(message)
@@ -848,7 +848,7 @@ def handle_claw_status(args: dict[str, Any]) -> dict[str, Any]:
 
     if not claw_role:
         raise RuntimeError("role is required")
-    if claw_role not in {"content", "ops", "analytics", "finance", "build"}:
+    if claw_role not in {"content", "ops", "analytics", "finance", "build", "assistant"}:
         raise RuntimeError(f"Invalid claw role: {claw_role}")
 
     home = Path.home()
@@ -1181,7 +1181,7 @@ def handle_generate_weekly_report(args: dict[str, Any]) -> dict[str, Any]:
     }
 
     # Aggregate from each claw
-    for role in ["content", "ops", "analytics", "finance", "build"]:
+    for role in ["content", "ops", "analytics", "finance", "build", "assistant"]:
         claw_info: dict[str, Any] = {"role": role}
 
         # Tool count
@@ -1400,7 +1400,7 @@ def handle_discover_tools(args: dict[str, Any]) -> dict[str, Any]:
         "discovered_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    for role in ["content", "ops", "analytics", "finance", "build"]:
+    for role in ["content", "ops", "analytics", "finance", "build", "assistant"]:
         claw_tools: dict[str, Any] = {"tools": [], "count": 0, "last_evolution": None}
 
         registry_file = (
@@ -1451,7 +1451,7 @@ def handle_get_result(args: dict[str, Any]) -> dict[str, Any]:
         return {"status": "not_found", "message": "No outbox directory exists"}
 
     roles_to_check = (
-        [role] if role else ["content", "ops", "analytics", "finance", "build"]
+        [role] if role else ["content", "ops", "analytics", "finance", "build", "assistant"]
     )
 
     for check_role in roles_to_check:
@@ -1500,7 +1500,7 @@ def handle_start_claw(args: dict[str, Any]) -> dict[str, Any]:
     """Start a specific claw role via the launcher.
 
     Args:
-        role: The claw role to start (content, ops, analytics, finance, build)
+        role: The claw role to start (content, ops, analytics, finance, build, assistant)
 
     Returns:
         Dict with started status and role info
@@ -1512,7 +1512,7 @@ def handle_start_claw(args: dict[str, Any]) -> dict[str, Any]:
     if not role:
         raise RuntimeError("role is required")
 
-    valid_roles = ["content", "ops", "analytics", "finance", "build"]
+    valid_roles = ["content", "ops", "analytics", "finance", "build", "assistant"]
     if role not in valid_roles:
         raise RuntimeError(
             f"Invalid role '{role}'. Must be one of: {', '.join(valid_roles)}"
@@ -1657,7 +1657,7 @@ def handle_restart_all_claws(args: dict[str, Any]) -> dict[str, Any]:
     """
     import time
 
-    roles = ["content", "ops", "analytics", "finance", "build"]
+    roles = ["content", "ops", "analytics", "finance", "build", "assistant"]
     results = {}
 
     for role in roles:
@@ -1746,7 +1746,7 @@ def handle_launcher_status(args: dict[str, Any]) -> dict[str, Any]:
         except Exception:
             pass
 
-    roles = ["content", "ops", "analytics", "finance", "build"]
+    roles = ["content", "ops", "analytics", "finance", "build", "assistant"]
     for role in roles:
         hb_file = mesh_dir / "heartbeats" / f"{role}.json"
         if hb_file.exists():

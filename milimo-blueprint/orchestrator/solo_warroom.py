@@ -6,7 +6,7 @@
 Milimo Claw — Solo War Room
 
 Single-operator action queue with prioritized processing.
-All five claw queues merged into one unified view.
+All six claw queues merged into one unified view.
 """
 
 from __future__ import annotations
@@ -25,8 +25,10 @@ logger = logging.getLogger("milimo.solo_warroom")
 
 # ---------------------------------------------------------------------------
 
+
 class ActionPriority(Enum):
     """Action priority levels."""
+
     HOLD = 1
     REVIEW = 2
     AUTO = 3
@@ -34,6 +36,7 @@ class ActionPriority(Enum):
 
 class ActionStatus(Enum):
     """Action status."""
+
     PENDING = "pending"
     APPROVED = "approved"
     BLOCKED = "blocked"
@@ -42,9 +45,11 @@ class ActionStatus(Enum):
 
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class WarRoomAction:
     """An action pending operator review."""
+
     id: str = field(default_factory=lambda: f"act_{uuid.uuid4().hex[:8]}")
     claw: str = ""
     action_type: str = ""
@@ -59,6 +64,7 @@ class WarRoomAction:
 @dataclass
 class DigestSchedule:
     """Schedule for morning/evening digests."""
+
     morning_brief: time_type = time_type(7, 0)
     evening_wrap: time_type = time_type(20, 0)
 
@@ -66,6 +72,7 @@ class DigestSchedule:
 @dataclass
 class RevenueSummary:
     """Revenue summary for War Room widget."""
+
     week_revenue: float = 0.0
     week_over_week_pct: float = 0.0
     invoices_paid: int = 0
@@ -75,11 +82,12 @@ class RevenueSummary:
 
 # ---------------------------------------------------------------------------
 
+
 class SoloWarRoom:
     """
     Single-operator War Room.
 
-    Manages a prioritized action queue for all five claws.
+    Manages a prioritized action queue for all six claws.
     """
 
     def __init__(
@@ -102,7 +110,9 @@ class SoloWarRoom:
         self._processed: list[WarRoomAction] = []
         self._auto_executed: list[WarRoomAction] = []
 
-        self.approval_modes = config.get("operator_policy", {}).get("approval_modes", {})
+        self.approval_modes = config.get("operator_policy", {}).get(
+            "approval_modes", {}
+        )
 
         if log_dir is None:
             log_dir = Path.home() / ".milimo" / "logs"
@@ -128,9 +138,9 @@ class SoloWarRoom:
     def _setup_logger(self) -> None:
         """Setup file handler for War Room logs."""
         file_handler = logging.FileHandler(self.log_file)
-        file_handler.setFormatter(logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        ))
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        )
         logger.addHandler(file_handler)
 
     def _get_action_priority(self, claw: str, action_type: str) -> ActionPriority:
@@ -156,7 +166,10 @@ class SoloWarRoom:
         return priority_map.get(mode, ActionPriority.REVIEW)
 
     def queue_action(
-        self, claw: str, action_type: str, payload: dict[str, Any],
+        self,
+        claw: str,
+        action_type: str,
+        payload: dict[str, Any],
     ) -> WarRoomAction:
         """
         Add an action to the queue.
@@ -197,7 +210,9 @@ class SoloWarRoom:
         """Sort queue by priority (HOLD first, then REVIEW, then AUTO)."""
         self._queue.sort(key=lambda a: a.priority.value)
 
-    def get_pending(self, priority_filter: Optional[ActionPriority] = None) -> list[WarRoomAction]:
+    def get_pending(
+        self, priority_filter: Optional[ActionPriority] = None
+    ) -> list[WarRoomAction]:
         """
         Get pending actions.
 
@@ -320,9 +335,15 @@ class SoloWarRoom:
         pending = self.get_pending()
         return {
             "total_pending": len(pending),
-            "hold_count": len([a for a in pending if a.priority == ActionPriority.HOLD]),
-            "review_count": len([a for a in pending if a.priority == ActionPriority.REVIEW]),
-            "auto_count": len([a for a in pending if a.priority == ActionPriority.AUTO]),
+            "hold_count": len(
+                [a for a in pending if a.priority == ActionPriority.HOLD]
+            ),
+            "review_count": len(
+                [a for a in pending if a.priority == ActionPriority.REVIEW]
+            ),
+            "auto_count": len(
+                [a for a in pending if a.priority == ActionPriority.AUTO]
+            ),
             "processed_today": len(self._processed),
             "auto_executed_today": len(self._auto_executed),
         }
@@ -344,7 +365,7 @@ class SoloWarRoom:
         print(f"   🟢 AUTO (executed automatically): {stats['auto_count']}")
         print()
 
-        if stats['auto_executed_today'] > 0:
+        if stats["auto_executed_today"] > 0:
             print(f"✅ Auto-executed overnight: {stats['auto_executed_today']} actions")
             print()
 
@@ -352,7 +373,9 @@ class SoloWarRoom:
             print("📋 Pending Actions (priority order):")
             for action in pending[:10]:
                 emoji = {"HOLD": "🔴", "REVIEW": "🟡", "AUTO": "🟢"}
-                print(f"   {emoji.get(action.priority.name, '⚪')} [{action.id}] {action.claw}: {action.action_type}")
+                print(
+                    f"   {emoji.get(action.priority.name, '⚪')} [{action.id}] {action.claw}: {action.action_type}"
+                )
             print()
 
         print("=" * 60 + "\n")
@@ -374,11 +397,13 @@ class SoloWarRoom:
         print(f"   Remaining pending: {stats['total_pending']}")
         print()
 
-        if stats['total_pending'] > 0:
+        if stats["total_pending"] > 0:
             print("⚠️  Actions still pending:")
             pending = self.get_pending()
             for action in pending[:5]:
-                print(f"   • [{action.priority.name}] {action.claw}: {action.action_type}")
+                print(
+                    f"   • [{action.priority.name}] {action.claw}: {action.action_type}"
+                )
             print()
 
         print("=" * 60 + "\n")
@@ -454,7 +479,9 @@ class SoloWarRoom:
             previous_revenue = float(previous_week.get("total_revenue", 0.0))
 
             if previous_revenue > 0:
-                week_over_week_pct = ((week_revenue - previous_revenue) / previous_revenue) * 100
+                week_over_week_pct = (
+                    (week_revenue - previous_revenue) / previous_revenue
+                ) * 100
             else:
                 week_over_week_pct = 0.0
 
@@ -511,7 +538,7 @@ class SoloWarRoom:
 
     def get_health_panel(self) -> dict[str, Any]:
         """
-        Get health panel data for all five claws.
+        Get health panel data for all six claws.
 
         Returns dict with claw names as keys and health data as values.
         """

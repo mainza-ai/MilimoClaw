@@ -6,7 +6,7 @@
 - `milimo-blueprint/orchestrator/evolution_cycle.py`
 - `raw/AGENTS.md`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #evolution #tools #self-improvement
 
@@ -29,6 +29,7 @@ Staggered so each claw runs on fresh Analytics intelligence:
 | Sunday 02:25 | Analytics: evolution cycle |
 | Sunday 02:35 | Build: evolution cycle |
 | Sunday 03:00 | Finance: weekly revenue summary + evolution cycle |
+| Sunday 03:15 | Assistant: dispatch pattern analysis |
 
 Analytics runs first. Every other claw's cycle reads the fresh report. Finance runs last — uses revenue summary just generated.
 
@@ -118,6 +119,7 @@ Before first evolution, each claw needs:
 | Analytics | 3 weeks signal data + 1 revenue_summary + 1 health_signal |
 | Finance | 3 invoices + 2 completed projects + 4 weeks expense data |
 | Build | 5 merged PRs + 3 sprints + 2 deploys + 4 weeks cost data |
+| Assistant | 15 queries dispatched + 4 weeks routing data |
 
 ## Evolution Tools by Claw
 
@@ -159,8 +161,16 @@ Cost anomaly detector v2 → Dependency audit runner v2 →
 Error pattern classifier v2 → Churn signal correlator → Auto-roadmap drafter
 ```
 
+### Assistant Claw
+
+```
+Query pattern analyzer → Dispatch optimizer v2 → Response time predictor →
+Context window calibrator → User preference learner → Proactive notifier v2
+```
+
 ## Related Pages
 
 - [[tool-generation]] — Tool builder details
 - [[pattern-detection]] — Pattern identification
 - [[solo-founder]] — Evolution schedule config
+- [[assistant-lucy]] — Assistant evolution cycle

@@ -39,7 +39,9 @@ _TEMPLATE_CANDIDATES = [
     # 1. Relative to CWD (development on host)
     Path("milimo-claw-docs/reference/MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md"),
     # 2. Relative to this script's directory (plugin bundled copy)
-    Path(__file__).resolve().parent.parent / "docs" / "MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md",
+    Path(__file__).resolve().parent.parent
+    / "docs"
+    / "MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md",
     # 3. Home-relative (sandbox deployment)
     Path.home() / ".milimo" / "MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md",
 ]
@@ -85,7 +87,7 @@ class AssistantConfig:
 
 
 TEMPLATE_CLAW_MAP: dict[str, list[str]] = {
-    "solo-founder": ["content", "ops", "analytics", "finance", "build"],
+    "solo-founder": ["content", "ops", "analytics", "finance", "build", "assistant"],
     "content-agency": ["content", "ops", "analytics"],
     "design-studio": ["content", "ops", "finance"],
     "event-promotion": ["content", "ops", "analytics"],
@@ -119,7 +121,7 @@ def load_assistant_config() -> AssistantConfig:
 
     template_name = config.get("template", "solo-founder")
     active_claws = TEMPLATE_CLAW_MAP.get(
-        template_name, ["content", "ops", "analytics", "finance", "build"]
+        template_name, ["content", "ops", "analytics", "finance", "build", "assistant"]
     )
 
     return AssistantConfig(
@@ -145,9 +147,7 @@ def render_template(config: AssistantConfig) -> str:
     try:
         template = template_path.read_text(encoding="utf-8")
     except FileNotFoundError:
-        raise FileNotFoundError(
-            f"System prompt template not found at {template_path}"
-        )
+        raise FileNotFoundError(f"System prompt template not found at {template_path}")
 
     substitutions = {
         "{{assistant_name}}": config.name,
@@ -238,7 +238,7 @@ def setup_workspace_files(config: AssistantConfig) -> None:
 
 - **Squad:** {config.squad_name}
 - **Template:** {config.template_name}
-- **Active Claws:** {', '.join(config.active_claws)}
+- **Active Claws:** {", ".join(config.active_claws)}
 """
     IDENTITY_FILE.write_text(identity_content, encoding="utf-8")
     print(f"✓ Identity file updated: {IDENTITY_FILE}")
@@ -252,7 +252,7 @@ def setup_workspace_files(config: AssistantConfig) -> None:
 ## Context
 
 _{config.operator_name} runs the {config.squad_name} squad using the {config.template_name} template._
-_The squad has {len(config.active_claws)} active claws: {', '.join(config.active_claws)}._
+_The squad has {len(config.active_claws)} active claws: {", ".join(config.active_claws)}._
 """
     USER_FILE.write_text(user_content, encoding="utf-8")
     print(f"✓ User file updated: {USER_FILE}")
@@ -274,7 +274,7 @@ The squad name is **{config.squad_name}**. The active template is **{config.temp
 
 Milimo Claw is a multi-agent autonomous hustle platform. Specialized AI agents — called **claws** — run 24/7 in isolated sandboxes. Each claw handles one domain of the operator's business autonomously.
 
-**Active claws on this squad:** {', '.join(config.active_claws)}
+**Active claws on this squad:** {", ".join(config.active_claws)}
 
 The operator reviews pending actions in the **War Room TUI** (opens with `milimo warroom`). You are NOT the War Room — you are the conversational layer alongside it.
 
@@ -286,7 +286,7 @@ The operator reviews pending actions in the **War Room TUI** (opens with `milimo
 
 **Be resourceful before asking.** Try to figure it out first. Read the file. Check the context. _Then_ ask if you're stuck.
 
-**You know your claws.** You're the operator's partner who knows all of them — content, ops, analytics, finance, build. You can query their status, relay messages, and help coordinate.
+**You know your claws.** You're the operator's partner who knows all of them — content, ops, analytics, finance, build, assistant. You can query their status, relay messages, and help coordinate.
 
 ## Boundaries
 
@@ -371,13 +371,13 @@ You wake up fresh each session. These files are your continuity.
         # Renumber existing items
         modified = content.replace(
             "Before doing anything else:\n",
-            "Before doing anything else:\n\n1. Read `MILIMO_CLAW.md` — your full squad context, claw knowledge, and capabilities\n"
+            "Before doing anything else:\n\n1. Read `MILIMO_CLAW.md` — your full squad context, claw knowledge, and capabilities\n",
         )
         # Re-number subsequent items (2, 3, 4 instead of 1, 2, 3)
         modified = re.sub(
             r"\n(\d+)\. Read (`SOUL\.md`|`USER\.md`|`IDENTITY\.md`)",
             lambda m: f"\n{int(m.group(1)) + 1}. Read {m.group(2)}",
-            modified
+            modified,
         )
         AGENTS_FILE.write_text(modified, encoding="utf-8")
         print(f"✓ Updated AGENTS.md with Milimo startup instruction")
@@ -396,7 +396,7 @@ Before doing anything else:
 3. Read `USER.md` — this is who you're helping
 4. Read `IDENTITY.md` — your name, creature, vibe, and squad context
 
-"""
+""",
         )
         AGENTS_FILE.write_text(modified, encoding="utf-8")
         print(f"✓ Updated AGENTS.md with Milimo startup section")
@@ -461,12 +461,17 @@ def verify_setup() -> dict[str, bool]:
         "template_exists": template_found,
         "system_prompt_installed": SYSTEM_PROMPT_DEST.exists(),
         "agent_config_exists": AGENT_CONFIG_DEST.exists(),
-        "bridge_cli_exists": (BLUEPRINT_BASE / "orchestrator" / "bridge_cli.py").exists(),
+        "bridge_cli_exists": (
+            BLUEPRINT_BASE / "orchestrator" / "bridge_cli.py"
+        ).exists(),
         "workspace_identity_exists": IDENTITY_FILE.exists(),
         "workspace_user_exists": USER_FILE.exists(),
         "bootstrap_removed": not BOOTSTRAP_FILE.exists(),
         "milimo_context_exists": MILIMO_CONTEXT_FILE.exists(),
-        "agents_includes_milimo": AGENTS_FILE.exists() and "MILIMO_CLAW.md" in AGENTS_FILE.read_text(encoding="utf-8") if AGENTS_FILE.exists() else False,
+        "agents_includes_milimo": AGENTS_FILE.exists()
+        and "MILIMO_CLAW.md" in AGENTS_FILE.read_text(encoding="utf-8")
+        if AGENTS_FILE.exists()
+        else False,
     }
 
 

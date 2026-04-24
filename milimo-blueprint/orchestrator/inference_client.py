@@ -3,7 +3,7 @@ NVIDIA NIM Inference Client with fallback chain and category-based model routing
 
 Wraps the NVIDIA NIM API (OpenAI-compatible) for all inference needs across
 Build, Content, and Ops claws. Implements the fallback chain defined in
-build_init.py (nemotron-120b → claude-sonnet-4-6 → gemini-3.1-pro) and
+build_init.py (NEMOCLAW_MODEL → claude-sonnet-4-6 → gemini-3.1-pro) and
 category-based model/temperature selection from BUILD_CATEGORIES.
 
 Environment variables:
@@ -26,36 +26,41 @@ import requests
 
 logger = logging.getLogger("milimo.inference_client")
 
+_NEMOCLAW_MODEL = os.environ.get("NEMOCLAW_MODEL", "nvidia/nemotron-4-340b-instruct")
+
 # Default fallback chain (matches build_init.py)
 DEFAULT_FALLBACK_CHAIN = [
-    "nvidia/nemotron-4-340b-instruct",
+    _NEMOCLAW_MODEL,
     "meta/llama-3.3-70b-instruct",
     "mistralai/mixtral-8x22b-instruct-v0.1",
 ]
 
-DEFAULT_API_BASE = os.environ.get("NVIDIA_API_BASE", "https://integrate.api.nvidia.com/v1")
+DEFAULT_API_BASE = os.environ.get(
+    "NVIDIA_API_BASE", "https://integrate.api.nvidia.com/v1"
+)
 
-# Category-based model routing defaults
+# Category-based model routing defaults (model set from NEMOCLAW_MODEL env var)
 CATEGORY_MODELS: dict[str, dict[str, Any]] = {
-    "source_code_generation": {"model": "nvidia/nemotron-4-340b-instruct", "temperature": 0.1},
-    "code_review": {"model": "nvidia/nemotron-4-340b-instruct", "temperature": 0.1},
-    "pr_description_generation": {"model": "nvidia/nemotron-4-340b-instruct", "temperature": 0.3},
-    "issue_complexity_scoring": {"model": "nvidia/nemotron-4-340b-instruct", "temperature": 0.2},
-    "changelog_generation": {"model": "nvidia/nemotron-4-340b-instruct", "temperature": 0.7},
-    "api_documentation_generation": {"model": "nvidia/nemotron-4-340b-instruct", "temperature": 0.3},
-    "devlog_draft_generation": {"model": "nvidia/nemotron-4-340b-instruct", "temperature": 0.7},
-    "dependency_vulnerability_analysis": {"model": "nvidia/nemotron-4-340b-instruct", "temperature": 0.1},
-    "content_draft": {"model": "nvidia/nemotron-4-340b-instruct", "temperature": 0.7},
-    "content_plan": {"model": "nvidia/nemotron-4-340b-instruct", "temperature": 0.3},
-    "sentiment_analysis": {"model": "nvidia/nemotron-4-340b-instruct", "temperature": 0.1},
-    "incident_analysis": {"model": "nvidia/nemotron-4-340b-instruct", "temperature": 0.2},
-    "general": {"model": "nvidia/nemotron-4-340b-instruct", "temperature": 0.5},
+    "source_code_generation": {"model": _NEMOCLAW_MODEL, "temperature": 0.1},
+    "code_review": {"model": _NEMOCLAW_MODEL, "temperature": 0.1},
+    "pr_description_generation": {"model": _NEMOCLAW_MODEL, "temperature": 0.3},
+    "issue_complexity_scoring": {"model": _NEMOCLAW_MODEL, "temperature": 0.2},
+    "changelog_generation": {"model": _NEMOCLAW_MODEL, "temperature": 0.7},
+    "api_documentation_generation": {"model": _NEMOCLAW_MODEL, "temperature": 0.3},
+    "devlog_draft_generation": {"model": _NEMOCLAW_MODEL, "temperature": 0.7},
+    "dependency_vulnerability_analysis": {"model": _NEMOCLAW_MODEL, "temperature": 0.1},
+    "content_draft": {"model": _NEMOCLAW_MODEL, "temperature": 0.7},
+    "content_plan": {"model": _NEMOCLAW_MODEL, "temperature": 0.3},
+    "sentiment_analysis": {"model": _NEMOCLAW_MODEL, "temperature": 0.1},
+    "incident_analysis": {"model": _NEMOCLAW_MODEL, "temperature": 0.2},
+    "general": {"model": _NEMOCLAW_MODEL, "temperature": 0.5},
 }
 
 
 @dataclass
 class InferenceUsage:
     """Tracks token usage and cost for a single inference call."""
+
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
@@ -71,6 +76,7 @@ class InferenceUsage:
 @dataclass
 class InferenceResponse:
     """Response from an inference call."""
+
     content: str
     usage: InferenceUsage
     model_used: str
@@ -157,7 +163,9 @@ class NvidiaInferenceClient:
                 )
                 usage = InferenceUsage(
                     prompt_tokens=response.get("usage", {}).get("prompt_tokens", 0),
-                    completion_tokens=response.get("usage", {}).get("completion_tokens", 0),
+                    completion_tokens=response.get("usage", {}).get(
+                        "completion_tokens", 0
+                    ),
                     total_tokens=response.get("usage", {}).get("total_tokens", 0),
                     estimated_cost_usd=self._estimate_cost(
                         response.get("usage", {}).get("total_tokens", 0)
@@ -169,11 +177,15 @@ class NvidiaInferenceClient:
 
                 content = ""
                 if "choices" in response and response["choices"]:
-                    content = response["choices"][0].get("message", {}).get("content", "")
+                    content = (
+                        response["choices"][0].get("message", {}).get("content", "")
+                    )
 
                 logger.info(
                     "Inference success with %s (attempt %d, %d tokens)",
-                    model_name, attempt_idx + 1, usage.total_tokens,
+                    model_name,
+                    attempt_idx + 1,
+                    usage.total_tokens,
                 )
                 return content
 
@@ -181,10 +193,13 @@ class NvidiaInferenceClient:
                 last_error = str(exc)
                 logger.warning(
                     "Inference failed with %s (attempt %d/%d): %s",
-                    model_name, attempt_idx + 1, len(self.fallback_chain), last_error,
+                    model_name,
+                    attempt_idx + 1,
+                    len(self.fallback_chain),
+                    last_error,
                 )
                 if attempt_idx < len(self.fallback_chain) - 1:
-                    time.sleep(2 ** attempt_idx)  # Exponential backoff
+                    time.sleep(2**attempt_idx)  # Exponential backoff
 
         raise RuntimeError(
             f"All {len(self.fallback_chain)} models in fallback chain failed. "
@@ -269,5 +284,5 @@ class NvidiaInferenceClient:
 
     @staticmethod
     def _estimate_cost(total_tokens: int) -> float:
-        """Estimate cost based on token count (~$0.0001 per token for Nemotron)."""
+        """Estimate cost based on token count (~$0.0001 per token for NEMOCLAW_MODEL)."""
         return total_tokens * 0.0001

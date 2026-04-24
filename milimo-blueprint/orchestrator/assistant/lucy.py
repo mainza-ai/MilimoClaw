@@ -34,7 +34,7 @@ import requests
 
 logger = logging.getLogger("milimo.assistant")
 
-ALL_CLAW_ROLES = ["content", "ops", "analytics", "finance", "build"]
+ALL_CLAW_ROLES = ["content", "ops", "analytics", "finance", "build", "assistant"]
 TELEGRAM_API_BASE = "https://api.telegram.org"
 RESPONSE_TIMEOUT_SECONDS = 60
 
@@ -154,7 +154,9 @@ class LucyAssistant:
         self._squad_id = squad_id
         self._mesh_gateway = mesh_gateway
         self._telegram = telegram_bridge
-        self._inbox_dir = inbox_dir or Path.home() / ".milimo" / "mesh" / "inbox" / "assistant"
+        self._inbox_dir = (
+            inbox_dir or Path.home() / ".milimo" / "mesh" / "inbox" / "assistant"
+        )
         self._base_path = base_path or Path("/sandbox/.milimo/assistant")
 
         self._pending: dict[str, PendingQuery] = {}
@@ -285,9 +287,7 @@ class LucyAssistant:
             if not sent:
                 logger.warning("LucyAssistant: failed to send query to %s", role)
 
-        logger.info(
-            "LucyAssistant: dispatched query %s to %s", query_id, roles
-        )
+        logger.info("LucyAssistant: dispatched query %s to %s", query_id, roles)
         return query_id
 
     def dispatch_task(
@@ -335,9 +335,7 @@ class LucyAssistant:
         if not sent:
             logger.warning("LucyAssistant: failed to send task to %s", target_role)
 
-        logger.info(
-            "LucyAssistant: dispatched task %s to %s", message_id, target_role
-        )
+        logger.info("LucyAssistant: dispatched task %s to %s", message_id, target_role)
         return message_id
 
     def _relay_to_telegram(self, pending: PendingQuery) -> None:
@@ -359,9 +357,7 @@ class LucyAssistant:
 
         missing = set(pending.target_roles) - set(pending.responses.keys())
         if missing:
-            lines.append(
-                f"_No response from: {', '.join(missing)}_"
-            )
+            lines.append(f"_No response from: {', '.join(missing)}_")
 
         text = "\n".join(lines)
         self._telegram.send_message(text, chat_id=pending.telegram_chat_id)
@@ -447,7 +443,15 @@ class LucyAssistant:
                 )
             return ""
 
-        task_keywords = ["do", "create", "generate", "send", "schedule", "start", "build"]
+        task_keywords = [
+            "do",
+            "create",
+            "generate",
+            "send",
+            "schedule",
+            "start",
+            "build",
+        ]
         first_word = message.split()[0].lower() if message else ""
         if first_word in task_keywords:
             return self.dispatch_task(

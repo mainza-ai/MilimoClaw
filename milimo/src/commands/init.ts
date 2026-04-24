@@ -183,6 +183,7 @@ function getRoleDescription(role: ClawRole): string {
     analytics: "Intelligence layer — performance, trends, opportunities",
     finance: "Financial ops — invoicing, pricing, margin tracking",
     build: "Engineering — code, PRs, deploys, monitoring (tech squads)",
+    assistant: "AI helper — scheduling, research, cross-claw coordination, operator support",
     solo: "All claws active on this machine (solo mode)",
   };
   return descriptions[role];

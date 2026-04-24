@@ -30,25 +30,32 @@ logger = logging.getLogger("milimo.solo_sandbox")
 
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SandboxPolicy:
     """NemoClaw sandbox policy configuration."""
+
     claw: str
     mount: str
     network_egress: list[str] = field(default_factory=list)
     inference_routes: dict[str, str] = field(default_factory=dict)
     approval_mode: str = "REVIEW"
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_at: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
     version: str = "1.0.0"
 
 
 # ---------------------------------------------------------------------------
 
-def init_solo_sandbox(config: dict[str, Any], base_dir: Path | None = None) -> dict[str, Any]:
+
+def init_solo_sandbox(
+    config: dict[str, Any], base_dir: Path | None = None
+) -> dict[str, Any]:
     """
     Initialize solo founder sandbox environment.
 
-    Creates all five filesystem mount directories and generates
+    Creates all six filesystem mount directories and generates
     NemoClaw-compatible sandbox policy YAML files.
 
     Args:
@@ -140,7 +147,9 @@ def _determine_default_approval(claw_modes: dict[str, str]) -> str:
         return "AUTO"
 
 
-def _get_inference_routes(claw: str, routing_overrides: dict[str, str]) -> dict[str, str]:
+def _get_inference_routes(
+    claw: str, routing_overrides: dict[str, str]
+) -> dict[str, str]:
     """
     Get inference routing configuration for a claw.
 
@@ -277,6 +286,7 @@ def create_mount_directories(config: dict[str, Any], dry_run: bool = True) -> li
             logger.info(f"Would create: {path}")
         else:
             import subprocess
+
             subprocess.run(cmd, shell=True, check=True)
             logger.info(f"Created: {path}")
 
@@ -294,13 +304,13 @@ def load_sandbox_policy(claw_role: str) -> dict[str, Any]:
     Maps role names: "ops" → "ops-sandbox.yaml", "clients" → "ops-sandbox.yaml"
 
     Args:
-        claw_role: The claw role name (content, ops, analytics, finance, build)
+    claw_role: The claw role name (content, ops, analytics, finance, build, assistant)
 
     Returns:
-        Parsed sandbox policy as dict
+    Parsed sandbox policy as dict
 
     Raises:
-        FileNotFoundError: If the policy file doesn't exist
+    FileNotFoundError: If the policy file doesn't exist
     """
     role_to_file = {
         "content": "content-sandbox.yaml",
@@ -309,6 +319,7 @@ def load_sandbox_policy(claw_role: str) -> dict[str, Any]:
         "analytics": "analytics-sandbox.yaml",
         "finance": "finance-sandbox.yaml",
         "build": "build-sandbox.yaml",
+        "assistant": "assistant-sandbox.yaml",
     }
 
     filename = role_to_file.get(claw_role, f"{claw_role}-sandbox.yaml")

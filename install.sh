@@ -109,7 +109,7 @@ while [[ $# -gt 0 ]]; do
       printf "  ${C_DIM}Usage:${C_RESET}\n"
       printf "    ./install.sh [options]\n\n"
       printf "  ${C_DIM}Options:${C_RESET}\n"
-      printf "    --solo                  Solo mode (all 5 claws active) [default]\n"
+      printf " --solo Solo mode (all 6 claws active) [default]\n"
       printf "    --operator-name <name>  Operator name (default: \$USER)\n"
       printf "    --squad-name <name>     Squad name (default: milimo-squad)\n"
       printf "    --warroom-mode <mode>   War Room mode: full|minimal|disabled\n"
@@ -415,7 +415,7 @@ deploy_to_sandbox() {
 
     echo "All sandbox directories initialized"
   '
-  ok "Sandbox directories initialized for all 5 claws (with log permissions fixed)"
+  ok "Sandbox directories initialized for all 6 claws (with log permissions fixed)"
 
   # ---- Step 6c: Copy blueprint to .milimo/blueprints/0.1.0/ ----
   info "Copying blueprint to .milimo/blueprints/0.1.0/..."
@@ -737,7 +737,7 @@ run_onboarding() {
 
   if [ "$DRY_RUN" = true ]; then
     info "Dry run — would configure:"
-    info "  Squad: $squad (solo template, all 5 claws)"
+    info " Squad: $squad (solo template, all 6 claws)"
     info "  Operator: $operator"
     info "  War Room: $WARROOM_MODE"
     return 0
@@ -925,9 +925,9 @@ print_summary() {
   printf "  ${C_GREEN}${C_BOLD}  MilimoClaw v%s — Installation Complete${C_RESET}\n" "$MILIMO_VERSION"
   printf "  ${C_GREEN}${C_BOLD}──────────────────────────────────────────────────────${C_RESET}\n"
   echo ""
-  echo "  Squad:      $squad (solo — all 5 claws active)"
-  echo "  Operator:   $operator"
-  echo "  Claws:      Content · Ops · Analytics · Finance · Build"
+  echo " Squad: $squad (solo — all 6 claws active)"
+  echo " Operator: $operator"
+  echo " Claws: Content · Ops · Analytics · Finance · Build · Assistant"
   echo "  War Room:   $WARROOM_MODE"
   echo "  Elapsed:    ${elapsed}s"
   echo ""

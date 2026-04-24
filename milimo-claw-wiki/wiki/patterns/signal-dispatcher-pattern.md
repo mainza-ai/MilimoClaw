@@ -1,6 +1,14 @@
 # Signal Dispatcher Pattern
 
-Inter-claw communication pattern used across all claws.
+**Summary**: Inter-claw communication pattern used across all claws for consistent message format, logging, and error handling.
+
+**Sources**: `milimo-blueprint/orchestrator/*/signal_dispatcher.py`, `milimo-blueprint/orchestrator/assistant/lucy.py`
+
+**Last updated**: 2026-04-23
+
+**Tags**: #patterns #signal-dispatcher #communication #mesh
+
+---
 
 ## Purpose
 

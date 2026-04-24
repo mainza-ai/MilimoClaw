@@ -12,14 +12,14 @@ schema_version: "0.1.0"
 
 # Required fields for every claw role blueprint
 required_fields:
-  - role                  # content | ops | analytics | finance | build
-  - display_name          # Human-readable role name
-  - description           # What this claw does
-  - filesystem_mount      # Primary sandbox directory
-  - egress_policy         # Network egress allowlist name
-  - inference_routing     # Data type → inference backend mapping
-  - inter_claw_policy     # Inbound/outbound message type contracts
-  - approval_thresholds   # Per-action approval modes
+  - "role"
+  - "display_name"
+  - "description"
+  - "filesystem_mount"
+  - "egress_policy"
+  - "inference_routing"
+  - "inter_claw_policy"
+  - "approval_thresholds"
 
 # Valid role identifiers
 valid_roles:
@@ -28,6 +28,7 @@ valid_roles:
   - analytics
   - finance
   - build
+  - assistant
 
 # Filesystem mount constraints
 filesystem_rules:
@@ -42,15 +43,15 @@ filesystem_rules:
 
 # Inference routing modes
 inference_backends:
-  - id: cloud
-    name: "NVIDIA Cloud Nemotron 120B"
-    description: "Max quality for client-facing work"
-  - id: local-nim
-    name: "Local NIM on RTX"
-    description: "Private data stays on device"
-  - id: local-vllm
-    name: "Local vLLM"
-    description: "Tightest isolation, lightweight"
+- id: cloud
+  name: "Cloud (NEMOCLAW_MODEL)"
+  description: "Max quality for client-facing work"
+- id: local-nim
+  name: "Local NIM (NEMOCLAW_MODEL)"
+  description: "Private data stays on device"
+- id: local-vllm
+  name: "Local vLLM"
+  description: "Tightest isolation, lightweight"
 
 # Approval mode definitions
 approval_modes:
@@ -69,9 +70,9 @@ approval_modes:
 
 # Inter-claw message type categories
 message_categories:
-  - brief           # Project/creative briefs
-  - query           # Data requests
-  - response        # Query responses
-  - signal          # Signals/alerts (deadline, risk, anomaly)
-  - deliverable     # Completed work products
-  - summary         # Periodic reports (weekly intelligence, shipping)
+  - brief
+  - query
+  - response
+  - signal
+  - deliverable
+  - summary

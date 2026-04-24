@@ -423,6 +423,39 @@ async function cliOnboard(opts) {
     };
     (0, config_js_1.saveOnboardConfig)(config);
     logger.info(" ✓ Saved configuration to ~/.milimo/config.json");
+    // Step 11a: Sandbox auto-creation (unless --no-sandbox)
+    if (!opts.noSandbox) {
+        logger.info("");
+        logger.info("Creating per-claw NemoClaw sandboxes...");
+        try {
+            const { execFileSync } = await import("child_process");
+            const home = process.env.HOME ?? "/tmp";
+            const blueprintDir = path.join(home, ".milimo", "blueprints", "0.1.0");
+            const soloInitPath = path.join(blueprintDir, "orchestrator", "solo_init.py");
+            if (fs.existsSync(soloInitPath)) {
+                const roleArg = solo ? "solo" : clawRole;
+                execFileSync("python3", [soloInitPath, "--role", roleArg, "--template", template], {
+                    cwd: blueprintDir,
+                    timeout: 120_000,
+                    stdio: ["pipe", "pipe", "pipe"],
+                });
+                logger.info(` ✓ Sandbox directories created for: ${activeClaws.join(", ")}`);
+            }
+            else {
+                logger.warn(" solo_init.py not found — skipping sandbox auto-creation.");
+                logger.warn(" Run 'openclaw milimo init' to create sandbox directories manually.");
+            }
+        }
+        catch (err) {
+            logger.warn(" Sandbox auto-creation failed — sandboxes can be created manually later.");
+            logger.warn(err instanceof Error ? err.message : String(err));
+        }
+    }
+    else {
+        logger.info("");
+        logger.info(" Skipping sandbox creation (--no-sandbox flag set).");
+        logger.info(" Create sandboxes manually with: openclaw milimo init");
+    }
     // Run assistant setup automatically
     logger.info("");
     logger.info("Configuring squad assistant...");

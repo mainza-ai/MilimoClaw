@@ -25,22 +25,27 @@ logger = logging.getLogger("milimo.solo_init")
 
 # ---------------------------------------------------------------------------
 
+
 class TemplateValidationError(Exception):
     """Raised when template validation fails."""
+
     pass
 
 
 class MissingFieldError(TemplateValidationError):
     """Raised when a required field is missing."""
+
     pass
 
 
 class InvalidFieldTypeError(TemplateValidationError):
     """Raised when a field has an invalid type."""
+
     pass
 
 
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class FilesystemConfig:
@@ -55,17 +60,24 @@ class FilesystemConfig:
 # ---------------------------------------------------------------------------
 
 REQUIRED_FIELDS = {
-    "template": ["name", "display_name", "category", "description", "squad_size", "claws_active"],
+    "template": [
+        "name",
+        "display_name",
+        "category",
+        "description",
+        "squad_size",
+        "claws_active",
+    ],
     "operator_policy": ["squad_lead", "approval_modes"],
-    "filesystem": ["content", "ops", "analytics", "finance", "build"],
+    "filesystem": ["content", "ops", "analytics", "finance", "build", "assistant"],
     "inference": ["routing_overrides", "cost_guard"],
     "war_room": ["operator", "mode", "queue_priority", "digest_schedule"],
     "evolution": ["cycle_day", "schedule", "per_claw"],
-    "network_egress": ["content", "ops", "analytics", "finance", "build"],
+    "network_egress": ["content", "ops", "analytics", "finance", "build", "assistant"],
     "deep_work_mode": ["alias", "on_activate", "auto_response_template"],
 }
 
-CLAWS = ["content", "ops", "analytics", "finance", "build"]
+CLAWS = ["content", "ops", "analytics", "finance", "build", "assistant"]
 
 LOCKED_ROUTES = ["financial_data", "source_code"]
 
@@ -298,6 +310,7 @@ def _print_path_summary(fs_config: FilesystemConfig) -> None:
 
 # ---------------------------------------------------------------------------
 
+
 def load_solo_founder_template(path: str) -> dict[str, Any]:
     """
     Load and validate a solo-founder.yaml template.
@@ -335,7 +348,9 @@ def load_solo_founder_template(path: str) -> dict[str, Any]:
     _validate_field_types(config)
     _validate_locked_routes(config)
 
-    logger.info(f"Successfully loaded template: {config.get('template', {}).get('name', 'unknown')}")
+    logger.info(
+        f"Successfully loaded template: {config.get('template', {}).get('name', 'unknown')}"
+    )
 
     return config
 
@@ -443,11 +458,15 @@ def _validate_field_types(config: dict[str, Any]) -> None:
             errors.append("inference.cost_guard must be a dict")
         else:
             if not isinstance(cost_guard.get("daily_cloud_token_budget"), int):
-                errors.append("inference.cost_guard.daily_cloud_token_budget must be an int")
+                errors.append(
+                    "inference.cost_guard.daily_cloud_token_budget must be an int"
+                )
             if not isinstance(cost_guard.get("alert_at_percent"), (int, float)):
                 errors.append("inference.cost_guard.alert_at_percent must be a number")
             if not isinstance(cost_guard.get("fallback_on_exceed"), str):
-                errors.append("inference.cost_guard.fallback_on_exceed must be a string")
+                errors.append(
+                    "inference.cost_guard.fallback_on_exceed must be a string"
+                )
 
     # war_room section
     war_room = config.get("war_room", {})
@@ -532,7 +551,7 @@ def get_claws_to_initialize(config: dict[str, Any]) -> list[str]:
 
     Solo mode (clawRole == "solo"):
         Returns all active claws from the template.
-        All five sandboxes are created on this machine.
+        All six sandboxes are created on this machine.
 
     Mesh mode (clawRole is a specific claw name):
         Returns only the one claw this operator runs.
@@ -549,7 +568,7 @@ def get_claws_to_initialize(config: dict[str, Any]) -> list[str]:
     """
     claw_role: str = config.get("clawRole", "solo")
     active_claws: list[str] = config.get(
-        "activeClaws", ["content", "ops", "analytics", "finance", "build"]
+        "activeClaws", ["content", "ops", "analytics", "finance", "build", "assistant"]
     )
 
     if claw_role == "solo":

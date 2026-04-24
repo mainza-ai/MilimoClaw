@@ -6,7 +6,7 @@
 - `raw/ARCHITECTURE.md`
 - `raw/AGENTS.md`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #architecture #sandbox #isolation #security
 
@@ -23,7 +23,7 @@ Each claw runs inside a NemoClaw sandbox with **kernel-level isolation**. This e
 | **Filesystem** | Landlock LSM | Each claw can only access its own `/sandbox/<role>` mount |
 | **Network** | OpenShell netns + egress policy | Per-claw API allowlists — Finance can't reach social APIs |
 | **Process** | seccomp BPF | Blocks privilege escalation, restricts dangerous syscalls |
-| **Inference** | Privacy router intercept | Sensitive data routed to local NIM, never to cloud |
+| **Inference** | Privacy router intercept | Sensitive data routed to local NIM (NEMOCLAW_MODEL), never to cloud |
 | **Communication** | Typed contract validation | Inter-claw messages validated against policy before delivery |
 
 ## Filesystem Mounts
@@ -62,7 +62,7 @@ One exception exists — Analytics Claw's shared read export:
 /sandbox/analytics/reports/weekly-intelligence.json
 ```
 
-This file must be configured as a read-only mount in **all five** claw sandbox policies. It's the only file in the entire mesh that all claws can read directly without a message contract.
+This file must be configured as a read-only mount in **all six** claw sandbox policies. It's the only file in the entire mesh that all claws can read directly without a message contract.
 
 ## Network Isolation
 
@@ -77,6 +77,7 @@ Each claw has a specific API allowlist defined in its sandbox policy:
 | Analytics | Read-only platform analytics, Google Trends |
 | Finance | Stripe, payment gateways |
 | Build | GitHub, Vercel, Sentry |
+| [[assistant-lucy\|Assistant]] | NVIDIA NIM, GitHub, Vercel, Sentry, Stripe (read-only), Telegram Bot API |
 
 ### Network Policy Files
 
@@ -182,3 +183,4 @@ Tests verify:
 - [[network-egress]] — Network policy configuration
 - [[mesh-coordinator]] — Inter-sandbox communication
 - [[privacy-router]] — Inference isolation
+- [[assistant-lucy]] — Assistant Claw sandbox details

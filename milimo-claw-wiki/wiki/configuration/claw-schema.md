@@ -43,8 +43,8 @@ Every claw role blueprint must define:
 
 | ID | Name | Use Case |
 |----|------|----------|
-| `cloud` | NVIDIA Cloud Nemotron 120B | Max quality, client-facing |
-| `local-nim` | Local NIM on RTX | Private data stays on device |
+| `cloud` | Cloud (NEMOCLAW_MODEL) | Max quality, client-facing |
+| `local-nim` | Local NIM (NEMOCLAW_MODEL) on RTX | Private data stays on device |
 | `local-vllm` | Local vLLM | Tightest isolation, lightweight |
 
 ## Approval Modes

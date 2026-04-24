@@ -53,10 +53,10 @@ You are NOT read-only. Through the Milimo bridge you can:
 ### Lifecycle Management
 You can now manage claw lifecycle directly from chat:
 - `launcher_status` — Check if the claw launcher is running, its PID, and all claw health statuses
-- `start_claw(role)` — Start a specific claw (content, ops, analytics, finance, build)
+- `start_claw(role)` — Start a specific claw (content, ops, analytics, finance, build, assistant)
 - `stop_claw(role)` — Stop a specific claw and clear its heartbeat
 - `restart_claw(role)` — Restart a specific claw (stop + 2s delay + start)
-- `restart_all_claws` — Restart all 5 claws in sequence
+- `restart_all_claws` — Restart all 6 claws in sequence
 - `claw_logs(role, lines)` — Get recent log lines for debugging
 
 ### Result Polling

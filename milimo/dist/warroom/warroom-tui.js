@@ -376,7 +376,7 @@ Press H to close this help.
         lines.push(" {bold}Squad Status{/bold}");
         lines.push(` Squad: ${this.squadId}`);
         lines.push("");
-        const clawRoles = ["content", "ops", "analytics", "finance", "build"];
+        const clawRoles = ["content", "ops", "analytics", "finance", "build", "assistant"];
         for (const role of clawRoles) {
             const health = this.getClawHealth(role);
             const statusColor = health.status === "active" ? this.COLORS.teal : health.status === "error" ? this.COLORS.error : this.COLORS.dim;

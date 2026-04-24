@@ -126,7 +126,7 @@ class ToolBuilder:
 4. Check improvement threshold (default: 5%)
 5. Stage for deployment if passed
 
-**Privacy routing**: Tool code generation routes to **Local NIM** — source code is IP.
+**Privacy routing**: Tool code generation routes to **Local NIM (NEMOCLAW_MODEL)** — source code is IP.
 
 ---
 
@@ -303,7 +303,7 @@ STAGE 4 — BUILD & TEST
 ## Dependencies
 
 - [[evolution-cycle]] — Sunday evolution pipeline
-- [[privacy-router]] — Inference routing (source_code → Local NIM)
+- [[privacy-router]] — Inference routing (source_code → Local NIM (NEMOCLAW_MODEL))
 - [[pattern-detector]] — Pattern identification
 
 ## Related Pages

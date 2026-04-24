@@ -5,7 +5,7 @@
 **Sources**:
 - `milimo-claw-docs/troubleshooting/ISSUES_AND_FIXES_AUDIT.md`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #troubleshooting #audit #fixes
 
@@ -21,7 +21,7 @@ This page documents all significant issues discovered and fixed during MilimoCla
 
 ### Problem
 
-All 5 claws were missing handlers for `assistant_query` and `assistant_task` message types. Messages from Lucy were delivered to inboxes but ignored.
+All 5 non-assistant claws (of 6 total) were missing handlers for `assistant_query` and `assistant_task` message types. Messages from Lucy were delivered to inboxes but ignored.
 
 ### Evidence
 
@@ -31,7 +31,7 @@ All 5 claws were missing handlers for `assistant_query` and `assistant_task` mes
 
 ### Fix
 
-Added `_handle_assistant_query` and `_handle_assistant_task` methods to all 5 claws.
+Added `_handle_assistant_query` and `_handle_assistant_task` methods to all 5 non-assistant claws (of 6 total).
 
 ### Files Modified
 
@@ -106,6 +106,7 @@ HEALTH_PORTS = {
     "analytics": 8083,
     "finance": 8084,
     "build": 8085,
+    "assistant": 8086,
 }
 ```
 

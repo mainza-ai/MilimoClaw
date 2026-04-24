@@ -1,7 +1,7 @@
 # milimo-blueprint/templates/solo-founder.yaml
 # ─────────────────────────────────────────────
 # MILIMO CLAW — SOLO FOUNDER TEMPLATE
-# Run all five claws from a single machine.
+# Run all six claws from a single machine.
 # One operator. Full company. Always on.
 # ─────────────────────────────────────────────
 
@@ -10,20 +10,21 @@ template:
   display_name: "Solo Founder"
   category: founder
   description: >
-    All five claws running on a single machine under a single operator.
+    All six claws running on a single machine under a single operator.
     Designed for solo founders who want to run a full autonomous operation
     before scaling to a squad. The War Room surfaces every claw's actions
     in a single unified queue — one person approves everything.
   squad_size: 1
   claws_active:
-    - content
-    - ops
-    - analytics
-    - finance
-    - build
+  - content
+  - ops
+  - analytics
+  - finance
+  - build
+  - assistant
   recommended_gpu: RTX 4070 or better
   note: >
-    Running all five claws simultaneously is GPU-intensive.
+    Running all six claws simultaneously is GPU-intensive.
     On an RTX 3060, disable the Build claw unless actively
     shipping code. Re-enable it when needed.
 
@@ -71,27 +72,34 @@ operator_policy:
       pricing_recommendation: REVIEW
       expense_log: AUTO
 
-    # Build Claw — code changes need human eyes
-    build:
-      pr_open: REVIEW # you review every PR
-      pr_merge: HOLD # you explicitly merge
-      production_deploy: HOLD # you explicitly deploy
-      issue_triage: AUTO # let it score and sort issues
-      dependency_audit: AUTO # security PRs auto-drafted, you approve
-      documentation_update: AUTO
+  # Build Claw — code changes need human eyes
+  build:
+    pr_open: REVIEW # you review every PR
+    pr_merge: HOLD # you explicitly merge
+    production_deploy: HOLD # you explicitly deploy
+    issue_triage: AUTO # let it score and sort issues
+    dependency_audit: AUTO # security PRs auto-drafted, you approve
+    documentation_update: AUTO
+
+  # Assistant Claw — always auto, it only coordinates
+  assistant:
+    cross_claw_query: AUTO # read-only status checks to other claws
+    cross_claw_task: REVIEW # task assignments need your approval
+    operator_message: AUTO # relay operator messages via Telegram
 
 # ─────────────────────────────────────────────
 # FILESYSTEM LAYOUT
-# All five sandboxes on one machine.
+# All six sandboxes on one machine.
 # Each claw reads only its own mount.
 # ─────────────────────────────────────────────
 
 filesystem:
-  content:  /sandbox/content    # brand assets, approved posts, style guides
-  ops:      /sandbox/clients    # client records, briefs, comms logs
+  content: /sandbox/content # brand assets, approved posts, style guides
+  ops: /sandbox/clients # client records, briefs, comms logs
   analytics: /sandbox/analytics # performance data, reports, trend datasets
-  finance:  /sandbox/finance    # invoices, revenue records, pricing rules
-  build:    /sandbox/build      # codebase, secrets, deploy configs
+  finance: /sandbox/finance # invoices, revenue records, pricing rules
+  build: /sandbox/build # codebase, secrets, deploy configs
+  assistant: /sandbox/.milimo/assistant # cross-claw coordination, Telegram bridge state
 
   shared_read:                  # all claws can read, none can write
     - /sandbox/analytics/reports/weekly-intelligence.json
@@ -110,13 +118,13 @@ inference:
   docker_testing: true  # macOS Docker mode — all routes go to cloud
 
   routing_overrides:
-    client_facing_drafts: cloud    # Nemotron 120B
-    internal_ideation: cloud       # macOS Docker: use cloud
-    financial_data: cloud          # Docker testing mode override
-    source_code: cloud             # Docker testing mode override
-    client_records: cloud          # macOS Docker: use cloud
-    analytics_synthesis: cloud     # macOS Docker: use cloud
-    public_docs_changelogs: cloud  # Nemotron 120B
+  client_facing_drafts: cloud # NEMOCLAW_MODEL (set during nemoclaw onboard)
+  internal_ideation: cloud # NEMOCLAW_MODEL
+  financial_data: cloud # Docker testing mode override — locked route
+  source_code: cloud # Docker testing mode override — locked route
+  client_records: cloud # NEMOCLAW_MODEL
+  analytics_synthesis: cloud # NEMOCLAW_MODEL
+  public_docs_changelogs: cloud # NEMOCLAW_MODEL
 
   cost_guard:
     daily_cloud_token_budget: 50000 # Solo spec requirement
@@ -126,7 +134,7 @@ inference:
 
 # ─────────────────────────────────────────────
 # WAR ROOM — SOLO CONFIGURATION
-# Single operator view. All five claw queues
+# Single operator view. All six claw queues
 # merged into one prioritized action feed.
 # Morning review target: under 15 minutes.
 # ─────────────────────────────────────────────
@@ -171,6 +179,7 @@ evolution:
     analytics_evolution: "02:25"
     build: "02:35"
     finance: "03:00"
+    assistant: "03:15"
 
   min_thresholds:
     content:
@@ -216,10 +225,15 @@ evolution:
       min_invoices: 3
       performance_threshold: 5
 
-    build:
-      enabled: true
-      min_prs_merged: 5         # needs real shipping history before evolving
-      performance_threshold: 5
+  build:
+    enabled: true
+    min_prs_merged: 5 # needs real shipping history before evolving
+    performance_threshold: 5
+
+  assistant:
+    enabled: true
+    min_coordinated_tasks: 10 # needs cross-claw task history before evolving
+    performance_threshold: 5
 
   capacity:
     max_tools_per_claw: 30
@@ -265,13 +279,17 @@ network_egress:
 
   build:
     approved:
-      - api.github.com
-      - api.vercel.com
-      - registry.npmjs.org
-      - pypi.org
-      - api.sentry.io
-    # - api.railway.app          # uncomment when Railway deployment active
-    # - api.cloudflare.com       # uncomment when Cloudflare integration needed
+    - api.github.com
+    - api.vercel.com
+    - registry.npmjs.org
+    - pypi.org
+    - api.sentry.io
+    # - api.railway.app # uncomment when Railway deployment active
+    # - api.cloudflare.com # uncomment when Cloudflare integration needed
+
+  assistant:
+    approved:
+    - api.telegram.org # Telegram bot API for operator bridge
 
 # ─────────────────────────────────────────────
 # FINALS MODE — SOLO EQUIVALENT: DEEP WORK MODE
@@ -284,11 +302,12 @@ deep_work_mode:
   alias: finals-mode            # same CLI command works: milimo squad finals-mode
 
   on_activate:
-    content:    pause_drafts    # queue only, no publishing
-    ops:        maintenance     # auto-responses to active clients
-    analytics:  passive         # collect data, no new experiments
-    finance:    invoices_only   # sends continue, no new intake
-    build:      issues_only     # triage only, no new PRs opened
+    content: pause_drafts # queue only, no publishing
+    ops: maintenance # auto-responses to active clients
+    analytics: passive # collect data, no new experiments
+    finance: invoices_only # sends continue, no new intake
+    build: issues_only # triage only, no new PRs opened
+    assistant: reduced # only operator-initiated queries, no proactive tasks
 
   auto_response_template: >
     Hey [name], I'm heads-down on a focused sprint until [resume_date].

@@ -107,3 +107,4 @@ milimo init --solo --operator-name "Your Name" --squad-name "my-squad"
 - [[analytics-claw]] — Analytics Claw
 - [[finance-claw]] — Finance Claw
 - [[build-claw]] — Build Claw
+- [[assistant-lucy]] — Assistant (Lucy)

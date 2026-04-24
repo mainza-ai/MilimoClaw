@@ -1,6 +1,6 @@
 # Evolution Integration
 
-**Summary**: Scheduler that orchestrates the weekly evolution cycle for all 5 claws, reading metrics and triggering tool deployment.
+**Summary**: Scheduler that orchestrates the weekly evolution cycle for all 6 claws, reading metrics and triggering tool deployment.
 
 **Sources**: `milimo-blueprint/orchestrator/evolution_integration.py`
 
@@ -66,10 +66,11 @@ On `start()`, registers cycles for:
 - `ops`
 - `analytics`
 - `finance`
+- `assistant`
 
 ## Startup Behavior
 
-1. Register all 5 claw evolution cycles
+1. Register all 6 claw evolution cycles
 2. Check for missed cycles during downtime
 3. If no history exists, run initial dry-run
 4. If last run was > `interval_days + 1` ago, trigger immediately
@@ -117,7 +118,7 @@ status = integration.get_status()
 #   "running": True,
 #   "squad_id": "my-squad",
 #   "interval_days": 7,
-#   "registered_claws": ["build", "content", "ops", "analytics", "finance"],
+#   "registered_claws": ["build", "content", "ops", "analytics", "finance", "assistant"],
 #   "total_cycles_run": 12,
 #   "last_cycle": { ... },
 #   "scheduler_status": { ... }

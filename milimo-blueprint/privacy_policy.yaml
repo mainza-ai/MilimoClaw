@@ -9,9 +9,9 @@
 # call transparently.
 #
 # Backends:
-#   cloud      = NVIDIA Cloud Nemotron 120B (max quality)
-#   local-nim  = Local NIM on RTX (private, on-device)
-#   local-vllm = Local vLLM (tightest isolation)
+# cloud = Cloud inference via NEMOCLAW_MODEL (max quality)
+# local-nim = Local NIM (NEMOCLAW_MODEL, private, on-device)
+# local-vllm = Local vLLM (tightest isolation)
 #
 # Override: squads can customize this file during onboarding.
 # Constraint: some routes are LOCKED and cannot be overridden

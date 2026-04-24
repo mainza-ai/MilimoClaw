@@ -58,6 +58,7 @@ const ROLE_DESCRIPTIONS = {
     analytics: "Intelligence layer — performance, trends, opportunities",
     finance: "Financial ops — invoicing, pricing, margin tracking",
     build: "Engineering — code, PRs, deploys, monitoring (tech squads)",
+    assistant: "AI helper — scheduling, research, cross-claw coordination, operator support",
     solo: "All claws active on this machine (solo mode)",
 };
 function getRoleDescription(role) {
@@ -167,7 +168,7 @@ function getBuiltInTemplates() {
             id: "solo-founder",
             name: "solo-founder",
             displayName: "Solo Founder",
-            description: "All 5 claws on one machine. One operator. The full product.",
+            description: "All 6 claws on one machine. One operator. The full product.",
             category: "solo",
             path: "",
             squadSize: 1,

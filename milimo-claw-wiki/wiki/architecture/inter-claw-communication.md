@@ -6,7 +6,7 @@
 - `raw/AGENTS.md`
 - `milimo-blueprint/orchestrator/contracts.py`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-23
 
 **Tags**: #architecture #communication #contracts #messaging
 

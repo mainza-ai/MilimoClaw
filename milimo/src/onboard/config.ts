@@ -75,7 +75,7 @@ const DEFAULT_CONFIG: MilimoConfig = {
     vibe: "sharp and unhurried",
     emoji: "🦀",
   },
-  activeClaws: ["content", "ops", "analytics", "finance", "build"],
+  activeClaws: ["content", "ops", "analytics", "finance", "build", "assistant"],
 };
 
 let configCache: MilimoConfig | null = null;
@@ -306,7 +306,7 @@ export function isNemoClawOnboarded(): boolean {
 export { MilimoConfig as MilimoOnboardConfig };
 
 export const TEMPLATE_CLAW_MAP: Record<string, string[]> = {
-  "solo-founder": ["content", "ops", "analytics", "finance", "build"],
+  "solo-founder": ["content", "ops", "analytics", "finance", "build", "assistant"],
   "content-agency": ["content", "ops", "analytics"],
   "design-studio": ["content", "ops", "finance"],
   "event-promotion": ["content", "ops", "analytics"],
@@ -316,5 +316,5 @@ export const TEMPLATE_CLAW_MAP: Record<string, string[]> = {
 };
 
 export function getActiveClawsForTemplate(templateName: string): string[] {
-  return TEMPLATE_CLAW_MAP[templateName] ?? ["content", "ops", "analytics", "finance", "build"];
+  return TEMPLATE_CLAW_MAP[templateName] ?? ["content", "ops", "analytics", "finance", "build", "assistant"];
 }

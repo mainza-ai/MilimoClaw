@@ -198,6 +198,7 @@
   },
   "active": "1e805db6e9f977a1",
   "lastOpenFiles": [
+    "wiki/troubleshooting/claw-silent-responses.md",
     "wiki/troubleshooting/common-issues.md",
     "wiki/architecture/assistant-system.md",
     "Welcome.md",
@@ -225,7 +226,6 @@
     "wiki/modules/build/github-client.md",
     "wiki/evolution/pattern-detection.md",
     "wiki/scripts/development-scripts.md",
-    "wiki/claws/analytics-claw.md",
     "wiki/onboard",
     "wiki/mesh",
     "wiki/lib",

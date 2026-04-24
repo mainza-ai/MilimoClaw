@@ -235,7 +235,7 @@ export class BridgeTools {
 					name: "claw_status",
 					description: "Get detailed status of a specific claw including health, tools, pending messages, and sandbox state.",
 					parameters: {
-						role: { type: "string", description: "Claw role: content, ops, analytics, finance, build", required: true },
+						role: { type: "string", description: "Claw role: content, ops, analytics, finance, build, assistant", required: true },
 						squad_id: { type: "string", description: "Squad identifier", required: false },
 					},
 				},

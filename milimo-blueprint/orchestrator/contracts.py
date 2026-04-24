@@ -39,12 +39,12 @@ import yaml
 logger = logging.getLogger("milimo.contracts")
 
 # Valid claw roles
-VALID_ROLES = {"content", "ops", "analytics", "finance", "build"}
-# Assistant is a valid sender but not a claw role
+VALID_ROLES = {"content", "ops", "analytics", "finance", "build", "assistant"}
+# Assistant role (also a valid claw role)
 ASSISTANT_ROLE = "assistant"
-VALID_SENDERS = VALID_ROLES | {ASSISTANT_ROLE}
+VALID_SENDERS = VALID_ROLES  # assistant already in VALID_ROLES
 # War room is a valid recipient but not a sender role
-VALID_RECIPIENTS = VALID_ROLES | {"war_room", "assistant"}
+VALID_RECIPIENTS = VALID_ROLES | {"war_room"}  # assistant already in VALID_ROLES
 
 # Valid message types
 VALID_MESSAGE_TYPES = {
@@ -433,7 +433,14 @@ MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
     # Assistant → Any Claw: Query (read-only status request)
     "assistant_query": {
         "sender_roles": ["assistant"],
-        "recipient_roles": ["content", "ops", "analytics", "finance", "build"],
+        "recipient_roles": [
+            "content",
+            "ops",
+            "analytics",
+            "finance",
+            "build",
+            "assistant",
+        ],
         "required_payload": ["query"],
         "optional_payload": ["context", "priority_hint"],
         "frequency": "on_event",
@@ -442,7 +449,14 @@ MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
     # Assistant → Any Claw: Task assignment (requires operator approval)
     "assistant_task": {
         "sender_roles": ["assistant"],
-        "recipient_roles": ["content", "ops", "analytics", "finance", "build"],
+        "recipient_roles": [
+            "content",
+            "ops",
+            "analytics",
+            "finance",
+            "build",
+            "assistant",
+        ],
         "required_payload": ["task_description", "deadline"],
         "optional_payload": ["context", "priority_hint", "attachments"],
         "frequency": "on_event",
@@ -450,8 +464,14 @@ MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     # Claw → Assistant: Response to assistant query
     "assistant_response": {
-        "sender_roles": ["content", "ops", "analytics", "finance", "build"],
-        "recipient_roles": ["war_room"],
+        "sender_roles": [
+            "content",
+            "ops",
+            "analytics",
+            "finance",
+            "build",
+            "assistant",
+        ],
         "required_payload": ["query_id", "response"],
         "optional_payload": ["data", "confidence", "generated_at"],
         "frequency": "on_event",

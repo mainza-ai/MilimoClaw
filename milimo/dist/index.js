@@ -10,7 +10,7 @@ const slash_js_1 = require("./commands/slash.js");
 const squad_js_1 = require("./commands/squad.js");
 const config_js_1 = require("./onboard/config.js");
 /** All valid claw roles (excluding "solo" which is a mode indicator). */
-exports.CLAW_ROLES = ["content", "ops", "analytics", "finance", "build"];
+exports.CLAW_ROLES = ["content", "ops", "analytics", "finance", "build", "assistant"];
 const DEFAULT_PLUGIN_CONFIG = {
     squadName: "",
     clawRole: "",
