@@ -1,4 +1,4 @@
-# NemoClaw — prek hook configuration
+# MilimoClaw — prek hook configuration
 # prek: https://github.com/j178/prek — single binary, no Python required for the runner
 # Installed as an npm devDependency (@j178/prek) — available after `npm install`.
 # All git hooks (pre-commit, commit-msg, pre-push) are managed by prek via this file.
@@ -18,7 +18,7 @@
 #  10  — Linters and read-only checks
 #  20  — Project-level checks (vitest)
 
-exclude: ^(nemoclaw/dist/|nemoclaw/node_modules/|docs/_build/|\.venv/|uv\.lock$)
+exclude: ^(milimo/dist/|milimo/node_modules/|docs/_build/|\.venv/|uv\.lock$)
 
 repos:
   # ── Priority 0: general file fixers ───────────────────────────────────────
@@ -63,31 +63,31 @@ repos:
     rev: v0.15.7
     hooks:
       - id: ruff-format
-        files: ^(nemoclaw-blueprint/.*\.py|scripts/.*\.py)$
+        files: ^(milimo-blueprint/.*.py)$
         priority: 5
       - id: ruff
         args: [--fix]
-        files: ^(nemoclaw-blueprint/.*\.py|scripts/.*\.py)$
+        files: ^(milimo-blueprint/.*.py)$
         priority: 6
 
   - repo: local
     hooks:
-      - id: nemoclaw-prettier
-        name: Prettier (nemoclaw TypeScript)
-        entry: bash -c 'root="$(git rev-parse --show-toplevel)" && cd "$root/nemoclaw" && files=() && for f in "$@"; do files+=("${f#nemoclaw/}"); done && npx prettier --write "${files[@]}"' --
+      - id: milimo-prettier
+        name: Prettier (milimo TypeScript)
+        entry: bash -c 'root="$(git rev-parse --show-toplevel)" && cd "$root/milimo" && files=() && for f in "$@"; do files+=("${f#milimo/}"); done && npx prettier --write "${files[@]}"' --
         language: system
-        files: ^nemoclaw/.*\.ts$
+        files: ^milimo/.*\.ts$
         pass_filenames: true
         priority: 5
 
   # ── Priority 6: auto-fix after formatting ─────────────────────────────────
   - repo: local
     hooks:
-      - id: nemoclaw-eslint
-        name: ESLint (nemoclaw TypeScript)
-        entry: bash -c 'root="$(git rev-parse --show-toplevel)" && cd "$root/nemoclaw" && files=() && for f in "$@"; do files+=("${f#nemoclaw/}"); done && npx eslint --fix "${files[@]}"' --
+      - id: milimo-eslint
+        name: ESLint (milimo TypeScript)
+        entry: bash -c 'root="$(git rev-parse --show-toplevel)" && cd "$root/milimo" && files=() && for f in "$@"; do files+=("${f#milimo/}"); done && npx eslint --fix "${files[@]}"' --
         language: system
-        files: ^nemoclaw/.*\.ts$
+        files: ^milimo/.*\.ts$
         pass_filenames: true
         priority: 6
 
@@ -136,7 +136,7 @@ repos:
         name: SPDX license headers
         entry: bash scripts/check-spdx-headers.sh
         language: system
-        files: ^(nemoclaw/src/.*\.ts|nemoclaw-blueprint/.*\.py|.*\.sh)$
+        files: ^(milimo/src/.*\.ts|milimo-blueprint/.*\.py|.*\.sh)$
         pass_filenames: true
         priority: 10
 
@@ -155,7 +155,7 @@ repos:
         entry: npx vitest run --project plugin
         language: system
         pass_filenames: false
-        files: ^nemoclaw/
+        files: ^milimo/
         priority: 20
 
   # ── commit-msg hooks ────────────────────────────────────────────────────────
@@ -173,15 +173,15 @@ repos:
     hooks:
       - id: tsc-check
         name: TypeScript type check (tsc --noEmit)
-        entry: bash -c 'cd nemoclaw && npx tsc --noEmit'
+        entry: bash -c 'cd milimo && npx tsc --noEmit'
         language: system
         pass_filenames: false
         always_run: true
         stages: [pre-push]
 
       - id: pyright-check
-        name: Pyright (nemoclaw-blueprint)
-        entry: bash -c 'cd nemoclaw-blueprint && uv run --with pyright pyright .'
+        name: Pyright (milimo-blueprint)
+        entry: bash -c 'cd milimo-blueprint && uv run --with pyright pyright .'
         language: system
         pass_filenames: false
         always_run: true
