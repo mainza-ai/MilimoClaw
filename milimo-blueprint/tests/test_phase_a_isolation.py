@@ -15,12 +15,10 @@ before proceeding to Phase B, C, D, E, or F tests.
 """
 
 import json
-import tempfile
 from pathlib import Path
 from typing import Any
 
 import pytest
-import yaml
 
 pytestmark = pytest.mark.phase_a
 

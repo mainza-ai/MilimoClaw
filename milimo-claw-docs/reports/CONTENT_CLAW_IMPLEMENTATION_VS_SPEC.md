@@ -109,14 +109,14 @@ This document compares the current implementation of the Content Claw against th
 
 | Data Type | Spec Route | Implementation Status | Location |
 |-----------|------------|----------------------|----------|
-| Public-facing drafts (final) | Cloud Nemotron 120B | ✅ IMPLEMENTED | `privacy_router.py`, `content-claw.yaml:54-57` |
-| Client proposals and pitches | Cloud Nemotron 120B | ✅ IMPLEMENTED | `client_facing_drafts → cloud` |
+| Public-facing drafts (final) | Cloud (NEMOCLAW_MODEL) | ✅ IMPLEMENTED | `privacy_router.py`, `content-claw.yaml:54-57` |
+| Client proposals and pitches | Cloud (NEMOCLAW_MODEL) | ✅ IMPLEMENTED | `client_facing_drafts → cloud` |
 | Internal ideation/brainstorming | Local NIM | ✅ IMPLEMENTED | `content-claw.yaml:59-62` |
 | Draft iterations/revisions | Local NIM | ✅ IMPLEMENTED | Falls under `internal_drafts` |
-| Trend research queries | Cloud Nemotron 120B | ✅ IMPLEMENTED | `content-claw.yaml:64-67` |
+| Trend research queries | Cloud (NEMOCLAW_MODEL) | ✅ IMPLEMENTED | `content-claw.yaml:64-67` |
 | Analytics report synthesis | Local NIM | ⚠️ IMPLICIT | No explicit route, falls to default |
 | Style calibration (voice adapter) | Local NIM | ⚠️ IMPLICIT | No explicit route for voice training |
-| A/B variant generation | Cloud Nemotron 120B | ⚠️ PARTIAL | No explicit route for A/B |
+| A/B variant generation | Cloud (NEMOCLAW_MODEL) | ⚠️ PARTIAL | No explicit route for A/B |
 
 **Implementation Details:**
 - `privacy_router.py` implements full routing logic

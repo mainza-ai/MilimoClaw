@@ -1,6 +1,6 @@
 # Milimo Claw Product Catalog
 
-## Subscriptions 
+## Subscriptions
 
 ### Milimo Claw Pro
 Price: $12/month
@@ -10,7 +10,7 @@ prod_UAntVVODckBNuK
 Marketing feature list
 —
 Description
-Full access to the Milimo Claw platform for your entire squad. Run up to 6 specialized AI agents simultaneously — Content, Ops, Analytics, Finance, and Build — coordinating 24/7 while you focus on what matters. Includes the Blueprint Marketplace, unlimited auto-approvals, War Room dashboard, Finals Mode, and full blueprint version history. One flat price. One squad. Always on.
+Full access to the Milimo Claw platform for your entire squad. Run up to 6 specialized AI agents simultaneously — Content, Ops, Analytics, Finance, Build, and Assistant — coordinating 24/7 while you focus on what matters. Includes the Blueprint Marketplace, unlimited auto-approvals, War Room dashboard, Finals Mode, and full blueprint version history. One flat price. One squad. Always on.
 
 ## One Time Purchases
 

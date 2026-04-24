@@ -68,7 +68,7 @@ def find_template() -> Path:
         if candidate.exists():
             return candidate
     raise FileNotFoundError(
-        f"System prompt template not found. Searched:\n"
+        "System prompt template not found. Searched:\n"
         + "\n".join(f"  - {p}" for p in _TEMPLATE_CANDIDATES)
         + "\nCopy MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md to ~/.milimo/"
     )
@@ -224,7 +224,7 @@ def setup_workspace_files(config: AssistantConfig) -> None:
     # Delete BOOTSTRAP.md to signal identity is known
     if BOOTSTRAP_FILE.exists():
         BOOTSTRAP_FILE.unlink()
-        print(f"✓ Removed bootstrap file (identity is configured)")
+        print("✓ Removed bootstrap file (identity is configured)")
 
     # Write IDENTITY.md
     identity_content = f"""# IDENTITY.md - Who Am I?
@@ -344,7 +344,7 @@ You wake up fresh each session. These files are your continuity.
 
 """
         AGENTS_FILE.write_text(agents_content, encoding="utf-8")
-        print(f"✓ Created AGENTS.md with Milimo startup instruction")
+        print("✓ Created AGENTS.md with Milimo startup instruction")
         return
 
     # Read existing AGENTS.md
@@ -352,19 +352,19 @@ You wake up fresh each session. These files are your continuity.
 
     # Check if already has Milimo instruction
     if "MILIMO_CLAW.md" in content:
-        print(f"✓ AGENTS.md already includes Milimo context instruction")
+        print("✓ AGENTS.md already includes Milimo context instruction")
         return
 
     # Find "Session Startup" section and inject Milimo instruction
     import re
 
     # Pattern to match Session Startup section
-    pattern = r"(## Session Startup.*?Before doing anything else:.*?)(1\. Read)"
+    _pattern = r"(## Session Startup.*?Before doing anything else:.*?)(1\. Read)"
 
     milimo_instruction = """1. Read `MILIMO_CLAW.md` — your full squad context, claw knowledge, and capabilities
 2. Read """
 
-    replacement = r"\1" + milimo_instruction
+    _replacement = r"\1" + milimo_instruction
 
     # Try to inject after "Before doing anything else:"
     if "Before doing anything else:" in content:
@@ -380,7 +380,7 @@ You wake up fresh each session. These files are your continuity.
             modified,
         )
         AGENTS_FILE.write_text(modified, encoding="utf-8")
-        print(f"✓ Updated AGENTS.md with Milimo startup instruction")
+        print("✓ Updated AGENTS.md with Milimo startup instruction")
     else:
         # Prepend Milimo instruction to the file
         modified = content.replace(
@@ -399,7 +399,7 @@ Before doing anything else:
 """,
         )
         AGENTS_FILE.write_text(modified, encoding="utf-8")
-        print(f"✓ Updated AGENTS.md with Milimo startup section")
+        print("✓ Updated AGENTS.md with Milimo startup section")
 
 
 def setup_assistant() -> None:

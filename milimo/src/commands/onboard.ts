@@ -102,6 +102,7 @@ function createMilimoDirectories(): void {
 export async function cliOnboard(opts: OnboardOptions): Promise<void> {
   const { logger, pluginConfig } = opts;
   const nonInteractive = isNonInteractive(opts);
+  let nemoModelConfig: { model: string; endpointUrl: string } | null = null;
 
   logger.info("");
   logger.info(" ╔═══════════════════════════════════════════════════════╗");
@@ -122,12 +123,15 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
         return;
       }
     } else {
+      logger.error("NemoClaw is not onboarded and cannot proceed in non-interactive mode.");
+      logger.error("Run 'openclaw nemoclaw onboard' first, then retry.");
+      process.exitCode = 1;
       return;
     }
   } else {
-    const nemoclawConfig = loadNemoClawConfig();
-    if (nemoclawConfig) {
-      logger.info(`Inference: ${nemoclawConfig.model} @ ${nemoclawConfig.endpointUrl}`);
+    nemoModelConfig = loadNemoClawConfig();
+    if (nemoModelConfig) {
+      logger.info(`Inference: ${nemoModelConfig.model} @ ${nemoModelConfig.endpointUrl}`);
       logger.info("");
     }
   }
@@ -155,9 +159,10 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
   } else {
     const builtInTemplates = getBuiltInTemplates();
     const discoveredTemplates = discoverTemplates(pluginConfig.blueprintDir);
-    const allTemplates = [...discoveredTemplates, ...builtInTemplates.filter(
-      (b) => !discoveredTemplates.some((d) => d.id === b.id)
-    )];
+    const allTemplates = [
+      ...discoveredTemplates,
+      ...builtInTemplates.filter((b) => !discoveredTemplates.some((d) => d.id === b.id)),
+    ];
 
     const templateOptions = allTemplates.map((t) => ({
       label: t.displayName,
@@ -169,7 +174,8 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
     template = await promptSelect("Template:", templateOptions, 0);
   }
 
-  const selectedTemplate = getBuiltInTemplates().find((t) => t.id === template) ||
+  const selectedTemplate =
+    getBuiltInTemplates().find((t) => t.id === template) ||
     discoverTemplates(pluginConfig.blueprintDir).find((t) => t.id === template);
 
   // Step 3: Solo vs Mesh Mode
@@ -258,14 +264,15 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
       logger.info("");
 
       // Only offer roles that are active in the selected template
-      const templateActiveClaws = selectedTemplate?.clawsActive || getActiveClawsForTemplate(template);
-      const roleOptions = CLAW_ROLES
-        .filter((role) => templateActiveClaws.includes(role))
-        .map((role) => ({
+      const templateActiveClaws =
+        selectedTemplate?.clawsActive || getActiveClawsForTemplate(template);
+      const roleOptions = CLAW_ROLES.filter((role) => templateActiveClaws.includes(role)).map(
+        (role) => ({
           label: role,
           value: role,
           hint: getRoleDescription(role),
-        }));
+        }),
+      );
 
       const defaultIndex = 0;
       const selectedRole = await promptSelect("Your claw role:", roleOptions, defaultIndex);
@@ -310,15 +317,18 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
     logger.info("all your claws. Give it a name, a creature, and a vibe.");
     logger.info("");
     logger.info("Examples:");
-    logger.info('  Name: Nova · Creature: a hawk · Vibe: fast and precise · 🦅');
-    logger.info('  Name: Rex · Creature: a wolf · Vibe: direct and loyal · 🐺');
-    logger.info('  Name: Sage · Creature: an owl · Vibe: measured and wise · 🦉');
-    logger.info('  Name: Moyo · Creature: a claw · Vibe: sharp and unhurried · 🦀');
+    logger.info("  Name: Nova · Creature: a hawk · Vibe: fast and precise · 🦅");
+    logger.info("  Name: Rex · Creature: a wolf · Vibe: direct and loyal · 🐺");
+    logger.info("  Name: Sage · Creature: an owl · Vibe: measured and wise · 🦉");
+    logger.info("  Name: Moyo · Creature: a claw · Vibe: sharp and unhurried · 🦀");
     logger.info("");
 
     const nameInput = await promptInput("Assistant name", "Nova");
     const creatureInput = await promptInput("Creature (e.g. a claw, a hawk, an owl)", "a claw");
-    const vibeInput = await promptInput("Vibe (e.g. sharp and unhurried, warm and direct)", "sharp and unhurried");
+    const vibeInput = await promptInput(
+      "Vibe (e.g. sharp and unhurried, warm and direct)",
+      "sharp and unhurried",
+    );
     const emojiInput = await promptInput("Signature emoji", "🦀");
 
     assistant = {
@@ -398,7 +408,9 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
   logger.info(` Template: ${template} (${clawsDisplay})`);
   logger.info(` Mode: ${solo ? "Solo" : "Mesh"}`);
   logger.info(` Operator: ${operatorName}`);
-  logger.info(` Assistant: ${assistant.name} (${assistant.creature} · ${assistant.vibe} · ${assistant.emoji})`);
+  logger.info(
+    ` Assistant: ${assistant.name} (${assistant.creature} · ${assistant.vibe} · ${assistant.emoji})`,
+  );
   logger.info(` War Room: ${warRoomMode}`);
   if (!solo && meshSecret) {
     logger.info(` Mesh Secret: ${meshSecret.slice(0, 8)}...`);
@@ -436,6 +448,9 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
     blueprintVersion: "0.1.0",
     assistant,
     activeClaws,
+    ...(nemoModelConfig
+      ? { model: nemoModelConfig.model, endpointUrl: nemoModelConfig.endpointUrl }
+      : {}),
   };
 
   saveOnboardConfig(config);

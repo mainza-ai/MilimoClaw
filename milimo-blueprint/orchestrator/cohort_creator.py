@@ -24,8 +24,7 @@ import secrets
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
-import uuid
+from typing import Any, Literal, Optional
 
 logger = logging.getLogger("milimo.cohort_creator")
 
@@ -102,7 +101,7 @@ class SquadCreationResult:
 
     squad_id: str
     squad_name: str
-    status: "success" | "failed" | "pending"
+    status: Literal["success", "failed", "pending"]
     members_invited: int = 0
     error: Optional[str] = None
 
@@ -113,7 +112,7 @@ class CohortCreationProgress:
 
     cohort_id: str
     cohort_name: str
-    status: "pending" | "creating" | "active" | "completed" | "failed"
+    status: Literal["pending", "creating", "active", "completed", "failed"]
     total_squads: int = 0
     squads_created: int = 0
     squads_failed: int = 0

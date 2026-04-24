@@ -55,7 +55,7 @@
 - **Key quote:** "You don't need to build a company. You deploy one."
 
 ### Section 4: What Milimo Claw Actually Is
-- Five specialized claws: Content, Ops, Analytics, Finance, Build
+- Six specialized claws: Content, Ops, Analytics, Finance, Build, Assistant
 - Each claw runs on a different laptop in the squad
 - They communicate through typed contracts — not chat
 - The War Room: where humans stay in control
@@ -128,7 +128,7 @@
 
 ## Supporting Visuals Needed
 
-1. **Mesh architecture diagram** — 5 laptops, 5 claws, inter-sandbox gateway
+1. **Mesh architecture diagram** — 6 laptops, 6 claws, inter-sandbox gateway
 2. **Evolution cycle flow** — Observe → Identify → Propose → Build → Deploy
 3. **Cross-claw evolution flows** — Analytics → Content loop, Build → Analytics → Ops chain
 4. **Privacy router routing decision tree** — data type → routing decision

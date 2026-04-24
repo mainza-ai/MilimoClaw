@@ -20,7 +20,7 @@ This document tracks the attempts to deploy the Milimo Claw plugin (with the sol
 1. **Missing `node_modules`** — The tar archive omitted runtime dependencies (`blessed`, `commander`, `ws`, `yaml`, `zod`), causing the plugin to load in `error` state.
 2. **Wrong install path in `openclaw.json`** — The config pointed `sourcePath`/`installPath` to `/tmp` (world-writable, mode 777), which OpenClaw's security policies block.
 3. **Wrong user context** — Plugin was installed under `/root/.openclaw/` (root user), but `nemoclaw connect` runs as the `sandbox` user (uid 999, home `/sandbox`) which cannot access `/root/`. The plugin must be at `/sandbox/extensions/milimo/` and registered in `/sandbox/.openclaw/openclaw.json`.
-4. **Solo template showed role selection** — A readline race condition caused the "Operating solo?" confirmation to malfunction, dropping the solo-founder template into mesh mode and prompting the user to select a single claw instead of activating all five.
+4. **Solo template showed role selection** — A readline race condition caused the "Operating solo?" confirmation to malfunction, dropping the solo-founder template into mesh mode and prompting the user to select a single claw instead of activating all six.
 
 ---
 
@@ -74,7 +74,7 @@ This document tracks the attempts to deploy the Milimo Claw plugin (with the sol
  }
 ```
 
-**Result:** Solo Founder now correctly activates all five claws without asking for role selection.
+**Result:** Solo Founder now correctly activates all six claws without asking for role selection.
 
 **Status:** ✅ Deployed and working.
 
@@ -158,7 +158,7 @@ NVIDIA_API_KEY="nvapi-..." NEMOCLAW_RECREATE_SANDBOX=1 nemoclaw onboard --non-in
 ```
 
 **Result:** Sandbox `my-assistant` created successfully with:
-- Model: nvidia/nemotron-3-super-120b-a12b
+- Model: ${NEMOCLAW_MODEL}
 - Provider: nvidia-nim
 - Policies: pypi, npm
 - Phase: Ready
@@ -293,13 +293,13 @@ Additionally, `openclaw plugins install --link` fails inside the sandbox because
 
 ### 4. Solo Template Onboard Dropped to Mesh Mode (Quaternary Cause)
 
-After deployment, running `openclaw milimo onboard` and selecting the Solo Founder template still asked the user to pick a single claw role (1-5) instead of activating all five claws.
+After deployment, running `openclaw milimo onboard` and selecting the Solo Founder template still asked the user to pick a single claw role (1-6) instead of activating all six claws.
 
 **Symptoms:**
 - User selects "Solo Founder" template
 - User answers "Y" to "Operating solo?"
 - Wizard immediately shows "Mesh mode — which claw are you running on this machine?"
-- User forced to select a single role instead of getting all 5 claws
+- User forced to select a single role instead of getting all 6 claws
 
 **Root cause:** Node.js readline race condition. The onboard wizard creates a new `readline.createInterface()` for every prompt (confirm, input, select) and closes it immediately after. When multiple readline interfaces are created/destroyed rapidly on the same stdin, buffered input leaks between prompts. The "Y" answer gets consumed by the squad name prompt, and the solo confirm returns empty — which evaluates as `false`, setting `solo = false`.
 

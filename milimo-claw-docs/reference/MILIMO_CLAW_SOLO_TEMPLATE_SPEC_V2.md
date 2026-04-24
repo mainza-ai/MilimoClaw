@@ -5,10 +5,10 @@
 # debugging, feature implementation, testing, or documentation.
 #
 # This is the authoritative version. It supersedes all previous solo
-# template specifications and incorporates the complete five-claw specs.
+# template specifications and incorporates the complete six-claw specs.
 #
 # DEVELOPMENT NOTE: This implementation is in active development and testing.
-# All inference currently routes to cloud (Nemotron 120B via NVIDIA Cloud API)
+# All inference currently routes to cloud (the configured NEMOCLAW_MODEL via NVIDIA Cloud API)
 # regardless of data sensitivity. The privacy routing rules documented here
 # represent the production target architecture. Do not implement privacy
 # routing enforcement during this phase — route everything to cloud.
@@ -27,12 +27,12 @@ from it, the implementation is wrong — not this spec.
 ## WHAT THE SOLO-FOUNDER TEMPLATE IS
 
 The solo-founder template is Milimo Claw configured for a single operator
-running all five claws simultaneously on one machine. It is the primary
+running all six claws simultaneously on one machine. It is the primary
 template for development, testing, and early deployment.
 
 In a standard squad deployment, each person runs one claw on their own
 laptop and the claws coordinate across machines through the OpenShell
-inter-sandbox gateway. In the solo template, all five claws run on one
+inter-sandbox gateway. In the solo template, all six claws run on one
 machine. The mesh coordination logic is identical — only the physical
 topology differs.
 
@@ -43,9 +43,9 @@ The tagline is the spec: *The milimo never stops. Work. Without working.*
 
 ---
 
-## THE FIVE CLAWS — SOLO CONFIGURATION
+## THE SIX CLAWS — SOLO CONFIGURATION
 
-All five claws run simultaneously. Each has its own isolated NemoClaw
+All six claws run simultaneously. Each has its own isolated NemoClaw
 sandbox, its own filesystem mount, its own network egress policy, and
 its own self-evolution cycle. They coordinate through the OpenShell
 inter-sandbox gateway exactly as they would across multiple machines.
@@ -57,6 +57,7 @@ inter-sandbox gateway exactly as they would across multiple machines.
 | ANALYTICS CLAW | `/sandbox/analytics` | Intelligence layer — reports, signals, projections |
 | FINANCE CLAW | `/sandbox/finance` | Revenue, invoicing, pricing, expenses |
 | BUILD CLAW | `/sandbox/build` | Engineering — issues, PRs, deploys, monitoring |
+| ASSISTANT CLAW | `/sandbox/assistant` | Conversational interface — operator queries, claw coordination |
 
 **For the full specification of each claw, refer to:**
 - `milimo-claw-docs/reference/MILIMO_CLAW_CONTENT_CLAW_SPEC.md`
@@ -65,7 +66,7 @@ inter-sandbox gateway exactly as they would across multiple machines.
 - `milimo-claw-docs/reference/MILIMO_CLAW_FINANCE_CLAW_SPEC.md`
 - `milimo-claw-docs/reference/MILIMO_CLAW_BUILD_CLAW_SPEC.md`
 
-This document defines how those five claws behave **specifically in the
+This document defines how those six claws behave **specifically in the
 solo-founder template context** — approval thresholds tuned for one
 operator, scheduling tuned for one machine, and the War Room tuned for
 a single-person review cadence.
@@ -74,7 +75,7 @@ a single-person review cadence.
 
 ## FILESYSTEM TOPOLOGY
 
-All five sandboxes on one machine. Each claw reads only its own mount.
+All six sandboxes on one machine. Each claw reads only its own mount.
 
 ```
 /sandbox/
@@ -112,18 +113,23 @@ All five sandboxes on one machine. Each claw reads only its own mount.
 │   ├── tax/
 │   └── logs/
 │
-└── build/                      BUILD CLAW — owns this, reads only here
-    ├── repo/
-    ├── context/
-    ├── prs/
-    ├── deployments/
-    ├── docs/
-    └── logs/
+└── build/ BUILD CLAW — owns this, reads only here
+├── repo/
+├── context/
+├── prs/
+├── deployments/
+├── docs/
+└── logs/
+│
+└── assistant/ ASSISTANT CLAW — owns this, reads only here
+├── sessions/
+├── context/
+└── logs/
 ```
 
 **The one shared-read file:**
 `/sandbox/analytics/reports/weekly-intelligence.json`
-This is the only file in the entire mesh that all five claws can read
+This is the only file in the entire mesh that all six claws can read
 directly without a message contract. It is written by the Analytics Claw
 every Sunday and mounted as read-only in every other claw's sandbox policy.
 **Verify this mount is configured in every claw's sandbox policy file.**
@@ -211,7 +217,7 @@ in under 15 minutes every morning.
 ## THE WAR ROOM — SOLO CONFIGURATION
 
 The War Room is the single interface through which the solo operator
-manages all five claws. In solo mode, all five claw queues are merged
+manages all six claws. In solo mode, all six claw queues are merged
 into one prioritized action feed.
 
 ### Queue Priority (HOLD first, then REVIEW, then AUTO)
@@ -242,12 +248,12 @@ required — awareness only.
 ### War Room Layout (Two-Panel)
 
 **Left panel — Action Queue:**
-Priority-ordered feed of all pending actions from all five claws.
+Priority-ordered feed of all pending actions from all six claws.
 Each action card shows: claw source, mode badge, summary, key metadata,
 and available decisions.
 
 **Right panel — Claw Health:**
-Five claw status rows. Per row: claw name in accent color, status dot
+Six claw status rows. Per row: claw name in accent color, status dot
 (active/idle/processing), tool count, last evolution timestamp, this
 week's activity count.
 
@@ -275,7 +281,7 @@ with performance delta.
 ## INFERENCE ROUTING — SOLO DEVELOPMENT PHASE
 
 **Current phase: ALL inference routes to cloud.**
-Nemotron 120B via NVIDIA Cloud API for every call, every claw, every
+the configured NEMOCLAW_MODEL via NVIDIA Cloud API for every call, every claw, every
 data type — regardless of sensitivity.
 
 **The `data_type` field must be logged on every single inference call.**
@@ -342,7 +348,7 @@ If thresholds are not met, the claw logs "evolution skipped — insufficient
 
 ## INTER-CLAW COORDINATION — SOLO TOPOLOGY
 
-In solo mode, all five claws are on the same machine. The OpenShell
+In solo mode, all six claws are on the same machine. The OpenShell
 inter-sandbox gateway handles inter-claw messaging exactly as it would
 across machines — typed contracts, policy validation, audit logging.
 
@@ -419,7 +425,7 @@ These rules apply in solo mode exactly as they do in squad mode:
 ## DEEP WORK MODE
 
 `milimo squad finals-mode` activates Deep Work Mode — simultaneously
-hot-reloads all five claw policies to a reduced-autonomy configuration.
+hot-reloads all six claw policies to a reduced-autonomy configuration.
 
 ```bash
 milimo squad finals-mode --duration 2weeks --resume-date 2026-05-12
@@ -456,7 +462,7 @@ messages to paused clients.
 
 ### Day 1–7 (baseline establishment)
 
-- All five claws initialize their filesystem structures
+- All six claws initialize their filesystem structures
 - Content Claw generates basic drafts using cloud Nemotron with style instructions
 - Ops Claw intercepts first inquiry — triage score appears in War Room
 - Analytics Claw begins collecting signals — no report yet (insufficient data)
@@ -487,7 +493,7 @@ messages to paused clients.
 
 ### Month 6+ (mature solo operation)
 
-- All evolution tools active across all five claws
+- All evolution tools active across all six claws
 - Content generates drafts in each client's voice without re-prompting
 - Ops handles 80%+ of routine client management autonomously
 - Analytics reports are predictive, not just descriptive
@@ -505,7 +511,7 @@ messages to paused clients.
 
 | Symptom | Likely Cause |
 |---|---|
-| weekly-intelligence.json not readable by Content/Ops/Finance/Build | Shared filesystem mount not configured in one or more claw sandbox policies |
+| weekly-intelligence.json not readable by Content/Ops/Finance/Build/Assistant | Shared filesystem mount not configured in one or more claw sandbox policies |
 | project_brief sent before pricing_response | OPS → FINANCE sequencing rule violated — check intake_manager |
 | Invoice sent at Stage 1 REVIEW approve | Two-stage approval bypassed in Finance approval_handler — critical bug |
 | PR merged at REVIEW approve | Two-stage approval bypassed in Build approval_handler — critical bug |
@@ -528,15 +534,15 @@ messages to paused clients.
 
 ## MINIMUM VIABLE FIRST RUN — SOLO TESTING SEQUENCE
 
-This sequence tests the full solo template end-to-end. All five claws
+This sequence tests the full solo template end-to-end. All six claws
 must be running. Use test credentials for all external APIs.
 
 ### Phase A — Verify Isolation and Shared Mount (before anything else)
 
 ```
-A1. Confirm all five sandbox filesystem mounts exist and are isolated:
-    /sandbox/content, /sandbox/clients, /sandbox/analytics,
-    /sandbox/finance, /sandbox/build
+A1. Confirm all six sandbox filesystem mounts exist and are isolated:
+/sandbox/content, /sandbox/clients, /sandbox/analytics,
+/sandbox/finance, /sandbox/build, /sandbox/assistant
 
 A2. Write a test file to /sandbox/analytics/reports/weekly-intelligence.json
 
@@ -555,7 +561,7 @@ proceeding. Nothing else works correctly without this foundation.
 ### Phase B — War Room and Approval Flow
 
 ```
-B1. Open War Room TUI — confirm five-claw health panel renders
+B1. Open War Room TUI — confirm six-claw health panel renders
 B2. Confirm morning brief scheduling initialized (07:00 target)
 B3. Inject a mock REVIEW action manually
 B4. Confirm it appears in the queue with correct priority
@@ -618,7 +624,7 @@ F2. Inject mock client_health_signal from Ops Claw
 F3. Inject mock revenue_summary from Finance Claw
 F4. Trigger manual report generation (bypass Sunday schedule)
 F5. Confirm weekly-intelligence.json written and valid JSON
-F6. Confirm all five claws can read the file (from Phase A mount)
+F6. Confirm all six claws can read the file (from Phase A mount)
 F7. Inject content_performance_query from Content Claw
 F8. Confirm response arrives within 2 minutes
 F9. Inject client_health_signal with score 5.0 (below threshold)
@@ -640,7 +646,7 @@ Key configuration values for solo mode:
 template:
   name: solo-founder
   squad_size: 1
-  claws_active: [content, ops, analytics, finance, build]
+  claws_active: [content, ops, analytics, finance, build, assistant]
 
 operator_policy:
   squad_lead: mainza
@@ -693,9 +699,9 @@ deep_work_mode:
 When there is a conflict between documents, this hierarchy applies:
 
 1. **Individual claw spec documents** — ground truth for each claw's
-   internal behavior, filesystem layout, network egress, and inference routing
+internal behavior, filesystem layout, network egress, and inference routing
 2. **This document (solo template spec v2)** — ground truth for how the
-   five claws are configured, coordinated, and operated together in solo mode
+six claws are configured, coordinated, and operated together in solo mode
 3. **solo-founder.yaml** — configuration values that implement the above
 4. **AGENTS.md** — quick reference summary (not ground truth)
 

@@ -368,7 +368,7 @@ MilimoClaw demonstrates a correct and well-architected extension of NemoClaw. Th
 - ✅ Correctly extends inference routing with privacy-aware classification
 - ✅ Implements the full self-evolution cycle
 - ✅ Provides complete War Room operator oversight
-- ✅ Defines all five claw roles with proper policy specifications
+- ✅ Defines all six claw roles with proper policy specifications
 
 **Critical bugs fixed**:
 1. Configuration source mismatch in War Room

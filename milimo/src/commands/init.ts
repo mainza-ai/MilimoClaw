@@ -13,7 +13,11 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { PluginLogger, MilimoConfig, ClawRole } from "../index.js";
 import { CLAW_ROLES } from "../index.js";
-import { ConfigManager, type MilimoConfig as FullMilimoConfig, getActiveClawsForTemplate } from "../onboard/config.js";
+import {
+  ConfigManager,
+  type MilimoConfig as FullMilimoConfig,
+  getActiveClawsForTemplate,
+} from "../onboard/config.js";
 import { assistantSetup } from "./assistant.js";
 
 interface InitOptions {

@@ -50,7 +50,7 @@ or moves money. It only observes and informs.
 
 **Shared filesystem mount — the most critical dependency:**
   `/sandbox/analytics/reports/weekly-intelligence.json`
-  must be readable by ALL five claws. This is configured in each claw's
+  must be readable by ALL six claws. This is configured in each claw's
   sandbox policy. Verify the mount exists in analytics-sandbox.yaml
   before writing any generation code. If it is missing, add it.
 
@@ -69,7 +69,7 @@ No placeholder comments. Every function must be complete and runnable.
 
 ## DEVELOPMENT PHASE CONSTRAINTS
 
-**Inference:** ALL inference routes to cloud (Nemotron 120B via NVIDIA
+**Inference:** ALL inference routes to cloud (the configured NEMOCLAW_MODEL via NVIDIA
 Cloud API) during development. Do NOT implement local NIM routing.
 Do NOT enforce privacy routing. DO log `data_type` as a field on every
 inference call so routing can be enforced later with a flag change only.

@@ -19,7 +19,12 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
-from .evolution_cycle import EvolutionCycle, EvolutionScheduler, EvolutionConfig, CycleResult
+from .evolution_cycle import (
+    EvolutionCycle,
+    EvolutionScheduler,
+    EvolutionConfig,
+    CycleResult,
+)
 from .inference_client import NvidiaInferenceClient
 from .metrics_collector import MetricsCollector
 
@@ -100,7 +105,9 @@ class EvolutionIntegration:
         # Schedule next run
         self._schedule_next_run()
 
-        logger.info("Evolution integration started (interval: %d days)", self.interval_days)
+        logger.info(
+            "Evolution integration started (interval: %d days)", self.interval_days
+        )
 
     def stop(self) -> None:
         """Stop the evolution scheduler."""
@@ -110,7 +117,9 @@ class EvolutionIntegration:
             self._timer = None
         logger.info("Evolution integration stopped")
 
-    def trigger_now(self, claw_role: str | None = None, dry_run: bool = False) -> list[CycleResult]:
+    def trigger_now(
+        self, claw_role: str | None = None, dry_run: bool = False
+    ) -> list[CycleResult]:
         """Manually trigger evolution cycles."""
         results = self.scheduler.trigger(claw_role=claw_role, dry_run=dry_run)
         self._history.extend(results)
@@ -121,7 +130,9 @@ class EvolutionIntegration:
                     "Evolution: deployed tool '%s' for %s claw (+%.1f%%)",
                     result.proposal.tool_name if result.proposal else "unknown",
                     result.claw_role,
-                    result.tool_deployed.performance_delta if result.tool_deployed else 0,
+                    result.tool_deployed.performance_delta
+                    if result.tool_deployed
+                    else 0,
                 )
             elif result.skipped_reason:
                 logger.debug(
@@ -139,8 +150,12 @@ class EvolutionIntegration:
         metrics_base = Path.home() / ".milimo" / "metrics"
 
         for role in ["build", "content", "ops", "analytics", "finance", "assistant"]:
-            collector = MetricsCollector(claw_role=role, metrics_dir=metrics_base / role)
-            summary[role] = collector.get_summary(lookback_hours=self.interval_days * 24)
+            collector = MetricsCollector(
+                claw_role=role, metrics_dir=metrics_base / role
+            )
+            summary[role] = collector.get_summary(
+                lookback_hours=self.interval_days * 24
+            )
 
         return summary
 
@@ -152,12 +167,16 @@ class EvolutionIntegration:
             logger.info("No evolution history found — running initial dry run")
             results = self.trigger_now(dry_run=True)
             if results:
-                logger.info("Initial evolution dry run complete for %d claws", len(results))
+                logger.info(
+                    "Initial evolution dry run complete for %d claws", len(results)
+                )
         else:
             last_run = history[-1].timestamp
             try:
                 last_run_time = datetime.fromisoformat(last_run)
-                if (datetime.now(timezone.utc) - last_run_time) > timedelta(days=self.interval_days + 1):
+                if (datetime.now(timezone.utc) - last_run_time) > timedelta(
+                    days=self.interval_days + 1
+                ):
                     logger.info("Missed evolution cycle detected — triggering now")
                     self.trigger_now()
             except (ValueError, TypeError):

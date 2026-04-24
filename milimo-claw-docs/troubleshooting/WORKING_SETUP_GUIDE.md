@@ -36,7 +36,7 @@ curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
 # 2. Go through the 7-step onboard wizard
 #    - Select your inference provider (NVIDIA Endpoints recommended)
 #    - Enter your NVIDIA API key
-#    - Choose your model (z-ai/glm5, nvidia/nemotron-3-super-120b-a12b, etc.)
+# - Choose your model (e.g., ${NEMOCLAW_MODEL})
 #    - Enable GPU if available
 #    - Accept policy presets (pypi, npm, telegram)
 #    - Confirm sandbox creation
@@ -210,7 +210,7 @@ openclaw milimo onboard
 # - Vibe (e.g., sharp and unhurried)
 # - Signature emoji (e.g., 👽)
 # - Squad name (e.g., zulu)
-# - Template: solo (all 5 claws active — no role selection)
+# - Template: solo (all 6 claws active — no role selection)
 # - War Room mode: full
 
 # Confirm with Y
@@ -250,7 +250,7 @@ from orchestrator.content.content_claw import ContentClaw
 from orchestrator.ops.ops_claw import OpsClaw
 from orchestrator.analytics.analytics_claw import AnalyticsClaw
 from orchestrator.finance.finance_claw import FinanceClaw
-print('All 5 claws importable')
+print('All 6 claws importable')
 "
 
 # 4. War Room
@@ -476,5 +476,5 @@ python3 orchestrator/assistant_setup.py
 2. **API key stays on host** — The sandbox uses `inference.local` which is proxied by OpenShell; credentials never enter the sandbox
 3. **Telegram is host-side** — The Telegram bridge runs via `nemoclaw start` on the host, not inside the sandbox
 4. **Two OpenClaw users** — The sandbox has both `root` and `sandbox` (uid 999) users. Plugins must be installed for the sandbox user at `/sandbox/.openclaw-data/extensions/`
-5. **Solo template = all 5 claws** — No role selection. All claws (Content, Ops, Analytics, Finance, Build) are active simultaneously
+5. **Solo template = all 6 claws** — No role selection. All claws (Content, Ops, Analytics, Finance, Build, Assistant) are active simultaneously
 6. **Assistant is NOT a claw** — It's the conversational bridge between the operator and the autonomous claws

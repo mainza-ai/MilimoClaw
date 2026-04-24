@@ -11,9 +11,8 @@ Schedules and manages the weekly self-evolution cycle for solo founders.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 from typing import Any, Optional
 
 logger = logging.getLogger("milimo.solo_evolution")
@@ -69,9 +68,11 @@ CONTENT_ADDITIONAL_THRESHOLDS = {
 
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class EvolutionSchedule:
     """Schedule for a claw's evolution cycle."""
+
     claw: str
     enabled: bool = True
     day: str = "sunday"
@@ -85,6 +86,7 @@ class EvolutionSchedule:
 @dataclass
 class EvolutionStatus:
     """Status of evolution for a claw."""
+
     claw: str
     can_evolve: bool
     reason: str
@@ -94,6 +96,7 @@ class EvolutionStatus:
 
 
 # ---------------------------------------------------------------------------
+
 
 def parse_evolution_schedule(evolution_config: dict[str, Any]) -> dict[str, str]:
     """
@@ -123,9 +126,7 @@ def parse_evolution_schedule(evolution_config: dict[str, Any]) -> dict[str, str]
         return {role: legacy_time for role in CLAW_SCHEDULE_KEYS.keys()}
 
 
-def get_claw_schedule_time(
-    evolution_config: dict[str, Any], claw: str
-) -> str:
+def get_claw_schedule_time(evolution_config: dict[str, Any], claw: str) -> str:
     """
     Get the scheduled time for a specific claw.
 
@@ -344,7 +345,9 @@ def _check_evolution_threshold(
         }
 
 
-def _get_next_evolution_time(schedules: dict[str, EvolutionSchedule]) -> Optional[datetime]:
+def _get_next_evolution_time(
+    schedules: dict[str, EvolutionSchedule],
+) -> Optional[datetime]:
     """
     Get the next evolution time across all claws.
 
@@ -354,10 +357,7 @@ def _get_next_evolution_time(schedules: dict[str, EvolutionSchedule]) -> Optiona
     Returns:
         Next evolution datetime, or None if no enabled schedules
     """
-    next_times = [
-        s.next_run for s in schedules.values()
-        if s.enabled and s.next_run
-    ]
+    next_times = [s.next_run for s in schedules.values() if s.enabled and s.next_run]
 
     if not next_times:
         return None
@@ -387,7 +387,9 @@ def _status_to_dict(status: EvolutionStatus) -> dict[str, Any]:
         "reason": status.reason,
         "current_activity": status.current_activity,
         "required_activity": status.required_activity,
-        "last_evolution": status.last_evolution.isoformat() if status.last_evolution else None,
+        "last_evolution": status.last_evolution.isoformat()
+        if status.last_evolution
+        else None,
     }
 
 
@@ -556,7 +558,9 @@ def check_content_evolution_thresholds(
         Dict with 'can_evolve', 'reasons', 'thresholds_checked'
     """
     if config:
-        evolution_config = config.get("evolution", {}).get("per_claw", {}).get("content", {})
+        evolution_config = (
+            config.get("evolution", {}).get("per_claw", {}).get("content", {})
+        )
     else:
         evolution_config = {}
 
@@ -568,9 +572,21 @@ def check_content_evolution_thresholds(
         "can_evolve": True,
         "reasons": [],
         "thresholds_checked": {
-            "approved_posts": {"required": min_approved, "actual": approved_count, "passed": True},
-            "rejected_drafts": {"required": rejected_min, "actual": rejected_count, "passed": True},
-            "performance_weeks": {"required": weeks_min, "actual": performance_log_age_days // 7, "passed": True},
+            "approved_posts": {
+                "required": min_approved,
+                "actual": approved_count,
+                "passed": True,
+            },
+            "rejected_drafts": {
+                "required": rejected_min,
+                "actual": rejected_count,
+                "passed": True,
+            },
+            "performance_weeks": {
+                "required": weeks_min,
+                "actual": performance_log_age_days // 7,
+                "passed": True,
+            },
         },
     }
 

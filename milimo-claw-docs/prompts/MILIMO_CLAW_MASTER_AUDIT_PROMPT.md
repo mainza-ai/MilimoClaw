@@ -40,19 +40,20 @@ matters. Do not skip ahead.
 ## WHAT THIS SYSTEM IS
 
 Milimo Claw is a multi-agent autonomous hustle platform built as a plugin
-on NVIDIA NemoClaw. Five specialized AI agents (claws) run in isolated
+on NVIDIA NemoClaw. Six specialized AI agents (claws) run in isolated
 sandboxes and coordinate through a typed inter-sandbox message gateway.
-In the solo-founder template, one operator manages all five claws through
+In the solo-founder template, one operator manages all six claws through
 a single War Room TUI, spending under 15 minutes per day. The operator
 is whoever deployed the template — a student, a solo founder, or any
 single person running their own squad. The platform is built for anyone.
 
-The five claws:
-  - CONTENT CLAW  — generates all creative output autonomously
-  - OPS CLAW      — manages the full client lifecycle
-  - ANALYTICS CLAW — intelligence layer, weekly reports, signals
-  - FINANCE CLAW  — invoicing, pricing, revenue, expenses
-  - BUILD CLAW    — GitHub issues, PRs, deploys, monitoring
+The six claws:
+- CONTENT CLAW — generates all creative output autonomously
+- OPS CLAW — manages the full client lifecycle
+- ANALYTICS CLAW — intelligence layer, weekly reports, signals
+- FINANCE CLAW — invoicing, pricing, revenue, expenses
+- BUILD CLAW — GitHub issues, PRs, deploys, monitoring
+- ASSISTANT CLAW — conversational interface, operator queries, claw coordination
 
 Everything you need to understand each claw is in the attached spec
 documents. Read them. They are the ground truth.
@@ -76,7 +77,7 @@ If this prompt conflicts with a claw spec: the spec wins.
 
 Apply these to every fix you make. No exceptions.
 
-**Inference:** ALL inference routes to cloud (Nemotron 120B).
+**Inference:** ALL inference routes to cloud (the configured NEMOCLAW_MODEL).
 No local NIM routing. No privacy routing enforcement.
 Log `data_type` on every inference call — mandatory.
 

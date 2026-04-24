@@ -6,8 +6,8 @@ Lucy, here is the updated status with corrections to your report.
 
 ## What You Got Right
 
-1. **Squad config** — zulu squad, solo-founder template, 5 active claws — correct
-2. **Mesh topology** — all 5 claws registered — correct
+1. **Squad config** — zulu squad, solo-founder template, 6 active claws — correct
+2. **Mesh topology** — all 6 claws registered — correct
 3. **Build sandbox** — initialized with directory structure — correct
 4. **Pending message** — feature_brief from ops in build inbox — correct
 
@@ -99,7 +99,7 @@ while True: time.sleep(1)
 "
 ```
 
-**To start all 5 claws:**
+**To start all 6 claws:**
 ```
 docker exec MilimoClaw python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/claw_launcher.py --all --verbose
 ```

@@ -26,6 +26,7 @@ import logging
 import sys
 from pathlib import Path
 from typing import Any
+from datetime import datetime, timedelta, timezone
 
 # Configure logging to stderr only
 logging.basicConfig(
@@ -51,7 +52,7 @@ def handle_evolution_status(args: dict[str, Any]) -> dict[str, Any]:
 
     try:
         registry = ToolRegistry(squad_id, claw_role)
-        cycle = EvolutionCycle(
+        _cycle = EvolutionCycle(
             squad_id=squad_id,
             claw_role=claw_role,
             blueprint_dir=blueprint_dir,
@@ -266,9 +267,8 @@ def handle_marketplace_publish(args: dict[str, Any]) -> dict[str, Any]:
 def handle_mesh_flow_state(args: dict[str, Any]) -> dict[str, Any]:
     """Get cross-claw mesh signal flow state — live topology and pending messages."""
     from pathlib import Path
-    from datetime import timedelta
 
-    squad_id = args.get("squad", "default")
+    _squad_id = args.get("squad", "default")
 
     try:
         mesh_dir = Path.home() / ".milimo" / "mesh"
@@ -365,8 +365,8 @@ def handle_provenance_verify(args: dict[str, Any]) -> dict[str, Any]:
     blueprint_dir = args.get("blueprint_dir", ".")
     version = args.get("version", "latest")
     strict = args.get("strict", False)
-    squad_id = args.get("squad_id", "default")
-    claw_role = args.get("claw_role", "content")
+    _squad_id = args.get("squad_id", "default")
+    _claw_role = args.get("claw_role", "content")
 
     try:
         verifier = ProvenanceVerifier(strict_mode=strict)
@@ -410,10 +410,10 @@ def handle_provenance_keygen(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_revenue_summary(args: dict[str, Any]) -> dict[str, Any]:
     """Get revenue summary for War Room widget."""
-    from .solo_warroom import SoloWarRoom, RevenueSummary
+    from .solo_warroom import SoloWarRoom
     from pathlib import Path
 
-    squad_id = args.get("squad_id", "default")
+    _squad_id = args.get("squad_id", "default")
     sandbox_dir = args.get("sandbox_dir")
 
     try:
@@ -439,7 +439,7 @@ def handle_morning_brief(args: dict[str, Any]) -> dict[str, Any]:
     """Generate morning brief digest."""
     from .solo_warroom import SoloWarRoom
 
-    squad_id = args.get("squad_id", "default")
+    _squad_id = args.get("squad_id", "default")
 
     try:
         config = {"war_room": {"operator": "operator", "mode": "solo"}}
@@ -474,7 +474,7 @@ def handle_evening_wrap(args: dict[str, Any]) -> dict[str, Any]:
     """Generate evening wrap digest."""
     from .solo_warroom import SoloWarRoom
 
-    squad_id = args.get("squad_id", "default")
+    _squad_id = args.get("squad_id", "default")
 
     try:
         config = {"war_room": {"operator": "operator", "mode": "solo"}}
@@ -595,7 +595,7 @@ def handle_squad_config(args: dict[str, Any]) -> dict[str, Any]:
 
 def _collect_claw_health(role: str, squad_id: str, base_dir: Path) -> dict[str, Any]:
     """Collect health for a single claw."""
-    now = datetime.now(timezone.utc).isoformat()
+    _now = datetime.now(timezone.utc).isoformat()
 
     claw_health: dict[str, Any] = {
         "role": role,
@@ -724,9 +724,6 @@ def _calculate_sparkline(role: str, log_file: Path) -> list[int]:
         return [0, 0, 0, 0, 0, 0, 0]
 
 
-from datetime import datetime, timezone, timedelta
-
-
 # ---------------------------------------------------------------------------
 # Command Registry
 # ---------------------------------------------------------------------------
@@ -754,7 +751,6 @@ def handle_send_to_claw(args: dict[str, Any]) -> dict[str, Any]:
 
     from .contracts import (
         ClawMessage,
-        ContractValidator,
         VALID_SENDERS,
         VALID_RECIPIENTS,
         VALID_MESSAGE_TYPES,
@@ -848,7 +844,14 @@ def handle_claw_status(args: dict[str, Any]) -> dict[str, Any]:
 
     if not claw_role:
         raise RuntimeError("role is required")
-    if claw_role not in {"content", "ops", "analytics", "finance", "build", "assistant"}:
+    if claw_role not in {
+        "content",
+        "ops",
+        "analytics",
+        "finance",
+        "build",
+        "assistant",
+    }:
         raise RuntimeError(f"Invalid claw role: {claw_role}")
 
     home = Path.home()
@@ -1451,7 +1454,9 @@ def handle_get_result(args: dict[str, Any]) -> dict[str, Any]:
         return {"status": "not_found", "message": "No outbox directory exists"}
 
     roles_to_check = (
-        [role] if role else ["content", "ops", "analytics", "finance", "build", "assistant"]
+        [role]
+        if role
+        else ["content", "ops", "analytics", "finance", "build", "assistant"]
     )
 
     for check_role in roles_to_check:
@@ -1538,8 +1543,6 @@ def handle_start_claw(args: dict[str, Any]) -> dict[str, Any]:
             hb = json.loads(hb_file.read_text())
             timestamp = hb.get("timestamp", "")
             if timestamp:
-                from datetime import datetime, timezone
-
                 hb_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
                 age = (datetime.now(timezone.utc) - hb_time).total_seconds()
                 if age < 90:
@@ -1703,7 +1706,9 @@ def handle_claw_logs(args: dict[str, Any]) -> dict[str, Any]:
 
     try:
         all_lines = log_file.read_text().splitlines()
-        role_lines = [l for l in all_lines if f".{role}]" in l or f" {role} " in l]
+        role_lines = [
+            line for line in all_lines if f".{role}]" in line or f" {role} " in line
+        ]
         recent_lines = role_lines[-lines:] if len(role_lines) > lines else role_lines
 
         return {
@@ -1754,8 +1759,6 @@ def handle_launcher_status(args: dict[str, Any]) -> dict[str, Any]:
                 hb = json.loads(hb_file.read_text())
                 timestamp = hb.get("timestamp", "")
                 if timestamp:
-                    from datetime import datetime, timezone
-
                     hb_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
                     age = (datetime.now(timezone.utc) - hb_time).total_seconds()
                     status["claws"][role] = {
@@ -1766,8 +1769,8 @@ def handle_launcher_status(args: dict[str, Any]) -> dict[str, Any]:
                     }
             except Exception:
                 status["claws"][role] = {"status": "unknown"}
-        else:
-            status["claws"][role] = {"status": "stopped"}
+            else:
+                status["claws"][role] = {"status": "stopped"}
 
     return status
 

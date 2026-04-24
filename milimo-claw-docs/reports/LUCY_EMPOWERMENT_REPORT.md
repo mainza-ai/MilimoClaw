@@ -9,7 +9,7 @@
 
 ## 1. Who Lucy Is
 
-Lucy is the OpenClaw agent that serves as the conversational interface between the human operator and the five autonomous claw agents (Content, Ops, Analytics, Finance, Build). She is configured via:
+Lucy is the OpenClaw agent that serves as the conversational interface between the human operator and the six autonomous claw agents (Content, Ops, Analytics, Finance, Build, Assistant). She is configured via:
 
 - **System prompt:** `milimo-claw-docs/reference/MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md`
 - **Agent config:** `.openclaw/agents/main/config.yaml` (written by `assistant_setup.py`)
@@ -125,10 +125,10 @@ COORDINATION LAYER
            │
            ▼
 RUNTIME LAYER (NemoClaw Sandboxes)
-┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-│ Content  │ │   Ops    │ │Analytics │ │ Finance  │ │  Build   │
-│ Claw     │ │  Claw    │ │  Claw    │ │  Claw    │ │  Claw    │
-└──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
+┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│ Content │ │ Ops │ │Analytics │ │ Finance │ │ Build │ │Assistant│
+│ Claw │ │ Claw │ │ Claw │ │ Claw │ │ Claw │ │ Claw │
+└──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
 ```
 
 The architecture was designed with a clear separation: claws are autonomous, the War Room is the human control surface, and Lucy is a conversational observer. This is safe but leaves Lucy powerless to act as an orchestrator.

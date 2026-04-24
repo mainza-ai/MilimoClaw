@@ -100,7 +100,7 @@ nemoclaw onboard
 export NVIDIA_API_KEY="nvapi-your-key-here"
 export NEMOCLAW_NON_INTERACTIVE=1
 export NEMOCLAW_PROVIDER=cloud
-export NEMOCLAW_MODEL="nvidia/nemotron-3-super-120b-a12b"
+export NEMOCLAW_MODEL="$(echo $NEMOCLAW_MODEL)"  # set during nemoclaw onboard; fallback: nvidia/nemotron-3-super-120b-a12b
 nemoclaw onboard
 ```
 
@@ -127,7 +127,7 @@ nemoclaw my-assistant status
 # Expected output:
 # Sandbox: my-assistant
 # Phase: Ready
-# Model: nvidia/nemotron-3-super-120b-a12b
+# Model: <your selected model>
 # Provider: nvidia-nim
 # Policies: pypi, npm
 ```

@@ -163,4 +163,4 @@ Phase 5 (Validation & Health) → Phase 6 (Execution Engine)
 - [ ] Real `SentryClient` reports errors when `SENTRY_AUTH_TOKEN` is set
 - [ ] Missing env vars cause clear error at startup, not silent degradation
 - [ ] HTTP `/health` on port 8081 returns JSON with all claw statuses
-- [ ] All 5 claws can be started via bridge commands and process real work
+- [ ] All 6 claws can be started via bridge commands and process real work

@@ -129,7 +129,7 @@ RUN mkdir -p /sandbox/.milimo/blueprints/0.1.0 \
 && chown -R sandbox:sandbox /sandbox/.milimo
 
 # Build args for config that varies per deployment.
-ARG MILIMO_MODEL=${NEMOCLAW_MODEL:-nvidia/nemotron-4-340b-instruct}
+ARG MILIMO_MODEL=${NEMOCLAW_MODEL:-nvidia/nemotron-3-super-120b-a12b}
 ARG CHAT_UI_URL=http://127.0.0.1:18789
 ARG MILIMO_BUILD_ID=default
 

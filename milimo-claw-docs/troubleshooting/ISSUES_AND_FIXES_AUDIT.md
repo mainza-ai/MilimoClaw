@@ -19,7 +19,7 @@ This document catalogs all issues identified during the MilimoClaw production re
 
 ### Problem Description
 
-All 5 claws were missing handlers for `assistant_query` and `assistant_task` message types. When Lucy (the assistant) sent messages to claws via the mesh messaging system, the messages were delivered to the inbox but ignored because no handler was registered to process them.
+All 6 claws were missing handlers for `assistant_query` and `assistant_task` message types. When Lucy (the assistant) sent messages to claws via the mesh messaging system, the messages were delivered to the inbox but ignored because no handler was registered to process them.
 
 ### Evidence
 
@@ -33,7 +33,7 @@ The assistant message types were added to `mesh_config.yaml` but the correspondi
 
 ### Fix Applied
 
-Added `_handle_assistant_query` and `_handle_assistant_task` methods to all 5 claws:
+Added `_handle_assistant_query` and `_handle_assistant_task` methods to all 6 claws:
 
 | Claw | Implementation Location | Method Used |
 |------|------------------------|-------------|
@@ -687,7 +687,7 @@ Check launcher log:
 ```bash
 grep "started successfully" /sandbox/.milimo/mesh/logs/launcher.log | tail -5
 ```
-Expected: All 5 claws showing "started successfully"
+Expected: All 6 claws showing "started successfully"
 
 ### Phase 2 Checks (April 14)
 
@@ -781,9 +781,9 @@ The 4 failures are NOT caused by Phase 2 changes:
 ## Outstanding Items
 
 1. **Log Permission Fix in install.sh**: Should add step to fix log directory permissions during fresh install
-2. ~~**Handler Response Format**: Should standardize response format across all claws (some return None, some return dict)~~ — **Resolved in Phase 2:** All 5 claws now send `assistant_response` messages via mesh
+2. ~~**Handler Response Format**: Should standardize response format across all claws (some return None, some return dict)~~ — **Resolved in Phase 2:** All 6 claws now send `assistant_response` messages via mesh
 3. **Error Handling for Unhandled Messages**: Should add logging when message type is not handled
-4. **Standardize Assistant Response Pattern**: All 5 claws implement `_send_assistant_response` independently — consider extracting to a shared mixin or base class
+4. **Standardize Assistant Response Pattern**: All 6 claws implement `_send_assistant_response` independently — consider extracting to a shared mixin or base class
 5. **Pre-existing Test Failures**: 4 tests fail on macOS host due to read-only `/sandbox` and port conflicts — need test fixtures that use `tmp_path` instead
 
 ---

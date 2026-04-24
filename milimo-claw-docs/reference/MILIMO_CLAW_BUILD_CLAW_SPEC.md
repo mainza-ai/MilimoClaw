@@ -5,7 +5,7 @@
 # feature implementation, testing, or documentation.
 #
 # DEVELOPMENT NOTE: This implementation is in active development and testing.
-# All inference currently routes to cloud (Nemotron 120B via NVIDIA Cloud API)
+# All inference currently routes to cloud (the configured NEMOCLAW_MODEL via NVIDIA Cloud API)
 # regardless of data sensitivity. The privacy routing rules documented here
 # represent the production target architecture. Do not implement privacy
 # routing enforcement during this phase — route everything to cloud.
@@ -126,6 +126,10 @@ Everything the Build Claw owns lives under `/sandbox/build`:
 - `/sandbox/clients/` — client contact data (Ops Claw only)
 - `/sandbox/finance/` — financial records (Finance Claw only)
 - `/sandbox/content/` — creative assets and brand data (Content Claw only)
+- `/sandbox/assistant/` — session data and context (Assistant Claw only)
+
+The Assistant Claw (`/sandbox/assistant`) likewise cannot read the Build
+Claw's primary mount or any other claw's primary mount — isolation is mutual.
 
 ---
 
@@ -187,13 +191,13 @@ Log `data_type` on every inference call. Mandatory, not optional.
 | API keys and env vars | Local NIM | Secrets — never cloud |
 | Architecture decisions | Local NIM | Sensitive design decisions |
 | Code review and analysis | Local NIM | Contains proprietary code |
-| Boilerplate and test generation | Cloud Nemotron 120B | Non-sensitive, quality preferred |
-| Public documentation drafts | Cloud Nemotron 120B | Public-facing, quality matters |
-| Public changelogs and release notes | Cloud Nemotron 120B | Community will read these |
+| Boilerplate and test generation | Cloud (NEMOCLAW_MODEL) | Non-sensitive, quality preferred |
+| Public documentation drafts | Cloud (NEMOCLAW_MODEL) | Public-facing, quality matters |
+| Public changelogs and release notes | Cloud (NEMOCLAW_MODEL) | Community will read these |
 | Production log analysis with user data | Local NIM | User privacy non-negotiable |
-| Dependency vulnerability analysis | Cloud Nemotron 120B | Public CVE data |
-| Issue complexity scoring | Cloud Nemotron 120B | Non-sensitive task estimation |
-| Devlog and shipping summary drafts | Cloud Nemotron 120B | Public build-in-public content |
+| Dependency vulnerability analysis | Cloud (NEMOCLAW_MODEL) | Public CVE data |
+| Issue complexity scoring | Cloud (NEMOCLAW_MODEL) | Non-sensitive task estimation |
+| Devlog and shipping summary drafts | Cloud (NEMOCLAW_MODEL) | Public build-in-public content |
 
 **In production, source code and secrets MUST route to local NIM.**
 During development, cloud is used — but `data_type` must be logged

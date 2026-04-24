@@ -232,11 +232,11 @@ The Analytics Claw is specified in detail but has **ZERO implementation**. No Py
 
 | Data Type | Backend | Reason |
 |-----------|---------|--------|
-| Public trend/market analysis | Cloud Nemotron 120B | Public data |
+| Public trend/market analysis | Cloud (NEMOCLAW_MODEL) | Public data |
 | Internal performance synthesis | Local NIM | Sensitive squad data |
 | Predictive model generation | Local NIM | Proprietary data |
 | Anomaly characterization | Local NIM | Operational intelligence |
-| Competitor signal analysis | Cloud Nemotron 120B | Public market data |
+| Competitor signal analysis | Cloud (NEMOCLAW_MODEL) | Public market data |
 | Opportunity scoring | Local NIM | Private revenue/client data |
 | Report narrative generation | Local NIM | Full operational picture |
 

@@ -280,7 +280,7 @@ RUN openclaw plugins install /opt/milimo
   "agents": {
     "defaults": {
       "model": {
-        "primary": "nvidia/nemotron-3-super-120b-a12b"
+        "primary": "${NEMOCLAW_MODEL}"
       }
     }
   },
@@ -307,9 +307,9 @@ RUN openclaw plugins install /opt/milimo
 
 | Profile | Provider | Endpoint | Model | Use Case |
 |---------|----------|----------|-------|----------|
-| default | nvidia | build.nvidia.com | Nemotron 120B | Production |
-| ncp | nvidia | Dynamic | Nemotron 120B | NVIDIA Cloud Partner |
-| nim-local | openai | nim-service.local:8000 | Nemotron 120B | On-prem NIM |
+| default | nvidia | build.nvidia.com | the NEMOCLAW_MODEL default | Production |
+| ncp | nvidia | Dynamic | the NEMOCLAW_MODEL default | NVIDIA Cloud Partner |
+| nim-local | openai | nim-service.local:8000 | the NEMOCLAW_MODEL default | On-prem NIM |
 | vllm | openai | localhost:8000 | Nemotron 30B | Local dev |
 
 ---

@@ -20,20 +20,17 @@ from __future__ import annotations
 
 import json
 import logging
-import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
+from datetime import datetime, timezone
 from typing import Any, Literal
 
-from ..privacy_router import InferenceBackend, PrivacyRouter, RoutingDecision
+from ..privacy_router import PrivacyRouter, RoutingDecision
 from ..tool_registry import ToolRegistry
 from .content_init import (
     ContentFilesystemInit,
     ContentOperationalLog,
     LogEntry,
     generate_draft_id,
-    generate_brief_id,
 )
 
 logger = logging.getLogger("milimo.content_generator")
@@ -287,9 +284,10 @@ class ContentGenerator:
             / "analytics-feed"
             / "weekly-intelligence.json"
         )
-        performance_hints = None
+
+        _performance_hints = None
         if intelligence_path.exists():
-            performance_hints = json.loads(intelligence_path.read_text())
+            _performance_hints = json.loads(intelligence_path.read_text())
 
         estimated_times = {}
         for brief_id in active_briefs:
@@ -530,7 +528,7 @@ class ContentGenerator:
             return ""
 
         client_desc = draft.client_id or "own content"
-        summary = (
+        _summary = (
             f"Draft ready: {draft.platform} {draft.content_type} for {client_desc}"
         )
 

@@ -5,12 +5,18 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    globals: true,
     projects: [
       {
-        test: {
-          name: "plugin",
-          include: ["milimo/src/**/*.test.ts"],
+      test: {
+        name: "plugin",
+        include: ["milimo/src/**/*.test.ts"],
+        globals: true,
+        setupFiles: ["milimo/vitest-setup.ts"],
+        typecheck: {
+          tsconfig: "milimo/tsconfig.test.json",
         },
+      },
       },
     ],
     coverage: {

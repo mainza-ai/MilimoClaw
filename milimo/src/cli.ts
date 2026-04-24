@@ -24,7 +24,14 @@ import {
   cliBlueprintInfo,
 } from "./commands/blueprint.js";
 import { cliWarRoom } from "./commands/warroom.js";
-import { cliPaymentCheckout, cliPaymentStatus, cliPaymentBalance, cliPaymentHistory, cliPaymentInvoice, cliPaymentConnect } from "./commands/payment.js";
+import {
+  cliPaymentCheckout,
+  cliPaymentStatus,
+  cliPaymentBalance,
+  cliPaymentHistory,
+  cliPaymentInvoice,
+  cliPaymentConnect,
+} from "./commands/payment.js";
 import { cliVerify, cliProvenanceKeygen } from "./commands/verify.js";
 import { cliBadge } from "./commands/badge.js";
 import { cliActionApprove, cliActionBlock, listPendingActions } from "./commands/action.js";
@@ -39,30 +46,28 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
 
   // ── openclaw milimo onboard ───────────────────────────────────────
   milimo
-  .command("onboard")
-  .description("Interactive setup: configure squad, template, role, and War Room")
-  .option("--squad <name>", "Squad name")
-  .option("--role <role>", "Claw role: content, ops, analytics, finance, build, assistant")
-  .option("--template <template>", "Squad template (e.g., solo-founder, content-agency)")
-  .option("--solo", "Initialize as a solo operator (no mesh)", false)
-  .option("--operator <name>", "Operator name")
-  .option("--no-sandbox", "Skip automatic NemoClaw sandbox creation", false)
-  .option(
-    "--war-room-mode <mode>",
-    "War Room mode: full, minimal, disabled",
-    "full" as const,
-  )
-  .action(async (opts: {
-    squad?: string;
-    role?: string;
-    template?: string;
-    solo: boolean;
-    operator?: string;
-    noSandbox: boolean;
-    warRoomMode: "full" | "minimal" | "disabled";
-  }) => {
-    await cliOnboard({ ...opts, logger, pluginConfig });
-  });
+    .command("onboard")
+    .description("Interactive setup: configure squad, template, role, and War Room")
+    .option("--squad <name>", "Squad name")
+    .option("--role <role>", "Claw role: content, ops, analytics, finance, build, assistant")
+    .option("--template <template>", "Squad template (e.g., solo-founder, content-agency)")
+    .option("--solo", "Initialize as a solo operator (no mesh)", false)
+    .option("--operator <name>", "Operator name")
+    .option("--no-sandbox", "Skip automatic NemoClaw sandbox creation", false)
+    .option("--war-room-mode <mode>", "War Room mode: full, minimal, disabled", "full" as const)
+    .action(
+      async (opts: {
+        squad?: string;
+        role?: string;
+        template?: string;
+        solo: boolean;
+        operator?: string;
+        noSandbox: boolean;
+        warRoomMode: "full" | "minimal" | "disabled";
+      }) => {
+        await cliOnboard({ ...opts, logger, pluginConfig });
+      },
+    );
 
   // ── openclaw milimo init ──────────────────────────────────────────
   milimo
@@ -76,18 +81,20 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
     .option("--assistant-creature <creature>", "Assistant creature", "a claw")
     .option("--assistant-vibe <vibe>", "Assistant vibe", "sharp and unhurried")
     .option("--assistant-emoji <emoji>", "Assistant emoji", "🦀")
-    .action(async (opts: {
-      squad?: string;
-      role?: string;
-      template?: string;
-      solo: boolean;
-      assistantName?: string;
-      assistantCreature?: string;
-      assistantVibe?: string;
-      assistantEmoji?: string;
-    }) => {
-      await cliInit({ ...opts, logger, pluginConfig });
-    });
+    .action(
+      async (opts: {
+        squad?: string;
+        role?: string;
+        template?: string;
+        solo: boolean;
+        assistantName?: string;
+        assistantCreature?: string;
+        assistantVibe?: string;
+        assistantEmoji?: string;
+      }) => {
+        await cliInit({ ...opts, logger, pluginConfig });
+      },
+    );
 
   // ── openclaw milimo squad ─────────────────────────────────────────
   const squad = milimo.command("squad").description("Squad lifecycle management");
@@ -210,71 +217,80 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
     .option("-w, --watch", "Watch mode - continuously update display")
     .option("-i, --interval <ms>", "Watch interval in milliseconds", "5000")
     .option("-j, --json", "Output as JSON")
-    .action(async (opts: {
-      squad?: string;
-      detailed?: boolean;
-      collect?: boolean;
-      watch?: boolean;
-      interval?: string;
-      json?: boolean;
-    }) => {
-      const { join } = await import("node:path");
-      const { homedir } = await import("node:os");
-      const { existsSync } = await import("node:fs");
-      const { readFile } = await import("node:fs/promises");
+    .action(
+      async (opts: {
+        squad?: string;
+        detailed?: boolean;
+        collect?: boolean;
+        watch?: boolean;
+        interval?: string;
+        json?: boolean;
+      }) => {
+        const { join } = await import("node:path");
+        const { homedir } = await import("node:os");
+        const { existsSync } = await import("node:fs");
+        const { readFile } = await import("node:fs/promises");
 
-      const squadId = opts.squad || process.env.MILIMO_SQUAD || "default";
-      const healthPath = join(homedir(), ".milimo", "health", "health.json");
+        const squadId = opts.squad || process.env.MILIMO_SQUAD || "default";
+        const healthPath = join(homedir(), ".milimo", "health", "health.json");
 
-      if (!existsSync(healthPath)) {
-        logger.info("No health data available. Run with --collect to gather data.");
-        return;
-      }
-
-      try {
-        const content = await readFile(healthPath, "utf-8");
-        const health = JSON.parse(content);
-
-        if (opts.json) {
-          logger.info(JSON.stringify(health, null, 2));
-        } else if (opts.detailed) {
-          logger.info("");
-          logger.info(" ┌─────────────────────────────────────────────────────┐");
-          logger.info(" │ 🏥 SQUAD HEALTH DASHBOARD 🏥                        │");
-          logger.info(" └─────────────────────────────────────────────────────┘");
-          logger.info("");
-          logger.info(` Overall: ${health.overall_score?.toFixed(1) || "N/A"} (${health.overall_status || "unknown"})`);
-          logger.info(` Squad: ${health.squad_id || squadId}`);
-          logger.info(` Updated: ${health.last_updated || "never"}`);
-          logger.info("");
-
-          if (health.claws) {
-            logger.info(" Claw Status:");
-            for (const claw of health.claws) {
-              const icon = claw.status === "healthy" ? "🟢" : claw.status === "degraded" ? "🔴" : "🟡";
-              logger.info(`  ${icon} ${claw.role?.padEnd(12) || "unknown"} ${claw.score?.toFixed(1) || "N/A"} ${claw.status || "unknown"}`);
-            }
-          }
-
-          if (health.alerts?.length > 0) {
-            logger.info("");
-            logger.info(" Alerts:");
-            for (const alert of health.alerts) {
-              logger.info(`  [${alert.level}] ${alert.role}: ${alert.message}`);
-            }
-          }
-        } else {
-          logger.info(`Squad Health: ${health.overall_status || "unknown"} (${health.overall_score?.toFixed(1) || "N/A"})`);
-          if (health.claws) {
-            for (const claw of health.claws) {
-              logger.info(`  ${claw.role}: ${claw.score?.toFixed(1) || "N/A"}`);
-            }
-          }
+        if (!existsSync(healthPath)) {
+          logger.info("No health data available. Run with --collect to gather data.");
+          return;
         }
-      } catch (err) {
-        logger.error(`Failed to read health data: ${(err as Error).message}`);
-      }
-    });
+
+        try {
+          const content = await readFile(healthPath, "utf-8");
+          const health = JSON.parse(content);
+
+          if (opts.json) {
+            logger.info(JSON.stringify(health, null, 2));
+          } else if (opts.detailed) {
+            logger.info("");
+            logger.info(" ┌─────────────────────────────────────────────────────┐");
+            logger.info(" │ 🏥 SQUAD HEALTH DASHBOARD 🏥                        │");
+            logger.info(" └─────────────────────────────────────────────────────┘");
+            logger.info("");
+            logger.info(
+              ` Overall: ${health.overall_score?.toFixed(1) || "N/A"} (${health.overall_status || "unknown"})`,
+            );
+            logger.info(` Squad: ${health.squad_id || squadId}`);
+            logger.info(` Updated: ${health.last_updated || "never"}`);
+            logger.info("");
+
+            if (health.claws) {
+              logger.info(" Claw Status:");
+              for (const claw of health.claws) {
+                const icon =
+                  claw.status === "healthy" ? "🟢" : claw.status === "degraded" ? "🔴" : "🟡";
+                logger.info(
+                  `  ${icon} ${claw.role?.padEnd(12) || "unknown"} ${claw.score?.toFixed(1) || "N/A"} ${claw.status || "unknown"}`,
+                );
+              }
+            }
+
+            if (health.alerts?.length > 0) {
+              logger.info("");
+              logger.info(" Alerts:");
+              for (const alert of health.alerts) {
+                logger.info(`  [${alert.level}] ${alert.role}: ${alert.message}`);
+              }
+            }
+          } else {
+            logger.info(
+              `Squad Health: ${health.overall_status || "unknown"} (${health.overall_score?.toFixed(1) || "N/A"})`,
+            );
+            if (health.claws) {
+              for (const claw of health.claws) {
+                logger.info(`  ${claw.role}: ${claw.score?.toFixed(1) || "N/A"}`);
+              }
+            }
+          }
+        } catch (err) {
+          logger.error(`Failed to read health data: ${(err as Error).message}`);
+        }
+      },
+    );
 
   // ── openclaw milimo payment ───────────────────────────────────────
   const payment = milimo.command("payment").description("Payment and marketplace operations");
@@ -308,7 +324,11 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
     .description("Show transaction history")
     .option("--limit <n>", "Number of transactions", "10")
     .action(async (opts: { limit?: string }) => {
-      await cliPaymentHistory({ limit: opts.limit ? parseInt(opts.limit, 10) : 10, logger, pluginConfig });
+      await cliPaymentHistory({
+        limit: opts.limit ? parseInt(opts.limit, 10) : 10,
+        logger,
+        pluginConfig,
+      });
     });
 
   payment
@@ -316,7 +336,12 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
     .description("Generate invoice for a completed payment")
     .option("--format <format>", "Output format: text, json, html", "text")
     .action(async (sessionId: string, opts: { format?: string }) => {
-      await cliPaymentInvoice({ sessionId, format: opts.format as "text" | "json" | "html", logger, pluginConfig });
+      await cliPaymentInvoice({
+        sessionId,
+        format: opts.format as "text" | "json" | "html",
+        logger,
+        pluginConfig,
+      });
     });
 
   payment
@@ -337,15 +362,17 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
     .option("--chain", "Validate full provenance chain", false)
     .option("--strict", "Enable strict validation mode", false)
     .option("--json", "Output as JSON", false)
-    .action(async (opts: {
-      blueprint?: string;
-      version?: string;
-      chain?: boolean;
-      strict?: boolean;
-      json?: boolean;
-    }) => {
-      await cliVerify({ ...opts, logger, pluginConfig });
-    });
+    .action(
+      async (opts: {
+        blueprint?: string;
+        version?: string;
+        chain?: boolean;
+        strict?: boolean;
+        json?: boolean;
+      }) => {
+        await cliVerify({ ...opts, logger, pluginConfig });
+      },
+    );
 
   milimo
     .command("provenance-keygen")
@@ -366,16 +393,18 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
     .option("--verify <file>", "Verify an attestation file")
     .option("--list", "List all attestations", false)
     .option("--json", "Output as JSON", false)
-    .action(async (opts: {
-      blueprint?: string;
-      performance?: boolean;
-      auditor?: string;
-      verify?: string;
-      list?: boolean;
-      json?: boolean;
-    }) => {
-      await cliBadge({ ...opts, logger, pluginConfig });
-    });
+    .action(
+      async (opts: {
+        blueprint?: string;
+        performance?: boolean;
+        auditor?: string;
+        verify?: string;
+        list?: boolean;
+        json?: boolean;
+      }) => {
+        await cliBadge({ ...opts, logger, pluginConfig });
+      },
+    );
 
   // ── openclaw milimo action ────────────────────────────────────────
   const action = milimo.command("action").description("Action queue management");
@@ -409,8 +438,10 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
       } else {
         logger.info(`Pending actions (${pending.length}):`);
         for (const action of pending) {
-          const priority = action.priority ?? action.needs_approval ? "REVIEW" : "AUTO";
-          logger.info(` [${priority}] ${action.message_id} - ${action.sender_role}: ${action.message_type}`);
+          const priority = (action.priority ?? action.needs_approval) ? "REVIEW" : "AUTO";
+          logger.info(
+            ` [${priority}] ${action.message_id} - ${action.sender_role}: ${action.message_type}`,
+          );
         }
       }
     });
@@ -429,23 +460,25 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
     .option("--limit <n>", "Maximum results", "50")
     .option("--json", "Output as JSON", false)
     .option("--squad <squad>", "Squad ID")
-    .action(async (opts: {
-      query?: string;
-      from?: string;
-      to?: string;
-      claw?: string;
-      decision?: string;
-      limit?: string;
-      json?: boolean;
-      squad?: string;
-    }) => {
-      await cliLogsSearch({
-        ...opts,
-        limit: opts.limit ? parseInt(opts.limit, 10) : 50,
-        logger,
-        pluginConfig,
-      });
-    });
+    .action(
+      async (opts: {
+        query?: string;
+        from?: string;
+        to?: string;
+        claw?: string;
+        decision?: string;
+        limit?: string;
+        json?: boolean;
+        squad?: string;
+      }) => {
+        await cliLogsSearch({
+          ...opts,
+          limit: opts.limit ? parseInt(opts.limit, 10) : 50,
+          logger,
+          pluginConfig,
+        });
+      },
+    );
 
   logs
     .command("list")

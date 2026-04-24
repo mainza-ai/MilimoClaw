@@ -127,7 +127,7 @@ This isn't a policy preference. It's enforced by the **privacy router**—a laye
 
 | Data Type | Routing |
 |-----------|---------|
-| Client proposals, public content | Cloud Nemotron 120B (maximum quality) |
+| Client proposals, public content | Cloud (NEMOCLAW_MODEL) (maximum quality) |
 | Internal squad comms | Local NIM on RTX (stays on device) |
 | Financial records, payment details | Local NIM only (never touches cloud) |
 | Personal notes | Local vLLM (tightest isolation) |
@@ -220,7 +220,7 @@ cp .env.example .env
 ./install.sh --solo --operator-name "your-name" --squad-name "your-squad"
 ```
 
-Your five autonomous claws—Content, Ops, Analytics, Finance, Build—are now running.
+Your six autonomous claws—Content, Ops, Analytics, Finance, Build, Assistant—are now running.
 
 The full documentation is at [github.com/mainza-ai/MilimoClaw](https://github.com/mainza-ai/MilimoClaw).
 

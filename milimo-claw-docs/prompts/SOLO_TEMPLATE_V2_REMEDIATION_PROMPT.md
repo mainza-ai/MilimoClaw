@@ -70,7 +70,7 @@ Log data_type on every inference call. Mandatory.
 
 **Audit finding (Section 3, HIGH):**
 Only `content-sandbox.yaml` has the shared read mount for
-`/sandbox/analytics/reports`. The other four claws are missing it.
+`/sandbox/analytics/reports`. The other five claws are missing it.
 The Analytics Claw's `weekly-intelligence.json` must be readable by
 ALL claws. Without this, the intelligence layer is silently broken.
 
@@ -98,10 +98,10 @@ append the new entry to it. Do not replace existing entries.
 
 Print the updated `filesystem` section of each modified file.
 
-**Verification:** After adding the mount entries, confirm that all five
+**Verification:** After adding the mount entries, confirm that all six
 sandbox policy files now contain a reference to
 `/sandbox/analytics/reports/weekly-intelligence.json`. Run a grep
-across all five policy files and show the output.
+across all six policy files and show the output.
 
 ---
 
@@ -262,8 +262,8 @@ Phase A — Shared Mount Verification and Sandbox Isolation Tests
 
 These tests MUST ALL PASS before any other MVR tests run.
 They verify:
-  1. All five sandbox mounts exist and are correctly configured
-  2. weekly-intelligence.json is readable by all five claws
+  1. All six sandbox mounts exist and are correctly configured
+  2. weekly-intelligence.json is readable by all six claws
   3. Cross-sandbox reads correctly fail (isolation enforcement)
 
 If any test in this file fails: fix sandbox policy configuration
@@ -827,7 +827,7 @@ class TestWarRoomInitialization:
 
     def test_b1_war_room_tui_renders_five_claw_health_panel(self):
         """
-        War Room TUI initializes with health panel showing all 5 claws.
+        War Room TUI initializes with health panel showing all 6 claws.
         Each claw appears in the right panel with: name, status dot,
         tool count, last evolution timestamp, this-week activity count.
         """
@@ -836,7 +836,7 @@ class TestWarRoomInitialization:
         war_room = SoloWarRoom(squad_id="test-squad")
         health_panel = war_room.get_health_panel()
 
-        expected_claws = ["content", "ops", "analytics", "finance", "build"]
+        expected_claws = ["content", "ops", "analytics", "finance", "build", "assistant"]
         for claw in expected_claws:
             assert claw in health_panel, (
                 f"Claw '{claw}' missing from War Room health panel"
@@ -1221,7 +1221,7 @@ root (same level as `README.md`). The file contents are already
 defined — this is a placement verification only.
 
 Confirm the file exists at `milimo-claw/AGENTS.md` and that it
-contains a reference to all five claw spec documents in
+contains a reference to all six claw spec documents in
 `milimo-claw-docs/reference/`.
 
 ---

@@ -94,7 +94,7 @@ curl -H "Authorization: Bearer $NVIDIA_API_KEY" \
 # Reconfigure inference (inside sandbox)
 openclaw nemoclaw onboard --endpoint build \
   --api-key "$NVIDIA_API_KEY" \
-  --model "nvidia/nemotron-3-super-120b-a12b"
+  --model "$NEMOCLAW_MODEL"
 ```
 
 ---

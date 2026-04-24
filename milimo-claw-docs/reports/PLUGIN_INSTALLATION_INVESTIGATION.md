@@ -22,7 +22,7 @@ The 'noble' sandbox was properly configured and running:
 
 ```
 Sandbox: noble
-Model: nvidia/nemotron-3-super-120b-a12b
+Model: ${NEMOCLAW_MODEL}
 Provider: nvidia-nim
 GPU: yes
 Policies: discord, docker, huggingface, jira, npm, outlook, pypi, slack, telegram

@@ -5,7 +5,7 @@
 # feature implementation, testing, or documentation.
 #
 # DEVELOPMENT NOTE: This implementation is in active development and testing.
-# All inference currently routes to cloud (Nemotron 120B via NVIDIA Cloud API)
+# All inference currently routes to cloud (the configured NEMOCLAW_MODEL via NVIDIA Cloud API)
 # regardless of data sensitivity. The privacy routing rules documented here
 # represent the production target architecture. Do not implement privacy
 # routing enforcement during this phase — route everything to cloud.
@@ -105,9 +105,13 @@ What the Ops Claw can read:
 - /sandbox/analytics/reports/weekly-intelligence.json (read-only mount)
 
 What the Ops Claw cannot read under any circumstances:
-- /sandbox/content/  — creative drafts and brand assets
-- /sandbox/finance/  — financial records and invoices
-- /sandbox/build/    — source code and secrets
+- /sandbox/content/ — creative drafts and brand assets
+- /sandbox/finance/ — financial records and invoices
+- /sandbox/build/ — source code and secrets
+- /sandbox/assistant/ — session data and context
+
+The Assistant Claw (/sandbox/assistant) likewise cannot read the Ops
+Claw's primary mount or any other claw's primary mount — isolation is mutual.
 
 ---
 

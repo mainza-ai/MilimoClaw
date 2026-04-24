@@ -15,7 +15,7 @@
 ## THE BUG
 
 In solo mode, the Milimo Claw onboarding wizard asks the operator to pick
-one of five claw roles. In solo mode ALL five claws run simultaneously on
+one of six claw roles. In solo mode ALL six claws run simultaneously on
 one machine. Asking the operator to pick one is wrong — it implies only
 one claw will run, contradicts the solo-founder template, and confuses
 every new user who sees it.
@@ -87,13 +87,14 @@ Mesh mode — which claw are you running on this machine?
 ");
 
   // Only offer roles that are active in the selected template
-  const allRoles = [
-    { value: "content",   label: "content   — Creative output — posts, copy, campaigns, brand voice" },
-    { value: "ops",       label: "ops       — Client lifecycle — intake, scoping, delivery, follow-up" },
-    { value: "analytics", label: "analytics — Intelligence layer — performance, trends, opportunities" },
-    { value: "finance",   label: "finance   — Financial ops — invoicing, pricing, margin tracking" },
-    { value: "build",     label: "build     — Engineering — code, PRs, deploys, monitoring" },
-  ];
+const allRoles = [
+  { value: "content", label: "content — Creative output — posts, copy, campaigns, brand voice" },
+  { value: "ops", label: "ops — Client lifecycle — intake, scoping, delivery, follow-up" },
+  { value: "analytics", label: "analytics — Intelligence layer — performance, trends, opportunities" },
+  { value: "finance", label: "finance — Financial ops — invoicing, pricing, margin tracking" },
+  { value: "build", label: "build — Engineering — code, PRs, deploys, monitoring" },
+  { value: "assistant", label: "assistant — Conversational interface — routing, status, operator proxy" },
+];
 
   const availableRoles = allRoles.filter(
     r => selectedTemplate.clawsActive.includes(r.value)
@@ -200,7 +201,7 @@ const config: MilimoConfig = {
 
 In `ConfigManager.getDefaults()`, add:
 ```typescript
-activeClaws: ["content", "ops", "analytics", "finance", "build"],
+activeClaws: ["content", "ops", "analytics", "finance", "build", "assistant"],
 ```
 
 In `ConfigManager.migrate()`, add a migration for existing configs
@@ -210,16 +211,16 @@ that lack `activeClaws` — derive it from the template field:
 if (!config.activeClaws) {
   // Derive from template if missing (legacy config migration)
   const TEMPLATE_CLAW_MAP: Record<string, string[]> = {
-    "solo-founder":         ["content", "ops", "analytics", "finance", "build"],
-    "content-agency":       ["content", "ops", "analytics"],
-    "design-studio":        ["content", "ops", "finance"],
-    "event-promotion":      ["content", "ops", "analytics"],
-    "freelance-collective":  ["ops", "analytics", "finance"],
-    "ai-micro-saas":        ["build", "ops", "analytics", "finance"],
-    "campus-ai-tool":       ["build", "content", "ops"],
-  };
-  config.activeClaws = TEMPLATE_CLAW_MAP[config.template] ??
-    ["content", "ops", "analytics", "finance", "build"];
+"solo-founder": ["content", "ops", "analytics", "finance", "build", "assistant"],
+  "content-agency": ["content", "ops", "analytics"],
+  "design-studio": ["content", "ops", "finance"],
+  "event-promotion": ["content", "ops", "analytics"],
+  "freelance-collective": ["ops", "analytics", "finance"],
+  "ai-micro-saas": ["build", "ops", "analytics", "finance"],
+  "campus-ai-tool": ["build", "content", "ops"],
+};
+config.activeClaws = TEMPLATE_CLAW_MAP[config.template] ??
+  ["content", "ops", "analytics", "finance", "build", "assistant"];
 }
 ```
 
@@ -240,7 +241,7 @@ def get_claws_to_initialize(config: dict) -> list[str]:
 
     Solo mode (clawRole == "solo"):
         Returns all active claws from the template.
-        All five sandboxes are created on this machine.
+        All six sandboxes are created on this machine.
 
     Mesh mode (clawRole is a specific claw name):
         Returns only the one claw this operator runs.
@@ -249,7 +250,7 @@ def get_claws_to_initialize(config: dict) -> list[str]:
     claw_role: str = config.get("clawRole", "solo")
     active_claws: list[str] = config.get(
         "activeClaws",
-        ["content", "ops", "analytics", "finance", "build"]
+    ["content", "ops", "analytics", "finance", "build", "assistant"]
     )
 
     if claw_role == "solo":
@@ -280,14 +281,14 @@ Template:
  * 1. Solo Founder — solo
    ...
 
-Select [1-5] (default: 1): 1
+Select [1-7] (default: 1): 1
 
 Operating solo (no mesh coordination)? (Y/n): Y
 
 Squad name [my-squad]: MQ
 
 ✓ Solo mode — all claws will run on this machine:
-  content · ops · analytics · finance · build
+content · ops · analytics · finance · build · assistant
 
 Operator name [mainza]:
 ```
@@ -298,16 +299,17 @@ Operating solo (no mesh coordination)? (Y/n): N
 
 Mesh mode — which claw are you running on this machine?
 
-  1. content   — Creative output — posts, copy, campaigns, brand voice
-  2. ops       — Client lifecycle — intake, scoping, delivery, follow-up
-  3. analytics — Intelligence layer — performance, trends, opportunities
-  4. finance   — Financial ops — invoicing, pricing, margin tracking
-  5. build     — Engineering — code, PRs, deploys, monitoring
+1. content — Creative output — posts, copy, campaigns, brand voice
+2. ops — Client lifecycle — intake, scoping, delivery, follow-up
+3. analytics — Intelligence layer — performance, trends, opportunities
+4. finance — Financial ops — invoicing, pricing, margin tracking
+5. build — Engineering — code, PRs, deploys, monitoring
+6. assistant — Conversational interface — routing, status, operator proxy
 
-Select [1-5] (default: 1): 3
+Select [1-6] (default: 1): 3
 
 ✓ You are running the analytics claw on this machine.
-  Other squad members will run: content, ops, finance, build
+Other squad members will run: content, ops, finance, build, assistant
 ```
 
 ---
@@ -436,20 +438,20 @@ def test_mesh_mode_role_not_in_active_claws_raises():
 def test_defaults_to_all_claws_when_role_missing():
     config = {}   # no clawRole key
     result = get_claws_to_initialize(config)
-    assert len(result) == 5
+    assert len(result) == 6
 
 
 def test_defaults_to_all_claws_when_role_is_solo_and_activeClaws_missing():
-    config = {"clawRole": "solo"}   # no activeClaws key
+    config = {"clawRole": "solo"} # no activeClaws key
     result = get_claws_to_initialize(config)
-    assert len(result) == 5
+    assert len(result) == 6
 ```
 
 ---
 
 ## VERIFICATION
 
-After applying all five changes, run through this manually:
+After applying all six changes, run through this manually:
 
 ```
 1. Run: openclaw milimo onboard

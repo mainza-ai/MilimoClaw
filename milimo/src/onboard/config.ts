@@ -9,7 +9,15 @@
  * Provides migration from legacy dual-file system.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, readdirSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  unlinkSync,
+  readdirSync,
+  rmSync,
+} from "node:fs";
 import { join } from "node:path";
 import type { ClawRole } from "../index.js";
 import { encryptConfig, decryptConfig } from "../lib/config-encryption.js";
@@ -38,6 +46,8 @@ export interface MilimoConfig {
   initializedAt: string;
   blueprintVersion: string;
   serverUrl?: string;
+  model?: string;
+  endpointUrl?: string;
   deep_work?: {
     active: boolean;
     activated_at: string;
@@ -132,41 +142,45 @@ function loadLegacyConfig(): Partial<MilimoConfig> | null {
   }
 }
 
-		export class ConfigManager {
-	static load(): MilimoConfig | null {
-		if (configCache) return configCache;
+export class ConfigManager {
+  static load(): MilimoConfig | null {
+    if (configCache) return configCache;
 
-		ensureConfigDir();
+    ensureConfigDir();
 
-		const legacyState = loadLegacyState();
-		const legacyConfig = loadLegacyConfig();
+    const legacyState = loadLegacyState();
+    const legacyConfig = loadLegacyConfig();
 
-		if (!legacyConfig && !legacyState) {
-			return null;
-		}
+    if (!legacyConfig && !legacyState) {
+      return null;
+    }
 
-		const merged: MilimoConfig = {
-			...DEFAULT_CONFIG,
-			...(legacyState ?? {}),
-			...(legacyConfig ?? {}),
-		};
+    const merged: MilimoConfig = {
+      ...DEFAULT_CONFIG,
+      ...(legacyState ?? {}),
+      ...(legacyConfig ?? {}),
+    };
 
-		if (legacyState && !legacyConfig?.onboardedAt) {
-			merged.onboardedAt = legacyState.initializedAt;
-		}
+    if (legacyState && !legacyConfig?.onboardedAt) {
+      merged.onboardedAt = legacyState.initializedAt;
+    }
 
-		const decrypted = decryptConfig(merged as unknown as Record<string, unknown>) as unknown as MilimoConfig;
-		configCache = decrypted;
-		return decrypted;
-	}
+    const decrypted = decryptConfig(
+      merged as unknown as Record<string, unknown>,
+    ) as unknown as MilimoConfig;
+    configCache = decrypted;
+    return decrypted;
+  }
 
-	static save(config: MilimoConfig): void {
-		ensureConfigDir();
-		const configPath = getConfigPath();
-		const encrypted = encryptConfig(config as unknown as Record<string, unknown>) as unknown as MilimoConfig;
-		writeFileSync(configPath, JSON.stringify(encrypted, null, 2), { mode: 0o600 });
-		configCache = config;
-	}
+  static save(config: MilimoConfig): void {
+    ensureConfigDir();
+    const configPath = getConfigPath();
+    const encrypted = encryptConfig(
+      config as unknown as Record<string, unknown>,
+    ) as unknown as MilimoConfig;
+    writeFileSync(configPath, JSON.stringify(encrypted, null, 2), { mode: 0o600 });
+    configCache = config;
+  }
 
   static migrate(): { migrated: boolean; hadLegacyState: boolean } {
     ensureConfigDir();
@@ -226,7 +240,16 @@ function loadLegacyConfig(): Partial<MilimoConfig> | null {
 
   static ensureDirectories(): void {
     ensureConfigDir();
-    const subdirs = ["blueprints", "audit", "mesh", "evolution", "tools", "attestations", "keys", "health"];
+    const subdirs = [
+      "blueprints",
+      "audit",
+      "mesh",
+      "evolution",
+      "tools",
+      "attestations",
+      "keys",
+      "health",
+    ];
     for (const subdir of subdirs) {
       const dir = join(CONFIG_DIR, subdir);
       if (!existsSync(dir)) {
@@ -285,11 +308,16 @@ export function loadNemoClawConfig(): { model: string; endpointUrl: string } | n
         models?: { providers?: Record<string, { baseUrl?: string }> };
       };
       const primaryModel = config.agents?.defaults?.model?.primary;
-      const providerId = primaryModel?.split("/")[0];
+      const envModel = process.env.NEMOCLAW_MODEL || primaryModel;
+      const providerId = envModel?.split("/")[0];
       const baseUrl = providerId ? config.models?.providers?.[providerId]?.baseUrl : undefined;
 
-      if (primaryModel && baseUrl) {
-        return { model: primaryModel, endpointUrl: baseUrl };
+      if (envModel && baseUrl) {
+        return { model: envModel, endpointUrl: baseUrl };
+      }
+      if (envModel && !baseUrl) {
+        const defaultBase = process.env.NVIDIA_API_BASE ?? "https://integrate.api.nvidia.com/v1";
+        return { model: envModel, endpointUrl: defaultBase };
       }
     } catch {
       // OpenClaw config exists but is malformed — return null
@@ -316,5 +344,14 @@ export const TEMPLATE_CLAW_MAP: Record<string, string[]> = {
 };
 
 export function getActiveClawsForTemplate(templateName: string): string[] {
-  return TEMPLATE_CLAW_MAP[templateName] ?? ["content", "ops", "analytics", "finance", "build", "assistant"];
+  return (
+    TEMPLATE_CLAW_MAP[templateName] ?? [
+      "content",
+      "ops",
+      "analytics",
+      "finance",
+      "build",
+      "assistant",
+    ]
+  );
 }

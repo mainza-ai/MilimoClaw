@@ -96,7 +96,7 @@ Milimo Claw is a platform with three layers:
 ### Layer 1: The Claw Deployment Kit
 A one-command installer that takes a student from zero to a running NemoClaw sandbox in under 10 minutes. The kit includes:
 - A curated menu of starter blueprint templates organized by category: Creative & Content, Commerce & Services, and Tech Startups — with a fifth Build Claw role exclusive to tech squads
-- Role-specific claw configurations (Content, Ops, Analytics, Finance, and Build for tech squads — detailed in Section 6.1)
+- Role-specific claw configurations (Content, Ops, Analytics, Finance, Build, and Assistant for tech squads — detailed in Section 6.1)
 - A guided squad onboarding wizard that establishes the inter-sandbox mesh for the group
 
 ### Layer 2: The Squad Mesh
@@ -154,7 +154,7 @@ Each squad member deploys one primary NemoClaw sandbox on their RTX laptop. The 
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-**Tech squad (5-claw mesh — adds Build Claw):**
+**Tech squad (5-claw mesh — adds Build Claw; 6-claw mesh with Assistant):**
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -198,7 +198,7 @@ Each sandbox exposes its filesystem mount label — `/sandbox/content`, `/sandbo
 
 **The War Room sits above the mesh, not inside it.** It is not a sixth sandbox. It is the human oversight layer — the `nemoclaw term` TUI extended by Milimo Claw to surface the full squad's pending action queue simultaneously. Every claw action that meets the REVIEW, HOLD, or VETO approval threshold is paused and held in the War Room queue until a squad member acts. The mesh runs autonomously; the War Room is where the humans remain in control.
 
-**Two topologies, one architecture.** Creative and commerce squads run 4-claw meshes. Tech squads run 5-claw meshes. The Build Claw is the only structural difference — it connects to the same inter-sandbox channel using the same typed contract system, but its inbound policy accepts a distinct set of message types (feature briefs from Ops, retention signals from Analytics) and its outbound policy emits a distinct set (shipping summaries to Content, deploy signals to Ops). Adding or removing a claw from the mesh is a blueprint change — the squad's shared policy is updated, the gateway is hot-reloaded, and the new topology is live without restarting any sandbox.
+**Two topologies, one architecture.** Creative and commerce squads run 4-claw meshes. Tech squads run 5-claw meshes (6-claw with Assistant). The Build Claw is the only structural difference — it connects to the same inter-sandbox channel using the same typed contract system, but its inbound policy accepts a distinct set of message types (feature briefs from Ops, retention signals from Analytics) and its outbound policy emits a distinct set (shipping summaries to Content, deploy signals to Ops). The Assistant Claw connects similarly, providing a conversational bridge between the operator and the autonomous claws. Adding or removing a claw from the mesh is a blueprint change — the squad's shared policy is updated, the gateway is hot-reloaded, and the new topology is live without restarting any sandbox.
 
 ### 5.2 Self-Evolving Claws = Departments That Get Smarter Autonomously
 
@@ -352,15 +352,15 @@ milimo blueprint rollback --to v3.0 --reason "new client wants retro style"
 
 ### 5.4 Privacy Router = Personal Data Never Leaves the Laptop
 
-NemoClaw ships with three inference profiles: NVIDIA cloud (Nemotron 120B), local NIM, and vLLM. The Milimo Claw privacy router adds a fourth layer: a **sensitivity classifier** that intercepts every inference call and routes it based on data type.
+NemoClaw ships with three inference profiles: NVIDIA cloud (the configured NEMOCLAW_MODEL), local NIM, and vLLM. The Milimo Claw privacy router adds a fourth layer: a **sensitivity classifier** that intercepts every inference call and routes it based on data type.
 
 | Data Type | Routing Decision | Rationale |
 |---|---|---|
-| Client proposals, public content drafts | Cloud Nemotron 120B | Max quality for client-facing work |
+| Client proposals, public content drafts | Cloud (NEMOCLAW_MODEL) | Max quality for client-facing work |
 | Internal squad comms, client contact details | Local NIM on RTX | Private business data stays on device |
 | Financial records, payment details | Local NIM only | No cloud touch for financial data |
 | Personal notes, private context | Local vLLM | Tightest isolation, never leaves machine |
-| Trend data, market research | Cloud Nemotron 120B | Public data, cloud quality preferred |
+| Trend data, market research | Cloud (NEMOCLAW_MODEL) | Public data, cloud quality preferred |
 
 The routing happens transparently — the claw doesn't know which inference backend was used. The privacy router makes the decision based on the configured sensitivity policy, which the squad sets once at onboarding.
 
@@ -411,9 +411,9 @@ This is a trust primitive that makes Milimo Claw viable for real squads — wher
 
 ## 6. Product Features
 
-### 6.1 The Five Claws
+### 6.1 The Six Claws
 
-Every Milimo Claw squad is assembled from five specialized claw roles. Creative and commerce squads typically run four (Content, Ops, Analytics, Finance). Tech squads unlock the fifth — the Build Claw — which transforms the squad from a service operation into a shipping product company.
+Every Milimo Claw squad is assembled from six specialized claw roles. Creative and commerce squads typically run four (Content, Ops, Analytics, Finance). Tech squads unlock the fifth — the Build Claw — which transforms the squad from a service operation into a shipping product company. The sixth — the Assistant Claw — serves as the conversational interface between the operator and the autonomous claw agents.
 
 Each claw is a fully isolated NemoClaw sandbox with its own filesystem mount, its own network egress policy, its own inference routing rules, and its own self-evolution cycle. They coordinate exclusively through the OpenShell inter-sandbox gateway — a policy-governed channel where every message is typed, logged, and subject to the squad's shared approval rules. No claw has ambient access to another claw's data. The coordination is intentional and auditable, not accidental and invisible.
 
@@ -428,9 +428,9 @@ Each claw is a fully isolated NemoClaw sandbox with its own filesystem mount, it
 **Network egress policy:** Approved social platform APIs (scheduled publishing only — no reading of DMs or private data), stock asset libraries, SEO trend APIs, the squad's public-facing website. No access to payment processors or internal comms channels.
 
 **Inference routing:**
-- Public-facing drafts → Cloud Nemotron 120B (peak quality for anything a client or audience will see)
+- Public-facing drafts → Cloud (NEMOCLAW_MODEL) (peak quality for anything a client or audience will see)
 - Internal drafts and ideation → Local NIM (private creative process stays on device)
-- Trend research and competitive analysis → Cloud Nemotron 120B (public data, speed preferred)
+- Trend research and competitive analysis → Cloud (NEMOCLAW_MODEL) (public data, speed preferred)
 
 **Inter-claw coordination:**
 - Receives creative briefs from Ops Claw when a new client project opens
@@ -462,10 +462,10 @@ Each claw is a fully isolated NemoClaw sandbox with its own filesystem mount, it
 **Network egress policy:** Approved client communication channels (email API, platform messaging APIs), scheduling tools, project management APIs, contract platforms. No access to social publishing, financial systems, or code repositories.
 
 **Inference routing:**
-- Client-facing communications → Cloud Nemotron 120B (client sees this — quality is the priority)
+- Client-facing communications → Cloud (NEMOCLAW_MODEL) (client sees this — quality is the priority)
 - Internal project summaries and briefs → Local NIM (business context is sensitive)
 - Contract review and risk flagging → Local NIM (legal-adjacent content never touches cloud)
-- Scheduling optimization → Cloud Nemotron 120B (non-sensitive computation)
+- Scheduling optimization → Cloud (NEMOCLAW_MODEL) (non-sensitive computation)
 
 **Inter-claw coordination:**
 - Opens a new project context in `/sandbox/clients/[id]` when a client is onboarded and broadcasts a project brief to the Content Claw or Build Claw via inter-sandbox message
@@ -495,7 +495,7 @@ Each claw is a fully isolated NemoClaw sandbox with its own filesystem mount, it
 **Network egress policy:** Platform analytics APIs (read-only), market research data feeds, competitor monitoring APIs, the squad's published content endpoints (to track post-publication performance). No write access to any external platform.
 
 **Inference routing:**
-- Public trend and market analysis → Cloud Nemotron 120B (public data, maximum reasoning quality)
+- Public trend and market analysis → Cloud (NEMOCLAW_MODEL) (public data, maximum reasoning quality)
 - Internal performance synthesis → Local NIM (squad's operational data is sensitive)
 - Predictive modeling and anomaly detection → Local NIM (models trained on proprietary squad data)
 
@@ -559,8 +559,8 @@ Each claw is a fully isolated NemoClaw sandbox with its own filesystem mount, it
 **Inference routing:**
 - Proprietary source code, API keys, environment variables → Local NIM, always. Code is IP. It never leaves the machine.
 - Architecture discussions and code review → Local NIM (sensitive design decisions)
-- Boilerplate generation, test writing, documentation drafts → Cloud Nemotron 120B (non-sensitive, quality preferred)
-- Public-facing docs and changelogs → Cloud Nemotron 120B (client and community will read these)
+- Boilerplate generation, test writing, documentation drafts → Cloud (NEMOCLAW_MODEL) (non-sensitive, quality preferred)
+- Public-facing docs and changelogs → Cloud (NEMOCLAW_MODEL) (client and community will read these)
 - Production log analysis with user data → Local NIM (user data privacy is non-negotiable)
 
 **Inter-claw coordination:**
@@ -587,13 +587,14 @@ Each claw is a fully isolated NemoClaw sandbox with its own filesystem mount, it
 
 #### Claw Coordination Summary
 
-| From \ To | Content | Ops | Analytics | Finance | Build |
+| From \ To | Content | Ops | Analytics | Finance | Build | Assistant |
 |---|---|---|---|---|---|
-| **Content** | — | Delivers completed drafts | Requests performance data | — | — |
-| **Ops** | Sends client briefs | — | — | Requests pricing estimates | Sends feature briefs |
-| **Analytics** | Sends performance intel | Sends client health signals | — | Sends revenue summaries | Sends retention signals |
-| **Finance** | — | Sends invoice triggers, rate alerts | Sends revenue totals | — | — |
-| **Build** | Sends shipping updates for devlog | Sends deploy completion | Requests user behavior data | — | — |
+| **Content** | — | Delivers completed drafts | Requests performance data | — | — | — |
+| **Ops** | Sends client briefs | — | — | Requests pricing estimates | Sends feature briefs | — |
+| **Analytics** | Sends performance intel | Sends client health signals | — | Sends revenue summaries | Sends retention signals | — |
+| **Finance** | — | Sends invoice triggers, rate alerts | Sends revenue totals | — | — | — |
+| **Build** | Sends shipping updates for devlog | Sends deploy completion | Requests user behavior data | — | — | — |
+| **Assistant** | — | — | — | — | — | — |
 
 All inter-claw messages are typed contracts, not freeform text. Each message type is defined in the squad's shared blueprint and enforced by the OpenShell gateway. A claw cannot send a message type that isn't in its outbound policy. A claw cannot receive a message type that isn't in its inbound policy. The coordination structure is the blueprint.
 
@@ -640,7 +641,7 @@ This is the highest-leverage category. Tech squads get access to the **Build Cla
 
 ##### The Build Claw
 
-Full technical specification — filesystem mount, network egress policy, inference routing, inter-claw coordination, and the complete 36-week self-evolution timeline — is documented in **Section 6.1: The Five Claws → Build Claw**.
+Full technical specification — filesystem mount, network egress policy, inference routing, inter-claw coordination, and the complete 36-week self-evolution timeline — is documented in **Section 6.1: The Six Claws → Build Claw**.
 
 **Why this matters for tech templates:** A 3-person tech squad with a Build Claw, an Ops Claw, and an Analytics Claw has the operational output of a team twice its size. The Build Claw handles the mechanical engineering work — issues, PRs, tests, docs, monitoring — freeing the human engineers for architecture decisions and product thinking. For an AI micro-SaaS, this is the difference between shipping monthly and shipping weekly.
 
@@ -967,7 +968,7 @@ For Gen Z, a well-evolved blueprint is a flex. It's proof of operational history
 
 **Minimum:** NVIDIA RTX 3060 12GB (local NIM, vLLM dev profile)
 **Recommended:** NVIDIA RTX 4070 or better (full local NIM at production quality)
-**Optimal:** NVIDIA RTX 4090 (full local inference at Nemotron 120B-equivalent quality)
+**Optimal:** NVIDIA RTX 4090 (full local inference at NEMOCLAW_MODEL-equivalent quality)
 
 Milimo Claw automatically selects the right inference profile based on detected GPU capabilities. A student with a 3060 gets a slightly lower-quality local model but the same architectural guarantees around privacy and isolation.
 
@@ -1033,7 +1034,7 @@ The RTX laptop requirement naturally expands as the installed base grows and as 
 
 **Pro Tier — "Full Send" — $12/month per squad**
 - Up to 6 squad members
-- All 5 claw roles active simultaneously (including Build Claw for tech squads)
+- All 6 claw roles active simultaneously (including Build Claw for tech squads and Assistant Claw)
 - Full Blueprint Marketplace access (buying + selling)
 - War Room with 90-day audit history + full replay
 - Priority cloud inference routing
@@ -1103,7 +1104,7 @@ The on-device privacy routing architecture creates a genuine trust differentiati
 
 ### Phase 0 — Foundation (Months 1–2)
 - [x] NemoClaw plugin architecture implemented — MilimoClaw rebuilt as extension, not fork
-- [x] Five claw role blueprints (Content, Ops, Analytics, Finance, Build) completed
+- [x] Six claw role blueprints (Content, Ops, Analytics, Finance, Build, Assistant) completed
 - [x] Squad mesh formation protocol built on OpenShell gateway
 - [x] War Room TUI (extends `nemoclaw term`) built
 - [x] Privacy router sensitivity classifier implemented

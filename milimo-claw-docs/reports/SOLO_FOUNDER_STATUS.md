@@ -11,7 +11,7 @@
 
 ## Summary
 
-Implemented the Solo Founder template - a single-operator configuration for running all five claws on one machine.
+Implemented the Solo Founder template - a single-operator configuration for running all six claws on one machine.
 
 ---
 
@@ -73,7 +73,7 @@ milimo-blueprint/templates/
 
 ### 2. Sandbox Initializer
 - Creates NemoClaw-compatible policy YAML
-- Generates policies for all 5 claws
+- Generates policies for all 6 claws
 - Configures network egress per claw
 - Sets up inference routing
 

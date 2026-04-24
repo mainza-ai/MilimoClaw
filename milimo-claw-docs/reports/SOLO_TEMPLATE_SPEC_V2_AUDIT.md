@@ -57,7 +57,7 @@ This audit compares the current code implementation against `MILIMO_CLAW_SOLO_TE
 
 > **Phase A — Verify Isolation and Shared Mount (before anything else)**
 >
-> A1. Confirm all five sandbox filesystem mounts exist and are isolated
+> A1. Confirm all six sandbox filesystem mounts exist and are isolated
 > A2. Write a test file to `/sandbox/analytics/reports/weekly-intelligence.json`
 > A3. Confirm Content Claw can read the file from its sandbox
 > A4. Confirm Ops Claw can read the file from its sandbox
@@ -276,7 +276,7 @@ ANALYTICS_WAIT_SECONDS = 300  # 5 minutes
 
 > **The one shared-read file:** `/sandbox/analytics/reports/weekly-intelligence.json`
 >
-> This is the only file in the entire mesh that all five claws can read directly without a message contract. It is written by the Analytics Claw every Sunday and mounted as read-only in every other claw's sandbox policy.
+> This is the only file in the entire mesh that all six claws can read directly without a message contract. It is written by the Analytics Claw every Sunday and mounted as read-only in every other claw's sandbox policy.
 >
 > **Verify this mount is configured in every claw's sandbox policy file. This is the most critical single configuration item in the solo template.**
 
@@ -307,7 +307,7 @@ read_only:
 ### Gaps
 
 1. **Only Content Claw has shared mount** — The other 4 claw sandbox policies don't include the shared read.
-2. **No test verifies all 5 claws can read** — Only Content and Ops have read tests in `test_analytics_integration.py`.
+2. **No test verifies all 6 claws can read** — Only Content and Ops have read tests in `test_analytics_integration.py`.
 
 ### Recommendation
 

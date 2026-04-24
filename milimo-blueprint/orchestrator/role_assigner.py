@@ -79,9 +79,11 @@ ROLE_PREREQUISITES = {
 
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Member:
     """Member to be assigned a role."""
+
     email: str
     name: Optional[str] = None
     skills: list[str] = field(default_factory=list)
@@ -92,6 +94,7 @@ class Member:
 @dataclass
 class RoleAssignment:
     """Result of role assignment."""
+
     member: Member
     role: str
     confidence: float = 1.0
@@ -102,6 +105,7 @@ class RoleAssignment:
 @dataclass
 class SquadAssignments:
     """Complete role assignments for a squad."""
+
     squad_name: str
     assignments: list[RoleAssignment]
     template: str
@@ -110,6 +114,7 @@ class SquadAssignments:
 
 
 # ---------------------------------------------------------------------------
+
 
 class RoleAssigner:
     """
@@ -192,20 +197,19 @@ class RoleAssigner:
                 assigned_members.add(best_member.email)
                 reason = self._get_assignment_reason(best_member, role, best_score)
 
-                assignments.append(RoleAssignment(
-                    member=best_member,
-                    role=role,
-                    confidence=min(best_score / 10, 1.0),
-                    reason=reason,
-                ))
+                assignments.append(
+                    RoleAssignment(
+                        member=best_member,
+                        role=role,
+                        confidence=min(best_score / 10, 1.0),
+                        reason=reason,
+                    )
+                )
 
         # Assign admin role to first member (or best fit for ops/content)
         if assign_admin and assignments:
             # Prefer ops or content role for admin
-            admin_candidates = [
-                a for a in assignments
-                if a.role in ["ops", "content"]
-            ]
+            admin_candidates = [a for a in assignments if a.role in ["ops", "content"]]
             if admin_candidates:
                 admin_candidates[0].is_admin = True
             else:
@@ -215,10 +219,7 @@ class RoleAssigner:
         assigned_roles = {a.role for a in assignments}
         missing_roles = [r for r in required_roles if r not in assigned_roles]
 
-        excess_members = [
-            m for m in members
-            if m.email not in assigned_members
-        ]
+        excess_members = [m for m in members if m.email not in assigned_members]
 
         return SquadAssignments(
             squad_name="",
@@ -293,7 +294,8 @@ class RoleAssigner:
             reasons.append("matched preference")
 
         matching_skills = [
-            skill for skill in member.skills
+            skill
+            for skill in member.skills
             if skill.lower() in [p.lower() for p in ROLE_PREREQUISITES.get(role, [])]
         ]
         if matching_skills:
@@ -338,6 +340,7 @@ class RoleAssigner:
 # ---------------------------------------------------------------------------
 # Utility Functions
 # ---------------------------------------------------------------------------
+
 
 def create_member_from_dict(data: dict[str, Any]) -> Member:
     """Create a Member from a dictionary."""

@@ -60,7 +60,7 @@ No stubs. No TODOs. No placeholder comments. Every function complete.
 
 ## DEVELOPMENT PHASE CONSTRAINTS
 
-**Inference:** ALL inference routes to cloud (Nemotron 120B via NVIDIA
+**Inference:** ALL inference routes to cloud (the configured NEMOCLAW_MODEL via NVIDIA
 Cloud API). Do NOT implement local NIM routing. DO log `data_type` on
 every inference call — mandatory, not optional.
 

@@ -55,7 +55,7 @@ Every function must be complete and runnable.
 
 ## DEVELOPMENT PHASE CONSTRAINTS
 
-**Inference:** ALL inference routes to cloud (Nemotron 120B via NVIDIA
+**Inference:** ALL inference routes to cloud (the configured NEMOCLAW_MODEL via NVIDIA
 Cloud API). Do NOT implement local NIM routing. Do NOT enforce privacy
 routing. DO log `data_type` as a field on every single inference call —
 this is mandatory, not optional. The data_type field is the only thing

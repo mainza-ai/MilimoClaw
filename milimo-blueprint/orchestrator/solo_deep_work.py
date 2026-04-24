@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -65,9 +65,11 @@ CLAW_ON_ACTIVATE_MAP = {
 
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class DeepWorkState:
     """State of deep work mode."""
+
     active: bool = False
     activated_at: Optional[datetime] = None
     resume_date: Optional[datetime] = None
@@ -78,6 +80,7 @@ class DeepWorkState:
 @dataclass
 class ClawPolicyUpdate:
     """Policy update for a claw."""
+
     claw: str
     previous_policy: str
     new_policy: str
@@ -86,6 +89,7 @@ class ClawPolicyUpdate:
 
 
 # ---------------------------------------------------------------------------
+
 
 def activate_deep_work_mode(
     config: dict[str, Any],
@@ -115,8 +119,7 @@ def activate_deep_work_mode(
 
     on_activate = deep_work_config.get("on_activate", CLAW_ON_ACTIVATE_MAP)
     auto_response_template = deep_work_config.get(
-        "auto_response_template",
-        "Hey [name], I'm heads-down until [resume_date]."
+        "auto_response_template", "Hey [name], I'm heads-down until [resume_date]."
     )
 
     try:
@@ -334,8 +337,12 @@ def _load_state(state_file: Path) -> Optional[DeepWorkState]:
 
         return DeepWorkState(
             active=data.get("active", False),
-            activated_at=datetime.fromisoformat(data["activated_at"]) if data.get("activated_at") else None,
-            resume_date=datetime.fromisoformat(data["resume_date"]) if data.get("resume_date") else None,
+            activated_at=datetime.fromisoformat(data["activated_at"])
+            if data.get("activated_at")
+            else None,
+            resume_date=datetime.fromisoformat(data["resume_date"])
+            if data.get("resume_date")
+            else None,
             auto_response_template=data.get("auto_response_template", ""),
             claw_policies=data.get("claw_policies", {}),
         )
@@ -362,7 +369,9 @@ def _print_confirmation_summary(result: dict[str, Any]) -> None:
 
     print("Policy Changes:")
     for change in result["policy_changes"]:
-        print(f"   • {change['claw'].capitalize()}: {change['previous']} → {change['new']}")
+        print(
+            f"   • {change['claw'].capitalize()}: {change['previous']} → {change['new']}"
+        )
         if change["blocked_actions"]:
             print(f"     Blocked: {', '.join(change['blocked_actions'])}")
         if change["queued_actions"]:
@@ -370,7 +379,7 @@ def _print_confirmation_summary(result: dict[str, Any]) -> None:
     print()
 
     print("Auto-Response Template:")
-    print(f"   \"{result['auto_response']}\"")
+    print(f'   "{result["auto_response"]}"')
     print()
 
     print("To resume normal operations:")

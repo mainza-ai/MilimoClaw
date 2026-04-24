@@ -12,7 +12,7 @@ This Obsidian vault is the **ultimate source of truth** for the MilimoClaw proje
 
 1. **New here?** Start at [[index]] — the master table of contents
 2. **AI assistant?** Read [[CLAUDE]] in full before modifying anything
-3. **Looking for a claw?** See [[content-claw]], [[ops-claw]], [[analytics-claw]], [[finance-claw]], or [[build-claw]]
+3. **Looking for a claw?** See [[content-claw]], [[ops-claw]], [[analytics-claw]], [[finance-claw]], [[build-claw]], or [[assistant-lucy]]
 4. **Debugging?** Check [[common-issues]] or [[issues-and-fixes]]
 
 ## What Is MilimoClaw?
@@ -21,23 +21,23 @@ MilimoClaw turns a squad of operators — each running a NemoClaw sandbox on the
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ MILIMO CLAW MESH                                                     │
-│                                                                      │
-│  CONTENT CLAW     OPS CLAW      ANALYTICS CLAW    FINANCE CLAW      │
-│  /sandbox/        /sandbox/     /sandbox/         /sandbox/         │
-│  content          clients       analytics         finance           │
-│  OpenShell GW ── OpenShell GW ── OpenShell GW ── OpenShell GW       │
-│                                                                      │
-│  BUILD CLAW (tech squads)                                           │
-│  /sandbox/build                                                      │
-│  OpenShell GW ─────────────────────────────────────────────────────┘│
-│                                                                      │
-│  ════════════════════════════════════════════════════════════════    │
-│  WAR ROOM (TUI) — Every pending action · every claw · one view      │
+│ MILIMO CLAW MESH                                                      │
+│                                                                        │
+│  CONTENT CLAW   OPS CLAW       ANALYTICS CLAW   FINANCE CLAW         │
+│  /sandbox/      /sandbox/      /sandbox/        /sandbox/            │
+│  content        clients        analytics        finance              │
+│  OpenShell GW ── OpenShell GW ── OpenShell GW ── OpenShell GW        │
+│                                                                        │
+│  BUILD CLAW (tech squads)          ASSISTANT CLAW (Lucy)             │
+│  /sandbox/build                    /sandbox/assistant                │
+│  OpenShell GW ──────────────────── OpenShell GW ────────────────────┘│
+│                                                                        │
+│  ════════════════════════════════════════════════════════════════════ │
+│  WAR ROOM (TUI) — Every pending action · every claw · one view       │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-## The Five Claws
+## The Six Claws
 
 | Claw | Role | Mount |
 |------|------|-------|
@@ -46,6 +46,7 @@ MilimoClaw turns a squad of operators — each running a NemoClaw sandbox on the
 | [[analytics-claw]] | Intelligence layer | `/sandbox/analytics` |
 | [[finance-claw]] | Financial system | `/sandbox/finance` |
 | [[build-claw]] | Engineering | `/sandbox/build` |
+| [[assistant-lucy]] | Operator interface | `/sandbox/assistant` |
 
 ## Key Concepts
 

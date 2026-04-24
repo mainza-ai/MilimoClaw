@@ -549,7 +549,9 @@ class ToolBuilder:
 
         # Check for NIM endpoint configuration
         nim_endpoint = os.environ.get("NIM_ENDPOINT", "http://localhost:8000")
-        nim_model = os.environ.get("NEMOCLAW_MODEL", "nvidia/nemotron-4-340b-instruct")
+        nim_model = os.environ.get(
+            "NEMOCLAW_MODEL", "nvidia/nemotron-3-super-120b-a12b"
+        )
 
         # Check if NIM is available
         try:
@@ -634,7 +636,7 @@ class ToolBuilder:
             request_data = {
                 "type": "inference_request",
                 "model": os.environ.get(
-                    "NEMOCLAW_MODEL", "nvidia/nemotron-4-340b-instruct"
+                    "NEMOCLAW_MODEL", "nvidia/nemotron-3-super-120b-a12b"
                 ),
                 "prompt": prompt,
                 "parameters": {
@@ -685,7 +687,6 @@ class ToolBuilder:
         Returns:
             Clean Python code or None
         """
-        import re
 
         # Try to extract code from markdown blocks
         code_block_pattern = r"```(?:python)?\s*\n(.*?)\n```"
@@ -740,16 +741,16 @@ class ToolBuilder:
         prompt_parts = [
             "# Tool Generation Request",
             "",
-            f"## Tool Purpose",
+            "## Tool Purpose",
             f"Name: {proposal.tool_name}",
             f"Type: {proposal.tool_type}",
             f"Role: {proposal.claw_role}",
             "",
-            f"## Target Metric",
+            "## Target Metric",
             f"Metric: {proposal.metric_target}",
             f"Expected Improvement: {proposal.estimated_improvement}%",
             "",
-            f"## Trigger Pattern",
+            "## Trigger Pattern",
             f"Type: {proposal.trigger_pattern.pattern_type}",
             f"Description: {proposal.trigger_pattern.trigger_description}",
             f"Confidence: {proposal.trigger_pattern.confidence}",

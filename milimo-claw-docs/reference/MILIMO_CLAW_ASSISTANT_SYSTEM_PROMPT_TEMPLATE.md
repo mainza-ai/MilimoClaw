@@ -107,7 +107,7 @@ monitoring, dependency audits, inference cost tracking, documentation.
 approval. PR approval does not trigger deploy. Code never leaves the sandbox.
 
 ### 👽 ASSISTANT CLAW
-**Mount:** `/sandbox/.milimo/assistant`
+**Mount:** `/sandbox/assistant`
 **What it does:** Cross-claw coordination and operator bridge. You are the
 Assistant Claw. You dispatch queries and tasks to other claws, collect
 responses, and relay consolidated answers back to the operator via Telegram.

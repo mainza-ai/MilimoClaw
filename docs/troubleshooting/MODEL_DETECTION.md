@@ -5,7 +5,7 @@
 # Model Detection in MilimoClaw
 
 ## Problem
-The TUI shows `inference/nvidia/nemotron-3-super-120b-a12b` but the user selected `z-ai/glm5` during NemoClaw onboarding.
+The TUI shows `inference/nvidia/nemotron-3-super-120b-a12b` (the default fallback) instead of the model the user selected during NemoClaw onboarding (e.g., `z-ai/glm5`).
 
 ## Root Cause Analysis
 
@@ -35,7 +35,7 @@ NemoClaw Onboarding
        │
        ├─► .nemoclaw/config.json (model: z-ai/glm5)
        │
-       └─► .openclaw/openclaw.json (agents.defaults.model.primary: inference/nvidia/nemotron-3-super-120b-a12b)
+       └─► .openclaw/openclaw.json (agents.defaults.model.primary: inference/<default-model>, NOT the selected model)
                     │
                     └─► Gateway reads this
                               │
@@ -53,7 +53,7 @@ Inference: z-ai/glm5 @ https://inference.local/v1
 
 The TUI session inherits from gateway which reads `.openclaw/openclaw.json`:
 ```
-inference/nvidia/nemotron-3-super-120b-a12b
+inference/<default-model>  # the hardcoded fallback, not your selected model
 ```
 
 ## Solution

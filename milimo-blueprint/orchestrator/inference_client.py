@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 NVIDIA NIM Inference Client with fallback chain and category-based model routing.
 
@@ -14,11 +17,10 @@ Environment variables:
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
@@ -26,7 +28,7 @@ import requests
 
 logger = logging.getLogger("milimo.inference_client")
 
-_NEMOCLAW_MODEL = os.environ.get("NEMOCLAW_MODEL", "nvidia/nemotron-4-340b-instruct")
+_NEMOCLAW_MODEL = os.environ.get("NEMOCLAW_MODEL", "nvidia/nemotron-3-super-120b-a12b")
 
 # Default fallback chain (matches build_init.py)
 DEFAULT_FALLBACK_CHAIN = [
@@ -145,7 +147,7 @@ class NvidiaInferenceClient:
             RuntimeError: If all models in the fallback chain fail.
         """
         category = CATEGORY_MODELS.get(data_type, CATEGORY_MODELS["general"])
-        model = category["model"]
+        _model = category["model"]
         temp = temperature if temperature is not None else category["temperature"]
 
         last_error: str | None = None

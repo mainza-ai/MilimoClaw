@@ -340,7 +340,7 @@ As of 2026-04-06, `install.sh` includes these provisioning steps that were previ
 
 | Step | What It Does |
 |------|-------------|
-| 6b | Initialize sandbox directories for all 5 claws |
+| 6b | Initialize sandbox directories for all 6 claws |
 | 6c | Copy blueprint to `/sandbox/.milimo/blueprints/0.1.0/` |
 | 6d | Install Python dependencies (pyyaml, requests, stripe, httpx, sentry-sdk) |
 | 6e | Install `gh` CLI with auto-detected architecture (ARM64/AMD64) |

@@ -5,7 +5,7 @@
 # feature implementation, testing, or documentation.
 #
 # DEVELOPMENT NOTE: This implementation is in active development and testing.
-# All inference currently routes to cloud (Nemotron 120B via NVIDIA Cloud API)
+# All inference currently routes to cloud (the configured NEMOCLAW_MODEL via NVIDIA Cloud API)
 # regardless of data sensitivity. The privacy routing rules documented here
 # represent the production target architecture — in production, ALL financial
 # data must be routed to local NIM with zero exceptions. This is the most
@@ -126,6 +126,10 @@ Everything the Finance Claw owns lives under `/sandbox/finance`:
 - `/sandbox/clients/` — client contact data (Ops Claw only)
 - `/sandbox/content/` — creative assets (Content Claw only)
 - `/sandbox/build/` — source code and secrets (Build Claw only)
+- `/sandbox/assistant/` — session data and context (Assistant Claw only)
+
+The Assistant Claw (`/sandbox/assistant`) likewise cannot read the Finance
+Claw's primary mount or any other claw's primary mount — isolation is mutual.
 
 ---
 
@@ -184,7 +188,7 @@ without changing call sites.
 | Tax category classification | Local NIM | Financial records |
 | Margin analysis | Local NIM | Core business intelligence |
 | Rate benchmarking narrative | Local NIM | Competitive pricing data |
-| Market rate research | Cloud Nemotron 120B | Public market data only |
+| Market rate research | Cloud (NEMOCLAW_MODEL) | Public market data only |
 
 **In production, ALL inference involving financial data routes to local
 NIM. There are no exceptions. This is the most strictly enforced privacy
@@ -364,7 +368,7 @@ All communication via typed message contracts through OpenShell gateway.
 
 ## WAR ROOM APPROVAL FLOW
 
-The Finance Claw has the strictest approval requirements of all five claws.
+The Finance Claw has the strictest approval requirements of all six claws.
 Money never moves without explicit human authorization.
 
 ### Approval modes for Finance Claw actions:

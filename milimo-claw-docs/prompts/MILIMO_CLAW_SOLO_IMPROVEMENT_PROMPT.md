@@ -23,9 +23,9 @@ working strictly in the phase order defined below.
 ## CONTEXT — WHAT YOU ARE WORKING WITH
 
 **Product:** Milimo Claw — a multi-agent autonomous hustle platform built
-as a plugin on NVIDIA NemoClaw. Five specialized AI agents (claws) run
+as a plugin on NVIDIA NemoClaw. Six specialized AI agents (claws) run
 24/7 inside isolated NemoClaw sandboxes, coordinating through the OpenShell
-inter-sandbox gateway. A single operator manages all five from the War Room
+inter-sandbox gateway. A single operator manages all six from the War Room
 dashboard.
 
 **Plugin structure:**
@@ -159,7 +159,7 @@ Register two commands under squad namespace:
     - Validate: at least one option required
     - Calculate resume date from duration if not provided directly
     - Call bridge: activate_deep_work with resume_date ISO string
-    - Print per-claw policy change summary (Content/Ops/Analytics/Finance/Build)
+    - Print per-claw policy change summary (Content/Ops/Analytics/Finance/Build/Assistant)
     - Print: "Deep Work Mode active. Resume scheduled: {date}"
     - Write deep_work state to config: { active, activated_at, resume_date }
 

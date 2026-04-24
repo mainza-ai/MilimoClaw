@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Build Claw filesystem initialization and operational log management.
 
@@ -76,12 +79,12 @@ REQUIRED_FILES: dict[str, Any] = {
 # Enhancement: Inference fallback chain (from oh-my-openagent session recovery)
 # If the primary inference model fails, fall back through this chain.
 INFERENCE_FALLBACK_CHAIN: list[str] = [
-    os.environ.get("NEMOCLAW_MODEL", "nvidia/nemotron-4-340b-instruct"),
+    os.environ.get("NEMOCLAW_MODEL", "nvidia/nemotron-3-super-120b-a12b"),
     "claude-sonnet-4-6",
     "gemini-3.1-pro",
 ]
 
-_NEMOCLAW_MODEL = os.environ.get("NEMOCLAW_MODEL", "nvidia/nemotron-4-340b-instruct")
+_NEMOCLAW_MODEL = os.environ.get("NEMOCLAW_MODEL", "nvidia/nemotron-3-super-120b-a12b")
 
 BUILD_CATEGORIES: dict[str, dict[str, Any]] = {
     "code_generation": {

@@ -7,7 +7,7 @@
 
 ## System Overview
 
-Milimo Claw is a distributed multi-agent system where each agent (claw) runs in its own isolated NemoClaw sandbox. The system has seven architectural layers:
+Milimo Claw is a distributed multi-agent system where each agent (claw) runs in its own isolated NemoClaw sandbox. The system has eight architectural layers:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -69,15 +69,16 @@ Each claw runs inside a NemoClaw sandbox with kernel-level isolation:
 ├── clients/      # Ops Claw — client records, project histories
 ├── analytics/    # Analytics Claw — performance data, reports
 │   └── reports/  # Read-only cross-mount for Content Claw
-├── finance/      # Finance Claw — invoices, revenue, pricing
-└── build/        # Build Claw — codebase, secrets, deploy configs
-    ├── repo/     # Codebase (GitHub mount)
-    ├── context/  # Sprint plans, error patterns, cost tracking
-    ├── prs/      # PR state tracking (drafted/approved/merged)
-    ├── deployments/ # Deploy state (pending/history)
-    ├── docs/     # Changelog, API docs, devlog
-    ├── memory/   # Filesystem memory pattern (Clawhip)
-    └── logs/     # Operational, PR, deploy, cost alerts
+├── finance/ # Finance Claw — invoices, revenue, pricing
+├── build/ # Build Claw — codebase, secrets, deploy configs
+│   ├── repo/ # Codebase (GitHub mount)
+│   ├── context/ # Sprint plans, error patterns, cost tracking
+│   ├── prs/ # PR state tracking (drafted/approved/merged)
+│   ├── deployments/ # Deploy state (pending/history)
+│   ├── docs/ # Changelog, API docs, devlog
+│   ├── memory/ # Filesystem memory pattern (Clawhip)
+│   └── logs/ # Operational, PR, deploy, cost alerts
+└── assistant/ # Assistant Claw — sessions, context, logs
 ```
 
 Each claw has **read-write** access only to its own mount. Cross-mounts are explicitly declared and **read-only**.
@@ -106,13 +107,14 @@ class ClawMessage:
 
 The **message matrix** defines which types each role can send to which recipient:
 
-| From \ To | Content | Ops | Analytics | Finance | Build | War Room |
-|---|---|---|---|---|---|---|
-| **Content** | — | deliverable | query | — | — | deliverable |
-| **Ops** | brief, signal | — | — | query, signal | brief | signal, deliverable |
-| **Analytics** | response, summary | signal | — | summary | response, signal | signal, summary |
-| **Finance** | — | response, signal | summary | — | — | signal, deliverable |
-| **Build** | summary | signal, deliverable | query | — | — | signal, deliverable |
+| From \ To | Content | Ops | Analytics | Finance | Build | Assistant | War Room |
+|---|---|---|---|---|---|---|---|
+| **Content** | — | deliverable | query | — | — | — | deliverable |
+| **Ops** | brief, signal | — | — | query, signal | brief | — | signal, deliverable |
+| **Analytics** | response, summary | signal | — | summary | response, signal | — | signal, summary |
+| **Finance** | — | response, signal | summary | — | — | — | signal, deliverable |
+| **Build** | summary | signal, deliverable | query | — | — | — | signal, deliverable |
+| **Assistant** | — | — | — | — | — | — | signal |
 
 Messages not in this matrix are **dropped and logged**. There is no freeform text between claws.
 
@@ -244,9 +246,8 @@ Inference Request → Sensitivity Classifier → Routing Decision
                          │
               ┌──────────┼──────────┐
               │          │          │
-        ☁️ Cloud    🔒 Local    🔐 Local
-      Nemotron      NIM        vLLM
-        120B
+☁️ Cloud 🔒 Local 🔐 Local
+NEMOCLAW_MODEL NIM vLLM
 ```
 
 **Key constraints:**
@@ -262,10 +263,10 @@ The Build Claw uses semantic categories to route inference calls to optimal mode
 | Category | Model | Temperature | Use Case |
 |---|---|---|---|
 | `code_generation` | Local NIM | 0.1 | Source code, patches |
-| `pr_review` | Cloud Nemotron | 0.3 | PR descriptions, reviews |
-| `deploy_planning` | Cloud Nemotron | 0.2 | Deploy strategies |
-| `doc_writing` | Cloud Nemotron | 0.7 | Changelogs, devlogs |
-| `issue_scoring` | Cloud Nemotron | 0.2 | Complexity estimation |
+| `pr_review` | Cloud (NEMOCLAW_MODEL) | 0.3 | PR descriptions, reviews |
+| `deploy_planning` | Cloud (NEMOCLAW_MODEL) | 0.2 | Deploy strategies |
+| `doc_writing` | Cloud (NEMOCLAW_MODEL) | 0.7 | Changelogs, devlogs |
+| `issue_scoring` | Cloud (NEMOCLAW_MODEL) | 0.2 | Complexity estimation |
 
 ### Inference Fallback Chain (OmO Pattern)
 
@@ -364,6 +365,7 @@ Rate limit status is visible in the War Room via `getRateLimitStatus()`.
 | **Ops Claw** | Python | `milimo-blueprint/orchestrator/ops/` | 11 modules — client/project management |
 | **Analytics Claw** | Python | `milimo-blueprint/orchestrator/analytics/` | 12 modules — intelligence layer |
 | **Finance Claw** | Python | `milimo-blueprint/orchestrator/finance/` | 12 modules — financial operations |
+| **Assistant Claw** | Python | `milimo-blueprint/orchestrator/assistant/` | Conversational interface — operator ↔ claws |
 
 ---
 
@@ -411,7 +413,7 @@ orchestrator/build/
 ### Unit Tests
 
 - **JavaScript:** 318 tests covering plugin exports, config parsing, blueprint validation, encryption, approval engine, War Room TUI
-- **Python:** 1192 tests covering all 5 claws, orchestrator core, Build Claw (116 tests), integration tests
+- **Python:** 1192 tests covering all 6 claws, orchestrator core, Build Claw (116 tests), integration tests
 
 ### Integration Tests
 

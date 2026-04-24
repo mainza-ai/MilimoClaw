@@ -100,7 +100,14 @@ export interface OpenClawPluginApi {
 export type ClawRole = "content" | "ops" | "analytics" | "finance" | "build" | "assistant" | "solo";
 
 /** All valid claw roles (excluding "solo" which is a mode indicator). */
-export const CLAW_ROLES: ClawRole[] = ["content", "ops", "analytics", "finance", "build", "assistant"];
+export const CLAW_ROLES: ClawRole[] = [
+  "content",
+  "ops",
+  "analytics",
+  "finance",
+  "build",
+  "assistant",
+];
 
 /** Milimo plugin configuration. */
 export interface MilimoConfig {

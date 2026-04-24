@@ -7,9 +7,7 @@
 from __future__ import annotations
 
 import json
-import shutil
 import sys
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -306,7 +304,7 @@ class TestRenderTemplate:
 
         monkeypatch.setattr(assistant_setup, "TEMPLATE_PATH", template_path)
 
-        config = AssistantConfig(
+        _config = AssistantConfig(
             name="Nova",
             creature="a claw",
             vibe="sharp",

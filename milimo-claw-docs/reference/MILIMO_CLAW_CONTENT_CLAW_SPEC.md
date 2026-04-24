@@ -104,7 +104,11 @@ Everything the Content Claw owns lives under `/sandbox/content`:
 - `/sandbox/clients/` — client contact data (Ops Claw only)
 - `/sandbox/finance/` — financial records (Finance Claw only)
 - `/sandbox/build/` — source code and secrets (Build Claw only)
+- `/sandbox/assistant/` — session data and context (Assistant Claw only)
 - Any path outside the above
+
+The Assistant Claw (`/sandbox/assistant`) likewise cannot read the Content
+Claw's primary mount or any other claw's primary mount — isolation is mutual.
 
 ---
 
@@ -153,14 +157,14 @@ data sensitivity.
 
 | Data Type | Route | Reason |
 |---|---|---|
-| Public-facing drafts (final) | Cloud Nemotron 120B | Quality matters — clients and audiences see this |
-| Client proposals and pitches | Cloud Nemotron 120B | High-stakes, client-facing |
+| Public-facing drafts (final) | Cloud (NEMOCLAW_MODEL) | Quality matters — clients and audiences see this |
+| Client proposals and pitches | Cloud (NEMOCLAW_MODEL) | High-stakes, client-facing |
 | Internal ideation and brainstorming | Local NIM | Private creative process — stays on device |
 | Draft iterations and revisions | Local NIM | Intermediate work — not client-facing |
-| Trend research queries | Cloud Nemotron 120B | Public data, speed and quality preferred |
+| Trend research queries | Cloud (NEMOCLAW_MODEL) | Public data, speed and quality preferred |
 | Analytics report synthesis | Local NIM | Operational data is proprietary |
 | Style calibration (voice adapter) | Local NIM | Trained on client data — never cloud |
-| A/B variant generation | Cloud Nemotron 120B | Final variants — quality matters |
+| A/B variant generation | Cloud (NEMOCLAW_MODEL) | Final variants — quality matters |
 
 The Content Claw does not know which backend was used. It submits
 inference requests and receives responses. The Privacy Router handles

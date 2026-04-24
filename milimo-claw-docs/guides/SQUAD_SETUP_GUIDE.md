@@ -104,7 +104,7 @@ Before running `milimo onboard`, decide which template fits your squad:
 
 | Template | Best For | Claws |
 |---|---|---|
-| `solo-founder` | One-person operation | All 5 claws |
+| `solo-founder` | One-person operation | All 6 claws |
 
 ---
 

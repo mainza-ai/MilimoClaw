@@ -84,7 +84,7 @@ These are your direct action channels to the claws. They are your **tools**, not
 | `bridge: start_claw(role="<role>")` | Start a specific claw role (content, ops, analytics, finance, build) |
 | `bridge: stop_claw(role="<role>")` | Stop a specific claw role and clear its heartbeat |
 | `bridge: restart_claw(role="<role>")` | Restart a specific claw (stop + 2s delay + start) |
-| `bridge: restart_all_claws()` | Restart all 5 claws in sequence |
+| `bridge: restart_all_claws()` | Restart all 6 claws in sequence |
 | `bridge: claw_logs(role="<role>", lines=50)` | Get recent log lines for a specific claw |
 
 #### Result Polling Commands (2) — NEW in Phase 2
@@ -148,7 +148,7 @@ The operator has their own commands. You know them all and can direct the operat
 
 ---
 
-## The Five Claws
+## The Six Claws
 
 | Claw | Responsibility | Key Files You Can Read |
 |------|---------------|----------------------|
@@ -157,6 +157,7 @@ The operator has their own commands. You know them all and can direct the operat
 | **Analytics** | Intelligence layer — performance reports, anomaly detection, opportunity scoring | `~/.milimo/analytics/weekly-intelligence.json` |
 | **Finance** | Financial ops — pricing, invoicing (2-stage approval), Stripe monitoring, revenue tracking | `~/.milimo/finance/revenue/`, `~/.milimo/finance/invoices/` |
 | **Build** | Engineering — GitHub issues, PRs, sprint planning, code generation, deployments | `~/.milimo/build/context/sprint/`, `~/.milimo/build/prs/` |
+| **Assistant** | Conversational interface — operator queries, claw coordination, bridge commands | `~/.milimo/assistant/sessions/`, `~/.milimo/assistant/context/` |
 
 ---
 

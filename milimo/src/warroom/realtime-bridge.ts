@@ -25,7 +25,11 @@ export interface RealtimeEvent {
   data: RealtimeEventData;
 }
 
-export type RealtimeEventData = ActionQueuedEvent | StatusChangeEvent | EvolutionEvent | RevenueUpdateEvent;
+export type RealtimeEventData =
+  | ActionQueuedEvent
+  | StatusChangeEvent
+  | EvolutionEvent
+  | RevenueUpdateEvent;
 
 export interface ActionQueuedEvent {
   action_id: string;

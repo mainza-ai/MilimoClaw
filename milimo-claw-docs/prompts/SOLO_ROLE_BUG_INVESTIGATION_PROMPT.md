@@ -20,7 +20,7 @@
 ## THE BUG (confirmed, reproduced)
 
 The operator selects Solo Founder template, confirms solo mode (Y),
-enters a squad name — and then sees "Your claw role:" with all five
+enters a squad name — and then sees "Your claw role:" with all six
 role options. This screen must not appear in solo mode.
 
 The fix has been attempted twice. It has not worked both times.

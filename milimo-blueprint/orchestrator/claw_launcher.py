@@ -29,12 +29,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import errno
 import json
 import logging
 import os
 import signal
-import socket
 import sys
 import threading
 import time
@@ -322,7 +320,7 @@ def print_startup_summary(launcher: "ClawLauncher") -> None:
     print(f"\n  Launcher PID: {os.getpid()}")
     print(f"  Squad ID: {SQUAD_ID}")
     print(f"  Started: {datetime.now(timezone.utc).isoformat()}")
-    print(f"\n  Claws Status:")
+    print("\n  Claws Status:")
     print("-" * 60)
 
     for role, claw_status in status.get("claws", {}).items():
@@ -677,7 +675,7 @@ class HeartbeatMonitor:
         if not self.heartbeat_dir.exists():
             return
 
-        now = time.time()
+        _now = time.time()
         for hb_file in sorted(self.heartbeat_dir.glob("*.json")):
             role = hb_file.stem
             if role not in self._active_roles:

@@ -179,7 +179,7 @@ export function getBuiltInTemplates(): TemplateDiscovery[] {
       category: "solo",
       path: "",
       squadSize: 1,
-      clawsActive: CLAW_ROLES.slice() as ClawRole[],
+      clawsActive: CLAW_ROLES.slice(),
       solo: true,
     },
     {
@@ -262,10 +262,7 @@ export function getBuiltInTemplates(): TemplateDiscovery[] {
   ];
 }
 
-export function resolveTemplatePath(
-  templateId: string,
-  blueprintDir: string,
-): string | null {
+export function resolveTemplatePath(templateId: string, blueprintDir: string): string | null {
   const builtIn = getBuiltInTemplates().find((t) => t.id === templateId);
   if (builtIn && builtIn.id === "custom") {
     return null;

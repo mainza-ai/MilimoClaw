@@ -18,8 +18,8 @@ The privacy router sits between the claw and all inference backends. Every infer
 
 | Data Type | Backend | Rationale |
 |---|---|---|
-| Client proposals, public content drafts | ☁️ Cloud Nemotron 120B | Maximum quality for client-facing work |
-| Trend data, market research | ☁️ Cloud Nemotron 120B | Public data, cloud quality preferred |
+| Client proposals, public content drafts | ☁️ Cloud (NEMOCLAW_MODEL) | Maximum quality for client-facing work |
+| Trend data, market research | ☁️ Cloud (NEMOCLAW_MODEL) | Public data, cloud quality preferred |
 | Internal squad comms, client contact details | 🔒 Local NIM | Private business data stays on device |
 | Contract review, legal-adjacent content | 🔒 Local NIM | Never touches cloud |
 | Financial records, payment details | 🔒 Local NIM only | Architectural constraint — no cloud endpoint |
@@ -54,6 +54,7 @@ Each claw's filesystem access is restricted by Landlock LSM — a Linux kernel s
 | Analytics | `/sandbox/analytics`, `/tmp` | System libraries only |
 | Finance | `/sandbox/finance`, `/tmp` | System libraries only |
 | Build | `/sandbox/build`, `/tmp` | System libraries only |
+| Assistant | `/sandbox/assistant`, `/tmp` | System libraries only |
 
 **Key guarantees:**
 - The Content Claw **cannot** read `/sandbox/clients` (Ops data)
@@ -80,6 +81,7 @@ Each claw has its own network egress policy — a whitelist of external APIs it 
 | **Analytics** | Platform analytics (read-only), market data feeds |
 | **Finance** | Payment processors (read-only), accounting APIs |
 | **Build** | GitHub, Vercel, Railway, npm, PyPI, Sentry |
+| **Assistant** | Operator messaging, squad status endpoints |
 
 **What's blocked:**
 - Finance cannot reach social platforms

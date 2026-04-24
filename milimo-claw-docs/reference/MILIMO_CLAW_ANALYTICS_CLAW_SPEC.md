@@ -5,7 +5,7 @@
 # feature implementation, testing, or documentation.
 #
 # DEVELOPMENT NOTE: This implementation is in active development and testing.
-# All inference currently routes to cloud (Nemotron 120B via NVIDIA Cloud API)
+# All inference currently routes to cloud (the configured NEMOCLAW_MODEL via NVIDIA Cloud API)
 # regardless of data sensitivity. The privacy routing rules documented here
 # represent the production target architecture. Do not implement privacy
 # routing enforcement during this phase — route everything to cloud.
@@ -118,7 +118,7 @@ Everything the Analytics Claw owns lives under `/sandbox/analytics`:
 This is the only file in the entire Milimo Claw mesh that all claws
 can read directly without a message contract. It is written by the
 Analytics Claw every Sunday and is the primary intelligence feed
-for the Content, Ops, Finance, and Build Claws.
+for the Content, Ops, Finance, Build, and Assistant Claws.
 
 **What the Analytics Claw can read:**
 - Everything under `/sandbox/analytics/`
@@ -129,6 +129,10 @@ for the Content, Ops, Finance, and Build Claws.
 - `/sandbox/finance/` — raw financial records (Finance Claw only)
 - `/sandbox/build/` — source code and secrets (Build Claw only)
 - `/sandbox/content/` — draft content and brand assets (Content Claw only)
+- `/sandbox/assistant/` — session data and context (Assistant Claw only)
+
+The Assistant Claw (`/sandbox/assistant`) likewise cannot read the Analytics
+Claw's primary mount or any other claw's primary mount — isolation is mutual.
 
 The Analytics Claw only receives aggregated, anonymized data signals
 from other claws via typed messages — never raw records.
@@ -174,11 +178,11 @@ Log `data_type` on every inference call for future routing enforcement.
 
 | Data Type | Production Route | Reason |
 |---|---|---|
-| Public trend and market analysis | Cloud Nemotron 120B | Public data, max reasoning quality |
+| Public trend and market analysis | Cloud (NEMOCLAW_MODEL) | Public data, max reasoning quality |
 | Internal performance synthesis | Local NIM | Squad's operational data is sensitive |
 | Predictive model generation | Local NIM | Trained on proprietary squad data |
 | Anomaly characterization | Local NIM | Contains operational intelligence |
-| Competitor signal analysis | Cloud Nemotron 120B | Public market data |
+| Competitor signal analysis | Cloud (NEMOCLAW_MODEL) | Public market data |
 | Opportunity scoring | Local NIM | Based on private revenue and client data |
 | Report narrative generation | Local NIM | Contains squad's full operational picture |
 
@@ -540,6 +544,7 @@ building any intelligence generation, verify that:
 - Ops Claw can read the same path
 - Finance Claw can read the same path
 - Build Claw can read the same path
+- Assistant Claw can read the same path
 If any claw cannot read the file, the Analytics Claw's primary output
 channel is broken. Fix the mount configuration before anything else.
 

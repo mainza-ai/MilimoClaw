@@ -401,13 +401,16 @@ deploy_to_sandbox() {
     # Finance Claw — primary mount at /sandbox/finance
     mkdir -p /sandbox/finance/{invoices/{draft,sent,paid,overdue},expenses,revenue,queue/{hold,review,auto},memory,context,logs,tools}
 
-    # Build Claw — primary mount at /sandbox/build
-    mkdir -p /sandbox/build/{prs/{open,merged,closed},deployments/{staging,production},tasks,docs,context,queue/{hold,review,auto},memory,logs,tools,data}
+# Build Claw — primary mount at /sandbox/build
+mkdir -p /sandbox/build/{prs/{open,merged,closed},deployments/{staging,production},tasks,docs,context,queue/{hold,review,auto},memory,logs,tools,data}
 
-    chown -R sandbox:sandbox /sandbox/clients /sandbox/content /sandbox/analytics /sandbox/finance /sandbox/build
+# Assistant Claw — primary mount at /sandbox/assistant
+mkdir -p /sandbox/assistant/{context,memory,logs,tools,queue/{hold,review,auto}}
+
+chown -R sandbox:sandbox /sandbox/clients /sandbox/content /sandbox/analytics /sandbox/finance /sandbox/build /sandbox/assistant
 
     # Fix log directory permissions (Issue #6: logs may be owned by root)
-    for d in /sandbox/clients/logs /sandbox/content/logs /sandbox/analytics/logs /sandbox/finance/logs /sandbox/build/logs; do
+    for d in /sandbox/clients/logs /sandbox/content/logs /sandbox/analytics/logs /sandbox/finance/logs /sandbox/build/logs /sandbox/assistant/logs; do
       mkdir -p "$d"
       chown -R sandbox:sandbox "$d"
       chmod -R 755 "$d"
@@ -622,8 +625,8 @@ echo "Cleanup complete"
     ERRORS=0
 
     # Verify orchestrator files exist in primary location
-    for claw in ops analytics content finance build; do
-      f="/sandbox/milimo-blueprint/orchestrator/${claw}/${claw}_claw.py"
+for claw in ops analytics content finance build assistant; do
+        f="/sandbox/milimo-blueprint/orchestrator/${claw}/${claw}_claw.py"
       if [ ! -f "$f" ]; then
         echo "MISSING: $f"
         ERRORS=$((ERRORS + 1))
@@ -653,7 +656,7 @@ echo "Cleanup complete"
     # Verify blueprints copy is in sync
     BP="/sandbox/.milimo/blueprints/0.1.0"
     if [ -d "$BP/orchestrator" ]; then
-      for claw in ops analytics content finance build; do
+      for claw in ops analytics content finance build assistant; do
         f="$BP/orchestrator/${claw}/${claw}_claw.py"
         if [ ! -f "$f" ]; then
           echo "MISSING (blueprints copy): $f"
@@ -768,37 +771,38 @@ plugin_config = {
     "operatorName": operator,
     "warRoomMode": warroom,
     "onboardedAt": now,
-    "activeClaws": ["content", "ops", "analytics", "finance", "build"],
-    # Assistant config for assistant_setup.py
-    "assistant": {
-        "name": "Lucy",
-        "creature": "a claw",
-        "vibe": "sharp and unhurried",
-        "emoji": "🦀"
-    }
-}
+"activeClaws": ["content", "ops", "analytics", "finance", "build", "assistant"],
+        # Assistant config for assistant_setup.py
+        "assistant": {
+            "name": "Lucy",
+            "creature": "a claw",
+            "vibe": "sharp and unhurried",
+            "emoji": "🦀"
+        }
+        }
 
-# Orchestrator format (nested — for Python code)
-orchestrator_config = {
-    "version": version,
-    "squad": {
-        "name": squad,
-        "template": "solo",
-        "mode": "solo",
-        "onboarded_at": now
-    },
-    "operator": { "name": operator },
-    "claws": {
-        "content": { "enabled": True, "mount": "/sandbox/content" },
-        "ops": { "enabled": True, "mount": "/sandbox/clients" },
-        "analytics": { "enabled": True, "mount": "/sandbox/analytics" },
-        "finance": { "enabled": True, "mount": "/sandbox/finance" },
-        "build": { "enabled": True, "mount": "/sandbox/build" }
-    },
-    "war_room": { "mode": warroom },
-    "mesh": { "enabled": False, "secret": None },
-    "blueprint_dir": "/sandbox/milimo-blueprint",
-    "activeClaws": ["content", "ops", "analytics", "finance", "build"],
+        # Orchestrator format (nested — for Python code)
+        orchestrator_config = {
+            "version": version,
+            "squad": {
+                "name": squad,
+                "template": "solo",
+                "mode": "solo",
+                "onboarded_at": now
+            },
+            "operator": { "name": operator },
+            "claws": {
+                "content": { "enabled": True, "mount": "/sandbox/content" },
+                "ops": { "enabled": True, "mount": "/sandbox/clients" },
+                "analytics": { "enabled": True, "mount": "/sandbox/analytics" },
+                "finance": { "enabled": True, "mount": "/sandbox/finance" },
+                "build": { "enabled": True, "mount": "/sandbox/build" },
+                "assistant": { "enabled": True, "mount": "/sandbox/assistant" }
+            },
+            "war_room": { "mode": warroom },
+            "mesh": { "enabled": False, "secret": None },
+            "blueprint_dir": "/sandbox/milimo-blueprint",
+            "activeClaws": ["content", "ops", "analytics", "finance", "build", "assistant"],
     # Assistant config for assistant_setup.py
     "assistant": {
         "name": "Lucy",
@@ -834,7 +838,7 @@ PYEOF
 
   ok "Squad: $squad (solo template)"
   ok "Operator: $operator"
-  ok "Claws: Content, Ops, Analytics, Finance, Build — all enabled"
+  ok "Claws: Content, Ops, Analytics, Finance, Build, Assistant — all enabled"
   ok "War Room: $WARROOM_MODE"
 
   # ---- Run assistant setup ----

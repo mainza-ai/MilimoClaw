@@ -137,7 +137,7 @@ class AssistantConfig:
 
 # Template names and their active claw sets — must match solo-founder.yaml
 TEMPLATE_CLAW_MAP: dict[str, list[str]] = {
-    "solo-founder":        ["content", "ops", "analytics", "finance", "build"],
+"solo-founder": ["content", "ops", "analytics", "finance", "build", "assistant"],
     "content-agency":      ["content", "ops", "analytics"],
     "design-studio":       ["content", "ops", "finance"],
     "event-promotion":     ["content", "ops", "analytics"],
@@ -173,7 +173,7 @@ def load_assistant_config() -> AssistantConfig:
     template_name = config.get("template", "solo-founder")
     active_claws = TEMPLATE_CLAW_MAP.get(
         template_name,
-        ["content", "ops", "analytics", "finance", "build"]
+        ["content", "ops", "analytics", "finance", "build", "assistant"]
     )
 
     return AssistantConfig(
@@ -473,9 +473,9 @@ const SPEC_TEMPLATES = [
     id: "solo-founder",
     displayName: "Solo Founder",
     category: "solo",
-    description: "All 5 claws on one machine. One operator. The full product.",
-    squadSize: 1,
-    clawsActive: ["content", "ops", "analytics", "finance", "build"],
+description: "All 6 claws on one machine. One operator. The full product.",
+squadSize: 1,
+clawsActive: ["content", "ops", "analytics", "finance", "build", "assistant"],
     isDefault: true,
   },
   {
@@ -655,7 +655,7 @@ assistant: {
   vibe: "sharp and unhurried",
   emoji: "🦀",
 },
-activeClaws: ["content", "ops", "analytics", "finance", "build"],
+activeClaws: ["content", "ops", "analytics", "finance", "build", "assistant"],
 ```
 
 Add a migration step in `ConfigManager.migrate()` for existing configs
@@ -787,8 +787,8 @@ in this prompt. It can be merged and deployed independently.
 ### The Bug
 
 When the operator selects solo mode during onboarding, the wizard
-immediately asks them to pick one of five claw roles. In solo mode,
-all five claws run simultaneously on the same machine. Asking the
+immediately asks them to pick one of six claw roles. In solo mode,
+all six claws run simultaneously on the same machine. Asking the
 operator to pick one is incorrect, confusing, and implies only one
 claw will run — which contradicts the entire purpose of the solo template.
 
@@ -802,7 +802,7 @@ Your claw role:
    2. ops — Client lifecycle...
    ...
 
-Select [1-5] (default: 1):     ← THIS QUESTION MUST NOT APPEAR IN SOLO MODE
+Select [1-6] (default: 1): ← THIS QUESTION MUST NOT APPEAR IN SOLO MODE
 ```
 
 ### TASK 2B.1 — Fix role prompt conditional in onboard.ts
@@ -844,13 +844,14 @@ if (isSolo) {
 Mesh mode — which claw are you running on this machine?
 ");
 
-  const roleChoices = [
-    { value: "content",   label: "content   — Creative output — posts, copy, campaigns, brand voice" },
-    { value: "ops",       label: "ops       — Client lifecycle — intake, scoping, delivery, follow-up" },
-    { value: "analytics", label: "analytics — Intelligence layer — performance, trends, opportunities" },
-    { value: "finance",   label: "finance   — Financial ops — invoicing, pricing, margin tracking" },
-    { value: "build",     label: "build     — Engineering — code, PRs, deploys, monitoring" },
-  ];
+const roleChoices = [
+  { value: "content", label: "content — Creative output — posts, copy, campaigns, brand voice" },
+  { value: "ops", label: "ops — Client lifecycle — intake, scoping, delivery, follow-up" },
+  { value: "analytics", label: "analytics — Intelligence layer — performance, trends, opportunities" },
+  { value: "finance", label: "finance — Financial ops — invoicing, pricing, margin tracking" },
+  { value: "build", label: "build — Engineering — code, PRs, deploys, monitoring" },
+  { value: "assistant", label: "assistant — Conversational interface — routing, status, operator proxy" },
+];
 
   // Filter to only claws active in the selected template
   const availableRoles = roleChoices.filter(
@@ -881,11 +882,11 @@ The `clawRole` field type must include `"solo"` as a valid value:
 type ClawRole = "content" | "ops" | "analytics" | "finance" | "build";
 
 // After:
-type ClawRole = "content" | "ops" | "analytics" | "finance" | "build" | "solo";
+type ClawRole = "content" | "ops" | "analytics" | "finance" | "build" | "assistant" | "solo";
 ```
 
 All downstream code that reads `clawRole` and expects exactly one of the
-five claw names must handle `"solo"` gracefully — typically by treating it
+six claw names must handle `"solo"` gracefully — typically by treating it
 as "all claws" or by reading `activeClaws` from the config instead.
 
 ### TASK 2B.3 — Update squad status display
@@ -914,7 +915,7 @@ This fixes the display seen in the screenshot:
 Role: build
 
 // After (accurate):
-Role: Solo (content, ops, analytics, finance, build)
+Role: Solo (content, ops, analytics, finance, build, assistant)
 ```
 
 ### TASK 2B.4 — Update solo_init.py to initialize all claws when role is solo
@@ -935,7 +936,7 @@ def get_claws_to_initialize(config: dict) -> list[str]:
     """
     claw_role = config.get("clawRole", "solo")
     active_claws = config.get("activeClaws",
-        ["content", "ops", "analytics", "finance", "build"])
+        ["content", "ops", "analytics", "finance", "build", "assistant"])
 
     if claw_role == "solo":
         return active_claws   # Initialize everything
@@ -956,7 +957,7 @@ After this fix, the same flow should look like:
 ```
 🦀 MILIMO CLAW — Onboarding Wizard 🦀
 
-Inference: nvidia/nemotron-3-super-120b-a12b @ https://inference.local/v1
+Inference: ${NEMOCLAW_MODEL} @ https://inference.local/v1
 
 Existing Milimo configuration found:
   Squad:    milimoquantum
@@ -969,11 +970,11 @@ Existing Milimo configuration found:
 Reconfigure? (y/N): y
 
 Template:
- * 1. Solo Founder — solo (all 5 claws)
+ * 1. Solo Founder — solo (all 6 claws)
    2. Content Agency — squad of 3
    ...
 
-Select [1-5] (default: 1): 1
+Select [1-7] (default: 1): 1
 
 Operating solo (no mesh coordination)? (Y/n): Y
 

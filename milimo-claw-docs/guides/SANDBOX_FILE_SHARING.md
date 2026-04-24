@@ -4,7 +4,7 @@ This guide explains how to share files with Milimo Claw / NemocLaw running insid
 
 ## Sandbox Architecture
 
-Each of the five claws (autonomous agents) has its own isolated filesystem mount under `/sandbox/`, enforced by Linux Landlock at the kernel level. The assistant (NemocLaw) cannot write directly to any claw's filesystem — all state changes go through the Python bridge CLI.
+Each of the six claws (autonomous agents) has its own isolated filesystem mount under `/sandbox/`, enforced by Linux Landlock at the kernel level. The assistant claw can read from other claws' shared mounts but cannot write directly to any claw's filesystem — all state changes go through the Python bridge CLI.
 
 ## Sandbox Directory Paths
 
@@ -17,6 +17,7 @@ The container is named `MilimoClaw`. Each claw has its own sandbox directory:
 | **Analytics** | `/sandbox/analytics/` | Data files, market research, external reports |
 | **Finance** | `/sandbox/finance/` | Pricing data, financial records, invoices |
 | **Build** | `/sandbox/build/` | Source code, config files, deployment scripts |
+| **Assistant** | `/sandbox/assistant/` | Session data, context files, operator interaction logs |
 | **Shared (all claws read)** | `/sandbox/analytics/reports/` | Any file here is readable by all claws + assistant |
 | **Workspace (agent)** | `/sandbox/.openclaw-data/workspace/` | Agent workspace files (SOUL.md, USER.md, etc.) |
 
