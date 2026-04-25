@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -25,6 +24,7 @@ try:
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.backends import default_backend
+
     HAS_CRYPTOGRAPHY = True
 except ImportError:
     HAS_CRYPTOGRAPHY = False
@@ -41,6 +41,7 @@ SALT_SEPARATOR = ":"
 @dataclass
 class EncryptedMessage:
     """Encrypted message container."""
+
     iv: str
     ciphertext: str
     auth_tag: str
@@ -65,9 +66,13 @@ class MessageEncryption:
         self.mesh_secret = mesh_secret
 
         if not HAS_CRYPTOGRAPHY:
-            raise RuntimeError("cryptography library not installed. Run: pip install cryptography")
+            raise RuntimeError(
+                "cryptography library not installed. Run: pip install cryptography"
+            )
 
-    def encrypt(self, plaintext: str, sender_role: str, recipient_role: str) -> EncryptedMessage:
+    def encrypt(
+        self, plaintext: str, sender_role: str, recipient_role: str
+    ) -> EncryptedMessage:
         """
         Encrypt a message.
 
@@ -92,7 +97,9 @@ class MessageEncryption:
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
 
-    def decrypt(self, encrypted: EncryptedMessage, sender_role: str, recipient_role: str) -> str:
+    def decrypt(
+        self, encrypted: EncryptedMessage, sender_role: str, recipient_role: str
+    ) -> str:
         """
         Decrypt a message.
 
@@ -114,7 +121,9 @@ class MessageEncryption:
 
         return plaintext.decode("utf-8")
 
-    def encrypt_message(self, message: dict[str, Any], sender_role: str, recipient_role: str) -> dict[str, Any]:
+    def encrypt_message(
+        self, message: dict[str, Any], sender_role: str, recipient_role: str
+    ) -> dict[str, Any]:
         """
         Encrypt a JSON message.
 

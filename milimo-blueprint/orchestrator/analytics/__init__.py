@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -23,7 +22,12 @@ from .analytics_init import (
 from .analytics_claw import AnalyticsClaw
 from .analytics_scheduler import AnalyticsScheduler
 from .anomaly_detector import AnomalyDetector, DetectedAnomaly
-from .baseline_manager import BaselineManager, ContentBaseline, RevenueBaseline, DeliveryBaseline
+from .baseline_manager import (
+    BaselineManager,
+    ContentBaseline,
+    RevenueBaseline,
+    DeliveryBaseline,
+)
 from .forward_projector import ForwardProjector, ForwardProjection
 from .opportunity_scorer import OpportunityScorer, ScoredOpportunity
 from .query_handler import QueryHandler, QueryResponse

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -12,7 +11,6 @@ Tests cover:
 """
 
 import json
-import os
 import shutil
 import sys
 import tempfile
@@ -261,9 +259,7 @@ class TestMeshCoordinator(unittest.TestCase):
     def test_deliverable_flagged_for_approval(self):
         self.mesh.register_claw("content", "local://content")
         self.mesh.register_claw("ops", "local://ops")
-        result = self.mesh.send_message(
-            self._msg("content", "ops", "deliverable")
-        )
+        result = self.mesh.send_message(self._msg("content", "ops", "deliverable"))
         self.assertTrue(result.delivered)
         self.assertTrue(result.requires_approval)
 

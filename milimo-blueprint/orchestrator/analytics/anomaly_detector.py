@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -20,7 +19,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal, Callable
 
-from .analytics_init import AnalyticsFilesystemInit, AnalyticsLogEntry, AnalyticsOperationalLog
+from .analytics_init import (
+    AnalyticsFilesystemInit,
+    AnalyticsLogEntry,
+    AnalyticsOperationalLog,
+)
 from .baseline_manager import ContentBaseline, RevenueBaseline, DeliveryBaseline
 
 logger = logging.getLogger("milimo.anomaly_detector")
@@ -347,7 +350,9 @@ class AnomalyDetector:
             return
 
         message_type_map = {
-            "content": "revenue_anomaly" if "revenue" in anomaly.metric else "performance_intel",
+            "content": "revenue_anomaly"
+            if "revenue" in anomaly.metric
+            else "performance_intel",
             "finance": "revenue_anomaly",
             "build": "retention_signals",
             "ops": "client_health_alert",

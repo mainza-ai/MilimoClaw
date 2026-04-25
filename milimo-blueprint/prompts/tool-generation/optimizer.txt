@@ -90,10 +90,10 @@ class Output(TypedDict):
 def run(input_data: Input) -> Output:
     """
     Optimize {{optimization_target}} given constraints.
-    
+
     Args:
         input_data: Current parameters and context
-        
+
     Returns:
         Optimized parameters with expected improvement
     """

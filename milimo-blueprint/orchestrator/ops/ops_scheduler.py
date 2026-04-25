@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -21,8 +20,7 @@ from __future__ import annotations
 import logging
 import threading
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from .ops_init import OpsFilesystemInit, OpsOperationalLog, OpsLogEntry
 
@@ -134,7 +132,9 @@ class OpsScheduler:
             if self._running:
                 self._timers.append(timer)
                 timer.start()
-                logger.debug("Scheduled daily deadline check in %d seconds", seconds_until)
+                logger.debug(
+                    "Scheduled daily deadline check in %d seconds", seconds_until
+                )
 
     def _schedule_weekly_health_scoring(self) -> None:
         if not self._running:
@@ -156,7 +156,9 @@ class OpsScheduler:
             if self._running:
                 self._timers.append(timer)
                 timer.start()
-                logger.debug("Scheduled weekly health scoring in %d seconds", seconds_until)
+                logger.debug(
+                    "Scheduled weekly health scoring in %d seconds", seconds_until
+                )
 
     def _run_daily_deadline_check(self) -> None:
         if not self._running:
@@ -182,7 +184,9 @@ class OpsScheduler:
                     entity_id="ops_scheduler",
                     outcome="success",
                     details={
-                        "duration_seconds": (datetime.now(timezone.utc) - start_time).total_seconds(),
+                        "duration_seconds": (
+                            datetime.now(timezone.utc) - start_time
+                        ).total_seconds(),
                     },
                 )
             )
@@ -224,7 +228,9 @@ class OpsScheduler:
                     outcome="success",
                     details={
                         "clients_scored": len(scores),
-                        "duration_seconds": (datetime.now(timezone.utc) - start_time).total_seconds(),
+                        "duration_seconds": (
+                            datetime.now(timezone.utc) - start_time
+                        ).total_seconds(),
                     },
                 )
             )
@@ -291,14 +297,20 @@ class OpsScheduler:
             if days_ahead < 0:
                 days_ahead += 7
             elif days_ahead == 0:
-                target_time = now.replace(hour=target_hour, minute=target_minute, second=0, microsecond=0)
+                target_time = now.replace(
+                    hour=target_hour, minute=target_minute, second=0, microsecond=0
+                )
                 if now >= target_time:
                     days_ahead = 7
 
             target = now + timedelta(days=days_ahead)
-            target = target.replace(hour=target_hour, minute=target_minute, second=0, microsecond=0)
+            target = target.replace(
+                hour=target_hour, minute=target_minute, second=0, microsecond=0
+            )
         else:
-            target = now.replace(hour=target_hour, minute=target_minute, second=0, microsecond=0)
+            target = now.replace(
+                hour=target_hour, minute=target_minute, second=0, microsecond=0
+            )
 
             if now >= target:
                 target += timedelta(days=1)

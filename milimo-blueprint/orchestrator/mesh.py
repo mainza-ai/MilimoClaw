@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -44,7 +43,7 @@ from .gateway_adapter import (
     WebSocketGateway,
     ConnectionState,
 )
-from .privacy_router import PrivacyRouter, RoutingDecision, InferenceBackend
+from .privacy_router import PrivacyRouter
 from .mesh_encryption import MessageEncryption, HAS_CRYPTOGRAPHY
 
 logger = logging.getLogger("milimo.mesh")

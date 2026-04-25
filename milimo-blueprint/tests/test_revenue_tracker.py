@@ -1,10 +1,11 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """Tests for Finance Claw Revenue Tracker."""
 
 import json
 import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -44,10 +45,12 @@ class MockMeshGateway:
         message_id: str,
         timestamp: str,
     ) -> bool:
-        self.sent_messages.append({
-            "message_type": message_type,
-            "payload": payload,
-        })
+        self.sent_messages.append(
+            {
+                "message_type": message_type,
+                "payload": payload,
+            }
+        )
         return True
 
 
@@ -95,7 +98,9 @@ class TestRevenueTracker:
         return MockApprovalHandler()
 
     @pytest.fixture
-    def revenue_tracker(self, fs, inference_client, dispatcher, approval_handler, operational_log):
+    def revenue_tracker(
+        self, fs, inference_client, dispatcher, approval_handler, operational_log
+    ):
         return RevenueTracker(
             fs=fs,
             inference_client=inference_client,
@@ -160,7 +165,9 @@ class TestRevenueTracker:
 
         revenue_tracker.record_payment(invoice)
 
-        revenue_msgs = [m for m in gateway.sent_messages if m["message_type"] == "revenue_summary"]
+        revenue_msgs = [
+            m for m in gateway.sent_messages if m["message_type"] == "revenue_summary"
+        ]
         assert len(revenue_msgs) >= 1
 
     def test_generate_weekly_summary_returns_revenue_summary(self, revenue_tracker):
@@ -187,7 +194,9 @@ class TestRevenueTracker:
                 payment_risk_level="low",
                 due_date="2026-03-01",
             )
-            (pending_dir / f"inv-pending-{i}.json").write_text(json.dumps(invoice.to_dict()))
+            (pending_dir / f"inv-pending-{i}.json").write_text(
+                json.dumps(invoice.to_dict())
+            )
 
         summary = revenue_tracker.generate_weekly_summary()
 
@@ -197,35 +206,48 @@ class TestRevenueTracker:
         """margin_analysis makes inference call with data_type='margin_analysis'."""
         revenue_tracker.margin_analysis()
 
-        margin_calls = [c for c in inference_client.calls if c["data_type"] == "margin_analysis"]
+        margin_calls = [
+            c for c in inference_client.calls if c["data_type"] == "margin_analysis"
+        ]
         assert len(margin_calls) >= 1
 
     def test_rate_optimization_inference_call(self, revenue_tracker, inference_client):
         """rate_optimization_check makes inference call with data_type='rate_benchmarking_narrative'."""
         revenue_tracker.rate_optimization_check()
 
-        rate_calls = [c for c in inference_client.calls if c["data_type"] == "rate_benchmarking_narrative"]
+        rate_calls = [
+            c
+            for c in inference_client.calls
+            if c["data_type"] == "rate_benchmarking_narrative"
+        ]
         assert len(rate_calls) >= 1
 
-    def test_margin_alert_queues_war_room_review(self, revenue_tracker, approval_handler, fs):
+    def test_margin_alert_queues_war_room_review(
+        self, revenue_tracker, approval_handler, fs
+    ):
         """Margin gap > 10% queues War Room REVIEW."""
         expense_path = fs.base / "expenses" / "log.jsonl"
         expense_path.parent.mkdir(parents=True, exist_ok=True)
-        expense_path.write_text(json.dumps({
-            "expense_id": "exp-1",
-            "amount": 900,
-            "description": "Test expense",
-            "expense_date": "2026-03-01",
-            "tax_category": "other",
-            "logged_at": "2026-03-01T10:00:00",
-        }) + "\n")
+        expense_path.write_text(
+            json.dumps(
+                {
+                    "expense_id": "exp-1",
+                    "amount": 900,
+                    "description": "Test expense",
+                    "expense_date": "2026-03-01",
+                    "tax_category": "other",
+                    "logged_at": "2026-03-01T10:00:00",
+                }
+            )
+            + "\n"
+        )
 
         annual_path = fs.base / "revenue" / "annual-summary.json"
         annual_path.write_text(json.dumps({"year_total": 1000}))
 
         result = revenue_tracker.margin_analysis()
 
-        margin_gap = result.get("margin_gap", 0)
+        result.get("margin_gap", 0)
 
     def test_record_payment_updates_monthly_summary(self, revenue_tracker, fs):
         """record_payment updates monthly-summary.json."""
@@ -291,7 +313,9 @@ class TestRevenueTracker:
                 payment_risk_level="low",
                 due_date="2026-03-01",
             )
-            (sent_dir / f"inv-pipeline-{i}.json").write_text(json.dumps(invoice.to_dict()))
+            (sent_dir / f"inv-pipeline-{i}.json").write_text(
+                json.dumps(invoice.to_dict())
+            )
 
         summary = revenue_tracker.generate_weekly_summary()
 
@@ -312,7 +336,9 @@ class TestRevenueTracker:
 
         revenue_tracker.record_payment(invoice)
 
-        revenue_msgs = [m for m in gateway.sent_messages if m["message_type"] == "revenue_summary"]
+        revenue_msgs = [
+            m for m in gateway.sent_messages if m["message_type"] == "revenue_summary"
+        ]
         assert len(revenue_msgs) >= 1
 
         payload = revenue_msgs[-1]["payload"]

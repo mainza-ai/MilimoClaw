@@ -10,7 +10,7 @@ Orchestrates all scheduled autonomous actions for the Finance Claw.
 import threading
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 import json
 
 from .finance_init import FinanceOperationalLog, FinanceLogEntry

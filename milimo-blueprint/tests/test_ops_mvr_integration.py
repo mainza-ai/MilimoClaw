@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -11,10 +10,8 @@ Each test verifies a critical path in the Ops Claw workflow.
 
 import json
 import sys
-import tempfile
-from datetime import datetime, timezone, timedelta
+from collections.abc import Iterator
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -23,21 +20,15 @@ _orchestrator_dir = _test_dir.parent / "orchestrator"
 if str(_orchestrator_dir) not in sys.path:
     sys.path.insert(0, str(_orchestrator_dir))
 
-from ops.ops_init import (
-    OpsFilesystemInit,
-    OpsOperationalLog,
-    OpsCommsLog,
-)
-from ops.signal_dispatcher import OpsSignalDispatcher, PricingNotConfirmedError
-from ops.approval_handler import OpsApprovalHandler
-from ops.intake_manager import IntakeManager, TriageScore
-from ops.project_manager import ProjectManager, ProjectStatus
+from ops.signal_dispatcher import PricingNotConfirmedError
+from ops.project_manager import ProjectStatus
 from ops.ops_claw import OpsClaw, MockMeshGateway
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Mock Classes
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class MockInferenceClient:
     """Mock inference client for testing."""
@@ -47,17 +38,20 @@ class MockInferenceClient:
         self.calls: list[dict] = []
 
     def complete(self, prompt: str, data_type: str, max_tokens: int = 100) -> str:
-        self.calls.append({
-            "prompt": prompt,
-            "data_type": data_type,
-            "max_tokens": max_tokens,
-        })
+        self.calls.append(
+            {
+                "prompt": prompt,
+                "data_type": data_type,
+                "max_tokens": max_tokens,
+            }
+        )
         return self.responses.get(data_type, '{"result": "mocked"}')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixtures
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def temp_sandbox(tmp_path: Path) -> Path:
@@ -90,7 +84,7 @@ def ops_claw(
     temp_sandbox: Path,
     inference_client: MockInferenceClient,
     mock_gateway: MockMeshGateway,
-) -> OpsClaw:
+) -> Iterator[OpsClaw]:
     """Create a fully initialized Ops Claw."""
     claw = OpsClaw(
         squad_id="test-squad",
@@ -107,8 +101,8 @@ def ops_claw(
 # MVR Test 1: Inject test inquiry manually
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestMVR01InjectInquiry:
 
+class TestMVR01InjectInquiry:
     def test_mvr_01_inject_test_inquiry(self, ops_claw: OpsClaw, temp_sandbox: Path):
         """MVR-1: Manually inject a test inquiry — Ops Claw receives it."""
         assert ops_claw.intake_manager is not None
@@ -134,8 +128,8 @@ class TestMVR01InjectInquiry:
 # MVR Test 2: Triage score in War Room card format
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestMVR02TriageScoreWarRoom:
 
+class TestMVR02TriageScoreWarRoom:
     def test_mvr_02_triage_score_in_war_room(self, ops_claw: OpsClaw):
         """MVR-2: Triage score appears in War Room card format (94/100 style)."""
         assert ops_claw.intake_manager is not None
@@ -170,9 +164,11 @@ class TestMVR02TriageScoreWarRoom:
 # MVR Test 3: Approve welcome message
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestMVR03ApproveWelcome:
 
-    def test_mvr_03_approve_welcome_message(self, ops_claw: OpsClaw, mock_gateway: MockMeshGateway):
+class TestMVR03ApproveWelcome:
+    def test_mvr_03_approve_welcome_message(
+        self, ops_claw: OpsClaw, mock_gateway: MockMeshGateway
+    ):
         """MVR-3: Approve welcome — confirm sent via email API (mocked)."""
         assert ops_claw.intake_manager is not None
         assert ops_claw.approval_handler is not None
@@ -199,9 +195,11 @@ class TestMVR03ApproveWelcome:
 # MVR Test 4: Inject client brief response
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestMVR04InjectClientBrief:
 
-    def test_mvr_04_inject_client_brief_response(self, ops_claw: OpsClaw, temp_sandbox: Path):
+class TestMVR04InjectClientBrief:
+    def test_mvr_04_inject_client_brief_response(
+        self, ops_claw: OpsClaw, temp_sandbox: Path
+    ):
         """MVR-4: Inject mock client response with complete project brief."""
         assert ops_claw.intake_manager is not None
 
@@ -227,7 +225,9 @@ class TestMVR04InjectClientBrief:
 
         prospect_dir = temp_sandbox / "prospects" / triage_score.inquiry_id
         if (prospect_dir / "client_response.json").exists():
-            response_data = json.loads((prospect_dir / "client_response.json").read_text())
+            response_data = json.loads(
+                (prospect_dir / "client_response.json").read_text()
+            )
             assert "response_text" in response_data
 
 
@@ -235,9 +235,11 @@ class TestMVR04InjectClientBrief:
 # MVR Test 5: Brief quality check runs
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestMVR05BriefQualityCheck:
 
-    def test_mvr_05_brief_quality_check_runs(self, ops_claw: OpsClaw, inference_client: MockInferenceClient):
+class TestMVR05BriefQualityCheck:
+    def test_mvr_05_brief_quality_check_runs(
+        self, ops_claw: OpsClaw, inference_client: MockInferenceClient
+    ):
         """MVR-5: Brief quality check runs — flags or passes the brief."""
         assert ops_claw.intake_manager is not None
 
@@ -247,7 +249,7 @@ class TestMVR05BriefQualityCheck:
         }
         triage_score = ops_claw.intake_manager.receive_inquiry(inquiry)
 
-        inference_calls_before = len(inference_client.calls)
+        len(inference_client.calls)
 
         client_response = """
         Goal: Website for my business
@@ -259,19 +261,19 @@ class TestMVR05BriefQualityCheck:
             response_text=client_response,
         )
 
-        inference_calls_after = len(inference_client.calls)
+        len(inference_client.calls)
 
         brief_check_calls = [
-            c for c in inference_client.calls
-            if c["data_type"] == "brief_quality_check"
+            c for c in inference_client.calls if c["data_type"] == "brief_quality_check"
         ]
 
         assert len(brief_check_calls) >= 1, (
             "Brief quality check inference should have been called"
         )
 
-        pricing_query_calls = [
-            c for c in inference_client.calls
+        [
+            c
+            for c in inference_client.calls
             if c["data_type"] == "pricing_query" or "pricing" in str(c).lower()
         ]
 
@@ -280,8 +282,8 @@ class TestMVR05BriefQualityCheck:
 # MVR Test 6: CRITICAL - No project_brief before pricing confirmed
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestMVR06PricingQueryBeforeBrief:
 
+class TestMVR06PricingQueryBeforeBrief:
     def test_mvr_06_no_project_brief_before_pricing(
         self,
         ops_claw: OpsClaw,
@@ -289,7 +291,7 @@ class TestMVR06PricingQueryBeforeBrief:
     ):
         """
         MVR-6: CRITICAL - Verify NO project_brief dispatched before pricing_response.
-        
+
         This is the single most important sequencing test.
         project_brief must ONLY be sent after pricing_response is received.
         """
@@ -309,8 +311,7 @@ class TestMVR06PricingQueryBeforeBrief:
             )
 
         brief_calls = [
-            c for c in mock_gateway.calls
-            if c.get("message_type") == "brief"
+            c for c in mock_gateway.calls if c.get("message_type") == "brief"
         ]
         assert len(brief_calls) == 0, (
             "CRITICAL: project_brief was sent without pricing confirmed. "
@@ -336,8 +337,7 @@ class TestMVR06PricingQueryBeforeBrief:
         )
 
         pricing_calls = [
-            c for c in mock_gateway.calls
-            if c.get("message_type") == "pricing_query"
+            c for c in mock_gateway.calls if c.get("message_type") == "pricing_query"
         ]
         assert len(pricing_calls) == 1
 
@@ -346,9 +346,11 @@ class TestMVR06PricingQueryBeforeBrief:
 # MVR Test 7: Inject mock pricing_response
 # ──────────────────────────────────────────────────────────────────────
 
-class TestMVR07PricingResponse:
 
-    def test_mvr_07_inject_pricing_response(self, ops_claw: OpsClaw, mock_gateway: MockMeshGateway):
+class TestMVR07PricingResponse:
+    def test_mvr_07_inject_pricing_response(
+        self, ops_claw: OpsClaw, mock_gateway: MockMeshGateway
+    ):
         """MVR-7: Inject mock pricing_response from Finance Claw."""
         assert ops_claw.project_manager is not None
 
@@ -392,8 +394,7 @@ class TestMVR07PricingResponse:
         )
 
         brief_calls = [
-            c for c in mock_gateway.calls
-            if c.get("message_type") == "brief"
+            c for c in mock_gateway.calls if c.get("message_type") == "brief"
         ]
         assert len(brief_calls) == 1
 
@@ -402,8 +403,8 @@ class TestMVR07PricingResponse:
 # MVR Test 8: Project brief queued for review after pricing
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestMVR08ProjectBriefQueued:
 
+class TestMVR08ProjectBriefQueued:
     def test_mvr_08_project_brief_queued_for_review(self, ops_claw: OpsClaw):
         """MVR-8: After pricing confirmed, project_brief queued as REVIEW."""
         assert ops_claw.approval_handler is not None
@@ -430,8 +431,8 @@ class TestMVR08ProjectBriefQueued:
 # MVR Test 9: Approve project brief
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestMVR09ApproveProjectBrief:
 
+class TestMVR09ApproveProjectBrief:
     def test_mvr_09_approve_project_brief(self, ops_claw: OpsClaw):
         """MVR-9: Operator approves project_brief in War Room."""
         assert ops_claw.approval_handler is not None
@@ -458,8 +459,8 @@ class TestMVR09ApproveProjectBrief:
 # MVR Test 10: Creative claw receives brief via mesh
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestMVR10CreativeClawReceives:
 
+class TestMVR10CreativeClawReceives:
     def test_mvr_10_creative_claw_receives_brief(
         self,
         ops_claw: OpsClaw,
@@ -496,8 +497,8 @@ class TestMVR10CreativeClawReceives:
 # Additional Integration Tests
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestOpsClawIntegration:
 
+class TestOpsClawIntegration:
     def test_full_workflow_with_inquiry(
         self,
         temp_sandbox: Path,
@@ -557,6 +558,7 @@ class TestOpsClawIntegration:
                 "message": "Test inquiry",
             }
 
+            assert claw.intake_manager is not None
             claw.intake_manager.receive_inquiry(inquiry)
 
             for call in inference_client.calls:

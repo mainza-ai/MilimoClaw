@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """
 Finance Claw MVR Integration Tests - 14 Critical Tests.
 
@@ -31,7 +33,6 @@ from finance.payment_risk_scorer import PaymentRiskScorer
 from finance.payment_monitor import PaymentMonitor
 from finance.revenue_tracker import RevenueTracker
 from finance.expense_tracker import ExpenseTracker
-from finance.finance_scheduler import FinanceScheduler
 from finance.finance_claw import FinanceClaw
 
 
@@ -46,9 +47,16 @@ class MockInferenceClient:
         self.calls.append({"prompt": prompt, "data_type": data_type})
         if self.response:
             return self.response
-        return json.dumps([
-            {"description": "Development work", "quantity": 1, "unit_price": 1500, "total": 1500}
-        ])
+        return json.dumps(
+            [
+                {
+                    "description": "Development work",
+                    "quantity": 1,
+                    "unit_price": 1500,
+                    "total": 1500,
+                }
+            ]
+        )
 
 
 class MockStripeClient:
@@ -60,12 +68,15 @@ class MockStripeClient:
 
     def get_invoice(self, invoice_id: str) -> dict:
         self.calls.append({"method": "get", "invoice_id": invoice_id})
-        return self.invoice_status.get(invoice_id, {
-            "id": invoice_id,
-            "status": "open",
-            "amount_paid": 0,
-            "amount_due": 100000,
-        })
+        return self.invoice_status.get(
+            invoice_id,
+            {
+                "id": invoice_id,
+                "status": "open",
+                "amount_paid": 0,
+                "amount_due": 100000,
+            },
+        )
 
     def create_invoice(
         self,
@@ -75,11 +86,13 @@ class MockStripeClient:
         description: str,
         due_date: str,
     ) -> dict:
-        self.calls.append({
-            "method": "create",
-            "customer_id": customer_id,
-            "amount": amount,
-        })
+        self.calls.append(
+            {
+                "method": "create",
+                "customer_id": customer_id,
+                "amount": amount,
+            }
+        )
         return {"id": f"st_test_{len(self.calls)}"}
 
     def send_invoice(self, invoice_id: str) -> dict:
@@ -102,14 +115,16 @@ class MockMeshGateway:
         message_id: str,
         timestamp: str,
     ) -> bool:
-        self.sent_messages.append({
-            "message_type": message_type,
-            "recipient_role": recipient_role,
-            "sender_role": sender_role,
-            "payload": payload,
-            "message_id": message_id,
-            "timestamp": timestamp,
-        })
+        self.sent_messages.append(
+            {
+                "message_type": message_type,
+                "recipient_role": recipient_role,
+                "sender_role": sender_role,
+                "payload": payload,
+                "message_id": message_id,
+                "timestamp": timestamp,
+            }
+        )
         return True
 
 
@@ -210,7 +225,9 @@ class TestMVRFinanceClaw:
     # -------------------------------------------------------------------------
     # MVR Test 2: Pricing query response within SLA (includes data_type)
     # -------------------------------------------------------------------------
-    def test_mvr_2_pricing_query_sla(self, fs, inference_client, dispatcher, operational_log):
+    def test_mvr_2_pricing_query_sla(
+        self, fs, inference_client, dispatcher, operational_log
+    ):
         """MVR-2: Pricing query responds with inference call using data_type."""
         engine = PricingEngine(fs, inference_client, dispatcher, operational_log)
 
@@ -225,13 +242,27 @@ class TestMVRFinanceClaw:
 
         assert estimate.project_id == "proj-mvr-2"
 
-        inference_calls = [c for c in inference_client.calls if c["data_type"] == "scope_cost_estimation"]
-        assert len(inference_calls) >= 1, "Inference call missing data_type='scope_cost_estimation'"
+        inference_calls = [
+            c
+            for c in inference_client.calls
+            if c["data_type"] == "scope_cost_estimation"
+        ]
+        assert len(inference_calls) >= 1, (
+            "Inference call missing data_type='scope_cost_estimation'"
+        )
 
     # -------------------------------------------------------------------------
     # MVR Test 3: Invoice generated on project_complete
     # -------------------------------------------------------------------------
-    def test_mvr_3_invoice_generation(self, fs, inference_client, dispatcher, risk_scorer, operational_log, payment_events_log):
+    def test_mvr_3_invoice_generation(
+        self,
+        fs,
+        inference_client,
+        dispatcher,
+        risk_scorer,
+        operational_log,
+        payment_events_log,
+    ):
         """MVR-3: Invoice is generated when project_complete message received."""
         invoice_manager = InvoiceManager(
             fs=fs,
@@ -271,15 +302,29 @@ class TestMVRFinanceClaw:
         payment_events_log.append(event)
 
         scorer = PaymentRiskScorer(payment_events_log, inference_client)
-        score = scorer.score("client-mvr-4")
+        scorer.score("client-mvr-4")
 
-        inference_calls = [c for c in inference_client.calls if c["data_type"] == "payment_risk_scoring"]
-        assert len(inference_calls) >= 1, "Inference call missing data_type='payment_risk_scoring'"
+        inference_calls = [
+            c
+            for c in inference_client.calls
+            if c["data_type"] == "payment_risk_scoring"
+        ]
+        assert len(inference_calls) >= 1, (
+            "Inference call missing data_type='payment_risk_scoring'"
+        )
 
     # -------------------------------------------------------------------------
     # MVR Test 5: Approval handler queues REVIEW and HOLD correctly
     # -------------------------------------------------------------------------
-    def test_mvr_5_approval_queue_workflow(self, fs, inference_client, dispatcher, risk_scorer, operational_log, payment_events_log):
+    def test_mvr_5_approval_queue_workflow(
+        self,
+        fs,
+        inference_client,
+        dispatcher,
+        risk_scorer,
+        operational_log,
+        payment_events_log,
+    ):
         """MVR-5: Approval handler correctly queues REVIEW then HOLD."""
         invoice_manager = InvoiceManager(
             fs=fs,
@@ -314,7 +359,15 @@ class TestMVRFinanceClaw:
     # -------------------------------------------------------------------------
     # MVR Test 6: CRITICAL - Two-stage approval, ZERO Stripe calls after Stage 1
     # -------------------------------------------------------------------------
-    def test_mvr_6_two_stage_approval_zero_stripe_calls(self, fs, inference_client, dispatcher, risk_scorer, operational_log, payment_events_log):
+    def test_mvr_6_two_stage_approval_zero_stripe_calls(
+        self,
+        fs,
+        inference_client,
+        dispatcher,
+        risk_scorer,
+        operational_log,
+        payment_events_log,
+    ):
         """
         MVR-6: CRITICAL TEST - Two-stage approval.
 
@@ -365,7 +418,9 @@ class TestMVRFinanceClaw:
     # -------------------------------------------------------------------------
     # MVR Test 7: Payment monitor detects overdue invoices
     # -------------------------------------------------------------------------
-    def test_mvr_7_payment_monitor_overdue_detection(self, fs, dispatcher, operational_log, payment_events_log):
+    def test_mvr_7_payment_monitor_overdue_detection(
+        self, fs, dispatcher, operational_log, payment_events_log
+    ):
         """MVR-7: Payment monitor correctly detects and processes overdue invoices."""
         stripe_client = MockStripeClient()
         revenue_tracker = MockRevenueTracker()
@@ -392,7 +447,9 @@ class TestMVRFinanceClaw:
             subtotal=1000,
             total=1000,
             payment_risk_level="low",
-            due_date=(datetime.now(timezone.utc) - timedelta(days=10)).strftime("%Y-%m-%d"),
+            due_date=(datetime.now(timezone.utc) - timedelta(days=10)).strftime(
+                "%Y-%m-%d"
+            ),
             status="sent",
             stripe_invoice_id="st_overdue",
         )
@@ -408,7 +465,9 @@ class TestMVRFinanceClaw:
     # -------------------------------------------------------------------------
     # MVR Test 8: First overdue queues REVIEW, repeat overdue queues HOLD
     # -------------------------------------------------------------------------
-    def test_mvr_8_overdue_escalation(self, fs, dispatcher, operational_log, payment_events_log):
+    def test_mvr_8_overdue_escalation(
+        self, fs, dispatcher, operational_log, payment_events_log
+    ):
         """MVR-8: First overdue queues REVIEW, repeat overdue queues HOLD."""
         stripe_client = MockStripeClient()
         revenue_tracker = MockRevenueTracker()
@@ -432,7 +491,9 @@ class TestMVRFinanceClaw:
             subtotal=1000,
             total=1000,
             payment_risk_level="low",
-            due_date=(datetime.now(timezone.utc) - timedelta(days=5)).strftime("%Y-%m-%d"),
+            due_date=(datetime.now(timezone.utc) - timedelta(days=5)).strftime(
+                "%Y-%m-%d"
+            ),
             status="sent",
         )
 
@@ -460,7 +521,7 @@ class TestMVRFinanceClaw:
 
         for i in range(2):
             event = PaymentEvent(
-                timestamp=f"2026-03-{i+1:02d}T10:00:00",
+                timestamp=f"2026-03-{i + 1:02d}T10:00:00",
                 event_type="payment_overdue",
                 invoice_id=f"inv-old-{i}",
                 client_id="client-repeat",
@@ -477,7 +538,9 @@ class TestMVRFinanceClaw:
             subtotal=1000,
             total=1000,
             payment_risk_level="medium",
-            due_date=(datetime.now(timezone.utc) - timedelta(days=5)).strftime("%Y-%m-%d"),
+            due_date=(datetime.now(timezone.utc) - timedelta(days=5)).strftime(
+                "%Y-%m-%d"
+            ),
             status="sent",
         )
 
@@ -488,7 +551,9 @@ class TestMVRFinanceClaw:
     # -------------------------------------------------------------------------
     # MVR Test 9: Revenue summary contains only totals (no line items or client names)
     # -------------------------------------------------------------------------
-    def test_mvr_9_revenue_summary_totals_only(self, fs, inference_client, dispatcher, operational_log):
+    def test_mvr_9_revenue_summary_totals_only(
+        self, fs, inference_client, dispatcher, operational_log
+    ):
         """MVR-9: Revenue summary contains totals only - no line items or client names."""
         approval_handler = MagicMock()
 
@@ -516,20 +581,30 @@ class TestMVRFinanceClaw:
 
         revenue_tracker.record_payment(invoice)
 
-        revenue_summaries = [m for m in gateway.sent_messages if m["message_type"] == "revenue_summary"]
+        revenue_summaries = [
+            m for m in gateway.sent_messages if m["message_type"] == "revenue_summary"
+        ]
         assert len(revenue_summaries) >= 1
 
         payload = revenue_summaries[-1]["payload"]
 
-        assert "line_items" not in payload, "Revenue summary must NOT contain line_items"
-        assert "client_names" not in payload, "Revenue summary must NOT contain client_names"
-        assert "invoice_ids" not in payload, "Revenue summary must NOT contain invoice_ids"
+        assert "line_items" not in payload, (
+            "Revenue summary must NOT contain line_items"
+        )
+        assert "client_names" not in payload, (
+            "Revenue summary must NOT contain client_names"
+        )
+        assert "invoice_ids" not in payload, (
+            "Revenue summary must NOT contain invoice_ids"
+        )
         assert "week_total" in payload, "Revenue summary must contain week_total"
 
     # -------------------------------------------------------------------------
     # MVR Test 10: Margin analysis uses inference with data_type
     # -------------------------------------------------------------------------
-    def test_mvr_10_margin_analysis_inference(self, fs, inference_client, dispatcher, operational_log):
+    def test_mvr_10_margin_analysis_inference(
+        self, fs, inference_client, dispatcher, operational_log
+    ):
         """MVR-10: Margin analysis uses inference with data_type='margin_analysis'."""
         approval_handler = MagicMock()
 
@@ -543,13 +618,19 @@ class TestMVRFinanceClaw:
 
         revenue_tracker.margin_analysis()
 
-        margin_calls = [c for c in inference_client.calls if c["data_type"] == "margin_analysis"]
-        assert len(margin_calls) >= 1, "Margin analysis missing inference call with data_type='margin_analysis'"
+        margin_calls = [
+            c for c in inference_client.calls if c["data_type"] == "margin_analysis"
+        ]
+        assert len(margin_calls) >= 1, (
+            "Margin analysis missing inference call with data_type='margin_analysis'"
+        )
 
     # -------------------------------------------------------------------------
     # MVR Test 11: Rate optimization uses inference with data_type
     # -------------------------------------------------------------------------
-    def test_mvr_11_rate_optimization_inference(self, fs, inference_client, dispatcher, operational_log):
+    def test_mvr_11_rate_optimization_inference(
+        self, fs, inference_client, dispatcher, operational_log
+    ):
         """MVR-11: Rate optimization uses inference with data_type='rate_benchmarking_narrative'."""
         approval_handler = MagicMock()
 
@@ -563,13 +644,21 @@ class TestMVRFinanceClaw:
 
         revenue_tracker.rate_optimization_check()
 
-        rate_calls = [c for c in inference_client.calls if c["data_type"] == "rate_benchmarking_narrative"]
-        assert len(rate_calls) >= 1, "Rate optimization missing inference call with data_type='rate_benchmarking_narrative'"
+        rate_calls = [
+            c
+            for c in inference_client.calls
+            if c["data_type"] == "rate_benchmarking_narrative"
+        ]
+        assert len(rate_calls) >= 1, (
+            "Rate optimization missing inference call with data_type='rate_benchmarking_narrative'"
+        )
 
     # -------------------------------------------------------------------------
     # MVR Test 12: Expense logging uses inference with data_type
     # -------------------------------------------------------------------------
-    def test_mvr_12_expense_classification_inference(self, fs, inference_client, operational_log):
+    def test_mvr_12_expense_classification_inference(
+        self, fs, inference_client, operational_log
+    ):
         """MVR-12: Expense classification uses inference with data_type='tax_category_classification'."""
         expense_tracker = ExpenseTracker(
             fs_path=fs.base,
@@ -577,14 +666,20 @@ class TestMVRFinanceClaw:
             operational_log=operational_log,
         )
 
-        expense = expense_tracker.log_expense(
+        expense_tracker.log_expense(
             description="AWS subscription",
             amount=100,
             expense_date="2026-03-01",
         )
 
-        tax_calls = [c for c in inference_client.calls if c["data_type"] == "tax_category_classification"]
-        assert len(tax_calls) >= 1, "Expense logging missing inference call with data_type='tax_category_classification'"
+        tax_calls = [
+            c
+            for c in inference_client.calls
+            if c["data_type"] == "tax_category_classification"
+        ]
+        assert len(tax_calls) >= 1, (
+            "Expense logging missing inference call with data_type='tax_category_classification'"
+        )
 
     # -------------------------------------------------------------------------
     # MVR Test 13: All JSONL log appends use file locking
@@ -593,7 +688,7 @@ class TestMVRFinanceClaw:
         """MVR-13: All JSONL log appends use fcntl file locking."""
         import fcntl
 
-        from finance.finance_init import FinanceLogEntry, PaymentEvent
+        from finance.finance_init import FinanceLogEntry
 
         entry = FinanceLogEntry(
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -618,7 +713,9 @@ class TestMVRFinanceClaw:
     # -------------------------------------------------------------------------
     # MVR Test 14: FinanceClaw full integration
     # -------------------------------------------------------------------------
-    def test_mvr_14_full_finance_claw_integration(self, fs, inference_client, stripe_client, gateway):
+    def test_mvr_14_full_finance_claw_integration(
+        self, fs, inference_client, stripe_client, gateway
+    ):
         """MVR-14: FinanceClaw initializes all components correctly and handles messages."""
         finance_claw = FinanceClaw(
             squad_id="mvr-test-squad",
@@ -654,7 +751,9 @@ class TestMVRFinanceClaw:
 
         finance_claw.handle_inbound(message)
 
-        pricing_responses = [m for m in gateway.sent_messages if m["message_type"] == "pricing_response"]
+        pricing_responses = [
+            m for m in gateway.sent_messages if m["message_type"] == "pricing_response"
+        ]
         assert len(pricing_responses) >= 1
 
         finance_claw.shutdown()

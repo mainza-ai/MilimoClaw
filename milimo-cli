@@ -34,12 +34,13 @@ if [[ -z "${NO_COLOR:-}" && -t 1 ]]; then
   C_CYAN=$'\033[1;36m'
   C_RESET=$'\033[0m'
 else
+  # shellcheck disable=SC2034
   C_GREEN='' C_BOLD='' C_DIM='' C_RED='' C_YELLOW='' C_CYAN='' C_RESET=''
 fi
 
-info()    { printf "${C_CYAN}[INFO]${C_RESET}  %s\n" "$*"; }
-ok()      { printf "  ${C_GREEN}✓${C_RESET}  %s\n" "$*"; }
-error()   { printf "${C_RED}[ERROR]${C_RESET} %s\n" "$*" >&2; }
+info() { printf "${C_CYAN}[INFO]${C_RESET}  %s\n" "$*"; }
+ok() { printf "  ${C_GREEN}✓${C_RESET}  %s\n" "$*"; }
+error() { printf "${C_RED}[ERROR]${C_RESET} %s\n" "$*" >&2; }
 
 # ---------------------------------------------------------------------------
 # Helper: run a command inside the sandbox
@@ -284,14 +285,14 @@ COMMAND="${1:-help}"
 shift || true
 
 case "$COMMAND" in
-  install)    cmd_install "$@" ;;
-  status)     cmd_status ;;
-  warroom)    cmd_warroom ;;
-  connect)    cmd_connect ;;
-  doctor)     cmd_doctor ;;
-  logs)       cmd_logs "$@" ;;
-  health)     cmd_health ;;
-  help|--help|-h) cmd_help ;;
+  install) cmd_install "$@" ;;
+  status) cmd_status ;;
+  warroom) cmd_warroom ;;
+  connect) cmd_connect ;;
+  doctor) cmd_doctor ;;
+  logs) cmd_logs "$@" ;;
+  health) cmd_health ;;
+  help | --help | -h) cmd_help ;;
   *)
     error "Unknown command: $COMMAND"
     echo "Run: milimo help"

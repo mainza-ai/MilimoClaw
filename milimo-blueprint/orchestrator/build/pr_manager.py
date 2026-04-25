@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Build Claw PR manager.
 
@@ -14,7 +17,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
@@ -101,8 +104,8 @@ class PRManager:
             github_pr_number=gh_number,
             github_pr_url=gh_url,
             files_changed=len(resolution.files_changed),
-            lines_added=resolution.lines_added if hasattr(resolution, 'lines_added') else 0,
-            lines_removed=resolution.lines_removed if hasattr(resolution, 'lines_removed') else 0,
+            lines_added=0,
+            lines_removed=0,
             test_status=resolution.test_result,
             tests_count=resolution.tests_passing + resolution.tests_failing,
             status="drafted",
@@ -131,13 +134,15 @@ class PRManager:
         self._fs.atomic_write_json(pr_path, self._pr_to_dict(pr))
 
         self._pr_log.append("pr_created", pr_id, {"issue": resolution.issue_number})
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="pr_opened",
-            entity_id=pr_id,
-            outcome="success",
-            details={"issue_number": resolution.issue_number, "status": "drafted"},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="pr_opened",
+                entity_id=pr_id,
+                outcome="success",
+                details={"issue_number": resolution.issue_number, "status": "drafted"},
+            )
+        )
         return pr
 
     # ------------------------------------------------------------------
@@ -166,13 +171,15 @@ class PRManager:
         )
 
         self._pr_log.append("review_approved", pr_id, {})
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="pr_review_approved",
-            entity_id=pr_id,
-            outcome="approved",
-            details={"hold_action_id": hold_action_id},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="pr_review_approved",
+                entity_id=pr_id,
+                outcome="approved",
+                details={"hold_action_id": hold_action_id},
+            )
+        )
 
     # ------------------------------------------------------------------
     # HOLD released → merge
@@ -197,13 +204,15 @@ class PRManager:
         approved_path.unlink(missing_ok=True)
 
         self._pr_log.append("pr_merged", pr_id, {})
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="pr_merged",
-            entity_id=pr_id,
-            outcome="success",
-            details={},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="pr_merged",
+                entity_id=pr_id,
+                outcome="success",
+                details={},
+            )
+        )
 
         return PRRecord(**pr_data)
 
@@ -221,13 +230,15 @@ class PRManager:
             self._fs.atomic_write_json(drafted_path, pr_data)
 
         self._pr_log.append("review_blocked", pr_id, {"reason": reason})
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="pr_blocked",
-            entity_id=pr_id,
-            outcome="blocked",
-            details={"reason": reason},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="pr_blocked",
+                entity_id=pr_id,
+                outcome="blocked",
+                details={"reason": reason},
+            )
+        )
 
     # ------------------------------------------------------------------
     # Conflict detection

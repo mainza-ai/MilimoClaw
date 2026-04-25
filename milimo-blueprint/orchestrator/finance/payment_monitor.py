@@ -8,8 +8,7 @@ Monitors payment status for all sent invoices via Stripe API.
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta, date
-from pathlib import Path
+from datetime import datetime, timezone, date
 from typing import Any, Protocol
 import json
 
@@ -416,9 +415,7 @@ class PaymentMonitor:
         self.payment_events_log.append(payment_event)
 
         try:
-            from .invoice_manager import InvoiceManager
-
-            sent_invoice = self._attempt_stripe_send(invoice)
+            self._attempt_stripe_send(invoice)
             return True
         except Exception as e:
             retry_entry = FinanceLogEntry(

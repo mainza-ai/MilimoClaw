@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -6,11 +5,10 @@
 Unit tests for Signal Processor.
 """
 
-from __future__ import annotations
-
 import json
 import shutil
 import tempfile
+from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -31,7 +29,7 @@ from orchestrator.analytics.signal_dispatcher import SignalDispatcher
 
 
 @pytest.fixture
-def temp_sandbox() -> Path:
+def temp_sandbox() -> Iterator[Path]:
     """Create a temporary sandbox directory for testing."""
     sandbox = Path(tempfile.mkdtemp(prefix="signal_test_"))
     yield sandbox
@@ -80,12 +78,15 @@ def signal_processor(
     dispatched_alerts: list[dict[str, Any]],
 ) -> SignalProcessor:
     """Create signal processor."""
+
     def alert_callback(message_type: str, target_claw: str, payload: dict) -> None:
-        dispatched_alerts.append({
-            "message_type": message_type,
-            "target_claw": target_claw,
-            "payload": payload,
-        })
+        dispatched_alerts.append(
+            {
+                "message_type": message_type,
+                "target_claw": target_claw,
+                "payload": payload,
+            }
+        )
 
     return SignalProcessor(fs, operational_log, alert_dispatcher=alert_callback)
 
@@ -227,7 +228,9 @@ class TestSignalProcessor:
 
         signal_processor.handle_client_health_signal(signal)
 
-        health_path = fs.get_data_path("client-health") / "client-001" / "health-history.jsonl"
+        health_path = (
+            fs.get_data_path("client-health") / "client-001" / "health-history.jsonl"
+        )
         assert health_path.exists()
 
     def test_handle_client_health_signal_below_6_triggers_alert(
@@ -295,7 +298,11 @@ class TestSignalProcessor:
 
         signal_processor.handle_client_onboarded(signal)
 
-        health_path = fs.get_data_path("client-health") / "new-client-001" / "health-history.jsonl"
+        health_path = (
+            fs.get_data_path("client-health")
+            / "new-client-001"
+            / "health-history.jsonl"
+        )
         assert health_path.exists()
 
         content = health_path.read_text()
@@ -393,9 +400,7 @@ class TestSignalProcessor:
 class TestSignalValidation:
     """Tests for signal validation."""
 
-    def test_process_validates_message_type(
-        self, signal_processor: SignalProcessor
-    ):
+    def test_process_validates_message_type(self, signal_processor: SignalProcessor):
         """Test that process validates message_type."""
         message = {
             "message_id": "test-001",
@@ -408,9 +413,7 @@ class TestSignalValidation:
 
         assert "message_type" in str(exc_info.value).lower()
 
-    def test_process_validates_sender(
-        self, signal_processor: SignalProcessor
-    ):
+    def test_process_validates_sender(self, signal_processor: SignalProcessor):
         """Test that process validates sender against schema."""
         message = {
             "message_id": "test-002",
@@ -428,11 +431,12 @@ class TestSignalValidation:
         with pytest.raises(SignalValidationError) as exc_info:
             signal_processor.process(message)
 
-        assert "sender" in str(exc_info.value).lower() or "allowed" in str(exc_info.value).lower()
+        assert (
+            "sender" in str(exc_info.value).lower()
+            or "allowed" in str(exc_info.value).lower()
+        )
 
-    def test_process_validates_required_fields(
-        self, signal_processor: SignalProcessor
-    ):
+    def test_process_validates_required_fields(self, signal_processor: SignalProcessor):
         """Test that process validates required payload fields."""
         message = {
             "message_id": "test-003",
@@ -446,4 +450,7 @@ class TestSignalValidation:
         with pytest.raises(SignalValidationError) as exc_info:
             signal_processor.process(message)
 
-        assert "post_id" in str(exc_info.value) or "required" in str(exc_info.value).lower()
+        assert (
+            "post_id" in str(exc_info.value)
+            or "required" in str(exc_info.value).lower()
+        )

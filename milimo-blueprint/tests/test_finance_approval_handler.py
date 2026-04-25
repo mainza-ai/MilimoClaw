@@ -1,8 +1,9 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """Tests for Finance Claw Approval Handler."""
 
 import json
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -23,9 +24,9 @@ class MockInferenceClient:
     """Mock inference client."""
 
     def complete(self, prompt: str, data_type: str, max_tokens: int = 800) -> str:
-        return json.dumps([
-            {"description": "Work", "quantity": 1, "unit_price": 1000, "total": 1000}
-        ])
+        return json.dumps(
+            [{"description": "Work", "quantity": 1, "unit_price": 1000, "total": 1000}]
+        )
 
 
 class MockStripeClient:
@@ -35,7 +36,12 @@ class MockStripeClient:
         self.calls: list[dict] = []
 
     def create_invoice(
-        self, customer_id: str, amount: float, currency: str, description: str, due_date: str
+        self,
+        customer_id: str,
+        amount: float,
+        currency: str,
+        description: str,
+        due_date: str,
     ) -> dict:
         self.calls.append({"method": "create", "customer_id": customer_id})
         return {"id": "st_test_123"}
@@ -108,7 +114,15 @@ class TestFinanceApprovalHandler:
         return MockPaymentRiskScorer()
 
     @pytest.fixture
-    def invoice_manager(self, fs, inference_client, dispatcher, risk_scorer, operational_log, payment_events_log):
+    def invoice_manager(
+        self,
+        fs,
+        inference_client,
+        dispatcher,
+        risk_scorer,
+        operational_log,
+        payment_events_log,
+    ):
         return InvoiceManager(
             fs=fs,
             inference_client=inference_client,
@@ -164,7 +178,9 @@ class TestFinanceApprovalHandler:
 
         assert action_id == "hold-inv-hold-1"
 
-    def test_handle_review_approve_moves_to_hold(self, approval_handler, invoice_manager, fs):
+    def test_handle_review_approve_moves_to_hold(
+        self, approval_handler, invoice_manager, fs
+    ):
         """handle_review_approve moves invoice to HOLD queue."""
         invoice = invoice_manager.generate_invoice(
             project_id="proj-approve",
@@ -177,7 +193,9 @@ class TestFinanceApprovalHandler:
         approved_path = fs.get_invoice_path("approved", invoice.invoice_id)
         assert approved_path.exists()
 
-    def test_handle_review_approve_logs_decision(self, approval_handler, invoice_manager, decisions_path):
+    def test_handle_review_approve_logs_decision(
+        self, approval_handler, invoice_manager, decisions_path
+    ):
         """handle_review_approve logs to decisions.log."""
         invoice = invoice_manager.generate_invoice(
             project_id="proj-log",
@@ -191,10 +209,12 @@ class TestFinanceApprovalHandler:
         with open(decisions_path) as f:
             lines = f.readlines()
 
-        approve_logs = [l for l in lines if "approve" in l]
+        approve_logs = [line for line in lines if "approve" in line]
         assert len(approve_logs) >= 1
 
-    def test_handle_hold_release_sends_invoice(self, approval_handler, invoice_manager, fs):
+    def test_handle_hold_release_sends_invoice(
+        self, approval_handler, invoice_manager, fs
+    ):
         """handle_hold_release sends invoice via Stripe."""
         invoice = invoice_manager.generate_invoice(
             project_id="proj-release",
@@ -205,7 +225,9 @@ class TestFinanceApprovalHandler:
         invoice_manager.handle_stage1_approve(invoice.invoice_id)
 
         stripe_client = MockStripeClient()
-        approval_handler.handle_hold_release(f"hold-{invoice.invoice_id}", stripe_client)
+        approval_handler.handle_hold_release(
+            f"hold-{invoice.invoice_id}", stripe_client
+        )
 
         assert len(stripe_client.calls) == 2
         assert stripe_client.calls[0]["method"] == "create"
@@ -214,7 +236,9 @@ class TestFinanceApprovalHandler:
         sent_path = fs.get_invoice_path("sent", invoice.invoice_id)
         assert sent_path.exists()
 
-    def test_handle_review_block_archives_invoice(self, approval_handler, invoice_manager, fs):
+    def test_handle_review_block_archives_invoice(
+        self, approval_handler, invoice_manager, fs
+    ):
         """handle_review_block archives invoice."""
         invoice = invoice_manager.generate_invoice(
             project_id="proj-block",
@@ -222,12 +246,16 @@ class TestFinanceApprovalHandler:
             delivered_at="2026-03-21",
         )
 
-        approval_handler.handle_review_block(f"review-{invoice.invoice_id}", "Client cancelled")
+        approval_handler.handle_review_block(
+            f"review-{invoice.invoice_id}", "Client cancelled"
+        )
 
         blocked_path = fs.base / "invoices" / "blocked" / f"{invoice.invoice_id}.json"
         assert blocked_path.exists()
 
-    def test_handle_review_edit_updates_invoice(self, approval_handler, invoice_manager, fs):
+    def test_handle_review_edit_updates_invoice(
+        self, approval_handler, invoice_manager, fs
+    ):
         """handle_review_edit updates invoice."""
         invoice = invoice_manager.generate_invoice(
             project_id="proj-edit",
@@ -236,7 +264,12 @@ class TestFinanceApprovalHandler:
         )
 
         edited_items = [
-            {"description": "Updated work", "quantity": 1, "unit_price": 1500, "total": 1500}
+            {
+                "description": "Updated work",
+                "quantity": 1,
+                "unit_price": 1500,
+                "total": 1500,
+            }
         ]
 
         approval_handler.handle_review_edit(
@@ -246,9 +279,11 @@ class TestFinanceApprovalHandler:
         )
 
         pending_path = fs.get_invoice_path("pending", invoice.invoice_id)
-        data = json.loads(pending_path.read_text())
+        json.loads(pending_path.read_text())
 
-    def test_handle_hold_cancel_keeps_approved(self, approval_handler, invoice_manager, fs):
+    def test_handle_hold_cancel_keeps_approved(
+        self, approval_handler, invoice_manager, fs
+    ):
         """handle_hold_cancel keeps invoice in approved/."""
         invoice = invoice_manager.generate_invoice(
             project_id="proj-cancel",
@@ -293,7 +328,9 @@ class TestFinanceApprovalHandler:
             due_date="2026-03-01",
         )
 
-        action_id = approval_handler.queue_overdue_hold(invoice, days_overdue=10, overdue_count=3)
+        action_id = approval_handler.queue_overdue_hold(
+            invoice, days_overdue=10, overdue_count=3
+        )
 
         assert action_id == "overdue-hold-inv-overdue-hold"
 
@@ -366,6 +403,8 @@ class TestFinanceApprovalHandler:
 
         assert len(stripe_client.calls) == 0
 
-        approval_handler.handle_hold_release(f"hold-{invoice.invoice_id}", stripe_client)
+        approval_handler.handle_hold_release(
+            f"hold-{invoice.invoice_id}", stripe_client
+        )
 
         assert len(stripe_client.calls) == 2

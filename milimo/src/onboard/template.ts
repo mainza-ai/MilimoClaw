@@ -12,7 +12,6 @@ import * as path from "node:path";
 import * as yaml from "yaml";
 import type { ClawRole } from "../index.js";
 import { CLAW_ROLES } from "../index.js";
-import type { TemplateInfo } from "./validate.js";
 
 export interface TemplateDiscovery {
   id: string;

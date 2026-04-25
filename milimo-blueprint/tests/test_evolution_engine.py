@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -15,7 +14,6 @@ Covers:
   - EvolutionCycle: full 5-stage pipeline
 """
 
-import json
 import os
 import tempfile
 import unittest
@@ -24,6 +22,7 @@ from pathlib import Path
 
 # Add parent to path for imports
 import sys
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from orchestrator.operation_log import ActionRecord, CrossSignal, OperationLog
@@ -35,8 +34,12 @@ from orchestrator.tool_proposal import (
 )
 from orchestrator.tool_builder import BuiltTool, ToolBuilder
 from orchestrator.tool_registry import ToolRegistry
-from orchestrator.blueprint_manager import BlueprintManager, BlueprintSnapshot
-from orchestrator.evolution_cycle import EvolutionConfig, EvolutionCycle, EvolutionScheduler
+from orchestrator.blueprint_manager import BlueprintManager
+from orchestrator.evolution_cycle import (
+    EvolutionConfig,
+    EvolutionCycle,
+    EvolutionScheduler,
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -44,18 +47,22 @@ from orchestrator.evolution_cycle import EvolutionConfig, EvolutionCycle, Evolut
 # ═══════════════════════════════════════════════════════════════════════
 
 
-def _make_actions(count, action_type="social_post_draft", outcome="approved", metrics=None, edits=None):
+def _make_actions(
+    count, action_type="social_post_draft", outcome="approved", metrics=None, edits=None
+):
     """Generate a list of ActionRecords for testing."""
     actions = []
     for i in range(count):
         ts = (datetime.now(timezone.utc) - timedelta(hours=i * 2)).isoformat()
-        actions.append(ActionRecord(
-            action_type=action_type,
-            outcome=outcome,
-            edits=edits or {},
-            metrics=metrics or {},
-            timestamp=ts,
-        ))
+        actions.append(
+            ActionRecord(
+                action_type=action_type,
+                outcome=outcome,
+                edits=edits or {},
+                metrics=metrics or {},
+                timestamp=ts,
+            )
+        )
     return actions
 
 
@@ -106,16 +113,20 @@ class TestOperationLog(unittest.TestCase):
 
     def test_get_window_filters_by_time(self):
         # Record one recent, one old
-        self.log.record(ActionRecord(
-            action_type="recent",
-            outcome="approved",
-            timestamp=datetime.now(timezone.utc).isoformat(),
-        ))
-        self.log.record(ActionRecord(
-            action_type="old",
-            outcome="approved",
-            timestamp=(datetime.now(timezone.utc) - timedelta(days=30)).isoformat(),
-        ))
+        self.log.record(
+            ActionRecord(
+                action_type="recent",
+                outcome="approved",
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            )
+        )
+        self.log.record(
+            ActionRecord(
+                action_type="old",
+                outcome="approved",
+                timestamp=(datetime.now(timezone.utc) - timedelta(days=30)).isoformat(),
+            )
+        )
         window = self.log.get_window(days=7)
         self.assertEqual(len(window), 1)
         self.assertEqual(window[0].action_type, "recent")
@@ -150,15 +161,21 @@ class TestOperationLog(unittest.TestCase):
 
     def test_clear_removes_files(self):
         self.log.record(ActionRecord(action_type="x", outcome="auto"))
-        self.log.record_cross_signal(CrossSignal(sender_role="ops", signal_type="signal"))
+        self.log.record_cross_signal(
+            CrossSignal(sender_role="ops", signal_type="signal")
+        )
         self.log.clear()
         self.assertEqual(self.log.count(), 0)
         self.assertEqual(len(self.log.get_cross_signals()), 0)
 
     def test_metric_averages(self):
         actions = [
-            ActionRecord(action_type="post", outcome="auto", metrics={"engagement": 0.04}),
-            ActionRecord(action_type="post", outcome="auto", metrics={"engagement": 0.06}),
+            ActionRecord(
+                action_type="post", outcome="auto", metrics={"engagement": 0.04}
+            ),
+            ActionRecord(
+                action_type="post", outcome="auto", metrics={"engagement": 0.06}
+            ),
         ]
         summary = self.log.get_action_summary(actions)
         self.assertAlmostEqual(summary.metric_averages["engagement"], 0.05)
@@ -175,10 +192,9 @@ class TestPatternDetector(unittest.TestCase):
 
     def test_detect_edit_patterns(self):
         """High edit frequency on a field should produce a classifier pattern."""
-        actions = (
-            _make_actions(6, outcome="edited", edits={"tone": "hype → educational"})
-            + _make_actions(4, outcome="approved")
-        )
+        actions = _make_actions(
+            6, outcome="edited", edits={"tone": "hype → educational"}
+        ) + _make_actions(4, outcome="approved")
         log = OperationLog("s", "c", log_dir=tempfile.mkdtemp())
         summary = log.get_action_summary(actions)
         patterns = self.detector.detect(summary, actions)
@@ -188,10 +204,9 @@ class TestPatternDetector(unittest.TestCase):
 
     def test_detect_approval_patterns(self):
         """Low approval rate for an action type should produce a predictor pattern."""
-        actions = (
-            _make_actions(3, action_type="email", outcome="approved")
-            + _make_actions(7, action_type="email", outcome="rejected")
-        )
+        actions = _make_actions(
+            3, action_type="email", outcome="approved"
+        ) + _make_actions(7, action_type="email", outcome="rejected")
         log = OperationLog("s", "c", log_dir=tempfile.mkdtemp())
         summary = log.get_action_summary(actions)
         patterns = self.detector.detect(summary, actions)
@@ -202,10 +217,13 @@ class TestPatternDetector(unittest.TestCase):
         """High metric variance should produce an anomaly_detector pattern."""
         actions = []
         for v in [0.01, 0.02, 0.03, 0.1, 0.15, 0.2]:
-            actions.append(ActionRecord(
-                action_type="post", outcome="auto",
-                metrics={"engagement": v},
-            ))
+            actions.append(
+                ActionRecord(
+                    action_type="post",
+                    outcome="auto",
+                    metrics={"engagement": v},
+                )
+            )
         log = OperationLog("s", "c", log_dir=tempfile.mkdtemp())
         summary = log.get_action_summary(actions)
         patterns = self.detector.detect(summary, actions)
@@ -216,12 +234,21 @@ class TestPatternDetector(unittest.TestCase):
         """Multiple signals from a claw should produce a cross-signal predictor."""
         actions = _make_actions(5, outcome="approved")
         signals = [
-            CrossSignal(sender_role="analytics", signal_type="summary",
-                        data={"retention": 0.8, "churn_rate": 0.02}),
-            CrossSignal(sender_role="analytics", signal_type="summary",
-                        data={"retention": 0.82, "churn_rate": 0.018}),
-            CrossSignal(sender_role="analytics", signal_type="signal",
-                        data={"peak_hour": 19, "audience_size": 1200}),
+            CrossSignal(
+                sender_role="analytics",
+                signal_type="summary",
+                data={"retention": 0.8, "churn_rate": 0.02},
+            ),
+            CrossSignal(
+                sender_role="analytics",
+                signal_type="summary",
+                data={"retention": 0.82, "churn_rate": 0.018},
+            ),
+            CrossSignal(
+                sender_role="analytics",
+                signal_type="signal",
+                data={"peak_hour": 19, "audience_size": 1200},
+            ),
         ]
         log = OperationLog("s", "c", log_dir=tempfile.mkdtemp())
         summary = log.get_action_summary(actions)
@@ -231,13 +258,22 @@ class TestPatternDetector(unittest.TestCase):
 
     def test_rank_returns_highest_confidence(self):
         patterns = [
-            EvolutionPattern(pattern_type="classifier", trigger_description="a",
-                             metric_target="x", confidence=0.5),
-            EvolutionPattern(pattern_type="optimizer", trigger_description="b",
-                             metric_target="y", confidence=0.9),
+            EvolutionPattern(
+                pattern_type="classifier",
+                trigger_description="a",
+                metric_target="x",
+                confidence=0.5,
+            ),
+            EvolutionPattern(
+                pattern_type="optimizer",
+                trigger_description="b",
+                metric_target="y",
+                confidence=0.9,
+            ),
         ]
         best = self.detector.rank(patterns)
         self.assertIsNotNone(best)
+        assert best is not None
         self.assertEqual(best.confidence, 0.9)
 
     def test_rank_returns_none_for_empty(self):
@@ -275,8 +311,11 @@ class TestToolProposal(unittest.TestCase):
             tool_name="test_tool",
             tool_type="classifier",
             trigger_pattern=EvolutionPattern(
-                pattern_type="classifier", trigger_description="t",
-                metric_target="x", confidence=0.8),
+                pattern_type="classifier",
+                trigger_description="t",
+                metric_target="x",
+                confidence=0.8,
+            ),
             metric_target="approval_rate",
             data_sources_required=["/sandbox/content/styles"],
         )
@@ -288,8 +327,11 @@ class TestToolProposal(unittest.TestCase):
             tool_name="test_tool",
             tool_type="classifier",
             trigger_pattern=EvolutionPattern(
-                pattern_type="classifier", trigger_description="t",
-                metric_target="x", confidence=0.8),
+                pattern_type="classifier",
+                trigger_description="t",
+                metric_target="x",
+                confidence=0.8,
+            ),
             metric_target="x",
             data_sources_required=["/sandbox/finance/invoices"],
         )
@@ -302,8 +344,11 @@ class TestToolProposal(unittest.TestCase):
             tool_name="test",
             tool_type="INVALID",
             trigger_pattern=EvolutionPattern(
-                pattern_type="classifier", trigger_description="t",
-                metric_target="x", confidence=0.5),
+                pattern_type="classifier",
+                trigger_description="t",
+                metric_target="x",
+                confidence=0.5,
+            ),
             metric_target="x",
         )
         valid, reason = validate_permissions(proposal, _make_policy())
@@ -312,8 +357,11 @@ class TestToolProposal(unittest.TestCase):
     def test_proposal_serialization(self):
         proposal = generate_proposal(
             EvolutionPattern(
-                pattern_type="optimizer", trigger_description="timing",
-                metric_target="engagement", confidence=0.7),
+                pattern_type="optimizer",
+                trigger_description="timing",
+                metric_target="engagement",
+                confidence=0.7,
+            ),
             claw_role="content",
         )
         d = proposal.to_dict()
@@ -360,6 +408,8 @@ class TestToolBuilder(unittest.TestCase):
         )
         self.assertTrue(result.passed)
         self.assertIsNotNone(result.tool)
+        self.assertIsNotNone(result.backtest)
+        assert result.backtest is not None
         self.assertGreater(result.backtest.improvement_percent, 0)
 
     def test_build_with_low_confidence_fails(self):
@@ -409,10 +459,14 @@ class TestToolRegistry(unittest.TestCase):
     def _make_tool(self, name="test_tool"):
         return BuiltTool(
             proposal=ToolProposal(
-                tool_name=name, tool_type="classifier",
+                tool_name=name,
+                tool_type="classifier",
                 trigger_pattern=EvolutionPattern(
-                    pattern_type="classifier", trigger_description="t",
-                    metric_target="x", confidence=0.8),
+                    pattern_type="classifier",
+                    trigger_description="t",
+                    metric_target="x",
+                    confidence=0.8,
+                ),
                 metric_target="x",
             ),
             tool_name=name,
@@ -535,10 +589,14 @@ class TestBlueprintManager(unittest.TestCase):
         registry = ToolRegistry("test", "content", registry_dir=reg_dir)
         tool = BuiltTool(
             proposal=ToolProposal(
-                tool_name="style_desc", tool_type="classifier",
+                tool_name="style_desc",
+                tool_type="classifier",
                 trigger_pattern=EvolutionPattern(
-                    pattern_type="classifier", trigger_description="t",
-                    metric_target="x", confidence=0.8),
+                    pattern_type="classifier",
+                    trigger_description="t",
+                    metric_target="x",
+                    confidence=0.8,
+                ),
                 metric_target="x",
             ),
             tool_name="style_desc",
@@ -546,7 +604,9 @@ class TestBlueprintManager(unittest.TestCase):
         )
         registry.register(tool)
         manager2 = BlueprintManager(
-            "test", "content", str(self.bp_dir),
+            "test",
+            "content",
+            str(self.bp_dir),
             tool_registry=registry,
             versions_dir=self.versions_dir,
         )
@@ -583,7 +643,9 @@ class TestEvolutionCycle(unittest.TestCase):
         with (self.bp_dir / "roles" / "content-claw.yaml").open("w") as f:
             f.write("role: content\n")
         with (self.bp_dir / "policies" / "content-sandbox.yaml").open("w") as f:
-            f.write("filesystem_policy:\n  read_write:\n    - /sandbox/content\n    - /tmp\n")
+            f.write(
+                "filesystem_policy:\n  read_write:\n    - /sandbox/content\n    - /tmp\n"
+            )
 
         self.config = EvolutionConfig(
             minimum_actions=5,
@@ -602,8 +664,12 @@ class TestEvolutionCycle(unittest.TestCase):
 
     def test_skips_on_insufficient_data(self):
         # Only 2 actions, need 5
-        self.cycle.operation_log.record(ActionRecord(action_type="draft", outcome="approved"))
-        self.cycle.operation_log.record(ActionRecord(action_type="draft", outcome="approved"))
+        self.cycle.operation_log.record(
+            ActionRecord(action_type="draft", outcome="approved")
+        )
+        self.cycle.operation_log.record(
+            ActionRecord(action_type="draft", outcome="approved")
+        )
         result = self.cycle.run()
         self.assertEqual(result.stage_reached, "observe")
         self.assertIn("Insufficient", result.skipped_reason)
@@ -611,30 +677,36 @@ class TestEvolutionCycle(unittest.TestCase):
     def test_full_cycle_with_edit_pattern(self):
         """Full cycle with enough data to trigger edit pattern → tool deployment."""
         for i in range(15):
-            self.cycle.operation_log.record(ActionRecord(
-                action_type="social_post_draft",
-                outcome="edited",
-                edits={"tone": f"hype → educational"},
-                metrics={"engagement": 0.04},
-            ))
+            self.cycle.operation_log.record(
+                ActionRecord(
+                    action_type="social_post_draft",
+                    outcome="edited",
+                    edits={"tone": "hype → educational"},
+                    metrics={"engagement": 0.04},
+                )
+            )
         for i in range(5):
-            self.cycle.operation_log.record(ActionRecord(
-                action_type="social_post_draft",
-                outcome="approved",
-                metrics={"engagement": 0.05},
-            ))
+            self.cycle.operation_log.record(
+                ActionRecord(
+                    action_type="social_post_draft",
+                    outcome="approved",
+                    metrics={"engagement": 0.05},
+                )
+            )
         result = self.cycle.run()
         # Should reach at least propose stage
         self.assertIn(result.stage_reached, ["propose", "build", "deploy"])
 
     def test_dry_run_stops_at_propose(self):
         for i in range(20):
-            self.cycle.operation_log.record(ActionRecord(
-                action_type="post",
-                outcome="edited",
-                edits={"tone": "fix"},
-                metrics={"engagement": 0.04},
-            ))
+            self.cycle.operation_log.record(
+                ActionRecord(
+                    action_type="post",
+                    outcome="edited",
+                    edits={"tone": "fix"},
+                    metrics={"engagement": 0.04},
+                )
+            )
         result = self.cycle.run(dry_run=True)
         if result.stage_reached != "observe" and result.stage_reached != "identify":
             self.assertEqual(result.stage_reached, "propose")
@@ -656,7 +728,8 @@ class TestEvolutionScheduler(unittest.TestCase):
 
         config = EvolutionConfig(minimum_actions=100)  # won't find enough
         cycle = EvolutionCycle(
-            squad_id="test", claw_role="content",
+            squad_id="test",
+            claw_role="content",
             blueprint_dir=str(bp_dir),
             log_dir=os.path.join(tmp, "logs"),
             config=config,

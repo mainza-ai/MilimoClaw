@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -21,9 +20,13 @@ import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
-from .analytics_init import AnalyticsFilesystemInit, AnalyticsLogEntry, AnalyticsOperationalLog
+from .analytics_init import (
+    AnalyticsFilesystemInit,
+    AnalyticsLogEntry,
+    AnalyticsOperationalLog,
+)
 
 logger = logging.getLogger("milimo.report_generator")
 
@@ -118,8 +121,12 @@ class ReportGenerator:
         )
 
         data_quality = {
-            "content_performance": "complete" if content_performance.get("top_formats") else "insufficient",
-            "client_health": "complete" if client_health.get("overall_score") else "insufficient",
+            "content_performance": "complete"
+            if content_performance.get("top_formats")
+            else "insufficient",
+            "client_health": "complete"
+            if client_health.get("overall_score")
+            else "insufficient",
             "revenue": "complete" if revenue.get("week_total") else "insufficient",
             "delivery": "complete" if delivery.get("prs_merged") else "insufficient",
         }
@@ -208,7 +215,7 @@ class ReportGenerator:
             shutil.move(temp_path, report_path)
             logger.info("Wrote report to %s", report_path)
 
-        except Exception as e:
+        except Exception:
             Path(temp_path).unlink(missing_ok=True)
             raise
 
@@ -253,7 +260,9 @@ class ReportGenerator:
                                     record = json.loads(line)
                                     received_at = record.get("received_at", "")
                                     try:
-                                        record_time = datetime.fromisoformat(received_at)
+                                        record_time = datetime.fromisoformat(
+                                            received_at
+                                        )
                                         if record_time < cutoff:
                                             continue
                                     except ValueError:
@@ -261,24 +270,34 @@ class ReportGenerator:
 
                                     content_type = record.get("content_type", "unknown")
                                     engagement_data = record.get("engagement_data", {})
-                                    engagement_rate = engagement_data.get("engagement_rate")
+                                    engagement_rate = engagement_data.get(
+                                        "engagement_rate"
+                                    )
 
                                     if isinstance(engagement_rate, (int, float)):
                                         if content_type not in format_engagement:
                                             format_engagement[content_type] = []
-                                        format_engagement[content_type].append(float(engagement_rate))
+                                        format_engagement[content_type].append(
+                                            float(engagement_rate)
+                                        )
 
                                         if platform not in platform_engagement:
                                             platform_engagement[platform] = []
-                                        platform_engagement[platform].append(float(engagement_rate))
+                                        platform_engagement[platform].append(
+                                            float(engagement_rate)
+                                        )
 
                                         publish_time = record.get("publish_time", "")
                                         if publish_time:
                                             try:
-                                                hour = datetime.fromisoformat(publish_time).hour
+                                                hour = datetime.fromisoformat(
+                                                    publish_time
+                                                ).hour
                                                 if hour not in time_engagement:
                                                     time_engagement[hour] = []
-                                                time_engagement[hour].append(float(engagement_rate))
+                                                time_engagement[hour].append(
+                                                    float(engagement_rate)
+                                                )
                                             except ValueError:
                                                 pass
 
@@ -291,33 +310,39 @@ class ReportGenerator:
         for content_type, rates in format_engagement.items():
             if rates:
                 avg = sum(rates) / len(rates)
-                top_formats.append({
-                    "format": content_type,
-                    "avg_engagement": round(avg, 4),
-                    "sample_count": len(rates),
-                })
+                top_formats.append(
+                    {
+                        "format": content_type,
+                        "avg_engagement": round(avg, 4),
+                        "sample_count": len(rates),
+                    }
+                )
         top_formats.sort(key=lambda x: x["avg_engagement"], reverse=True)
 
         top_platforms = []
         for platform, rates in platform_engagement.items():
             if rates:
                 avg = sum(rates) / len(rates)
-                top_platforms.append({
-                    "platform": platform,
-                    "avg_engagement": round(avg, 4),
-                    "sample_count": len(rates),
-                })
+                top_platforms.append(
+                    {
+                        "platform": platform,
+                        "avg_engagement": round(avg, 4),
+                        "sample_count": len(rates),
+                    }
+                )
         top_platforms.sort(key=lambda x: x["avg_engagement"], reverse=True)
 
         top_times = []
         for hour, rates in time_engagement.items():
             if rates:
                 avg = sum(rates) / len(rates)
-                top_times.append({
-                    "hour": hour,
-                    "avg_engagement": round(avg, 4),
-                    "sample_count": len(rates),
-                })
+                top_times.append(
+                    {
+                        "hour": hour,
+                        "avg_engagement": round(avg, 4),
+                        "sample_count": len(rates),
+                    }
+                )
         top_times.sort(key=lambda x: x["avg_engagement"], reverse=True)
         top_times = top_times[:5]
 
@@ -381,18 +406,24 @@ class ReportGenerator:
             if scores:
                 avg_score = sum(scores) / len(scores)
                 if avg_score < 6.0:
-                    at_risk_clients.append({
-                        "client_id": client_id,
-                        "score": round(avg_score, 1),
-                        "risk_factor": "Low health score",
-                    })
+                    at_risk_clients.append(
+                        {
+                            "client_id": client_id,
+                            "score": round(avg_score, 1),
+                            "risk_factor": "Low health score",
+                        }
+                    )
                 elif avg_score >= 8.0:
-                    healthy_clients.append({
-                        "client_id": client_id,
-                        "score": round(avg_score, 1),
-                    })
+                    healthy_clients.append(
+                        {
+                            "client_id": client_id,
+                            "score": round(avg_score, 1),
+                        }
+                    )
 
-        overall_score = round(sum(all_scores) / len(all_scores), 1) if all_scores else 0.0
+        overall_score = (
+            round(sum(all_scores) / len(all_scores), 1) if all_scores else 0.0
+        )
 
         return {
             "overall_score": overall_score,
@@ -431,10 +462,16 @@ class ReportGenerator:
 
         if latest_record:
             week_total = latest_record.get("week_total", 0)
-            previous_total = previous_record.get("week_total", week_total) if previous_record else week_total
+            previous_total = (
+                previous_record.get("week_total", week_total)
+                if previous_record
+                else week_total
+            )
             wow_pct = 0.0
             if previous_total > 0:
-                wow_pct = round(((week_total - previous_total) / previous_total) * 100, 1)
+                wow_pct = round(
+                    ((week_total - previous_total) / previous_total) * 100, 1
+                )
 
             return {
                 "week_total": week_total,
@@ -481,7 +518,11 @@ class ReportGenerator:
             except Exception as e:
                 logger.warning("Failed to read delivery data: %s", e)
 
-        avg_cycle = round(sum(avg_pr_cycle_hours) / len(avg_pr_cycle_hours), 1) if avg_pr_cycle_hours else 0.0
+        avg_cycle = (
+            round(sum(avg_pr_cycle_hours) / len(avg_pr_cycle_hours), 1)
+            if avg_pr_cycle_hours
+            else 0.0
+        )
 
         return {
             "prs_merged": prs_merged,
@@ -536,11 +577,11 @@ class ReportGenerator:
 
         return f"""Generate a 3-4 sentence summary of this week's performance for a solo founder's analytics dashboard:
 
-- Top content format: {top_format[0]['format'] if top_format else 'N/A'} ({top_format[0].get('avg_engagement', 0):.2%} avg engagement)
-- Top platform: {top_platform[0]['platform'] if top_platform else 'N/A'}
-- Client health score: {client_health.get('overall_score', 0):.1f}/10
-- Revenue: ${revenue.get('week_total', 0):,.0f} ({revenue.get('week_over_week_pct', 0):+.1f}% WoW)
-- Delivery: {delivery.get('prs_merged', 0)} PRs merged, {delivery.get('deploys', 0)} deploys
+- Top content format: {top_format[0]["format"] if top_format else "N/A"} ({top_format[0].get("avg_engagement", 0):.2%} avg engagement)
+- Top platform: {top_platform[0]["platform"] if top_platform else "N/A"}
+- Client health score: {client_health.get("overall_score", 0):.1f}/10
+- Revenue: ${revenue.get("week_total", 0):,.0f} ({revenue.get("week_over_week_pct", 0):+.1f}% WoW)
+- Delivery: {delivery.get("prs_merged", 0)} PRs merged, {delivery.get("deploys", 0)} deploys
 
 Write in a professional but friendly tone. Be specific with numbers. End with one actionable recommendation."""
 
@@ -563,14 +604,22 @@ Write in a professional but friendly tone. Be specific with numbers. End with on
 
         score = client_health.get("overall_score", 0)
         if score > 0:
-            status = "strong" if score >= 8.0 else "needs attention" if score < 6.0 else "stable"
+            status = (
+                "strong"
+                if score >= 8.0
+                else "needs attention"
+                if score < 6.0
+                else "stable"
+            )
             parts.append(f"Client health is {status} at {score:.1f}/10.")
 
         wow = revenue.get("week_over_week_pct", 0)
         total = revenue.get("week_total", 0)
         if total > 0:
             direction = "up" if wow > 0 else "down" if wow < 0 else "flat"
-            parts.append(f"Weekly revenue ${total:,.0f} is {direction} ({wow:+.1f}% WoW).")
+            parts.append(
+                f"Weekly revenue ${total:,.0f} is {direction} ({wow:+.1f}% WoW)."
+            )
 
         prs = delivery.get("prs_merged", 0)
         if prs > 0:
@@ -638,8 +687,16 @@ Write in a professional but friendly tone. Be specific with numbers. End with on
             generated_at=datetime.now(timezone.utc).isoformat(),
             week_of=week_of,
             squad_id=self.squad_id,
-            content_performance={"top_formats": [], "top_platforms": [], "top_publish_times": []},
-            client_health={"overall_score": 0, "at_risk_clients": [], "healthy_clients": []},
+            content_performance={
+                "top_formats": [],
+                "top_platforms": [],
+                "top_publish_times": [],
+            },
+            client_health={
+                "overall_score": 0,
+                "at_risk_clients": [],
+                "healthy_clients": [],
+            },
             revenue={"week_total": 0, "week_over_week_pct": 0},
             delivery={"prs_merged": 0, "deploys": 0},
             opportunities=[],

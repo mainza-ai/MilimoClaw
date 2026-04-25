@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -25,7 +24,6 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
 
 logger = logging.getLogger("milimo.tool_validator")
 
@@ -105,24 +103,20 @@ FORBIDDEN_MODULES = {
     "imaplib",
     "nntplib",
     "telnetlib",
-
     # Code execution
     "subprocess",
     "commands",
     "popen2",
-
     # Serialization exploits
     "pickle",
     "shelve",
     "marshal",
     "dill",
     "cloudpickle",
-
     # System access
     "ctypes",
     "multiprocessing",
     "threading",
-
     # File system low-level
     "os",  # Partial - some functions allowed
 }
@@ -273,7 +267,10 @@ class ASTAnalyzer(ast.NodeVisitor):
                 )
 
             # Check os functions
-            if call_name.startswith("os.") and call_name.split(".")[1] in FORBIDDEN_OS_FUNCTIONS:
+            if (
+                call_name.startswith("os.")
+                and call_name.split(".")[1] in FORBIDDEN_OS_FUNCTIONS
+            ):
                 self.issues.append(
                     ValidationIssue(
                         severity=Severity.CRITICAL,
@@ -310,7 +307,12 @@ class ASTAnalyzer(ast.NodeVisitor):
 
         # Check for docstring
         if self.constraints.require_docstrings:
-            if not (node.body and isinstance(node.body[0], ast.Expr) and isinstance(node.body[0].value, ast.Constant) and isinstance(node.body[0].value.value, str)):
+            if not (
+                node.body
+                and isinstance(node.body[0], ast.Expr)
+                and isinstance(node.body[0].value, ast.Constant)
+                and isinstance(node.body[0].value.value, str)
+            ):
                 if node.name == "run":
                     self.issues.append(
                         ValidationIssue(
@@ -361,7 +363,7 @@ class ASTAnalyzer(ast.NodeVisitor):
             if keyword.arg == "mode":
                 if isinstance(keyword.value, ast.Constant):
                     mode = keyword.value.value
-                    if "w" in mode or "a" in mode:
+                    if isinstance(mode, str) and ("w" in mode or "a" in mode):
                         self.issues.append(
                             ValidationIssue(
                                 severity=Severity.ERROR,
@@ -377,7 +379,7 @@ class ASTAnalyzer(ast.NodeVisitor):
         if len(node.args) >= 2:
             if isinstance(node.args[1], ast.Constant):
                 mode = node.args[1].value
-                if "w" in mode or "a" in mode:
+                if isinstance(mode, str) and ("w" in mode or "a" in mode):
                     self.issues.append(
                         ValidationIssue(
                             severity=Severity.ERROR,
@@ -535,7 +537,9 @@ class ToolValidator:
         warning_count = sum(1 for i in issues if i.severity == Severity.WARNING)
 
         # Score: 100 - (critical * 30) - (error * 10) - (warning * 2)
-        score = max(0, 100 - (critical_count * 30) - (error_count * 10) - (warning_count * 2))
+        score = max(
+            0, 100 - (critical_count * 30) - (error_count * 10) - (warning_count * 2)
+        )
 
         # Determine if passed
         passed = critical_count == 0 and error_count == 0
@@ -555,7 +559,7 @@ class ToolValidator:
         for pattern, description in DANGEROUS_PATTERNS:
             matches = re.finditer(pattern, code)
             for match in matches:
-                line_num = code[:match.start()].count("\n") + 1
+                line_num = code[: match.start()].count("\n") + 1
                 issues.append(
                     ValidationIssue(
                         severity=Severity.WARNING,
@@ -574,7 +578,9 @@ class ToolValidator:
 # ---------------------------------------------------------------------------
 
 
-def validate_tool(code: str, constraints: PolicyConstraints | None = None) -> ValidationResult:
+def validate_tool(
+    code: str, constraints: PolicyConstraints | None = None
+) -> ValidationResult:
     """
     Validate tool code for security and quality.
 

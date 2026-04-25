@@ -89,10 +89,10 @@ class Output(TypedDict):
 def run(input_data: Input) -> Output:
     """
     Predict {{target_value}} based on input features.
-    
+
     Args:
         input_data: Input data matching the schema
-        
+
     Returns:
         Prediction with confidence interval
     """

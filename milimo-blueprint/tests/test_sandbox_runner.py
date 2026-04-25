@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -6,9 +5,6 @@
 Tests for sandbox_runner.py - Real Backtesting in Sandbox Isolation
 """
 
-import json
-import tempfile
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -40,10 +36,10 @@ def apply(action_data: dict) -> dict:
     return action_data
 '''
 
-SYNTAX_ERROR_CODE = '''
+SYNTAX_ERROR_CODE = """
 def apply(action_data: dict
     return action_data
-'''
+"""
 
 # ---------------------------------------------------------------------------
 
@@ -60,11 +56,31 @@ class TestSandboxRunner:
     def historical_data(self) -> list[dict[str, Any]]:
         """Create sample historical data for testing."""
         return [
-            {"action_id": "act_1", "type": "social_post", "metrics": {"approval_rate": 0.7}},
-            {"action_id": "act_2", "type": "social_post", "metrics": {"approval_rate": 0.75}},
-            {"action_id": "act_3", "type": "social_post", "metrics": {"approval_rate": 0.8}},
-            {"action_id": "act_4", "type": "social_post", "metrics": {"approval_rate": 0.72}},
-            {"action_id": "act_5", "type": "social_post", "metrics": {"approval_rate": 0.78}},
+            {
+                "action_id": "act_1",
+                "type": "social_post",
+                "metrics": {"approval_rate": 0.7},
+            },
+            {
+                "action_id": "act_2",
+                "type": "social_post",
+                "metrics": {"approval_rate": 0.75},
+            },
+            {
+                "action_id": "act_3",
+                "type": "social_post",
+                "metrics": {"approval_rate": 0.8},
+            },
+            {
+                "action_id": "act_4",
+                "type": "social_post",
+                "metrics": {"approval_rate": 0.72},
+            },
+            {
+                "action_id": "act_5",
+                "type": "social_post",
+                "metrics": {"approval_rate": 0.78},
+            },
         ]
 
     def test_initialization(self, runner: SandboxRunner) -> None:
@@ -160,22 +176,23 @@ class TestSandboxRunner:
     def test_backtest_timeout(self) -> None:
         """Test backtest timeout enforcement."""
         import platform
-        
+
         # Skip on macOS due to different subprocess timeout behavior
         if platform.system() == "Darwin":
             import pytest
+
             pytest.skip("Timeout test unreliable on macOS subprocess handling")
-            
+
         config = SandboxConfig(timeout_seconds=1)
         runner = SandboxRunner(config)
 
         # Code that would take longer than 1 second
-        slow_code = '''
+        slow_code = """
 import time
 def apply(action_data: dict) -> dict:
     time.sleep(10)  # This will timeout
     return action_data
-'''
+"""
 
         result = runner.backtest(
             tool_code=slow_code,

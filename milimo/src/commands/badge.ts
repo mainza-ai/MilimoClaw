@@ -67,7 +67,10 @@ interface PerformanceAttestation {
 
 // ---------------------------------------------------------------------------
 
-const BADGE_LEVELS: Record<string, { threshold: number; icon: string; label: string; color: string }> = {
+const BADGE_LEVELS: Record<
+  string,
+  { threshold: number; icon: string; label: string; color: string }
+> = {
   verified: { threshold: 0, icon: "✅", label: "Verified", color: "green" },
   bronze: { threshold: 5, icon: "🥉", label: "Bronze", color: "#CD7F32" },
   silver: { threshold: 10, icon: "🥈", label: "Silver", color: "#C0C0C0" },
@@ -78,62 +81,61 @@ const BADGE_LEVELS: Record<string, { threshold: number; icon: string; label: str
 
 // ---------------------------------------------------------------------------
 
-export async function cliBadge(opts: BadgeOptions): Promise<void> {
-  const { logger, pluginConfig } = opts;
+export function cliBadge(opts: BadgeOptions): Promise<void> {
+  const { logger } = opts;
   const state = loadMilimoState();
 
   logger.info("");
-  logger.info("  ┌─────────────────────────────────────────────────────┐");
-  logger.info("  │          🏆  PERFORMANCE BADGES  🏆                │");
-  logger.info("  └─────────────────────────────────────────────────────┘");
+  logger.info(" ┌─────────────────────────────────────────────────────┐");
+  logger.info(" │ 🏆 PERFORMANCE BADGES 🏆 │");
+  logger.info(" └─────────────────────────────────────────────────────┘");
   logger.info("");
 
   if (opts.verify) {
-    await verifyAttestation(opts, logger);
-    return;
+    verifyAttestation(opts, logger);
+    return Promise.resolve();
   }
 
   if (opts.list) {
-    await listAttestations(opts, state, logger);
-    return;
+    listAttestations(opts, state, logger);
+    return Promise.resolve();
   }
 
   if (opts.performance) {
-    await generatePerformanceAttestation(opts, state, logger);
-    return;
+    generatePerformanceAttestation(opts, state, logger);
+    return Promise.resolve();
   }
 
   if (opts.auditor) {
-    await requestAuditorVerification(opts, state, logger);
-    return;
+    requestAuditorVerification(opts, state, logger);
+    return Promise.resolve();
   }
 
-  // Default: show current badge status
-  await showBadgeStatus(opts, state, logger);
+  showBadgeStatus(opts, state, logger);
+  return Promise.resolve();
 }
 
 // ---------------------------------------------------------------------------
 
-async function showBadgeStatus(
+function showBadgeStatus(
   opts: BadgeOptions,
   state: ReturnType<typeof loadMilimoState>,
-  logger: PluginLogger
-): Promise<void> {
+  logger: PluginLogger,
+): void {
   const blueprintId = opts.blueprint || (state ? `${state.squadName}-${state.clawRole}` : "");
 
   if (!blueprintId) {
-    logger.error("  ✗ No blueprint specified.");
-    logger.info("    Use --blueprint <id> or activate a squad.");
+    logger.error(" ✗ No blueprint specified.");
+    logger.info(" Use --blueprint <id> or activate a squad.");
     logger.info("");
     return;
   }
 
-  logger.info(`  Blueprint: ${blueprintId}`);
+  logger.info(` Blueprint: ${blueprintId}`);
   logger.info("");
 
-  // Fetch attestation from server/local
-	try {
-		const code = `
+  try {
+    const code = `
 import json
 from pathlib import Path
 import sys
@@ -149,55 +151,50 @@ else:
     print(json.dumps({"exists": False}))
 `;
 
-		const result = spawnSync(
-			"python3",
-			["-c", code],
-			{ encoding: "utf-8" }
-		);
-		if (result.error) throw result.error;
-		if (result.status !== 0) throw new Error(result.stderr);
-		const rawOutput = result.stdout.trim();
+    const result = spawnSync("python3", ["-c", code], { encoding: "utf-8" });
+    if (result.error) throw result.error;
+    if (result.status !== 0) throw new Error(result.stderr);
+    const rawOutput = result.stdout.trim();
 
-		const data = JSON.parse(rawOutput);
+    const data = JSON.parse(rawOutput);
 
     if (!data.exists) {
-      logger.info("  No performance attestation found.");
+      logger.info(" No performance attestation found.");
       logger.info("");
-      logger.info("  Generate one with:");
-      logger.info(`    openclaw milimo badge --performance`);
+      logger.info(" Generate one with:");
+      logger.info(` openclaw milimo badge --performance`);
       logger.info("");
       return;
     }
 
-const attestation = data as PerformanceAttestation;
-renderAttestation(attestation, opts.json ?? false, logger);
-
+    const attestation = data as PerformanceAttestation;
+    renderAttestation(attestation, opts.json ?? false, logger);
   } catch (err) {
-    logger.error(`  ✗ Failed to load attestation: ${(err as Error).message}`);
+    logger.error(` ✗ Failed to load attestation: ${(err as Error).message}`);
     logger.info("");
   }
 }
 
 // ---------------------------------------------------------------------------
 
-async function generatePerformanceAttestation(
+function generatePerformanceAttestation(
   opts: BadgeOptions,
   state: ReturnType<typeof loadMilimoState>,
-  logger: PluginLogger
-): Promise<void> {
+  logger: PluginLogger,
+): void {
   if (!state) {
-    logger.error("  ✗ No active squad. Run 'openclaw milimo init' first.");
+    logger.error(" ✗ No active squad. Run 'openclaw milimo init' first.");
     logger.info("");
     return;
   }
 
   const blueprintId = opts.blueprint || `${state.squadName}-${state.clawRole}`;
 
-  logger.info(`  Generating performance attestation for ${blueprintId}...`);
+  logger.info(` Generating performance attestation for ${blueprintId}...`);
   logger.info("");
 
-	try {
-		const code = `
+  try {
+    const code = `
 import json
 from datetime import datetime, timedelta, timezone
 from orchestrator.provenance_signer import ProvenanceSigner, Attestation, calculate_content_hash
@@ -275,81 +272,75 @@ attestation_file.write_text(json.dumps(attestation_data, indent=2))
 print(json.dumps({"success": True, "attestation": attestation_data}))
 `;
 
-		const safeCode = `import sys; sys.path.insert(0, ${JSON.stringify(opts.pluginConfig.blueprintDir)}); ${code}`;
-		const result = spawnSync(
-			"python3",
-			["-c", safeCode],
-			{ cwd: opts.pluginConfig.blueprintDir, encoding: "utf-8" }
-		);
-		if (result.error) throw result.error;
-	if (result.status !== 0) throw new Error(result.stderr);
-		const rawOutput = result.stdout.trim();
+    const safeCode = `import sys; sys.path.insert(0, ${JSON.stringify(opts.pluginConfig.blueprintDir)}); ${code}`;
+    const result = spawnSync("python3", ["-c", safeCode], {
+      cwd: opts.pluginConfig.blueprintDir,
+      encoding: "utf-8",
+    });
+    if (result.error) throw result.error;
+    if (result.status !== 0) throw new Error(result.stderr);
+    const rawOutput = result.stdout.trim();
 
-		const response = JSON.parse(rawOutput);
+    const response = JSON.parse(rawOutput);
 
-		if (response.success) {
+    if (response.success) {
       const attestation = response.attestation as PerformanceAttestation;
 
-logger.info(" ✅ Performance attestation generated!");
-logger.info("");
-renderAttestation(attestation, opts.json ?? false, logger);
-
-      logger.info("  Note: This is a self-attested performance claim.");
-      logger.info("  For verified status, request auditor verification:");
-      logger.info(`    openclaw milimo badge --auditor verifier@example.com`);
+      logger.info(" ✅ Performance attestation generated!");
       logger.info("");
+      renderAttestation(attestation, opts.json ?? false, logger);
 
+      logger.info(" Note: This is a self-attested performance claim.");
+      logger.info(" For verified status, request auditor verification:");
+      logger.info(` openclaw milimo badge --auditor verifier@example.com`);
+      logger.info("");
     } else {
-      logger.error(`  ✗ Failed to generate attestation`);
+      logger.error(` ✗ Failed to generate attestation`);
       logger.info("");
     }
-
   } catch (err) {
-    logger.error(`  ✗ Generation failed: ${(err as Error).message}`);
+    logger.error(` ✗ Generation failed: ${(err as Error).message}`);
     logger.info("");
   }
 }
 
 // ---------------------------------------------------------------------------
 
-async function requestAuditorVerification(
+function requestAuditorVerification(
   opts: BadgeOptions,
   state: ReturnType<typeof loadMilimoState>,
-  logger: PluginLogger
-): Promise<void> {
+  logger: PluginLogger,
+): void {
   if (!state) {
-    logger.error("  ✗ No active squad.");
+    logger.error(" ✗ No active squad.");
     logger.info("");
     return;
   }
 
-  logger.info(`  Requesting auditor verification from: ${opts.auditor}`);
+  logger.info(` Requesting auditor verification from: ${opts.auditor}`);
   logger.info("");
-  logger.info("  This feature requires:");
-  logger.info("    1. An existing performance attestation");
-  logger.info("    2. Auditor agreement to verify");
-  logger.info("    3. Payment of auditor fees (if applicable)");
+  logger.info(" This feature requires:");
+  logger.info(" 1. An existing performance attestation");
+  logger.info(" 2. Auditor agreement to verify");
+  logger.info(" 3. Payment of auditor fees (if applicable)");
   logger.info("");
-  logger.info("  In production, this would:");
-  logger.info("    • Send verification request to auditor");
-  logger.info("    • Include attestation data for review");
-  logger.info("    • Track verification status");
+  logger.info(" In production, this would:");
+  logger.info(" • Send verification request to auditor");
+  logger.info(" • Include attestation data for review");
+  logger.info(" • Track verification status");
   logger.info("");
-  logger.info("  Status: Not implemented (requires auditor integration)");
+  logger.info(" Status: Not implemented (requires auditor integration)");
   logger.info("");
 }
 
 // ---------------------------------------------------------------------------
 
-async function verifyAttestation(
-	opts: BadgeOptions,
-	logger: PluginLogger
-): Promise<void> {
-	logger.info(` Verifying attestation: ${opts.verify}`);
-	logger.info("");
+function verifyAttestation(opts: BadgeOptions, logger: PluginLogger): void {
+  logger.info(` Verifying attestation: ${opts.verify}`);
+  logger.info("");
 
-	try {
-		const code = `
+  try {
+    const code = `
 import json
 from pathlib import Path
 
@@ -366,44 +357,39 @@ else:
     print(json.dumps({"valid": False, "error": "Attestation not found"}))
 `;
 
-		const result = spawnSync(
-			"python3",
-			["-c", code],
-			{ encoding: "utf-8" }
-		);
-		if (result.error) throw result.error;
-		if (result.status !== 0) throw new Error(result.stderr);
-		const rawOutput = result.stdout.trim();
+    const result = spawnSync("python3", ["-c", code], { encoding: "utf-8" });
+    if (result.error) throw result.error;
+    if (result.status !== 0) throw new Error(result.stderr);
+    const rawOutput = result.stdout.trim();
 
-		const response = JSON.parse(rawOutput);
+    const response = JSON.parse(rawOutput);
 
     if (!response.valid) {
-      logger.error(`  ✗ ${response.error}`);
+      logger.error(` ✗ ${response.error}`);
       logger.info("");
       return;
     }
 
-const attestation = response.attestation as PerformanceAttestation;
-renderAttestation(attestation, opts.json ?? false, logger);
-
+    const attestation = response.attestation as PerformanceAttestation;
+    renderAttestation(attestation, opts.json ?? false, logger);
   } catch (err) {
-    logger.error(`  ✗ Verification failed: ${(err as Error).message}`);
+    logger.error(` ✗ Verification failed: ${(err as Error).message}`);
     logger.info("");
   }
 }
 
 // ---------------------------------------------------------------------------
 
-async function listAttestations(
-	opts: BadgeOptions,
-	state: ReturnType<typeof loadMilimoState>,
-	logger: PluginLogger
-): Promise<void> {
-	logger.info(" Available Attestations:");
-	logger.info("");
+function listAttestations(
+  opts: BadgeOptions,
+  state: ReturnType<typeof loadMilimoState>,
+  logger: PluginLogger,
+): void {
+  logger.info(" Available Attestations:");
+  logger.info("");
 
-	try {
-		const code = `
+  try {
+    const code = `
 import json
 from pathlib import Path
 
@@ -426,16 +412,12 @@ else:
     print(json.dumps(attestations))
 `;
 
-		const result = spawnSync(
-			"python3",
-			["-c", code],
-			{ encoding: "utf-8" }
-		);
-		if (result.error) throw result.error;
-		if (result.status !== 0) throw new Error(result.stderr);
-		const rawOutput = result.stdout.trim();
+    const result = spawnSync("python3", ["-c", code], { encoding: "utf-8" });
+    if (result.error) throw result.error;
+    if (result.status !== 0) throw new Error(result.stderr);
+    const rawOutput = result.stdout.trim();
 
-		const attestations = JSON.parse(rawOutput) as Array<{
+    const attestations = JSON.parse(rawOutput) as Array<{
       blueprint_id: string;
       version: string;
       improvement: number;
@@ -443,20 +425,19 @@ else:
     }>;
 
     if (attestations.length === 0) {
-      logger.info("    No attestations found.");
+      logger.info(" No attestations found.");
       logger.info("");
       return;
     }
 
     for (const att of attestations) {
       const badge = getBadgeForImprovement(att.improvement);
-      logger.info(`    ${badge.icon} ${att.blueprint_id} (v${att.version}) +${att.improvement}%`);
+      logger.info(` ${badge.icon} ${att.blueprint_id} (v${att.version}) +${att.improvement}%`);
     }
 
     logger.info("");
-
   } catch (err) {
-    logger.error(`  ✗ Failed to list: ${(err as Error).message}`);
+    logger.error(` ✗ Failed to list: ${(err as Error).message}`);
     logger.info("");
   }
 }
@@ -466,7 +447,7 @@ else:
 function renderAttestation(
   attestation: PerformanceAttestation,
   jsonOutput: boolean,
-  logger: PluginLogger
+  logger: PluginLogger,
 ): void {
   if (jsonOutput) {
     logger.info(JSON.stringify(attestation, null, 2));
@@ -475,57 +456,61 @@ function renderAttestation(
 
   const badge = getBadgeForImprovement(attestation.metrics.improvement_percent);
 
-  logger.info(`  ${badge.icon} ${badge.label} Badge`);
+  logger.info(` ${badge.icon} ${badge.label} Badge`);
   logger.info("");
-  logger.info("  Performance Metrics:");
-  logger.info(`    Baseline:  ${attestation.metrics.baseline_performance.toFixed(1)}`);
-  logger.info(`    Current:   ${attestation.metrics.current_performance.toFixed(1)}`);
-  logger.info(`    Improvement: +${attestation.metrics.improvement_percent}%`);
-  logger.info(`    Sample Size: ${attestation.metrics.sample_size.toLocaleString()}`);
-  logger.info(`    Period: ${attestation.metrics.measurement_period_days} days`);
+  logger.info(" Performance Metrics:");
+  logger.info(` Baseline: ${attestation.metrics.baseline_performance.toFixed(1)}`);
+  logger.info(` Current: ${attestation.metrics.current_performance.toFixed(1)}`);
+  logger.info(` Improvement: +${attestation.metrics.improvement_percent}%`);
+  logger.info(` Sample Size: ${attestation.metrics.sample_size.toLocaleString()}`);
+  logger.info(` Period: ${attestation.metrics.measurement_period_days} days`);
   logger.info("");
 
   if (attestation.metrics.breakdown) {
     const b = attestation.metrics.breakdown;
-    logger.info("  Breakdown:");
+    logger.info(" Breakdown:");
     if (b.approval_rate !== undefined) {
-      logger.info(`    Approval Rate: ${b.approval_rate}%`);
+      logger.info(` Approval Rate: ${b.approval_rate}%`);
     }
     if (b.auto_approval_rate !== undefined) {
-      logger.info(`    Auto-Approval: ${b.auto_approval_rate}%`);
+      logger.info(` Auto-Approval: ${b.auto_approval_rate}%`);
     }
     if (b.response_time_ms !== undefined) {
-      logger.info(`    Response Time: ${b.response_time_ms}ms`);
+      logger.info(` Response Time: ${b.response_time_ms}ms`);
     }
     if (b.error_rate !== undefined) {
-      logger.info(`    Error Rate: ${b.error_rate}%`);
+      logger.info(` Error Rate: ${b.error_rate}%`);
     }
     logger.info("");
   }
 
-  logger.info("  Verification:");
-  logger.info(`    Method: ${attestation.verification.method}`);
-  logger.info(`    Hash: ${attestation.attestation_hash.substring(0, 24)}...`);
+  logger.info(" Verification:");
+  logger.info(` Method: ${attestation.verification.method}`);
+  logger.info(` Hash: ${attestation.attestation_hash.substring(0, 24)}...`);
   logger.info("");
 
   if (attestation.verification.auditor) {
-    logger.info("  Auditor:");
-    logger.info(`    Name: ${attestation.verification.auditor.name}`);
-    logger.info(`    Date: ${attestation.verification.auditor.verification_date}`);
+    logger.info(" Auditor:");
+    logger.info(` Name: ${attestation.verification.auditor.name}`);
+    logger.info(` Date: ${attestation.verification.auditor.verification_date}`);
     logger.info("");
   }
 
-  logger.info(`  Blueprint: ${attestation.blueprint_id} v${attestation.blueprint_version}`);
-  logger.info(`  Created: ${new Date(attestation.created_at).toLocaleString()}`);
+  logger.info(` Blueprint: ${attestation.blueprint_id} v${attestation.blueprint_version}`);
+  logger.info(` Created: ${new Date(attestation.created_at).toLocaleString()}`);
   logger.info("");
 }
 
 // ---------------------------------------------------------------------------
 
-function getBadgeForImprovement(improvement: number): { icon: string; label: string; color: string } {
+function getBadgeForImprovement(improvement: number): {
+  icon: string;
+  label: string;
+  color: string;
+} {
   const levels = Object.entries(BADGE_LEVELS).sort((a, b) => b[1].threshold - a[1].threshold);
 
-  for (const [_, badge] of levels) {
+  for (const [, badge] of levels) {
     if (improvement >= badge.threshold) {
       return badge;
     }

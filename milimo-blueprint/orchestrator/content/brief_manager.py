@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -23,7 +22,6 @@ import logging
 import threading
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 from typing import Any, Literal
 
 from .content_init import (
@@ -43,16 +41,19 @@ logger = logging.getLogger("milimo.brief_manager")
 
 class BriefError(Exception):
     """Base exception for brief operations."""
+
     pass
 
 
 class BriefValidationError(BriefError):
     """Brief validation failed."""
+
     pass
 
 
 class BriefAcknowledgmentError(BriefError):
     """Brief acknowledgment window exceeded."""
+
     pass
 
 
@@ -185,17 +186,19 @@ class BriefManager:
 
         self._schedule_auto_acknowledgment(brief_id, brief)
 
-        self._log.append(LogEntry(
-            action_type="brief_received",
-            entity_id=brief_id,
-            outcome="success",
-            client_id=brief.client_id,
-            details={
-                "project_id": brief.project_id,
-                "platforms": brief.platform_targets,
-                "deadline": brief.deadline,
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="brief_received",
+                entity_id=brief_id,
+                outcome="success",
+                client_id=brief.client_id,
+                details={
+                    "project_id": brief.project_id,
+                    "platforms": brief.platform_targets,
+                    "deadline": brief.deadline,
+                },
+            )
+        )
 
         logger.info("Brief %s received from Ops Claw", brief_id)
         return brief
@@ -208,7 +211,9 @@ class BriefManager:
         acknowledgment is sent before deadline.
         """
         safety_buffer_seconds = 30
-        timer_seconds = (self.ACKNOWLEDGMENT_WINDOW_MINUTES * 60) - safety_buffer_seconds
+        timer_seconds = (
+            self.ACKNOWLEDGMENT_WINDOW_MINUTES * 60
+        ) - safety_buffer_seconds
 
         def auto_acknowledge():
             with self._lock:
@@ -220,15 +225,19 @@ class BriefManager:
                             brief_id,
                         )
                         self.acknowledge_brief(brief_id)
-                        self._log.append(LogEntry(
-                            action_type="brief_auto_acknowledged",
-                            entity_id=brief_id,
-                            outcome="success",
-                            client_id=current_brief.client_id,
-                            details={"reason": "sla_safety"},
-                        ))
+                        self._log.append(
+                            LogEntry(
+                                action_type="brief_auto_acknowledged",
+                                entity_id=brief_id,
+                                outcome="success",
+                                client_id=current_brief.client_id,
+                                details={"reason": "sla_safety"},
+                            )
+                        )
                 except Exception as e:
-                    logger.error("Auto-acknowledgment failed for brief %s: %s", brief_id, e)
+                    logger.error(
+                        "Auto-acknowledgment failed for brief %s: %s", brief_id, e
+                    )
 
         timer = threading.Timer(timer_seconds, auto_acknowledge)
         with self._lock:
@@ -269,33 +278,39 @@ class BriefManager:
                 del self._ack_timers[brief_id]
 
         acknowledged_at = datetime.now(timezone.utc).isoformat()
-        estimated_draft_time = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
+        estimated_draft_time = (
+            datetime.now(timezone.utc) + timedelta(hours=2)
+        ).isoformat()
 
         brief.acknowledged_at = acknowledged_at
         self._save_brief(brief)
 
         if self._mesh:
-            self._mesh.send({
-                "message_type": "brief_acknowledged",
-                "sender_role": "content",
-                "recipient_role": "ops",
-                "payload": {
-                    "project_id": brief.project_id,
-                    "estimated_first_draft_time": estimated_draft_time,
-                    "acknowledged_at": acknowledged_at,
-                },
-            })
+            self._mesh.send(
+                {
+                    "message_type": "brief_acknowledged",
+                    "sender_role": "content",
+                    "recipient_role": "ops",
+                    "payload": {
+                        "project_id": brief.project_id,
+                        "estimated_first_draft_time": estimated_draft_time,
+                        "acknowledged_at": acknowledged_at,
+                    },
+                }
+            )
 
-        self._log.append(LogEntry(
-            action_type="brief_acknowledged",
-            entity_id=brief_id,
-            outcome="success",
-            client_id=brief.client_id,
-            details={
-                "project_id": brief.project_id,
-                "estimated_draft_time": estimated_draft_time,
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="brief_acknowledged",
+                entity_id=brief_id,
+                outcome="success",
+                client_id=brief.client_id,
+                details={
+                    "project_id": brief.project_id,
+                    "estimated_draft_time": estimated_draft_time,
+                },
+            )
+        )
 
         logger.info("Brief %s acknowledged", brief_id)
 
@@ -337,18 +352,20 @@ class BriefManager:
             "regeneration_required": True,
         }
 
-        self._log.append(LogEntry(
-            action_type="revision_requested",
-            entity_id=draft_id,
-            outcome="success",
-            details={
-                "project_id": project_id,
-                "revision_notes": revision_notes[:200],
-                "deadline": deadline,
-                "has_original_draft": original_draft_data is not None,
-                "regeneration_required": True,
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="revision_requested",
+                entity_id=draft_id,
+                outcome="success",
+                details={
+                    "project_id": project_id,
+                    "revision_notes": revision_notes[:200],
+                    "deadline": deadline,
+                    "has_original_draft": original_draft_data is not None,
+                    "regeneration_required": True,
+                },
+            )
+        )
 
         logger.info(
             "Revision request for draft %s: %s",
@@ -364,12 +381,14 @@ class BriefManager:
         revisions = []
         for entry in entries:
             if entry.details.get("regeneration_required"):
-                revisions.append({
-                    "draft_id": entry.entity_id,
-                    "project_id": entry.details.get("project_id"),
-                    "revision_notes": entry.details.get("revision_notes"),
-                    "deadline": entry.details.get("deadline"),
-                })
+                revisions.append(
+                    {
+                        "draft_id": entry.entity_id,
+                        "project_id": entry.details.get("project_id"),
+                        "revision_notes": entry.details.get("revision_notes"),
+                        "deadline": entry.details.get("deadline"),
+                    }
+                )
         return revisions
 
     def complete_brief(self, brief_id: str, published_urls: list[str]) -> None:
@@ -394,16 +413,18 @@ class BriefManager:
         if active_path.exists():
             active_path.unlink()
 
-        self._log.append(LogEntry(
-            action_type="brief_completed",
-            entity_id=brief_id,
-            outcome="success",
-            client_id=brief.client_id,
-            details={
-                "project_id": brief.project_id,
-                "published_urls": published_urls,
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="brief_completed",
+                entity_id=brief_id,
+                outcome="success",
+                client_id=brief.client_id,
+                details={
+                    "project_id": brief.project_id,
+                    "published_urls": published_urls,
+                },
+            )
+        )
 
         if self._mesh:
             deliverable_message = {
@@ -471,14 +492,16 @@ class BriefManager:
                 if hours_remaining <= 4:
                     risk_level = "critical"
 
-                risks.append(BriefDeadlineRisk(
-                    brief_id=brief.brief_id,
-                    project_id=brief.project_id,
-                    client_id=brief.client_id,
-                    hours_remaining=hours_remaining,
-                    drafts_count=drafts_count,
-                    risk_level=risk_level,
-                ))
+                risks.append(
+                    BriefDeadlineRisk(
+                        brief_id=brief.brief_id,
+                        project_id=brief.project_id,
+                        client_id=brief.client_id,
+                        hours_remaining=hours_remaining,
+                        drafts_count=drafts_count,
+                        risk_level=risk_level,
+                    )
+                )
 
         return sorted(risks, key=lambda r: r.hours_remaining)
 

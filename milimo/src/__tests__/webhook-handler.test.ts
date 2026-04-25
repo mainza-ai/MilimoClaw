@@ -1,31 +1,36 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-/**
- * Jest tests for Stripe Webhook Handler
- */
+import {
+  StripeWebhookHandler,
+  type WebhookEvent,
+  type SubscriptionChange,
+  type PaymentFailureAlert,
+} from "../lib/webhook-handler";
 
-import { StripeWebhookHandler, type WebhookEvent, type SubscriptionChange } from "../lib/webhook-handler";
+const mockExistsSync = vi.fn();
+const mockReadFileSync = vi.fn();
+const mockWriteFileSync = vi.fn();
+const mockMkdirSync = vi.fn();
 
-const mockExistsSync = jest.fn();
-const mockReadFileSync = jest.fn();
-const mockWriteFileSync = jest.fn();
-const mockMkdirSync = jest.fn();
-
-jest.mock("node:fs", () => ({
+vi.mock("node:fs", () => ({
   existsSync: (...args: unknown[]) => mockExistsSync(...args),
   readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
   writeFileSync: (...args: unknown[]) => mockWriteFileSync(...args),
   mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
 }));
 
-jest.mock("node:os", () => ({
+vi.mock("node:os", () => ({
   homedir: () => "/home/test",
+}));
+
+vi.mock("node:path", () => ({
+  join: (...args: string[]) => args.join("/"),
 }));
 
 describe("StripeWebhookHandler", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockExistsSync.mockReturnValue(false);
     mockMkdirSync.mockReturnValue(undefined);
     mockWriteFileSync.mockReturnValue(undefined);
@@ -33,6 +38,7 @@ describe("StripeWebhookHandler", () => {
 
   describe("handleEvent", () => {
     it("handles subscription.created event", () => {
+      mockExistsSync.mockReturnValue(true);
       mockReadFileSync.mockReturnValue(JSON.stringify({ tier: "free" }));
 
       const handler = new StripeWebhookHandler();
@@ -56,6 +62,7 @@ describe("StripeWebhookHandler", () => {
     });
 
     it("handles subscription.deleted event", () => {
+      mockExistsSync.mockReturnValue(true);
       mockReadFileSync.mockReturnValue(JSON.stringify({ tier: "pro" }));
 
       const handler = new StripeWebhookHandler();
@@ -92,10 +99,10 @@ describe("StripeWebhookHandler", () => {
         },
       };
 
-      const result = handler.handleEvent(event);
+      const result = handler.handleEvent(event) as PaymentFailureAlert;
 
       expect(result).not.toBeNull();
-      expect(result?.customerId).toBe("cus_123");
+      expect(result.customerId).toBe("cus_123");
     });
 
     it("returns null for unhandled event types", () => {

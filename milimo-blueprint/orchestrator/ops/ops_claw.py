@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -12,7 +11,6 @@ Called by the NemoClaw blueprint orchestrator on sandbox startup.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 from datetime import datetime, timezone

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -10,14 +9,9 @@ All 15 steps must pass before autonomous scheduling is enabled.
 Step 9 is the critical correctness test — REVIEW approval must NOT trigger merge.
 """
 
-from __future__ import annotations
-
-import json
 import os
 import sys
-import tempfile
 from datetime import datetime, timezone
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -49,17 +43,28 @@ class TestBuildMVR:
         mock_github = MagicMock()
         mock_github.get_open_issues.return_value = [
             {"number": 1, "title": "Fix bug", "body": "Fix the thing", "labels": []},
-            {"number": 2, "title": "Add feature", "body": "Add new thing", "labels": []},
+            {
+                "number": 2,
+                "title": "Add feature",
+                "body": "Add new thing",
+                "labels": [],
+            },
         ]
         mock_github.create_issue.return_value = 10
-        mock_github.create_pull_request.return_value = (123, "https://github.com/repo/pull/123")
+        mock_github.create_pull_request.return_value = (
+            123,
+            "https://github.com/repo/pull/123",
+        )
         mock_github.merge_pull_request.return_value = True
         mock_github.get_open_pull_requests.return_value = []
         mock_github.create_branch.return_value = True
         mock_github.commit_file.return_value = True
 
         mock_vercel = MagicMock()
-        mock_vercel.trigger_deployment.return_value = {"id": "deploy-123", "url": "https://example.com"}
+        mock_vercel.trigger_deployment.return_value = {
+            "id": "deploy-123",
+            "url": "https://example.com",
+        }
         mock_vercel.get_deployment_status.return_value = "ready"
 
         mock_sentry = MagicMock()
@@ -93,6 +98,7 @@ class TestBuildMVR:
                     claw._deploy_log = DeployActivityLog(deploy_log_path)
 
                     from build.signal_dispatcher import BuildSignalDispatcher
+
                     claw._dispatcher = BuildSignalDispatcher(
                         fs=claw._fs,
                         operational_log=claw._log,
@@ -100,7 +106,8 @@ class TestBuildMVR:
                     )
 
                     from build.approval_handler import BuildApprovalHandler
-                    claw._approval = BuildApprovalHandler(
+
+                    claw._approval_handler = BuildApprovalHandler(
                         fs=claw._fs,
                         operational_log=claw._log,
                         pr_log=claw._pr_log,
@@ -108,46 +115,50 @@ class TestBuildMVR:
                     )
 
                     from build.issue_manager import IssueManager
+
                     claw._issue_manager = IssueManager(
                         fs=claw._fs,
                         inference_client=mock_inference,
                         github_client=mock_github,
                         dispatcher=claw._dispatcher,
-                        approval_handler=claw._approval,
+                        approval_handler=claw._approval_handler,
                         operational_log=claw._log,
                     )
 
-                    from build.code_generator import CodeGenerator
-                    claw._code_generator = CodeGenerator(
-                        fs=claw._fs,
-                        inference_client=mock_inference,
-                        github_client=mock_github,
-                        approval_handler=claw._approval,
-                        operational_log=claw._log,
-                        repo_path=tmp_path / "repo",
-                    )
+        from build.code_generator import CodeGenerator
 
-                    from build.pr_manager import PRManager
-                    claw._pr_manager = PRManager(
-                        fs=claw._fs,
-                        inference_client=mock_inference,
-                        github_client=mock_github,
-                        approval_handler=claw._approval,
-                        operational_log=claw._log,
-                        pr_log=claw._pr_log,
-                    )
+        claw._code_generator = CodeGenerator(
+            fs=claw._fs,
+            inference_client=mock_inference,
+            github_client=mock_github,
+            approval_handler=claw._approval_handler,
+            operational_log=claw._log,
+            repo_path=tmp_path / "repo",
+        )
 
-                    from build.deploy_manager import DeployManager
-                    claw._deploy_manager = DeployManager(
-                        fs=claw._fs,
-                        dispatcher=claw._dispatcher,
-                        approval_handler=claw._approval,
-                        operational_log=claw._log,
-                        deploy_log=claw._deploy_log,
-                        vercel_client=mock_vercel,
-                    )
+        from build.pr_manager import PRManager
 
-                    return claw
+        claw._pr_manager = PRManager(
+            fs=claw._fs,
+            inference_client=mock_inference,
+            github_client=mock_github,
+            approval_handler=claw._approval_handler,
+            operational_log=claw._log,
+            pr_log=claw._pr_log,
+        )
+
+        from build.deploy_manager import DeployManager
+
+        claw._deploy_manager = DeployManager(
+            fs=claw._fs,
+            dispatcher=claw._dispatcher,
+            approval_handler=claw._approval_handler,
+            operational_log=claw._log,
+            deploy_log=claw._deploy_log,
+            vercel_client=mock_vercel,
+        )
+
+        return claw
 
     def test_mvr_01_github_credentials_configured(self, build_claw, tmp_path):
         """GitHub token and test repo configured from environment."""
@@ -162,6 +173,7 @@ class TestBuildMVR:
     def test_mvr_03_sprint_plan_generated(self, build_claw, tmp_path):
         """Sprint plan generated — proceeds without Analytics after timeout."""
         import build.issue_manager
+
         original_wait = build.issue_manager.ANALYTICS_WAIT_SECONDS
         build.issue_manager.ANALYTICS_WAIT_SECONDS = 0.1
 
@@ -175,15 +187,19 @@ class TestBuildMVR:
     def test_mvr_04_sprint_plan_in_war_room_as_review(self, build_claw, tmp_path):
         """Sprint plan queued as REVIEW — not AUTO, not HOLD."""
         import build.issue_manager
+
         original_wait = build.issue_manager.ANALYTICS_WAIT_SECONDS
         build.issue_manager.ANALYTICS_WAIT_SECONDS = 0.1
 
         with patch("build.issue_manager.time.sleep"):
-            plan = build_claw.issue_manager.generate_sprint_plan()
+            build_claw.issue_manager.generate_sprint_plan()
 
         build.issue_manager.ANALYTICS_WAIT_SECONDS = original_wait
-        sprint_actions = [a for a in build_claw.approval_handler._pending_actions.values()
-            if a.action_type == "sprint_plan"]
+        sprint_actions = [
+            a
+            for a in build_claw.approval_handler._pending_actions.values()
+            if a.action_type == "sprint_plan"
+        ]
         assert len(sprint_actions) >= 1
         action = sprint_actions[-1]
         assert action.mode == "REVIEW"
@@ -191,15 +207,19 @@ class TestBuildMVR:
     def test_mvr_05_approve_sprint_plan(self, build_claw, tmp_path):
         """Sprint plan approved — Build Claw begins work on Issue #1."""
         import build.issue_manager
+
         original_wait = build.issue_manager.ANALYTICS_WAIT_SECONDS
         build.issue_manager.ANALYTICS_WAIT_SECONDS = 0.1
 
         with patch("build.issue_manager.time.sleep"):
-            plan = build_claw.issue_manager.generate_sprint_plan()
+            build_claw.issue_manager.generate_sprint_plan()
 
         build.issue_manager.ANALYTICS_WAIT_SECONDS = original_wait
-        sprint_actions = [aid for aid, a in build_claw.approval_handler._pending_actions.items()
-            if a.action_type == "sprint_plan"]
+        sprint_actions = [
+            aid
+            for aid, a in build_claw.approval_handler._pending_actions.items()
+            if a.action_type == "sprint_plan"
+        ]
         if sprint_actions:
             action_id = sprint_actions[-1]
             result = build_claw.approval_handler.handle_approve(action_id)
@@ -207,7 +227,6 @@ class TestBuildMVR:
 
     def test_mvr_06_pr_opened_on_github(self, build_claw, tmp_path):
         """Confirm PR is opened on GitHub test repository."""
-        from build.code_generator import ResolutionResult
         from build.issue_manager import ComplexityScore
 
         score = ComplexityScore(
@@ -220,8 +239,12 @@ class TestBuildMVR:
             scored_at=datetime.now(timezone.utc).isoformat(),
         )
 
-        with patch.object(build_claw._code_generator, "run_tests", return_value=("passing", 10, 0)):
-            with patch.object(build_claw._code_generator, "write_to_branch", return_value=["file.py"]):
+        with patch.object(
+            build_claw._code_generator, "run_tests", return_value=("passing", 10, 0)
+        ):
+            with patch.object(
+                build_claw._code_generator, "write_to_branch", return_value=["file.py"]
+            ):
                 result = build_claw._code_generator.resolve_issue(score)
 
         assert result.status == "ready_for_pr"
@@ -229,7 +252,6 @@ class TestBuildMVR:
     def test_mvr_07_pr_in_war_room_as_review(self, build_claw, tmp_path):
         """PR queued as REVIEW in War Room."""
         from build.code_generator import ResolutionResult
-        from build.pr_manager import PRRecord
 
         resolution = ResolutionResult(
             issue_number=1,
@@ -243,14 +265,19 @@ class TestBuildMVR:
             failure_summary=None,
         )
 
-        pr = build_claw._pr_manager.open_pr(resolution)
+        build_claw._pr_manager.open_pr(resolution)
 
-        pr_actions = [a for a in build_claw.approval_handler._pending_actions.values()
-                      if a.action_type == "pr_review"]
+        pr_actions = [
+            a
+            for a in build_claw.approval_handler._pending_actions.values()
+            if a.action_type == "pr_review"
+        ]
         assert len(pr_actions) >= 1
         assert pr_actions[-1].mode == "REVIEW"
 
-    def test_mvr_08_pr_review_approve_creates_hold_not_merge(self, build_claw, tmp_path):
+    def test_mvr_08_pr_review_approve_creates_hold_not_merge(
+        self, build_claw, tmp_path
+    ):
         """
         CRITICAL TEST: Approving PR REVIEW must NOT merge the PR.
         PR must move to HOLD queue only.
@@ -274,8 +301,11 @@ class TestBuildMVR:
 
         build_claw._github.merge_pull_request.reset_mock()
 
-        pr_review_actions = [aid for aid, a in build_claw.approval_handler._pending_actions.items()
-                             if a.action_type == "pr_review" and a.entity_id == pr.pr_id]
+        pr_review_actions = [
+            aid
+            for aid, a in build_claw.approval_handler._pending_actions.items()
+            if a.action_type == "pr_review" and a.entity_id == pr.pr_id
+        ]
 
         if pr_review_actions:
             action_id = pr_review_actions[-1]
@@ -301,16 +331,27 @@ class TestBuildMVR:
 
         pr = build_claw._pr_manager.open_pr(resolution)
 
-        pr_review_actions = [aid for aid, a in build_claw.approval_handler._pending_actions.items()
-            if a.action_type == "pr_review"]
+        pr_review_actions = [
+            aid
+            for aid, a in build_claw.approval_handler._pending_actions.items()
+            if a.action_type == "pr_review"
+        ]
 
         if pr_review_actions:
             action_id = pr_review_actions[-1]
-            next_step = lambda: build_claw._pr_manager.handle_review_approved(pr.pr_id)
-            build_claw.approval_handler.handle_approve(action_id, next_step_fn=next_step)
 
-        pr_hold_actions = [aid for aid, a in build_claw.approval_handler._pending_actions.items()
-            if a.action_type == "pr_merge_hold"]
+            def next_step():
+                return build_claw._pr_manager.handle_review_approved(pr.pr_id)
+
+            build_claw.approval_handler.handle_approve(
+                action_id, next_step_fn=next_step
+            )
+
+        pr_hold_actions = [
+            aid
+            for aid, a in build_claw.approval_handler._pending_actions.items()
+            if a.action_type == "pr_merge_hold"
+        ]
 
         build_claw._github.merge_pull_request.reset_mock()
 
@@ -318,7 +359,9 @@ class TestBuildMVR:
             action_id = pr_hold_actions[-1]
             build_claw.approval_handler.handle_hold_release(
                 action_id,
-                execute_fn=lambda: build_claw._pr_manager.handle_merge_hold_released(pr.pr_id)
+                execute_fn=lambda: build_claw._pr_manager.handle_merge_hold_released(
+                    pr.pr_id
+                ),
             )
 
         build_claw._github.merge_pull_request.assert_called()
@@ -393,16 +436,22 @@ class TestBuildMVR:
             merged_at=datetime.now(timezone.utc).isoformat(),
         )
 
-        deploy = build_claw._deploy_manager.stage_deployment(pr)
+        build_claw._deploy_manager.stage_deployment(pr)
 
-        deploy_actions = [a for a in build_claw.approval_handler._pending_actions.values()
-                          if a.action_type == "deploy_hold"]
+        deploy_actions = [
+            a
+            for a in build_claw.approval_handler._pending_actions.values()
+            if a.action_type == "deploy_hold"
+        ]
 
         assert len(deploy_actions) >= 1
         assert deploy_actions[-1].mode == "HOLD"
 
-        pr_hold_actions = [a for a in build_claw.approval_handler._pending_actions.values()
-                           if a.action_type == "pr_merge_hold"]
+        pr_hold_actions = [
+            a
+            for a in build_claw.approval_handler._pending_actions.values()
+            if a.action_type == "pr_merge_hold"
+        ]
 
         if pr_hold_actions:
             assert pr_hold_actions[-1].action_id != deploy_actions[-1].action_id
@@ -434,8 +483,11 @@ class TestBuildMVR:
 
         deploy = build_claw._deploy_manager.stage_deployment(pr)
 
-        deploy_hold_actions = [aid for aid, a in build_claw.approval_handler._pending_actions.items()
-                               if a.action_type == "deploy_hold"]
+        deploy_hold_actions = [
+            aid
+            for aid, a in build_claw.approval_handler._pending_actions.items()
+            if a.action_type == "deploy_hold"
+        ]
 
         build_claw._vercel.trigger_deployment.reset_mock()
 
@@ -443,7 +495,11 @@ class TestBuildMVR:
             action_id = deploy_hold_actions[-1]
             build_claw.approval_handler.handle_hold_release(
                 action_id,
-                execute_fn=lambda: build_claw._deploy_manager.handle_deploy_hold_released(deploy.deploy_id)
+                execute_fn=lambda: (
+                    build_claw._deploy_manager.handle_deploy_hold_released(
+                        deploy.deploy_id
+                    )
+                ),
             )
 
         build_claw._vercel.trigger_deployment.assert_called()
@@ -475,7 +531,7 @@ class TestBuildMVR:
 
         deploy = build_claw._deploy_manager.stage_deployment(pr)
 
-        with patch.object(build_claw._dispatcher, "send_deploy_complete") as mock_send:
+        with patch.object(build_claw._dispatcher, "send_deploy_complete"):
             build_claw._deploy_manager.handle_deploy_hold_released(deploy.deploy_id)
 
     def test_mvr_14_deploy_failure_queues_review_no_retry(self, build_claw, tmp_path):
@@ -509,7 +565,9 @@ class TestBuildMVR:
 
         build_claw._vercel.trigger_deployment.reset_mock()
 
-        result = build_claw._deploy_manager.handle_deploy_hold_released(deploy.deploy_id)
+        result = build_claw._deploy_manager.handle_deploy_hold_released(
+            deploy.deploy_id
+        )
 
         assert result.status == "failed"
 
@@ -521,7 +579,6 @@ class TestBuildMVR:
     def test_mvr_15_shipping_summary_accumulates_for_friday(self, build_claw, tmp_path):
         """Merged PR data accumulates in devlog context for Friday dispatch."""
         from build.code_generator import ResolutionResult
-        from build.pr_manager import PRRecord
 
         resolution = ResolutionResult(
             issue_number=1,

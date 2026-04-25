@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -14,7 +13,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import fcntl
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -91,14 +89,16 @@ class AnalyticsLogEntry:
     details: dict[str, Any] = field(default_factory=dict)
 
     def to_json(self) -> str:
-        return json.dumps({
-            "timestamp": self.timestamp,
-            "action_type": self.action_type,
-            "entity_id": self.entity_id,
-            "source_claw": self.source_claw,
-            "outcome": self.outcome,
-            "details": self.details,
-        })
+        return json.dumps(
+            {
+                "timestamp": self.timestamp,
+                "action_type": self.action_type,
+                "entity_id": self.entity_id,
+                "source_claw": self.source_claw,
+                "outcome": self.outcome,
+                "details": self.details,
+            }
+        )
 
 
 class AnalyticsOperationalLog:
@@ -126,7 +126,9 @@ class AnalyticsOperationalLog:
                 fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
     def read_recent(
-        self, days: int = 7, action_type: str | None = None,
+        self,
+        days: int = 7,
+        action_type: str | None = None,
     ) -> list[AnalyticsLogEntry]:
         """Read recent log entries, optionally filtered by action_type.
 
@@ -134,7 +136,9 @@ class AnalyticsOperationalLog:
         So days=3 returns entries from today and the past 3 days.
         """
         entries: list[AnalyticsLogEntry] = []
-        cutoff = datetime.now(timezone.utc) - __import__("datetime").timedelta(days=days)
+        cutoff = datetime.now(timezone.utc) - __import__("datetime").timedelta(
+            days=days
+        )
         cutoff = cutoff.replace(hour=0, minute=0, second=0, microsecond=0)
 
         if not self.log_path.exists():
@@ -265,7 +269,7 @@ class AnalyticsFilesystemInit:
 
     def get_data_path(
         self,
-        data_type: Literal["content-performance", "client-health", "revenue", "delivery-velocity"],
+        data_type: str,
         sub_path: str = "",
     ) -> Path:
         """Get the path for data storage."""
@@ -280,7 +284,9 @@ class AnalyticsFilesystemInit:
 
     def get_archive_path(self, date_str: str) -> Path:
         """Get the archive path for a specific date."""
-        return self.base / "reports" / "weekly-intelligence-archive" / f"{date_str}.json"
+        return (
+            self.base / "reports" / "weekly-intelligence-archive" / f"{date_str}.json"
+        )
 
     def get_baseline_path(self, baseline_type: str) -> Path:
         """Get the path for a baseline file."""

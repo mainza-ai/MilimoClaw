@@ -8,9 +8,8 @@ Manages the full invoice lifecycle.
 CRITICAL: Two-stage approval is non-negotiable.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 from typing import Any, Literal, Protocol
 import json
 import uuid
@@ -236,7 +235,9 @@ class InvoiceManager:
 
         subtotal = sum(item.total for item in line_items)
         invoice_id = f"inv-{uuid.uuid4().hex[:8]}"
-        due_date = (datetime.now(timezone.utc) + timedelta(days=DEFAULT_PAYMENT_TERMS_DAYS)).strftime("%Y-%m-%d")
+        due_date = (
+            datetime.now(timezone.utc) + timedelta(days=DEFAULT_PAYMENT_TERMS_DAYS)
+        ).strftime("%Y-%m-%d")
 
         risk_score = self.payment_risk_scorer.score(client_id)
 
@@ -546,7 +547,10 @@ Create line items that fairly represent the work done. Return JSON array:
         """Get all sent invoices."""
         return self._load_invoices_by_status("sent")
 
-    def _load_invoices_by_status(self, status: Literal["pending", "approved", "sent", "paid", "overdue", "blocked"]) -> list[Invoice]:
+    def _load_invoices_by_status(
+        self,
+        status: Literal["pending", "approved", "sent", "paid", "overdue", "blocked"],
+    ) -> list[Invoice]:
         """Load all invoices with a given status."""
         invoices: list[Invoice] = []
         status_dir = self.fs.base / "invoices" / status
@@ -562,7 +566,11 @@ Create line items that fairly represent the work done. Return JSON array:
 
         return invoices
 
-    def load_invoice(self, invoice_id: str, status: Literal["pending", "approved", "sent", "paid", "overdue", "blocked"]) -> Invoice:
+    def load_invoice(
+        self,
+        invoice_id: str,
+        status: Literal["pending", "approved", "sent", "paid", "overdue", "blocked"],
+    ) -> Invoice:
         """Load an invoice by ID and status."""
         path = self.fs.get_invoice_path(status, invoice_id)
         if not path.exists():

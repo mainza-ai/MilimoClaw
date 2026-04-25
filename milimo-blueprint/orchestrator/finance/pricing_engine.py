@@ -10,8 +10,7 @@ SLA: Must respond within 10 minutes.
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Protocol
+from typing import Protocol
 import json
 
 from .finance_init import (
@@ -126,12 +125,22 @@ class PricingEngine:
             )
 
             parsed = self._parse_inference_output(inference_output, rules)
-            estimated_hours = parsed.get("estimated_hours", COMPLEXITY_TO_HOURS.get(complexity_estimate, 20))
-            recommended_rate = parsed.get("recommended_rate", rules.get("default_hourly_rate", 100))
+            estimated_hours = parsed.get(
+                "estimated_hours", COMPLEXITY_TO_HOURS.get(complexity_estimate, 20)
+            )
+            recommended_rate = parsed.get(
+                "recommended_rate", rules.get("default_hourly_rate", 100)
+            )
             scope_notes = parsed.get("scope_notes", scope_description)
 
-            floor_price = estimated_hours * recommended_rate * rules.get("floor_multiplier", 0.8)
-            ceiling_price = estimated_hours * recommended_rate * rules.get("ceiling_multiplier", 1.5)
+            floor_price = (
+                estimated_hours * recommended_rate * rules.get("floor_multiplier", 0.8)
+            )
+            ceiling_price = (
+                estimated_hours
+                * recommended_rate
+                * rules.get("ceiling_multiplier", 1.5)
+            )
 
             estimate = PricingEstimate(
                 project_id=project_id,
@@ -223,15 +232,19 @@ class PricingEngine:
             return []
 
         results: list[dict] = []
-        for path in sorted(history_dir.glob("*.json"), reverse=True)[:max_projects * 2]:
+        for path in sorted(history_dir.glob("*.json"), reverse=True)[
+            : max_projects * 2
+        ]:
             try:
                 data = json.loads(path.read_text())
                 if data.get("complexity_estimate") == complexity:
-                    results.append({
-                        "estimated_hours": data.get("estimated_hours", 0),
-                        "actual_hours": data.get("actual_hours", 0),
-                        "accuracy_pct": data.get("accuracy_pct", 100),
-                    })
+                    results.append(
+                        {
+                            "estimated_hours": data.get("estimated_hours", 0),
+                            "actual_hours": data.get("actual_hours", 0),
+                            "accuracy_pct": data.get("accuracy_pct", 100),
+                        }
+                    )
                     if len(results) >= max_projects:
                         break
             except (json.JSONDecodeError, Exception):
@@ -300,7 +313,7 @@ class PricingEngine:
 Scope: {scope}
 Complexity: {complexity}
 Deadline: {deadline}
-Default hourly rate: ${rules.get('default_hourly_rate', 100)}
+Default hourly rate: ${rules.get("default_hourly_rate", 100)}
 {calibration_section}
 
 Provide your response as JSON:
@@ -321,12 +334,20 @@ Provide your response as JSON:
             except json.JSONDecodeError:
                 pass
 
-        hours_match = re.search(r"estimated_hours[\"']?\s*[:=]\s*(\d+(?:\.\d+)?)", output)
-        rate_match = re.search(r"recommended_rate[\"']?\s*[:=]\s*(\d+(?:\.\d+)?)", output)
+        hours_match = re.search(
+            r"estimated_hours[\"']?\s*[:=]\s*(\d+(?:\.\d+)?)", output
+        )
+        rate_match = re.search(
+            r"recommended_rate[\"']?\s*[:=]\s*(\d+(?:\.\d+)?)", output
+        )
 
         return {
-            "estimated_hours": float(hours_match.group(1)) if hours_match else COMPLEXITY_TO_HOURS.get("medium", 20),
-            "recommended_rate": float(rate_match.group(1)) if rate_match else rules.get("default_hourly_rate", 100),
+            "estimated_hours": float(hours_match.group(1))
+            if hours_match
+            else COMPLEXITY_TO_HOURS.get("medium", 20),
+            "recommended_rate": float(rate_match.group(1))
+            if rate_match
+            else rules.get("default_hourly_rate", 100),
             "scope_notes": "Parsed from inference output",
         }
 
@@ -364,7 +385,9 @@ Provide your response as JSON:
 
         accuracy = 100.0
         if estimated_hours > 0:
-            accuracy = 100 - abs((actual_hours - estimated_hours) / estimated_hours * 100)
+            accuracy = 100 - abs(
+                (actual_hours - estimated_hours) / estimated_hours * 100
+            )
             accuracy = max(0, min(100, accuracy))
 
         history_path = self.fs.get_pricing_history_path(project_id)

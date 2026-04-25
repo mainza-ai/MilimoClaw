@@ -77,33 +77,33 @@ The content hash covers all blueprint components:
 def calculate_content_hash(blueprint: BlueprintSnapshot) -> str:
     """
     Calculate SHA-256 hash of blueprint content.
-    
+
     Hashed components:
     - Tool configurations (sorted by name)
     - Policy settings (sorted by key)
     - Evolution parameters
     - Performance baseline
-    
+
     Excludes:
     - Timestamps (signed separately)
     - Metadata (non-functional)
     """
     components = []
-    
+
     # Tools (sorted for deterministic hash)
     for tool in sorted(blueprint.tools, key=lambda t: t.name):
         components.append(f"tool:{tool.name}:{tool.version}:{tool.config_hash}")
-    
+
     # Policies (sorted by key)
     for key in sorted(blueprint.policies.keys()):
         components.append(f"policy:{key}:{blueprint.policies[key]}")
-    
+
     # Evolution settings
     components.append(f"evolution:{blueprint.evolution_config_hash}")
-    
+
     # Performance baseline
     components.append(f"baseline:{blueprint.performance_baseline_hash}")
-    
+
     content = "\n".join(components)
     return hashlib.sha256(content.encode()).hexdigest()
 ```
@@ -157,7 +157,7 @@ async def create_blueprint_attestation(
     """
     # Calculate content hash
     content_hash = calculate_content_hash(blueprint)
-    
+
     # Build attestation
     attestation = Attestation(
         version="1.0",
@@ -173,12 +173,12 @@ async def create_blueprint_attestation(
         parent_attestation=parent_attestation.hash() if parent_attestation else None,
         evolution_summary=extract_evolution_summary(blueprint, parent_attestation)
     )
-    
+
     # Sign attestation
     attestation_bytes = attestation.to_signable_bytes()
     signature = private_key.sign(attestation_bytes)
     attestation.signature = f"ed25519:{signature.hex()}"
-    
+
     return attestation
 ```
 
@@ -191,19 +191,19 @@ def verify_attestation(attestation: Attestation) -> ValidationResult:
     """
     # Extract public key
     public_key = Ed25519PublicKey.from_hex(attestation.author.public_key)
-    
+
     # Verify signature
     attestation_bytes = attestation.to_signable_bytes()
     signature = bytes.fromhex(attestation.signature.replace("ed25519:", ""))
-    
+
     try:
         public_key.verify(signature, attestation_bytes)
     except InvalidSignature:
         return ValidationResult(valid=False, error="Invalid signature")
-    
+
     # Verify content hash
     # (Content hash verification requires blueprint data)
-    
+
     return ValidationResult(valid=True)
 ```
 

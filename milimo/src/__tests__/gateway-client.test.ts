@@ -1,283 +1,267 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-/**
- * Jest tests for GatewayClient
- */
+const mockSocketInstance = {
+  connect: vi.fn(),
+  write: vi.fn(),
+  destroy: vi.fn(),
+  on: vi.fn(),
+  once: vi.fn(),
+};
 
-jest.mock("node:net", () => ({
-    Socket: jest.fn().mockImplementation(() => ({
-        connect: jest.fn(),
-        write: jest.fn(),
-        destroy: jest.fn(),
-        on: jest.fn(),
-        once: jest.fn(),
-    })),
+vi.mock("node:net", () => ({
+  Socket: function () {
+    return mockSocketInstance;
+  },
 }));
 
-jest.mock("node:fs", () => ({
-    existsSync: jest.fn((path: string) => path.includes("gateway")),
-    mkdirSync: jest.fn(),
-    writeFileSync: jest.fn(),
-    readdirSync: jest.fn(),
-    readFileSync: jest.fn(),
-    unlinkSync: jest.fn(),
+vi.mock("node:fs", () => ({
+  existsSync: vi.fn((path: string) => path.includes("gateway")),
+  mkdirSync: vi.fn(),
+  writeFileSync: vi.fn(),
+  readdirSync: vi.fn(),
+  readFileSync: vi.fn(),
+  unlinkSync: vi.fn(),
 }));
 
-jest.mock("node:crypto", () => ({
-    createCipheriv: jest.fn(() => ({
-        update: jest.fn(() => Buffer.from("encrypted")),
-        final: jest.fn(() => Buffer.from("")),
-        getAuthTag: jest.fn(() => Buffer.from("tag")),
-    })),
-    createDecipheriv: jest.fn(() => ({
-        setAuthTag: jest.fn(),
-        update: jest.fn(() => Buffer.from('{"id":"test"}')),
-        final: jest.fn(() => Buffer.from("")),
-    })),
-    randomBytes: jest.fn(() => Buffer.from("1234567890123456")),
+vi.mock("node:crypto", () => ({
+  createCipheriv: vi.fn(() => ({
+    update: vi.fn(() => Buffer.from("encrypted")),
+    final: vi.fn(() => Buffer.from("")),
+    getAuthTag: vi.fn(() => Buffer.from("tag")),
+  })),
+  createDecipheriv: vi.fn(() => ({
+    setAuthTag: vi.fn(),
+    update: vi.fn(() => Buffer.from('{"id":"test"}')),
+    final: vi.fn(() => Buffer.from("")),
+  })),
+  randomBytes: vi.fn(() => Buffer.from("1234567890123456")),
+  hkdfSync: vi.fn(() => Buffer.alloc(32, "a")),
 }));
 
-import { GatewayClient, GatewayDeliveryError, getGatewaySocketPath, checkGatewayAvailable } from "../mesh/gateway-client";
+import {
+  GatewayClient,
+  GatewayDeliveryError,
+  getGatewaySocketPath,
+  checkGatewayAvailable,
+} from "../mesh/gateway-client";
 
-const mockedNet = jest.requireMock("node:net");
-const mockedFs = jest.requireMock("node:fs");
+const mockedFs = await import("node:fs");
 
 describe("GatewayClient", () => {
-    const defaultOptions = {
-        squadId: "test-squad",
-        meshSecret: "test-secret-12345",
-    };
+  const defaultOptions = {
+    squadId: "test-squad",
+    meshSecret: "test-secret-12345",
+  };
 
-    beforeEach(() => {
-        jest.clearAllMocks();
+  let client: GatewayClient;
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    mockSocketInstance.connect.mockReset();
+    mockSocketInstance.write.mockReset();
+    mockSocketInstance.destroy.mockReset();
+    mockSocketInstance.on.mockReset();
+    mockSocketInstance.once.mockReset();
+  });
+
+  describe("constructor", () => {
+    it("initializes with squad ID and mesh secret", () => {
+      client = new GatewayClient(defaultOptions);
+
+      expect(client.isConnected()).toBe(false);
     });
 
-    describe("constructor", () => {
-        it("initializes with squad ID and mesh secret", () => {
-            const client = new GatewayClient(defaultOptions);
+    it("uses macOS socket path on darwin", () => {
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, "platform", { value: "darwin", configurable: true });
 
-            expect(client.isConnected()).toBe(false);
-        });
+      expect(getGatewaySocketPath()).toBe("/tmp/openshell-gateway.sock");
 
-        it("uses macOS socket path on darwin", () => {
-            const originalPlatform = process.platform;
-            Object.defineProperty(process, "platform", { value: "darwin" });
-
-            const client = new GatewayClient(defaultOptions);
-
-            expect(getGatewaySocketPath()).toBe("/tmp/openshell-gateway.sock");
-
-            Object.defineProperty(process, "platform", { value: originalPlatform });
-        });
-
-        it("uses Linux socket path on linux", () => {
-            const originalPlatform = process.platform;
-            Object.defineProperty(process, "platform", { value: "linux" });
-
-            expect(getGatewaySocketPath()).toBe("/var/run/openshell/gateway.sock");
-
-            Object.defineProperty(process, "platform", { value: originalPlatform });
-        });
-
-        it("accepts message handler in options", () => {
-            const handler = jest.fn();
-            const client = new GatewayClient({ ...defaultOptions, onMessage: handler });
-
-            expect(client).toBeDefined();
-        });
+      Object.defineProperty(process, "platform", { value: originalPlatform, configurable: true });
     });
 
-    describe("connect()", () => {
-        it("sets connected to true on successful connection", async () => {
-            mockedFs.existsSync.mockReturnValue(true);
+    it("uses Linux socket path on linux", () => {
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, "platform", { value: "linux", configurable: true });
 
-            const mockSocket = {
-                connect: jest.fn(),
-                write: jest.fn(),
-                destroy: jest.fn(),
-                on: jest.fn(),
-                once: jest.fn((event: string, callback: () => void) => {
-                    if (event === "connect") {
-                        callback();
-                    }
-                }),
-            };
-            mockedNet.Socket.mockReturnValue(mockSocket);
+      expect(getGatewaySocketPath()).toBe("/var/run/openshell/gateway.sock");
 
-            const client = new GatewayClient(defaultOptions);
-            await client.connect();
-
-            expect(client.isConnected()).toBe(true);
-        });
-
-        it("enters fallback mode when socket not available", async () => {
-            mockedFs.existsSync.mockReturnValue(false);
-
-            const client = new GatewayClient(defaultOptions);
-            await client.connect();
-
-            expect(client.getFallbackMode()).toBe(true);
-        });
+      Object.defineProperty(process, "platform", { value: originalPlatform, configurable: true });
     });
 
-    describe("send()", () => {
-        it("writes message to file in fallback mode", async () => {
-            mockedFs.existsSync.mockReturnValue(false);
+    it("accepts message handler in options", () => {
+      const handler = vi.fn();
+      client = new GatewayClient({ ...defaultOptions, onMessage: handler });
 
-            const client = new GatewayClient(defaultOptions);
-            await client.connect();
+      expect(handler).toBeDefined();
+    });
+  });
 
-            const message = {
-                id: "msg-123",
-                sender_role: "content",
-                recipient_role: "ops",
-                message_type: "deliverable",
-                payload: { test: true },
-                timestamp: new Date().toISOString(),
-            };
+  describe("connect()", () => {
+    it("sets connected to true on successful connection", async () => {
+      (mockedFs.existsSync as vi.Mock).mockReturnValue(true);
 
-            await client.send(message);
+      mockSocketInstance.once.mockImplementation((event: string, callback: () => void) => {
+        if (event === "connect") {
+          callback();
+        }
+      });
 
-            expect(mockedFs.writeFileSync).toHaveBeenCalled();
-        });
+      client = new GatewayClient(defaultOptions);
+      await client.connect();
 
- it("throws GatewayDeliveryError on timeout", async () => {
- mockedFs.existsSync.mockReturnValue(true);
-
- const mockSocket = {
- connect: jest.fn(),
- write: jest.fn(),
- destroy: jest.fn(),
- on: jest.fn(),
- once: jest.fn((event: string, callback: () => void) => {
- if (event === "connect") {
- callback();
- }
- }),
- };
- mockedNet.Socket.mockReturnValue(mockSocket);
-
- const client = new GatewayClient(defaultOptions);
- await client.connect();
-
- const message = {
- id: "msg-timeout",
- sender_role: "content",
- recipient_role: "ops",
- message_type: "signal",
- payload: {},
- timestamp: new Date().toISOString(),
- };
-
- await expect(client.send(message)).rejects.toThrow(GatewayDeliveryError);
- }, 10000);
+      expect(client.isConnected()).toBe(true);
     });
 
-    describe("disconnect()", () => {
-        it("destroys the socket", async () => {
-            mockedFs.existsSync.mockReturnValue(true);
+    it("enters fallback mode when socket not available", async () => {
+      (mockedFs.existsSync as vi.Mock).mockReturnValue(false);
 
-            const mockSocket = {
-                connect: jest.fn(),
-                write: jest.fn(),
-                destroy: jest.fn(),
-                on: jest.fn(),
-                once: jest.fn((event: string, callback: () => void) => {
-                    if (event === "connect") {
-                        callback();
-                    }
-                }),
-            };
-            mockedNet.Socket.mockReturnValue(mockSocket);
+      client = new GatewayClient(defaultOptions);
+      await client.connect();
 
-            const client = new GatewayClient(defaultOptions);
-            await client.connect();
-            client.disconnect();
+      expect(client.getFallbackMode()).toBe(true);
+    });
+  });
 
-            expect(mockSocket.destroy).toHaveBeenCalled();
-            expect(client.isConnected()).toBe(false);
-        });
+  describe("send()", () => {
+    it("writes message to file in fallback mode", async () => {
+      (mockedFs.existsSync as vi.Mock).mockReturnValue(false);
+
+      client = new GatewayClient(defaultOptions);
+      await client.connect();
+
+      const message = {
+        id: "msg-123",
+        sender_role: "content",
+        recipient_role: "ops",
+        message_type: "deliverable",
+        payload: { test: true },
+        timestamp: new Date().toISOString(),
+      };
+
+      await client.send(message);
+
+      expect(mockedFs.writeFileSync).toHaveBeenCalled();
     });
 
-    describe("onMessage()", () => {
-        it("registers message handler", () => {
-            const client = new GatewayClient(defaultOptions);
-            const handler = jest.fn();
+    it("throws GatewayDeliveryError on timeout", async () => {
+      (mockedFs.existsSync as vi.Mock).mockReturnValue(true);
 
-            client.onMessage(handler);
+      mockSocketInstance.once.mockImplementation((event: string, callback: () => void) => {
+        if (event === "connect") {
+          callback();
+        }
+      });
+      mockSocketInstance.on.mockImplementation(() => {});
+      mockSocketInstance.write.mockImplementation(() => {});
 
-            expect(handler).toBeDefined();
-        });
+      client = new GatewayClient(defaultOptions);
+      await client.connect();
+
+      const message = {
+        id: "msg-timeout",
+        sender_role: "content",
+        recipient_role: "ops",
+        message_type: "signal",
+        payload: {},
+        timestamp: new Date().toISOString(),
+      };
+
+      await expect(client.send(message)).rejects.toThrow(GatewayDeliveryError);
+    }, 10000);
+  });
+
+  describe("disconnect()", () => {
+    it("destroys the socket", async () => {
+      (mockedFs.existsSync as vi.Mock).mockReturnValue(true);
+
+      mockSocketInstance.once.mockImplementation((event: string, callback: () => void) => {
+        if (event === "connect") {
+          callback();
+        }
+      });
+
+      client = new GatewayClient(defaultOptions);
+      await client.connect();
+      client.disconnect();
+
+      expect(mockSocketInstance.destroy).toHaveBeenCalled();
+      expect(client.isConnected()).toBe(false);
+    });
+  });
+
+  describe("onMessage()", () => {
+    it("registers message handler", () => {
+      client = new GatewayClient(defaultOptions);
+      const handler = vi.fn();
+
+      client.onMessage(handler);
+
+      expect(handler).toBeDefined();
+    });
+  });
+
+  describe("getFallbackMode()", () => {
+    it("returns true when in fallback", async () => {
+      (mockedFs.existsSync as vi.Mock).mockReturnValue(false);
+
+      client = new GatewayClient(defaultOptions);
+      await client.connect();
+
+      expect(client.getFallbackMode()).toBe(true);
     });
 
-    describe("getFallbackMode()", () => {
-        it("returns true when in fallback", async () => {
-            mockedFs.existsSync.mockReturnValue(false);
+    it("returns false when connected", async () => {
+      (mockedFs.existsSync as vi.Mock).mockReturnValue(true);
 
-            const client = new GatewayClient(defaultOptions);
-            await client.connect();
+      mockSocketInstance.once.mockImplementation((event: string, callback: () => void) => {
+        if (event === "connect") {
+          callback();
+        }
+      });
 
-            expect(client.getFallbackMode()).toBe(true);
-        });
+      client = new GatewayClient(defaultOptions);
+      await client.connect();
 
-        it("returns false when connected", async () => {
-            mockedFs.existsSync.mockReturnValue(true);
+      expect(client.getFallbackMode()).toBe(false);
+    });
+  });
 
-            const mockSocket = {
-                connect: jest.fn(),
-                write: jest.fn(),
-                destroy: jest.fn(),
-                on: jest.fn(),
-                once: jest.fn((event: string, callback: () => void) => {
-                    if (event === "connect") {
-                        callback();
-                    }
-                }),
-            };
-            mockedNet.Socket.mockReturnValue(mockSocket);
-
-            const client = new GatewayClient(defaultOptions);
-            await client.connect();
-
-            expect(client.getFallbackMode()).toBe(false);
-        });
+  describe("exponential backoff", () => {
+    it("starts with 1 second delay", () => {
+      const delay = 1000;
+      expect(delay).toBe(1000);
     });
 
-    describe("exponential backoff", () => {
-        it("starts with 1 second delay", () => {
-            const delay = 1000;
-            expect(delay).toBe(1000);
-        });
-
-        it("doubles on each retry", () => {
-            const delays = [1000];
-            for (let i = 1; i < 5; i++) {
-                delays.push(Math.min(delays[i - 1]! * 2, 30000));
-            }
-            expect(delays).toEqual([1000, 2000, 4000, 8000, 16000]);
-        });
-
-        it("caps at 30 seconds", () => {
-            let delay = 1000;
-            for (let i = 0; i < 10; i++) {
-                delay = Math.min(delay * 2, 30000);
-            }
-            expect(delay).toBeLessThanOrEqual(30000);
-        });
+    it("doubles on each retry", () => {
+      const delays = [1000];
+      for (let i = 1; i < 5; i++) {
+        delays.push(Math.min(delays[i - 1] * 2, 30000));
+      }
+      expect(delays).toEqual([1000, 2000, 4000, 8000, 16000]);
     });
 
-    describe("checkGatewayAvailable()", () => {
-        it("returns true when socket exists", () => {
-            mockedFs.existsSync.mockReturnValue(true);
-
-            expect(checkGatewayAvailable()).toBe(true);
-        });
-
-        it("returns false when socket missing", () => {
-            mockedFs.existsSync.mockReturnValue(false);
-
-            expect(checkGatewayAvailable()).toBe(false);
-        });
+    it("caps at 30 seconds", () => {
+      let delay = 1000;
+      for (let i = 0; i < 10; i++) {
+        delay = Math.min(delay * 2, 30000);
+      }
+      expect(delay).toBeLessThanOrEqual(30000);
     });
+  });
+
+  describe("checkGatewayAvailable()", () => {
+    it("returns true when socket exists", () => {
+      (mockedFs.existsSync as vi.Mock).mockReturnValue(true);
+
+      expect(checkGatewayAvailable()).toBe(true);
+    });
+
+    it("returns false when socket missing", () => {
+      (mockedFs.existsSync as vi.Mock).mockReturnValue(false);
+
+      expect(checkGatewayAvailable()).toBe(false);
+    });
+  });
 });

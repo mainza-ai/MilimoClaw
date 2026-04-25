@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -12,7 +11,6 @@ blueprints.
 import json
 import logging
 import os
-import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
@@ -58,7 +56,9 @@ class MarketplaceManager:
         with self._registry_file.open("w") as f:
             json.dump(registry, f, indent=2, default=str)
 
-    def publish(self, snapshot: BlueprintSnapshot, price: str, name: str, squad_id: str) -> str:
+    def publish(
+        self, snapshot: BlueprintSnapshot, price: str, name: str, squad_id: str
+    ) -> str:
         """
         List a blueprint on the public registry.
         Returns the marketplace blueprint ID.
@@ -66,7 +66,7 @@ class MarketplaceManager:
         registry = self._load_registry()
 
         # Generate unique ID based on name and timestamp
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+        datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
         safe_name = "".join(c if c.isalnum() else "-" for c in name).lower().strip("-")
         blueprint_id = f"@{squad_id}/{safe_name}-v{snapshot.meta.version}"
 
@@ -105,24 +105,30 @@ class MarketplaceManager:
         listings = registry.get("listings", {}).values()
 
         results = []
-        for l in listings:
-            if category and l.get("business_type", "").lower() != category.lower():
+        for listing in listings:
+            if (
+                category
+                and listing.get("business_type", "").lower() != category.lower()
+            ):
                 continue
-            
+
             if query:
                 q = query.lower()
-                matches_query = (
-                    q in l.get("name", "").lower()
-                    or q in l.get("author", "").lower()
-                    or any(q in tag.lower() for tag in l.get("tags", []))
-                )
-                if not matches_query:
-                    continue
+            matches_query = (
+                q in listing.get("name", "").lower()
+                or q in listing.get("author", "").lower()
+                or any(q in tag.lower() for tag in listing.get("tags", []))
+            )
+            if not matches_query:
+                continue
 
-            results.append(l)
+        results.append(listing)
 
         # Sort by verified and fork count
-        results.sort(key=lambda x: (x.get("verified", False), x.get("fork_count", 0)), reverse=True)
+        results.sort(
+            key=lambda x: (x.get("verified", False), x.get("fork_count", 0)),
+            reverse=True,
+        )
         return results
 
     def get_listing(self, blueprint_id: str) -> Optional[Dict[str, Any]]:
@@ -146,7 +152,9 @@ class MarketplaceManager:
             return None
 
         # Increment fork count
-        registry["listings"][blueprint_id]["fork_count"] = registry["listings"][blueprint_id].get("fork_count", 0) + 1
+        registry["listings"][blueprint_id]["fork_count"] = (
+            registry["listings"][blueprint_id].get("fork_count", 0) + 1
+        )
         self._save_registry(registry)
 
         with snapshot_path.open() as f:

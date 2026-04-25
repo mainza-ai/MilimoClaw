@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -42,7 +41,9 @@ class ClientHealthScore:
     revision_request_rate: float = 0.0
     scope_adherence_score: float = 0.0
     communication_sentiment: float = 0.0
-    scored_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    scored_at: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -101,7 +102,9 @@ class ClientHealthScorer:
         self._approval_handler = approval_handler
         self._operational_log = operational_log
         self._comms_log = comms_log
-        self._decisions_log_path = decisions_log_path or fs._base / "logs" / "decisions.log"
+        self._decisions_log_path = (
+            decisions_log_path or fs._base / "logs" / "decisions.log"
+        )
 
     def score_client(self, client_id: str) -> ClientHealthScore:
         response_time_score = self._calculate_response_time_score(client_id)

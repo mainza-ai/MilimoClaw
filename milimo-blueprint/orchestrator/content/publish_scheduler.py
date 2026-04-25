@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -15,10 +14,8 @@ from __future__ import annotations
 import json
 import logging
 import threading
-import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Callable
 
 from .content_init import (
@@ -233,15 +230,17 @@ class PublishScheduler:
 
                 hours_late = (now - publish_dt).total_seconds() / 3600
 
-                missed.append(MissedPublish(
-                    schedule_id=item.schedule_id,
-                    draft_id=item.draft_id,
-                    platform=item.platform,
-                    client_id=item.client_id,
-                    scheduled_time=item.publish_time,
-                    detected_at=now.isoformat(),
-                    hours_late=hours_late,
-                ))
+                missed.append(
+                    MissedPublish(
+                        schedule_id=item.schedule_id,
+                        draft_id=item.draft_id,
+                        platform=item.platform,
+                        client_id=item.client_id,
+                        scheduled_time=item.publish_time,
+                        detected_at=now.isoformat(),
+                        hours_late=hours_late,
+                    )
+                )
 
             except Exception as e:
                 logger.warning("Failed to check schedule %s: %s", schedule_file, e)
@@ -259,18 +258,20 @@ class PublishScheduler:
                 item.hours_late,
             )
 
-            self._log.append(LogEntry(
-                action_type="missed_publish_detected",
-                entity_id=item.draft_id,
-                outcome="failed",
-                platform=item.platform,
-                client_id=item.client_id,
-                details={
-                    "schedule_id": item.schedule_id,
-                    "scheduled_time": item.scheduled_time,
-                    "hours_late": item.hours_late,
-                },
-            ))
+            self._log.append(
+                LogEntry(
+                    action_type="missed_publish_detected",
+                    entity_id=item.draft_id,
+                    outcome="failed",
+                    platform=item.platform,
+                    client_id=item.client_id,
+                    details={
+                        "schedule_id": item.schedule_id,
+                        "scheduled_time": item.scheduled_time,
+                        "hours_late": item.hours_late,
+                    },
+                )
+            )
 
             if self._war_room:
                 self._war_room.queue_action(
@@ -312,6 +313,7 @@ class PublishScheduler:
             return
 
         from .content_generator import Draft
+
         draft_data = json.loads(draft_path.read_text())
         draft = Draft.from_dict(draft_data)
 
@@ -325,7 +327,9 @@ class PublishScheduler:
 
     def _mark_schedule_complete(self, item: ScheduledItem) -> None:
         """Mark a schedule as completed."""
-        schedule_path = self._fs.BASE / "calendar" / "scheduled" / f"{item.schedule_id}.json"
+        schedule_path = (
+            self._fs.BASE / "calendar" / "scheduled" / f"{item.schedule_id}.json"
+        )
 
         if schedule_path.exists():
             data = json.loads(schedule_path.read_text())
@@ -333,18 +337,22 @@ class PublishScheduler:
             data["completed_at"] = datetime.now(timezone.utc).isoformat()
             schedule_path.write_text(json.dumps(data, indent=2))
 
-        self._log.append(LogEntry(
-            action_type="scheduled_publish_completed",
-            entity_id=item.draft_id,
-            outcome="success",
-            platform=item.platform,
-            client_id=item.client_id,
-            details={"schedule_id": item.schedule_id},
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="scheduled_publish_completed",
+                entity_id=item.draft_id,
+                outcome="success",
+                platform=item.platform,
+                client_id=item.client_id,
+                details={"schedule_id": item.schedule_id},
+            )
+        )
 
     def _mark_schedule_failed(self, item: ScheduledItem, reason: str) -> None:
         """Mark a schedule as failed."""
-        schedule_path = self._fs.BASE / "calendar" / "scheduled" / f"{item.schedule_id}.json"
+        schedule_path = (
+            self._fs.BASE / "calendar" / "scheduled" / f"{item.schedule_id}.json"
+        )
 
         if schedule_path.exists():
             data = json.loads(schedule_path.read_text())
@@ -353,14 +361,16 @@ class PublishScheduler:
             data["failure_reason"] = reason
             schedule_path.write_text(json.dumps(data, indent=2))
 
-        self._log.append(LogEntry(
-            action_type="scheduled_publish_failed",
-            entity_id=item.draft_id,
-            outcome="failed",
-            platform=item.platform,
-            client_id=item.client_id,
-            details={
-                "schedule_id": item.schedule_id,
-                "reason": reason,
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="scheduled_publish_failed",
+                entity_id=item.draft_id,
+                outcome="failed",
+                platform=item.platform,
+                client_id=item.client_id,
+                details={
+                    "schedule_id": item.schedule_id,
+                    "reason": reason,
+                },
+            )
+        )

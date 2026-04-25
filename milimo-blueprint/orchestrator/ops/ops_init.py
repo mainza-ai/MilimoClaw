@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -252,9 +251,7 @@ class OpsCommsLog:
             finally:
                 fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
-    def get_client_history(
-        self, client_id: str, days: int = 90
-    ) -> list[CommsLogEntry]:
+    def get_client_history(self, client_id: str, days: int = 90) -> list[CommsLogEntry]:
         entries: list[CommsLogEntry] = []
         cutoff = datetime.now(timezone.utc).timestamp() - (days * 86400)
 

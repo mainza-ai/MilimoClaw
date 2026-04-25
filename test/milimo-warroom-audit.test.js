@@ -15,7 +15,7 @@ describe('AuditLogger', () => {
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
-    
+
     const logger = new AuditLogger(squadId);
     logger.logAction({ actionType: 'START' });
 
@@ -24,7 +24,7 @@ describe('AuditLogger', () => {
 
   it('logs actions correctly and retrieves them', () => {
     const logger = new AuditLogger(squadId);
-    
+
     logger.logAction({
       actionType: 'WAR_ROOM_APPROVED',
       clawRole: 'ops',
@@ -41,7 +41,7 @@ describe('AuditLogger', () => {
 
   it('gets recent logs with limit', () => {
     const logger = new AuditLogger(squadId);
-    
+
     for (let i = 0; i < 5; i++) {
         logger.logAction({ actionType: `TEST_ACTION_${i}` });
     }

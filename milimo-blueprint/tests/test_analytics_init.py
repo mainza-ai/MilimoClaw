@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -6,15 +5,13 @@
 Unit tests for Analytics Filesystem Initialization.
 """
 
-from __future__ import annotations
-
 import json
 import shutil
 import tempfile
 import threading
+from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -22,16 +19,13 @@ from orchestrator.analytics.analytics_init import (
     AnalyticsFilesystemInit,
     AnalyticsLogEntry,
     AnalyticsOperationalLog,
-    InitResult,
-    ValidationResult,
-    BASE,
     REQUIRED_DIRS,
     REQUIRED_FILES,
 )
 
 
 @pytest.fixture
-def temp_sandbox() -> Path:
+def temp_sandbox() -> Iterator[Path]:
     """Create a temporary sandbox directory for testing."""
     sandbox = Path(tempfile.mkdtemp(prefix="analytics_init_test_"))
     yield sandbox
@@ -94,7 +88,9 @@ class TestAnalyticsFilesystemInit:
                 except json.JSONDecodeError:
                     pytest.fail(f"Invalid JSON in {rel_file}")
 
-    def test_validate_returns_valid_when_structure_exists(self, fs: AnalyticsFilesystemInit):
+    def test_validate_returns_valid_when_structure_exists(
+        self, fs: AnalyticsFilesystemInit
+    ):
         """Test that validate passes when structure is correct."""
         fs.initialize()
         result = fs.validate()
@@ -103,14 +99,18 @@ class TestAnalyticsFilesystemInit:
         assert len(result.missing_dirs) == 0
         assert len(result.missing_files) == 0
 
-    def test_validate_returns_invalid_when_directories_missing(self, fs: AnalyticsFilesystemInit):
+    def test_validate_returns_invalid_when_directories_missing(
+        self, fs: AnalyticsFilesystemInit
+    ):
         """Test that validate fails when directories are missing."""
         result = fs.validate()
 
         assert not result.valid
         assert len(result.missing_dirs) > 0
 
-    def test_validate_returns_invalid_when_files_missing(self, fs: AnalyticsFilesystemInit):
+    def test_validate_returns_invalid_when_files_missing(
+        self, fs: AnalyticsFilesystemInit
+    ):
         """Test that validate fails when files are missing."""
         fs.initialize()
 
@@ -147,9 +147,19 @@ class TestAnalyticsFilesystemInit:
 
     def test_get_data_path_with_sub_path(self, fs: AnalyticsFilesystemInit):
         """Test that get_data_path with sub_path returns correct path."""
-        path = fs.get_data_path("content-performance", "linkedin/2024-01/performance.jsonl")
+        path = fs.get_data_path(
+            "content-performance", "linkedin/2024-01/performance.jsonl"
+        )
 
-        assert path == fs.base / "data" / "content-performance" / "linkedin" / "2024-01" / "performance.jsonl"
+        assert (
+            path
+            == fs.base
+            / "data"
+            / "content-performance"
+            / "linkedin"
+            / "2024-01"
+            / "performance.jsonl"
+        )
 
     def test_get_report_path_returns_correct_path(self, fs: AnalyticsFilesystemInit):
         """Test that get_report_path returns expected path."""
@@ -266,7 +276,7 @@ class TestAnalyticsOperationalLog:
             t.join()
 
         content = log_path.read_text()
-        lines = [l for l in content.strip().split("\n") if l]
+        lines = [line for line in content.strip().split("\n") if line]
 
         assert len(lines) == num_threads * entries_per_thread
 
@@ -288,7 +298,9 @@ class TestAnalyticsOperationalLog:
 
         for i in range(10):
             days_ago = i
-            timestamp = (now - __import__("datetime").timedelta(days=days_ago)).isoformat()
+            timestamp = (
+                now - __import__("datetime").timedelta(days=days_ago)
+            ).isoformat()
             entry = AnalyticsLogEntry(
                 timestamp=timestamp,
                 action_type=f"action_{i}",

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -14,14 +13,16 @@ from __future__ import annotations
 
 import json
 import logging
-import math
 import statistics
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 from typing import Any, Literal
 
-from .analytics_init import AnalyticsFilesystemInit, AnalyticsLogEntry, AnalyticsOperationalLog
+from .analytics_init import (
+    AnalyticsFilesystemInit,
+    AnalyticsLogEntry,
+    AnalyticsOperationalLog,
+)
 
 logger = logging.getLogger("milimo.baseline_manager")
 
@@ -276,9 +277,14 @@ class BaselineManager:
         if baselines:
             baseline_file = self.fs.get_baseline_path("content")
             baseline_file.parent.mkdir(parents=True, exist_ok=True)
-            data = {f"{b.platform}:{b.content_type}:{b.metric}": b.to_dict() for b in baselines}
+            data = {
+                f"{b.platform}:{b.content_type}:{b.metric}": b.to_dict()
+                for b in baselines
+            }
             baseline_file.write_text(json.dumps(data, indent=2) + "\n")
-            logger.debug("Wrote %d content baselines to %s", len(baselines), baseline_file)
+            logger.debug(
+                "Wrote %d content baselines to %s", len(baselines), baseline_file
+            )
 
         return baselines
 
@@ -350,7 +356,9 @@ class BaselineManager:
             baseline_file.parent.mkdir(parents=True, exist_ok=True)
             data = {b.metric: b.to_dict() for b in baselines}
             baseline_file.write_text(json.dumps(data, indent=2) + "\n")
-            logger.debug("Wrote %d revenue baselines to %s", len(baselines), baseline_file)
+            logger.debug(
+                "Wrote %d revenue baselines to %s", len(baselines), baseline_file
+            )
 
         return baselines
 
@@ -422,7 +430,9 @@ class BaselineManager:
             baseline_file.parent.mkdir(parents=True, exist_ok=True)
             data = {b.metric: b.to_dict() for b in baselines}
             baseline_file.write_text(json.dumps(data, indent=2) + "\n")
-            logger.debug("Wrote %d delivery baselines to %s", len(baselines), baseline_file)
+            logger.debug(
+                "Wrote %d delivery baselines to %s", len(baselines), baseline_file
+            )
 
         return baselines
 
@@ -479,11 +489,19 @@ class BaselineManager:
 
             sample_count = self._count_samples("content-performance")
             if sample_count < self.MIN_SAMPLES:
-                return False, f"Only {sample_count} content samples, need {self.MIN_SAMPLES}"
+                return (
+                    False,
+                    f"Only {sample_count} content samples, need {self.MIN_SAMPLES}",
+                )
 
         return True, ""
 
-    def _count_samples(self, data_type: Literal["content-performance", "client-health", "revenue", "delivery-velocity"]) -> int:
+    def _count_samples(
+        self,
+        data_type: Literal[
+            "content-performance", "client-health", "revenue", "delivery-velocity"
+        ],
+    ) -> int:
         """Count total samples in a data directory."""
         count = 0
         data_dir = self.fs.get_data_path(data_type)

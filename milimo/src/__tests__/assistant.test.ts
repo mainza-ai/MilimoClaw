@@ -1,58 +1,67 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-/**
- * Jest tests for assistant.ts
- */
+const mockReadFileSync = vi.fn();
+
+vi.mock("node:child_process", () => ({
+  spawn: vi.fn(),
+}));
+
+vi.mock("node:fs", () => ({
+  existsSync: vi.fn(),
+  readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
+}));
+
+vi.mock("node:path", () => ({
+  join: vi.fn((...args: string[]) => args.join("/")),
+}));
+
+vi.mock("node:os", () => ({
+  homedir: vi.fn(() => "/home/test"),
+}));
 
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import {
+  getAssistantConfig,
+  assistantSetup,
+  assistantVerify,
+  assistantStart,
+} from "../commands/assistant";
 
-jest.mock("node:child_process", () => ({
-  spawn: jest.fn(),
-}));
-
-jest.mock("node:fs", () => ({
-  existsSync: jest.fn(),
-  readFileSync: jest.fn(),
-}));
-
-jest.mock("node:path", () => ({
-  join: jest.fn((...args: string[]) => args.join("/")),
-}));
-
-const mockedSpawn = spawn as jest.MockedFunction<typeof spawn>;
-const mockedFs = jest.requireMock("node:fs");
+const mockedSpawn = spawn as vi.MockedFunction<typeof spawn>;
+const mockedExistsSync = existsSync as vi.MockedFunction<typeof existsSync>;
 
 describe("assistant commands", () => {
-  let mockProcess: { on: jest.Mock; stdout?: { on: jest.Mock }; stderr?: { on: jest.Mock } };
+  let mockProcess: { on: vi.Mock; stdout?: { on: vi.Mock }; stderr?: { on: vi.Mock } };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.restoreAllMocks();
     mockProcess = {
-      on: jest.fn(),
+      on: vi.fn(),
     };
     mockedSpawn.mockReturnValue(mockProcess as unknown as ReturnType<typeof spawn>);
+    mockReadFileSync.mockReset();
+    mockedExistsSync.mockReset();
   });
 
   describe("getAssistantConfig", () => {
-    it("returns null when config file does not exist", async () => {
-      mockedFs.existsSync.mockReturnValue(false);
+    it("returns null when config file does not exist", () => {
+      mockedExistsSync.mockReturnValue(false);
 
-      const { getAssistantConfig } = await import("../commands/assistant.js");
       const result = getAssistantConfig();
 
       expect(result).toBeNull();
     });
 
-    it("returns config when assistant name is set", async () => {
-      mockedFs.existsSync.mockReturnValue(true);
-      mockedFs.readFileSync.mockReturnValue(
+    it("returns config when assistant name is set", () => {
+      mockedExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(
         JSON.stringify({
           assistant: { name: "Nova", emoji: "🦅" },
-        })
+        }),
       );
 
-      const { getAssistantConfig } = await import("../commands/assistant.js");
       const result = getAssistantConfig();
 
       expect(result).not.toBeNull();
@@ -60,29 +69,23 @@ describe("assistant commands", () => {
       expect(result?.emoji).toBe("🦅");
     });
 
-    it("returns null when assistant name is missing", async () => {
-      mockedFs.existsSync.mockReturnValue(true);
-      mockedFs.readFileSync.mockReturnValue(
+    it("returns null when assistant name is missing", () => {
+      mockedExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(
         JSON.stringify({
           assistant: {},
-        })
+        }),
       );
 
-      const { getAssistantConfig } = await import("../commands/assistant.js");
       const result = getAssistantConfig();
 
       expect(result).toBeNull();
     });
 
-    it("uses default emoji when not set", async () => {
-      mockedFs.existsSync.mockReturnValue(true);
-      mockedFs.readFileSync.mockReturnValue(
-        JSON.stringify({
-          assistant: { name: "Rex" },
-        })
-      );
+    it("uses default emoji when not set", () => {
+      mockedExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(JSON.stringify({ assistant: { name: "Rex" } }));
 
-      const { getAssistantConfig } = await import("../commands/assistant.js");
       const result = getAssistantConfig();
 
       expect(result?.emoji).toBe("🦀");
@@ -90,14 +93,13 @@ describe("assistant commands", () => {
   });
 
   describe("assistantSetup", () => {
-    it("spawns python3 with correct arguments", async () => {
-      const { assistantSetup } = await import("../commands/assistant.js");
+    it("spawns python3 with resolved script path", async () => {
+      mockedExistsSync.mockReturnValue(false);
 
       const setupPromise = assistantSetup();
 
-      // Simulate successful exit
       const closeCallback = mockProcess.on.mock.calls.find(
-        (call: unknown[]) => call[0] === "close"
+        (call: unknown[]) => call[0] === "close",
       )?.[1] as (code: number) => void;
       closeCallback?.(0);
 
@@ -105,19 +107,18 @@ describe("assistant commands", () => {
 
       expect(mockedSpawn).toHaveBeenCalledWith(
         "python3",
-        ["milimo-blueprint/orchestrator/assistant_setup.py"],
-        { stdio: "inherit" }
+        ["/home/test/.milimo/blueprints/0.1.0/orchestrator/assistant_setup.py"],
+        { stdio: "inherit" },
       );
     });
 
     it("rejects on non-zero exit code", async () => {
-      const { assistantSetup } = await import("../commands/assistant.js");
+      mockedExistsSync.mockReturnValue(false);
 
       const setupPromise = assistantSetup();
 
-      // Simulate error exit
       const closeCallback = mockProcess.on.mock.calls.find(
-        (call: unknown[]) => call[0] === "close"
+        (call: unknown[]) => call[0] === "close",
       )?.[1] as (code: number) => void;
       closeCallback?.(1);
 
@@ -126,21 +127,13 @@ describe("assistant commands", () => {
   });
 
   describe("assistantVerify", () => {
-    it("spawns python3 with --verify flag", async () => {
-      mockedFs.existsSync.mockReturnValue(true);
-      mockedFs.readFileSync.mockReturnValue(
-        JSON.stringify({
-          assistant: { name: "Nova", emoji: "🦅" },
-        })
-      );
-
-      const { assistantVerify } = await import("../commands/assistant.js");
+    it("spawns python3 with resolved script path and --verify flag", async () => {
+      mockedExistsSync.mockReturnValue(false);
 
       const verifyPromise = assistantVerify();
 
-      // Simulate successful exit
       const closeCallback = mockProcess.on.mock.calls.find(
-        (call: unknown[]) => call[0] === "close"
+        (call: unknown[]) => call[0] === "close",
       )?.[1] as (code: number) => void;
       closeCallback?.(0);
 
@@ -148,19 +141,18 @@ describe("assistant commands", () => {
 
       expect(mockedSpawn).toHaveBeenCalledWith(
         "python3",
-        ["milimo-blueprint/orchestrator/assistant_setup.py", "--verify"],
-        { stdio: "inherit" }
+        ["/home/test/.milimo/blueprints/0.1.0/orchestrator/assistant_setup.py", "--verify"],
+        { stdio: "inherit" },
       );
     });
 
     it("rejects when verification fails", async () => {
-      const { assistantVerify } = await import("../commands/assistant.js");
+      mockedExistsSync.mockReturnValue(false);
 
       const verifyPromise = assistantVerify();
 
-      // Simulate failed verification
       const closeCallback = mockProcess.on.mock.calls.find(
-        (call: unknown[]) => call[0] === "close"
+        (call: unknown[]) => call[0] === "close",
       )?.[1] as (code: number) => void;
       closeCallback?.(1);
 
@@ -170,13 +162,11 @@ describe("assistant commands", () => {
 
   describe("assistantStart", () => {
     it("exits when agent config does not exist", async () => {
-      mockedFs.existsSync.mockReturnValue(false);
+      mockedExistsSync.mockReturnValue(false);
 
-      const mockExit = jest.spyOn(process, "exit").mockImplementation(() => {
+      const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
         throw new Error("process.exit");
-      });
-
-      const { assistantStart } = await import("../commands/assistant.js");
+      }) as never);
 
       await expect(assistantStart()).rejects.toThrow("process.exit");
 
@@ -185,47 +175,39 @@ describe("assistant commands", () => {
     });
 
     it("spawns openclaw with correct agent path", async () => {
-      mockedFs.existsSync.mockReturnValue(true);
-      mockedFs.readFileSync.mockReturnValue(
+      mockedExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(
         JSON.stringify({
           assistant: { name: "Nova", emoji: "🦅" },
-        })
+        }),
       );
-
-      const { assistantStart } = await import("../commands/assistant.js");
 
       const startPromise = assistantStart();
 
-      // Simulate successful exit
       const closeCallback = mockProcess.on.mock.calls.find(
-        (call: unknown[]) => call[0] === "close"
+        (call: unknown[]) => call[0] === "close",
       )?.[1] as (code: number) => void;
       closeCallback?.(0);
 
       await startPromise;
 
-      expect(mockedSpawn).toHaveBeenCalledWith(
-        "openclaw",
-        ["tui", "--session", "main"],
-        { stdio: "inherit" }
-      );
+      expect(mockedSpawn).toHaveBeenCalledWith("openclaw", ["tui", "--session", "main"], {
+        stdio: "inherit",
+      });
     });
 
     it("rejects on non-zero exit code", async () => {
-      mockedFs.existsSync.mockReturnValue(true);
-      mockedFs.readFileSync.mockReturnValue(
+      mockedExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(
         JSON.stringify({
           assistant: { name: "Nova", emoji: "🦅" },
-        })
+        }),
       );
-
-      const { assistantStart } = await import("../commands/assistant.js");
 
       const startPromise = assistantStart();
 
-      // Simulate error exit
       const closeCallback = mockProcess.on.mock.calls.find(
-        (call: unknown[]) => call[0] === "close"
+        (call: unknown[]) => call[0] === "close",
       )?.[1] as (code: number) => void;
       closeCallback?.(1);
 
@@ -233,21 +215,18 @@ describe("assistant commands", () => {
     });
 
     it("uses default name when assistant config missing", async () => {
-      mockedFs.existsSync.mockReturnValue(true);
-      mockedFs.readFileSync.mockReturnValue(JSON.stringify({}));
-
-      const { assistantStart } = await import("../commands/assistant.js");
+      mockedExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(JSON.stringify({}));
 
       const startPromise = assistantStart();
 
       const closeCallback = mockProcess.on.mock.calls.find(
-        (call: unknown[]) => call[0] === "close"
+        (call: unknown[]) => call[0] === "close",
       )?.[1] as (code: number) => void;
       closeCallback?.(0);
 
       await startPromise;
 
-      // Should use default name "your assistant"
       expect(mockedSpawn).toHaveBeenCalled();
     });
   });

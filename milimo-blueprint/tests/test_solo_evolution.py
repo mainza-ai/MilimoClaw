@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -6,11 +5,10 @@
 Tests for solo_evolution.py - Evolution Scheduler
 """
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Any
 from unittest.mock import MagicMock
 
-import pytest
 
 from orchestrator.solo_evolution import (
     schedule_evolution,
@@ -74,6 +72,7 @@ VALID_CONFIG: dict[str, Any] = {
 
 # ---------------------------------------------------------------------------
 
+
 class TestScheduleEvolution:
     """Tests for schedule_evolution function."""
 
@@ -100,7 +99,9 @@ class TestScheduleEvolution:
         result = schedule_evolution(VALID_CONFIG)
 
         assert result["schedules"]["content"]["threshold_field"] == "min_approved_posts"
-        assert result["schedules"]["ops"]["threshold_field"] == "min_client_interactions"
+        assert (
+            result["schedules"]["ops"]["threshold_field"] == "min_client_interactions"
+        )
         assert result["schedules"]["finance"]["threshold_field"] == "min_invoices"
 
     def test_threshold_values_assigned(self) -> None:
@@ -632,13 +633,17 @@ class TestInitEvolutionTimers:
 
         schedule_calls = []
 
-        def mock_schedule_fn(job_name, job_fn, target_hour, target_minute, target_weekday):
-            schedule_calls.append({
-                "job_name": job_name,
-                "hour": target_hour,
-                "minute": target_minute,
-                "weekday": target_weekday,
-            })
+        def mock_schedule_fn(
+            job_name, job_fn, target_hour, target_minute, target_weekday
+        ):
+            schedule_calls.append(
+                {
+                    "job_name": job_name,
+                    "hour": target_hour,
+                    "minute": target_minute,
+                    "weekday": target_weekday,
+                }
+            )
 
         log_calls = []
 
@@ -681,7 +686,9 @@ class TestInitEvolutionTimers:
 
         schedule_calls = []
 
-        def mock_schedule_fn(job_name, job_fn, target_hour, target_minute, target_weekday):
+        def mock_schedule_fn(
+            job_name, job_fn, target_hour, target_minute, target_weekday
+        ):
             schedule_calls.append({"job_name": job_name})
 
         log_calls = []
@@ -720,12 +727,16 @@ class TestInitEvolutionTimers:
 
         schedule_calls = []
 
-        def mock_schedule_fn(job_name, job_fn, target_hour, target_minute, target_weekday):
-            schedule_calls.append({
-                "job_name": job_name,
-                "hour": target_hour,
-                "minute": target_minute,
-            })
+        def mock_schedule_fn(
+            job_name, job_fn, target_hour, target_minute, target_weekday
+        ):
+            schedule_calls.append(
+                {
+                    "job_name": job_name,
+                    "hour": target_hour,
+                    "minute": target_minute,
+                }
+            )
 
         log_calls = []
 
@@ -739,7 +750,9 @@ class TestInitEvolutionTimers:
             log_fn=mock_log_fn,
         )
 
-        finance_call = next((c for c in schedule_calls if "finance" in c["job_name"]), None)
+        finance_call = next(
+            (c for c in schedule_calls if "finance" in c["job_name"]), None
+        )
         assert finance_call is not None
         assert finance_call["hour"] == 3
         assert finance_call["minute"] == 0
@@ -765,12 +778,16 @@ class TestInitEvolutionTimers:
 
         schedule_calls = []
 
-        def mock_schedule_fn(job_name, job_fn, target_hour, target_minute, target_weekday):
-            schedule_calls.append({
-                "job_name": job_name,
-                "hour": target_hour,
-                "minute": target_minute,
-            })
+        def mock_schedule_fn(
+            job_name, job_fn, target_hour, target_minute, target_weekday
+        ):
+            schedule_calls.append(
+                {
+                    "job_name": job_name,
+                    "hour": target_hour,
+                    "minute": target_minute,
+                }
+            )
 
         log_calls = []
 
@@ -784,7 +801,9 @@ class TestInitEvolutionTimers:
             log_fn=mock_log_fn,
         )
 
-        content_call = next((c for c in schedule_calls if "content" in c["job_name"]), None)
+        content_call = next(
+            (c for c in schedule_calls if "content" in c["job_name"]), None
+        )
         assert content_call is not None
         assert content_call["hour"] == 2
         assert content_call["minute"] == 5
@@ -802,7 +821,9 @@ class TestInitEvolutionTimers:
 
         schedule_calls = []
 
-        def mock_schedule_fn(job_name, job_fn, target_hour, target_minute, target_weekday):
+        def mock_schedule_fn(
+            job_name, job_fn, target_hour, target_minute, target_weekday
+        ):
             schedule_calls.append({"weekday": target_weekday})
 
         log_calls = []

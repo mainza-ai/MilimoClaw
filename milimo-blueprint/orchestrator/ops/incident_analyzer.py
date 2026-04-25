@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """
 Ops Claw — Incident Analyzer
 
@@ -26,6 +28,7 @@ logger = logging.getLogger("milimo.ops.incident_analyzer")
 @dataclass
 class IncidentAnalysis:
     """Result of an incident analysis."""
+
     alert_id: str
     source: str
     severity: str
@@ -93,36 +96,43 @@ class IncidentAnalyzer:
         source = alert.get("source", "unknown")
         severity = alert.get("severity", "warning")
         title = alert.get("title", "")
-        description = alert.get("description", "")
-        raw_payload = alert.get("raw_payload", {})
+        alert.get("description", "")
+        alert.get("raw_payload", {})
 
         logger.info("Analyzing incident %s from %s: %s", alert_id, source, title)
 
         try:
             analysis = self._run_inference_analysis(alert)
         except Exception as e:
-            logger.warning("AI analysis failed for %s, using rule-based fallback: %s", alert_id, e)
+            logger.warning(
+                "AI analysis failed for %s, using rule-based fallback: %s", alert_id, e
+            )
             analysis = self._rule_based_analysis(alert)
 
         self._analysis_history.append(analysis)
 
-        self._log.append(OpsLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="incident_analyzed",
-            entity_id=alert_id,
-            outcome="success",
-            details={
-                "source": source,
-                "severity": severity,
-                "runbook_match": analysis.runbook_match,
-                "recommended_actions_count": len(analysis.recommended_actions),
-                "confidence": analysis.confidence,
-            },
-        ))
+        self._log.append(
+            OpsLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="incident_analyzed",
+                entity_id=alert_id,
+                outcome="success",
+                details={
+                    "source": source,
+                    "severity": severity,
+                    "runbook_match": analysis.runbook_match,
+                    "recommended_actions_count": len(analysis.recommended_actions),
+                    "confidence": analysis.confidence,
+                },
+            )
+        )
 
         logger.info(
             "Incident %s analyzed: runbook=%s, actions=%d, confidence=%.2f",
-            alert_id, analysis.runbook_match, len(analysis.recommended_actions), analysis.confidence,
+            alert_id,
+            analysis.runbook_match,
+            len(analysis.recommended_actions),
+            analysis.confidence,
         )
 
         return analysis
@@ -163,8 +173,12 @@ class IncidentAnalyzer:
             source=alert.get("source", "unknown"),
             severity=alert.get("severity", "warning"),
             title=alert.get("title", ""),
-            root_cause_hypothesis=data.get("root_cause_hypothesis", "Unable to determine"),
-            recommended_actions=data.get("recommended_actions", ["Investigate further"]),
+            root_cause_hypothesis=data.get(
+                "root_cause_hypothesis", "Unable to determine"
+            ),
+            recommended_actions=data.get(
+                "recommended_actions", ["Investigate further"]
+            ),
             runbook_match=data.get("runbook_match", "investigate"),
             confidence=float(data.get("confidence", 0.5)),
         )
@@ -181,15 +195,27 @@ class IncidentAnalyzer:
 
         if "out of memory" in title or "oom" in title:
             runbook = "restart_service"
-            actions = ["Restart the affected service", "Check memory limits", "Review recent deployments"]
+            actions = [
+                "Restart the affected service",
+                "Check memory limits",
+                "Review recent deployments",
+            ]
             confidence = 0.7
         elif "connection" in title or "timeout" in title:
             runbook = "investigate"
-            actions = ["Check network connectivity", "Verify service health", "Review load balancer logs"]
+            actions = [
+                "Check network connectivity",
+                "Verify service health",
+                "Review load balancer logs",
+            ]
             confidence = 0.5
         elif "deployment" in title and "fail" in title:
             runbook = "rollback"
-            actions = ["Rollback to previous deployment", "Check deployment logs", "Verify build artifacts"]
+            actions = [
+                "Rollback to previous deployment",
+                "Check deployment logs",
+                "Verify build artifacts",
+            ]
             confidence = 0.8
         elif "disk" in title or "storage" in title:
             runbook = "clear_cache"
@@ -197,11 +223,19 @@ class IncidentAnalyzer:
             confidence = 0.6
         elif "cpu" in title or "load" in title:
             runbook = "scale_up"
-            actions = ["Scale up instances", "Identify resource-intensive processes", "Check for runaway processes"]
+            actions = [
+                "Scale up instances",
+                "Identify resource-intensive processes",
+                "Check for runaway processes",
+            ]
             confidence = 0.5
 
         if severity == "critical" and not actions:
-            actions = ["Investigate immediately", "Notify on-call team", "Check service dashboards"]
+            actions = [
+                "Investigate immediately",
+                "Notify on-call team",
+                "Check service dashboards",
+            ]
 
         return IncidentAnalysis(
             alert_id=alert.get("alert_id", "unknown"),
@@ -218,13 +252,13 @@ class IncidentAnalyzer:
         """Build the analysis prompt for the inference client."""
         return f"""Analyze the following incident alert:
 
-Source: {alert.get('source', 'unknown')}
-Severity: {alert.get('severity', 'warning')}
-Title: {alert.get('title', '')}
-Description: {alert.get('description', '')}
+Source: {alert.get("source", "unknown")}
+Severity: {alert.get("severity", "warning")}
+Title: {alert.get("title", "")}
+Description: {alert.get("description", "")}
 
 Raw payload:
-{json.dumps(alert.get('raw_payload', {}), indent=2)[:2000]}
+{json.dumps(alert.get("raw_payload", {}), indent=2)[:2000]}
 
 Return a JSON object with:
 - root_cause_hypothesis: A brief hypothesis about the root cause
@@ -236,8 +270,9 @@ Return a JSON object with:
     def _extract_json_from_text(text: str) -> dict:
         """Extract JSON from free-form text response."""
         import re
+
         # Try to find JSON object in text
-        match = re.search(r'\{[^{}]*\}', text, re.DOTALL)
+        match = re.search(r"\{[^{}]*\}", text, re.DOTALL)
         if match:
             try:
                 return json.loads(match.group())

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -6,23 +5,19 @@
 Unit tests for Analytics Claw main entry point.
 """
 
-from __future__ import annotations
-
-import json
 import shutil
 import tempfile
 from datetime import datetime, timezone
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
 
 import pytest
 
 from orchestrator.analytics.analytics_claw import AnalyticsClaw
-from orchestrator.analytics.analytics_init import AnalyticsFilesystemInit
 
 
 @pytest.fixture
-def temp_sandbox() -> Path:
+def temp_sandbox() -> Iterator[Path]:
     sandbox = Path(tempfile.mkdtemp(prefix="claw_test_"))
     yield sandbox
     shutil.rmtree(sandbox, ignore_errors=True)
@@ -83,6 +78,7 @@ class TestAnalyticsClaw:
         claw.shutdown()
 
         assert not claw._started
+        assert claw.scheduler is not None
         assert not claw.scheduler._running
 
     def test_handle_inbound_routes_messages(self, temp_sandbox: Path):
@@ -186,7 +182,9 @@ class TestAnalyticsClaw:
         )
         claw.startup()
 
-        assert claw.report_generator.inference_client is inference_client
+        rg = claw.report_generator
+        assert rg is not None
+        assert rg.inference_client is inference_client
 
         claw.shutdown()
 

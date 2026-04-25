@@ -50,7 +50,9 @@ class FinanceApprovalHandler:
     ):
         self.invoice_manager = invoice_manager
         self.operational_log = operational_log
-        self.decisions_path = decisions_path or Path("/sandbox/finance/logs/decisions.log")
+        self.decisions_path = decisions_path or Path(
+            "/sandbox/finance/logs/decisions.log"
+        )
 
     def queue_invoice_review(self, invoice: Invoice) -> str:
         """
@@ -238,9 +240,7 @@ class FinanceApprovalHandler:
         }
         self._log_decision(decision)
 
-    def queue_overdue_review(
-        self, invoice: Invoice, days_overdue: int
-    ) -> str:
+    def queue_overdue_review(self, invoice: Invoice, days_overdue: int) -> str:
         """
         Queue REVIEW action for first overdue.
 

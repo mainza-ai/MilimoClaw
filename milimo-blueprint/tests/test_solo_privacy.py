@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -6,7 +5,6 @@
 Tests for solo_privacy.py - Inference Router
 """
 
-import tempfile
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -48,6 +46,7 @@ VALID_CONFIG: dict[str, Any] = {
 
 # ---------------------------------------------------------------------------
 
+
 class TestSoloPrivacyRouter:
     """Tests for SoloPrivacyRouter class."""
 
@@ -87,7 +86,9 @@ class TestSoloPrivacyRouter:
         decision = router.route("internal_ideation")
 
         assert decision.route == Route.LOCAL
-        assert "privacy" in decision.reason.lower() or "local" in decision.reason.lower()
+        assert (
+            "privacy" in decision.reason.lower() or "local" in decision.reason.lower()
+        )
 
     def test_route_unknown_defaults_to_local(self, router: SoloPrivacyRouter) -> None:
         """Test that unknown data types default to local."""
@@ -181,11 +182,13 @@ class TestSoloPrivacyRouter:
 
     def test_route_batch(self, router: SoloPrivacyRouter) -> None:
         """Test routing multiple data types."""
-        decisions = router.route_batch([
-            "financial_data",
-            "client_facing_drafts",
-            "internal_ideation",
-        ])
+        decisions = router.route_batch(
+            [
+                "financial_data",
+                "client_facing_drafts",
+                "internal_ideation",
+            ]
+        )
 
         assert len(decisions) == 3
         assert decisions[0].route == Route.LOCAL

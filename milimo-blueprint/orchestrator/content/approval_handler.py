@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -17,7 +16,6 @@ import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Callable
 
 from .content_init import (
@@ -141,17 +139,19 @@ class ContentApprovalHandler:
 
         self._log_approval(draft_id, "APPROVED", action_id)
 
-        self._log.append(LogEntry(
-            action_type="draft_approved",
-            entity_id=draft_id,
-            outcome="success",
-            client_id=draft.client_id,
-            details={
-                "action_id": action_id,
-                "platform": draft.platform,
-                "scheduled_time": draft.scheduled_time,
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="draft_approved",
+                entity_id=draft_id,
+                outcome="success",
+                client_id=draft.client_id,
+                details={
+                    "action_id": action_id,
+                    "platform": draft.platform,
+                    "scheduled_time": draft.scheduled_time,
+                },
+            )
+        )
 
         if publish_immediately and self._on_publish:
             self._on_publish(draft)
@@ -192,7 +192,9 @@ class ContentApprovalHandler:
         draft_data = json.loads(pending_path.read_text())
         draft = Draft.from_dict(draft_data)
 
-        original_path = self._fs.BASE / "drafts" / "pending" / f"{draft_id}_original.json"
+        original_path = (
+            self._fs.BASE / "drafts" / "pending" / f"{draft_id}_original.json"
+        )
         original_path.write_text(json.dumps(draft.to_dict(), indent=2))
 
         delta = self._calculate_edit_delta(draft.processed_content, edited_content)
@@ -200,19 +202,21 @@ class ContentApprovalHandler:
         draft.processed_content = edited_content
         draft.tools_applied.append("operator_edit")
 
-        self._log.append(LogEntry(
-            action_type="draft_edited",
-            entity_id=draft_id,
-            outcome="success",
-            client_id=draft.client_id,
-            details={
-                "action_id": action_id,
-                "original_length": delta.original_length,
-                "edited_length": delta.edited_length,
-                "change_ratio": delta.change_ratio,
-                "significant": delta.significant,
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="draft_edited",
+                entity_id=draft_id,
+                outcome="success",
+                client_id=draft.client_id,
+                details={
+                    "action_id": action_id,
+                    "original_length": delta.original_length,
+                    "edited_length": delta.edited_length,
+                    "change_ratio": delta.change_ratio,
+                    "significant": delta.significant,
+                },
+            )
+        )
 
         if delta.significant:
             new_draft_id = f"{draft_id}_edited"
@@ -222,12 +226,17 @@ class ContentApprovalHandler:
             new_path = self._fs.get_draft_path("pending", new_draft_id)
             new_path.write_text(json.dumps(draft.to_dict(), indent=2))
 
-            self._log.append(LogEntry(
-                action_type="draft_requeued",
-                entity_id=new_draft_id,
-                outcome="success",
-                details={"original_draft": draft_id, "change_ratio": delta.change_ratio},
-            ))
+            self._log.append(
+                LogEntry(
+                    action_type="draft_requeued",
+                    entity_id=new_draft_id,
+                    outcome="success",
+                    details={
+                        "original_draft": draft_id,
+                        "change_ratio": delta.change_ratio,
+                    },
+                )
+            )
 
             logger.info(
                 "Draft %s edited significantly (%.1f%% changed), re-queued as %s",
@@ -306,17 +315,19 @@ class ContentApprovalHandler:
         reason_str = reason or "No reason provided"
         self._log_approval(draft_id, "BLOCKED", action_id, reason_str)
 
-        self._log.append(LogEntry(
-            action_type="draft_rejected",
-            entity_id=draft_id,
-            outcome="success",
-            client_id=draft.client_id,
-            details={
-                "action_id": action_id,
-                "reason": reason_str,
-                "platform": draft.platform,
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="draft_rejected",
+                entity_id=draft_id,
+                outcome="success",
+                client_id=draft.client_id,
+                details={
+                    "action_id": action_id,
+                    "reason": reason_str,
+                    "platform": draft.platform,
+                },
+            )
+        )
 
         alert = self._check_rejection_alert(draft)
         if alert:
@@ -362,15 +373,22 @@ class ContentApprovalHandler:
         if not draft.scheduled_time:
             return
 
-        calendar_path = self._fs.BASE / "calendar" / "scheduled" / f"{draft.draft_id}.json"
+        calendar_path = (
+            self._fs.BASE / "calendar" / "scheduled" / f"{draft.draft_id}.json"
+        )
         calendar_path.parent.mkdir(parents=True, exist_ok=True)
-        calendar_path.write_text(json.dumps({
-            "draft_id": draft.draft_id,
-            "platform": draft.platform,
-            "client_id": draft.client_id,
-            "scheduled_time": draft.scheduled_time,
-            "content_preview": draft.processed_content[:100],
-        }, indent=2))
+        calendar_path.write_text(
+            json.dumps(
+                {
+                    "draft_id": draft.draft_id,
+                    "platform": draft.platform,
+                    "client_id": draft.client_id,
+                    "scheduled_time": draft.scheduled_time,
+                    "content_preview": draft.processed_content[:100],
+                },
+                indent=2,
+            )
+        )
 
         logger.debug("Draft %s scheduled for %s", draft.draft_id, draft.scheduled_time)
 

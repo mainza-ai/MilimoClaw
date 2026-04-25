@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -17,10 +16,13 @@ import json
 import logging
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Callable
 
-from .analytics_init import AnalyticsFilesystemInit, AnalyticsLogEntry, AnalyticsOperationalLog
+from .analytics_init import (
+    AnalyticsFilesystemInit,
+    AnalyticsLogEntry,
+    AnalyticsOperationalLog,
+)
 
 logger = logging.getLogger("milimo.signal_dispatcher")
 
@@ -180,7 +182,10 @@ class SignalDispatcher:
         )
 
     def _send(
-        self, message_type: str, recipient_role: str, payload: dict[str, Any],
+        self,
+        message_type: str,
+        recipient_role: str,
+        payload: dict[str, Any],
     ) -> None:
         """Core send via mesh gateway."""
         message_id = str(uuid.uuid4())

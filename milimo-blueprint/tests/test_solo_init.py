@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -6,12 +5,10 @@
 Tests for solo_init.py - Template Loader
 """
 
-import tempfile
 from pathlib import Path
 from typing import Any
 
 import pytest
-import yaml
 
 from orchestrator.solo_init import (
     load_solo_founder_template,
@@ -22,7 +19,6 @@ from orchestrator.solo_init import (
     get_claw_network_policy,
     get_approval_modes,
     get_evolution_config,
-    CLAWS,
 )
 
 
@@ -165,6 +161,7 @@ deep_work_mode:
 
 # ---------------------------------------------------------------------------
 
+
 class TestLoadSoloFounderTemplate:
     """Tests for load_solo_founder_template function."""
 
@@ -212,7 +209,9 @@ class TestLoadSoloFounderTemplate:
 
     def test_missing_required_section(self, tmp_path: Path) -> None:
         """Test that MissingFieldError is raised when a required section is missing."""
-        invalid_template = VALID_TEMPLATE.replace("operator_policy:", "removed_section:")
+        invalid_template = VALID_TEMPLATE.replace(
+            "operator_policy:", "removed_section:"
+        )
         template_file = tmp_path / "invalid.yaml"
         template_file.write_text(invalid_template)
 
@@ -223,7 +222,7 @@ class TestLoadSoloFounderTemplate:
 
     def test_invalid_field_type_squad_size(self, tmp_path: Path) -> None:
         """Test that InvalidFieldTypeError is raised for wrong type."""
-        invalid_template = VALID_TEMPLATE.replace("squad_size: 1", "squad_size: \"one\"")
+        invalid_template = VALID_TEMPLATE.replace("squad_size: 1", 'squad_size: "one"')
         template_file = tmp_path / "invalid.yaml"
         template_file.write_text(invalid_template)
 
@@ -236,7 +235,7 @@ class TestLoadSoloFounderTemplate:
         """Test that InvalidFieldTypeError is raised when claws_active is not a list."""
         invalid_template = VALID_TEMPLATE.replace(
             "claws_active:\n    - content\n    - ops\n    - analytics\n    - finance\n    - build",
-            "claws_active: content"
+            "claws_active: content",
         )
         template_file = tmp_path / "invalid.yaml"
         template_file.write_text(invalid_template)
@@ -248,10 +247,7 @@ class TestLoadSoloFounderTemplate:
 
     def test_invalid_claw_name_in_claws_active(self, tmp_path: Path) -> None:
         """Test that InvalidFieldTypeError is raised for invalid claw name."""
-        invalid_template = VALID_TEMPLATE.replace(
-            "- build",
-            "- invalid_claw"
-        )
+        invalid_template = VALID_TEMPLATE.replace("- build", "- invalid_claw")
         template_file = tmp_path / "invalid.yaml"
         template_file.write_text(invalid_template)
 
@@ -263,8 +259,7 @@ class TestLoadSoloFounderTemplate:
     def test_locked_route_financial_data_not_local(self, tmp_path: Path) -> None:
         """Test that TemplateValidationError is raised when locked route is not 'local'."""
         invalid_template = VALID_TEMPLATE.replace(
-            "financial_data: local",
-            "financial_data: cloud"
+            "financial_data: local", "financial_data: cloud"
         )
         template_file = tmp_path / "invalid.yaml"
         template_file.write_text(invalid_template)
@@ -278,8 +273,7 @@ class TestLoadSoloFounderTemplate:
     def test_locked_route_source_code_not_local(self, tmp_path: Path) -> None:
         """Test that TemplateValidationError is raised when source_code is not 'local'."""
         invalid_template = VALID_TEMPLATE.replace(
-            "source_code: local",
-            "source_code: cloud"
+            "source_code: local", "source_code: cloud"
         )
         template_file = tmp_path / "invalid.yaml"
         template_file.write_text(invalid_template)
@@ -309,7 +303,7 @@ class TestLoadSoloFounderTemplate:
         """Test that MissingFieldError is raised when evolution.per_claw is missing a claw."""
         invalid_template = VALID_TEMPLATE.replace(
             "build:\n      enabled: true\n      min_prs_merged: 5\n      performance_threshold: 5",
-            ""
+            "",
         )
         template_file = tmp_path / "invalid.yaml"
         template_file.write_text(invalid_template)
@@ -322,8 +316,7 @@ class TestLoadSoloFounderTemplate:
     def test_missing_approval_mode_claw(self, tmp_path: Path) -> None:
         """Test that MissingFieldError is raised when approval_modes is missing a claw."""
         invalid_template = VALID_TEMPLATE.replace(
-            "build:\n      pr_open: REVIEW\n      pr_merge: HOLD",
-            ""
+            "build:\n      pr_open: REVIEW\n      pr_merge: HOLD", ""
         )
         template_file = tmp_path / "invalid.yaml"
         template_file.write_text(invalid_template)
@@ -361,7 +354,9 @@ class TestHelperFunctions:
         assert "api.twitter.com" in policy["approved"]
         assert "api.instagram.com" in policy["approved"]
 
-    def test_get_claw_network_policy_invalid_claw(self, valid_config: dict[str, Any]) -> None:
+    def test_get_claw_network_policy_invalid_claw(
+        self, valid_config: dict[str, Any]
+    ) -> None:
         """Test that ValueError is raised for invalid claw name."""
         with pytest.raises(ValueError):
             get_claw_network_policy(valid_config, "invalid_claw")
@@ -383,7 +378,9 @@ class TestHelperFunctions:
         assert evo_config["min_approved_posts"] == 10
         assert evo_config["performance_threshold"] == 5
 
-    def test_get_evolution_config_invalid_claw(self, valid_config: dict[str, Any]) -> None:
+    def test_get_evolution_config_invalid_claw(
+        self, valid_config: dict[str, Any]
+    ) -> None:
         """Test that ValueError is raised for invalid claw name."""
         with pytest.raises(ValueError):
             get_evolution_config(valid_config, "invalid_claw")

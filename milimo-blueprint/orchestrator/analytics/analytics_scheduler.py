@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -22,7 +21,6 @@ import logging
 import threading
 import time
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 from typing import Any, Callable
 
 from .analytics_init import AnalyticsLogEntry, AnalyticsOperationalLog
@@ -157,7 +155,9 @@ class AnalyticsScheduler:
             except Exception as e:
                 logger.error("Scheduled job %s failed: %s", job_name, e)
 
-            self._schedule_next(job_name, job_fn, target_hour, target_minute, target_weekday)
+            self._schedule_next(
+                job_name, job_fn, target_hour, target_minute, target_weekday
+            )
 
         if job_name in self._timers:
             self._timers[job_name].cancel()
@@ -195,7 +195,9 @@ class AnalyticsScheduler:
                 )
             )
 
-            logger.info("Baseline recalculation completed in %.2fs", time.time() - start_time)
+            logger.info(
+                "Baseline recalculation completed in %.2fs", time.time() - start_time
+            )
 
         except Exception as e:
             logger.error("Baseline recalculation failed: %s", e)
@@ -286,7 +288,9 @@ class AnalyticsScheduler:
                 )
             )
 
-            logger.info("Opportunity scoring completed in %.2fs", time.time() - start_time)
+            logger.info(
+                "Opportunity scoring completed in %.2fs", time.time() - start_time
+            )
 
         except Exception as e:
             logger.error("Opportunity scoring failed: %s", e)
@@ -311,9 +315,15 @@ class AnalyticsScheduler:
         last_report = None
 
         for entry in recent_entries:
-            if entry.action_type == "baseline_recalculation" and entry.outcome == "success":
+            if (
+                entry.action_type == "baseline_recalculation"
+                and entry.outcome == "success"
+            ):
                 last_baseline = entry.timestamp
-            elif entry.action_type == "weekly_report_generation" and entry.outcome == "success":
+            elif (
+                entry.action_type == "weekly_report_generation"
+                and entry.outcome == "success"
+            ):
                 last_report = entry.timestamp
 
         if last_baseline:
@@ -364,16 +374,22 @@ class AnalyticsScheduler:
         if target_weekday is not None:
             days_ahead = (target_weekday - now.weekday()) % 7
             if days_ahead == 0:
-                target = now.replace(hour=target_hour, minute=target_minute, second=0, microsecond=0)
+                target = now.replace(
+                    hour=target_hour, minute=target_minute, second=0, microsecond=0
+                )
                 if target <= now:
                     days_ahead = 7
             else:
                 pass
 
-            target = now.replace(hour=target_hour, minute=target_minute, second=0, microsecond=0)
+            target = now.replace(
+                hour=target_hour, minute=target_minute, second=0, microsecond=0
+            )
             target = target + timedelta(days=days_ahead)
         else:
-            target = now.replace(hour=target_hour, minute=target_minute, second=0, microsecond=0)
+            target = now.replace(
+                hour=target_hour, minute=target_minute, second=0, microsecond=0
+            )
             if target <= now:
                 target = target + timedelta(days=1)
 

@@ -1,10 +1,11 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """Tests for Finance Claw Payment Monitor."""
 
 import json
 import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -16,7 +17,7 @@ from finance.finance_init import (
 )
 from finance.signal_dispatcher import FinanceSignalDispatcher
 from finance.payment_monitor import PaymentMonitor, PaymentStatus
-from finance.invoice_manager import Invoice, InvoiceManager
+from finance.invoice_manager import Invoice
 
 
 class MockStripeClient:
@@ -67,11 +68,13 @@ class MockMeshGateway:
         message_id: str,
         timestamp: str,
     ) -> bool:
-        self.sent_messages.append({
-            "message_type": message_type,
-            "recipient_role": sender_role,
-            "payload": payload,
-        })
+        self.sent_messages.append(
+            {
+                "message_type": message_type,
+                "recipient_role": sender_role,
+                "payload": payload,
+            }
+        )
         return True
 
 
@@ -138,8 +141,14 @@ class TestPaymentMonitor:
 
     @pytest.fixture
     def payment_monitor(
-        self, fs, stripe_client, dispatcher, revenue_tracker,
-        approval_handler, operational_log, payment_events_log
+        self,
+        fs,
+        stripe_client,
+        dispatcher,
+        revenue_tracker,
+        approval_handler,
+        operational_log,
+        payment_events_log,
     ):
         return PaymentMonitor(
             fs=fs,
@@ -161,7 +170,9 @@ class TestPaymentMonitor:
             subtotal=1000,
             total=1000,
             payment_risk_level="low",
-            due_date=(datetime.now(timezone.utc) - timedelta(days=5)).strftime("%Y-%m-%d"),
+            due_date=(datetime.now(timezone.utc) - timedelta(days=5)).strftime(
+                "%Y-%m-%d"
+            ),
             stripe_invoice_id="st_123",
         )
 
@@ -215,7 +226,9 @@ class TestPaymentMonitor:
         assert paid_path.exists()
         assert not sent_path.exists()
 
-    def test_process_payment_received_calls_revenue_tracker(self, payment_monitor, revenue_tracker):
+    def test_process_payment_received_calls_revenue_tracker(
+        self, payment_monitor, revenue_tracker
+    ):
         """Payment received calls revenue_tracker.record_payment."""
         invoice = Invoice(
             invoice_id="inv-rev",
@@ -246,7 +259,9 @@ class TestPaymentMonitor:
             subtotal=1000,
             total=1000,
             payment_risk_level="low",
-            due_date=(datetime.now(timezone.utc) - timedelta(days=5)).strftime("%Y-%m-%d"),
+            due_date=(datetime.now(timezone.utc) - timedelta(days=5)).strftime(
+                "%Y-%m-%d"
+            ),
             status="sent",
         )
 
@@ -258,7 +273,9 @@ class TestPaymentMonitor:
         overdue_path = fs.get_invoice_path("overdue", invoice.invoice_id)
         assert overdue_path.exists()
 
-    def test_first_overdue_queues_review(self, payment_monitor, approval_handler, payment_events_log):
+    def test_first_overdue_queues_review(
+        self, payment_monitor, approval_handler, payment_events_log
+    ):
         """First overdue queues REVIEW in War Room."""
         invoice = Invoice(
             invoice_id="inv-first-overdue",
@@ -268,7 +285,9 @@ class TestPaymentMonitor:
             subtotal=1000,
             total=1000,
             payment_risk_level="low",
-            due_date=(datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
+            due_date=(datetime.now(timezone.utc) - timedelta(days=1)).strftime(
+                "%Y-%m-%d"
+            ),
             status="sent",
         )
 
@@ -276,14 +295,17 @@ class TestPaymentMonitor:
 
         assert len(approval_handler.queued_reviews) == 1
 
-    def test_repeat_overdue_queues_hold(self, payment_monitor, approval_handler, payment_events_log):
+    def test_repeat_overdue_queues_hold(
+        self, payment_monitor, approval_handler, payment_events_log
+    ):
         """Repeat overdue (2+) queues HOLD in War Room."""
         client_id = "client-repeat"
 
         for i in range(2):
             from finance.finance_init import PaymentEvent
+
             event = PaymentEvent(
-                timestamp=f"2026-03-{1+i:02d}T10:00:00",
+                timestamp=f"2026-03-{1 + i:02d}T10:00:00",
                 event_type="payment_overdue",
                 invoice_id=f"inv-old-{i}",
                 client_id=client_id,
@@ -300,7 +322,9 @@ class TestPaymentMonitor:
             subtotal=1000,
             total=1000,
             payment_risk_level="low",
-            due_date=(datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
+            due_date=(datetime.now(timezone.utc) - timedelta(days=1)).strftime(
+                "%Y-%m-%d"
+            ),
             status="sent",
         )
 
@@ -321,7 +345,9 @@ class TestPaymentMonitor:
             subtotal=1000,
             total=1000,
             payment_risk_level="low",
-            due_date=(datetime.now(timezone.utc) - timedelta(days=5)).strftime("%Y-%m-%d"),
+            due_date=(datetime.now(timezone.utc) - timedelta(days=5)).strftime(
+                "%Y-%m-%d"
+            ),
             status="sent",
         )
 
@@ -334,7 +360,9 @@ class TestPaymentMonitor:
         overdue_ids = [i.invoice_id for i in overdue]
         assert "inv-flag-overdue" in overdue_ids
 
-    def test_stripe_call_logged_to_payment_events(self, payment_monitor, payment_events_log):
+    def test_stripe_call_logged_to_payment_events(
+        self, payment_monitor, payment_events_log
+    ):
         """Stripe API call is logged to payment-events.log."""
         invoice = Invoice(
             invoice_id="inv-logged",
@@ -380,7 +408,9 @@ class TestPaymentMonitor:
 
     def test_days_overdue_calculation(self, payment_monitor):
         """days_overdue is calculated correctly."""
-        due_date = (datetime.now(timezone.utc) - timedelta(days=10)).strftime("%Y-%m-%d")
+        due_date = (datetime.now(timezone.utc) - timedelta(days=10)).strftime(
+            "%Y-%m-%d"
+        )
 
         invoice = Invoice(
             invoice_id="inv-days",
@@ -426,12 +456,16 @@ class TestPaymentMonitor:
             subtotal=1000,
             total=1000,
             payment_risk_level="low",
-            due_date=(datetime.now(timezone.utc) - timedelta(days=5)).strftime("%Y-%m-%d"),
+            due_date=(datetime.now(timezone.utc) - timedelta(days=5)).strftime(
+                "%Y-%m-%d"
+            ),
             status="sent",
         )
 
         payment_monitor.process_payment_overdue(invoice)
 
         assert len(gateway.sent_messages) >= 1
-        overdue_msgs = [m for m in gateway.sent_messages if m["message_type"] == "payment_overdue"]
+        overdue_msgs = [
+            m for m in gateway.sent_messages if m["message_type"] == "payment_overdue"
+        ]
         assert len(overdue_msgs) >= 1

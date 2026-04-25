@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """
 Build Claw — Vercel Client
 
@@ -148,7 +150,7 @@ class VercelClient:
 
         result = self._request(
             "POST",
-            f"/v13/deployments",
+            "/v13/deployments",
             json=payload,
         )
 

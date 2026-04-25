@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -34,25 +33,29 @@ logger = logging.getLogger("milimo.tool_proposal")
 
 
 # Valid tool types (must match pattern_types in evolution_config.yaml)
-VALID_TOOL_TYPES = frozenset({
-    "classifier",
-    "optimizer",
-    "predictor",
-    "generator_variant",
-    "anomaly_detector",
-})
+VALID_TOOL_TYPES = frozenset(
+    {
+        "classifier",
+        "optimizer",
+        "predictor",
+        "generator_variant",
+        "anomaly_detector",
+    }
+)
 
 # Valid proposal statuses
-VALID_STATUSES = frozenset({
-    "proposed",
-    "approved",
-    "building",
-    "testing",
-    "deployed",
-    "rejected",
-    "disabled",
-    "failed",
-})
+VALID_STATUSES = frozenset(
+    {
+        "proposed",
+        "approved",
+        "building",
+        "testing",
+        "deployed",
+        "rejected",
+        "disabled",
+        "failed",
+    }
+)
 
 
 # ---------------------------------------------------------------------------
@@ -65,7 +68,9 @@ class ToolProposal:
     """A proposal for a new evolved tool."""
 
     tool_name: str
-    tool_type: str  # classifier | optimizer | predictor | generator_variant | anomaly_detector
+    tool_type: (
+        str  # classifier | optimizer | predictor | generator_variant | anomaly_detector
+    )
     trigger_pattern: EvolutionPattern
     metric_target: str
     data_sources_required: list[str] = field(default_factory=list)
@@ -88,10 +93,13 @@ class ToolProposal:
         # Handle nested EvolutionPattern
         trigger = data.get("trigger_pattern", {})
         if isinstance(trigger, dict):
-            data["trigger_pattern"] = EvolutionPattern(**{
-                k: v for k, v in trigger.items()
-                if k in EvolutionPattern.__dataclass_fields__
-            })
+            data["trigger_pattern"] = EvolutionPattern(
+                **{
+                    k: v
+                    for k, v in trigger.items()
+                    if k in EvolutionPattern.__dataclass_fields__
+                }
+            )
         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
 
 

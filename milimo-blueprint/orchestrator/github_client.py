@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """
 GitHub Client wrapping the `gh` CLI.
 
@@ -56,7 +58,9 @@ class GitHubClient:
     # Repository context
     # ------------------------------------------------------------------
 
-    def _gh(self, args: list[str], timeout: int | None = None) -> subprocess.CompletedProcess:
+    def _gh(
+        self, args: list[str], timeout: int | None = None
+    ) -> subprocess.CompletedProcess:
         """Run a gh CLI command with the repo flag."""
         cmd = ["gh"]
         if self.repo:
@@ -69,7 +73,9 @@ class GitHubClient:
             timeout=timeout or self.timeout,
         )
 
-    def _gh_api(self, endpoint: str, method: str = "GET", payload: dict | None = None) -> Any:
+    def _gh_api(
+        self, endpoint: str, method: str = "GET", payload: dict | None = None
+    ) -> Any:
         """Make a raw GitHub API call via gh CLI."""
         args = ["api", endpoint, "--method", method]
         if payload:
@@ -119,27 +125,42 @@ class GitHubClient:
 
     def get_open_issues(self, limit: int = 50) -> list[dict[str, Any]]:
         """Fetch open issues with labels, assignees, and body."""
-        result = self._gh([
-            "issue", "list",
-            "--state", "open",
-            "--limit", str(limit),
-            "--json", "number,title,body,labels,assignees,createdAt,updatedAt,author,url",
-        ])
+        result = self._gh(
+            [
+                "issue",
+                "list",
+                "--state",
+                "open",
+                "--limit",
+                str(limit),
+                "--json",
+                "number,title,body,labels,assignees,createdAt,updatedAt,author,url",
+            ]
+        )
         if result.returncode != 0:
             raise RuntimeError(f"Failed to fetch issues: {result.stderr.strip()}")
         return json.loads(result.stdout) if result.stdout.strip() else []
 
     def get_issue(self, issue_number: int) -> dict[str, Any]:
         """Fetch a single issue by number."""
-        result = self._gh([
-            "issue", "view", str(issue_number),
-            "--json", "number,title,body,labels,assignees,comments,createdAt,updatedAt,author,url",
-        ])
+        result = self._gh(
+            [
+                "issue",
+                "view",
+                str(issue_number),
+                "--json",
+                "number,title,body,labels,assignees,comments,createdAt,updatedAt,author,url",
+            ]
+        )
         if result.returncode != 0:
-            raise RuntimeError(f"Failed to fetch issue #{issue_number}: {result.stderr.strip()}")
+            raise RuntimeError(
+                f"Failed to fetch issue #{issue_number}: {result.stderr.strip()}"
+            )
         return json.loads(result.stdout)
 
-    def create_issue(self, title: str, body: str, labels: list[str] | None = None) -> int:
+    def create_issue(
+        self, title: str, body: str, labels: list[str] | None = None
+    ) -> int:
         """Create a new GitHub issue. Returns the issue number."""
         args = ["issue", "create", "--title", title, "--body", body]
         if labels:
@@ -159,13 +180,17 @@ class GitHubClient:
         """Close an issue."""
         result = self._gh(["issue", "close", str(issue_number)])
         if result.returncode != 0:
-            raise RuntimeError(f"Failed to close issue #{issue_number}: {result.stderr.strip()}")
+            raise RuntimeError(
+                f"Failed to close issue #{issue_number}: {result.stderr.strip()}"
+            )
 
     def add_issue_comment(self, issue_number: int, comment: str) -> None:
         """Add a comment to an issue."""
         result = self._gh(["issue", "comment", str(issue_number), "--body", comment])
         if result.returncode != 0:
-            raise RuntimeError(f"Failed to comment on issue #{issue_number}: {result.stderr.strip()}")
+            raise RuntimeError(
+                f"Failed to comment on issue #{issue_number}: {result.stderr.strip()}"
+            )
 
     # ------------------------------------------------------------------
     # Branch operations
@@ -189,7 +214,9 @@ class GitHubClient:
                 timeout=self.timeout,
             )
             if result.returncode != 0:
-                raise RuntimeError(f"Failed to create branch {branch_name}: {result.stderr.strip()}")
+                raise RuntimeError(
+                    f"Failed to create branch {branch_name}: {result.stderr.strip()}"
+                )
 
     def delete_branch(self, branch_name: str) -> None:
         """Delete a branch locally and remotely."""
@@ -262,6 +289,7 @@ class GitHubClient:
         )
         if result and isinstance(result, dict):
             import base64
+
             return base64.b64decode(result.get("content", "")).decode("utf-8")
         return ""
 
@@ -284,11 +312,16 @@ class GitHubClient:
             Tuple of (PR number, PR URL).
         """
         args = [
-            "pr", "create",
-            "--title", title,
-            "--body", body,
-            "--head", branch,
-            "--base", base,
+            "pr",
+            "create",
+            "--title",
+            title,
+            "--body",
+            body,
+            "--head",
+            branch,
+            "--base",
+            base,
         ]
         if draft:
             args.append("--draft")
@@ -311,24 +344,35 @@ class GitHubClient:
 
     def get_open_pull_requests(self) -> list[dict[str, Any]]:
         """List open pull requests."""
-        result = self._gh([
-            "pr", "list",
-            "--state", "open",
-            "--json", "number,title,author,createdAt,updatedAt,labels,url,headRefName,baseRefName,files,mergeable",
-        ])
+        result = self._gh(
+            [
+                "pr",
+                "list",
+                "--state",
+                "open",
+                "--json",
+                "number,title,author,createdAt,updatedAt,labels,url,headRefName,baseRefName,files,mergeable",
+            ]
+        )
         if result.returncode != 0:
             raise RuntimeError(f"Failed to list PRs: {result.stderr.strip()}")
         return json.loads(result.stdout) if result.stdout.strip() else []
 
     def get_pr_files(self, pr_number: int) -> list[dict[str, Any]]:
         """Get the list of files changed in a PR."""
-        result = self._gh([
-            "pr", "diff", str(pr_number),
-            "--name-only",
-        ])
+        result = self._gh(
+            [
+                "pr",
+                "diff",
+                str(pr_number),
+                "--name-only",
+            ]
+        )
         if result.returncode != 0:
             raise RuntimeError(f"Failed to get PR files: {result.stderr.strip()}")
-        return [{"filename": line} for line in result.stdout.strip().split("\n") if line]
+        return [
+            {"filename": line} for line in result.stdout.strip().split("\n") if line
+        ]
 
     def merge_pull_request(
         self,
@@ -349,22 +393,30 @@ class GitHubClient:
 
         result = self._gh(args)
         if result.returncode != 0:
-            raise RuntimeError(f"Failed to merge PR #{pr_number}: {result.stderr.strip()}")
+            raise RuntimeError(
+                f"Failed to merge PR #{pr_number}: {result.stderr.strip()}"
+            )
 
     def close_pull_request(self, pr_number: int) -> None:
         """Close a pull request without merging."""
         result = self._gh(["pr", "close", str(pr_number)])
         if result.returncode != 0:
-            raise RuntimeError(f"Failed to close PR #{pr_number}: {result.stderr.strip()}")
+            raise RuntimeError(
+                f"Failed to close PR #{pr_number}: {result.stderr.strip()}"
+            )
 
-    def add_pr_review(self, pr_number: int, state: str = "APPROVE", body: str = "") -> None:
+    def add_pr_review(
+        self, pr_number: int, state: str = "APPROVE", body: str = ""
+    ) -> None:
         """Add a review to a PR."""
         args = ["pr", "review", str(pr_number), f"--{state.lower()}"]
         if body:
             args.extend(["--body", body])
         result = self._gh(args)
         if result.returncode != 0:
-            raise RuntimeError(f"Failed to review PR #{pr_number}: {result.stderr.strip()}")
+            raise RuntimeError(
+                f"Failed to review PR #{pr_number}: {result.stderr.strip()}"
+            )
 
     # ------------------------------------------------------------------
     # Dependency auditing
@@ -373,9 +425,12 @@ class GitHubClient:
     def get_dependabot_alerts(self) -> list[dict[str, Any]]:
         """Fetch Dependabot security alerts via the API."""
         try:
-            return self._gh_api(
-                f"/repos/{self.repo}/dependabot/alerts",
-            ) or []
+            return (
+                self._gh_api(
+                    f"/repos/{self.repo}/dependabot/alerts",
+                )
+                or []
+            )
         except Exception as exc:
             logger.warning("Failed to fetch Dependabot alerts: %s", exc)
             return []
@@ -383,9 +438,12 @@ class GitHubClient:
     def get_code_scanning_alerts(self) -> list[dict[str, Any]]:
         """Fetch CodeQL scanning alerts via the API."""
         try:
-            return self._gh_api(
-                f"/repos/{self.repo}/code-scanning/alerts",
-            ) or []
+            return (
+                self._gh_api(
+                    f"/repos/{self.repo}/code-scanning/alerts",
+                )
+                or []
+            )
         except Exception as exc:
             logger.warning("Failed to fetch CodeQL alerts: %s", exc)
             return []
@@ -393,9 +451,12 @@ class GitHubClient:
     def run_dependency_graph(self) -> dict[str, Any]:
         """Get repository dependency graph summary."""
         try:
-            return self._gh_api(
-                f"/repos/{self.repo}/dependency-graph/snapshots",
-            ) or {}
+            return (
+                self._gh_api(
+                    f"/repos/{self.repo}/dependency-graph/snapshots",
+                )
+                or {}
+            )
         except Exception as exc:
             logger.warning("Failed to fetch dependency graph: %s", exc)
             return {}

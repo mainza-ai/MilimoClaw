@@ -33,7 +33,6 @@ import {
   discoverTemplates,
   getRoleDescription,
   resolveTemplatePath,
-  type TemplateDiscovery,
 } from "../onboard/template.js";
 import { assistantSetup } from "./assistant.js";
 
@@ -120,13 +119,13 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
     if (!nonInteractive) {
       const proceed = await promptConfirm("Continue anyway? (Inference will use defaults)", false);
       if (!proceed) {
-        return;
+        return Promise.resolve();
       }
     } else {
       logger.error("NemoClaw is not onboarded and cannot proceed in non-interactive mode.");
       logger.error("Run 'openclaw nemoclaw onboard' first, then retry.");
       process.exitCode = 1;
-      return;
+      return Promise.resolve();
     }
   } else {
     nemoModelConfig = loadNemoClawConfig();
@@ -147,7 +146,7 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
       const reconfigure = await promptConfirm("Reconfigure?", false);
       if (!reconfigure) {
         logger.info("Keeping existing configuration.");
-        return;
+        return Promise.resolve();
       }
     }
   }
@@ -222,7 +221,7 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
     const validation = validateSquadName(opts.squad);
     if (!validation.valid) {
       logger.error(`Invalid squad name: ${validation.error}`);
-      return;
+      return Promise.resolve();
     }
     squadName = opts.squad.trim();
   } else {
@@ -255,7 +254,7 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
     if (opts.role) {
       if (!CLAW_ROLES.includes(opts.role as ClawRole)) {
         logger.error(`Invalid role "${opts.role}". Must be one of: ${CLAW_ROLES.join(", ")}`);
-        return;
+        return Promise.resolve();
       }
       clawRole = opts.role as ClawRole;
     } else {
@@ -294,7 +293,7 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
     const validation = validateOperatorName(opts.operator);
     if (!validation.valid) {
       logger.error(`Invalid operator name: ${validation.error}`);
-      return;
+      return Promise.resolve();
     }
     operatorName = opts.operator.trim();
   } else {
@@ -421,7 +420,7 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
     const proceed = await promptConfirm("Apply this configuration?");
     if (!proceed) {
       logger.info("Onboarding cancelled.");
-      return;
+      return Promise.resolve();
     }
   }
 
@@ -549,7 +548,7 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
   logger.info("");
 }
 
-export async function cliOnboardStatus(logger: PluginLogger): Promise<void> {
+export function cliOnboardStatus(logger: PluginLogger): Promise<void> {
   const config = loadOnboardConfig();
 
   if (!config) {
@@ -559,7 +558,7 @@ export async function cliOnboardStatus(logger: PluginLogger): Promise<void> {
     logger.info("Run the onboard command to set up:");
     logger.info("    milimo onboard");
     logger.info("");
-    return;
+    return Promise.resolve();
   }
 
   const assistant = config.assistant;
@@ -589,4 +588,5 @@ export async function cliOnboardStatus(logger: PluginLogger): Promise<void> {
 
   logger.info("To reconfigure, run: milimo onboard");
   logger.info("");
+  return Promise.resolve();
 }

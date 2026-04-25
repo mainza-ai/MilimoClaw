@@ -161,7 +161,7 @@ export async function cliInit(opts: InitOptions): Promise<void> {
   logger.info("Configuring squad assistant...");
   try {
     await assistantSetup();
-  } catch (err) {
+  } catch {
     logger.warn("Assistant setup skipped — run 'milimo assistant setup' manually.");
   }
 

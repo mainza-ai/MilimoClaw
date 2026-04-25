@@ -86,7 +86,7 @@ try:
     dispatcher.send_project_brief(...)  # Before pricing confirmed
 except PricingNotConfirmedError:
     # CORRECT BEHAVIOR - no message sent
-    
+
 assert len(gateway.calls) == 0  # ZERO messages sent
 ```
 

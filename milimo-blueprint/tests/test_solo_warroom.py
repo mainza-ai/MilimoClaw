@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -7,8 +6,7 @@ Tests for solo_warroom.py - War Room Queue
 """
 
 import json
-import tempfile
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -65,6 +63,7 @@ VALID_CONFIG: dict[str, Any] = {
 
 
 # ---------------------------------------------------------------------------
+
 
 class TestSoloWarRoom:
     """Tests for SoloWarRoom class."""
@@ -127,7 +126,9 @@ class TestSoloWarRoom:
         """Test getting pending actions filtered by priority."""
         warroom.queue_action("finance", "invoice_send", {})  # HOLD
         warroom.queue_action("content", "client_proposal_draft", {})  # REVIEW
-        warroom.queue_action("content", "social_post_draft", {"content": "test"})  # AUTO
+        warroom.queue_action(
+            "content", "social_post_draft", {"content": "test"}
+        )  # AUTO
 
         hold_pending = warroom.get_pending(priority_filter=ActionPriority.HOLD)
         review_pending = warroom.get_pending(priority_filter=ActionPriority.REVIEW)
@@ -350,7 +351,6 @@ class TestRevenueSummary:
 
     def test_get_revenue_summary_normal_data(self, tmp_path: Path) -> None:
         """Test getting revenue summary with valid data."""
-        from orchestrator.solo_warroom import RevenueSummary
 
         finance_dir = tmp_path / "finance" / "revenue"
         finance_dir.mkdir(parents=True)
@@ -543,6 +543,7 @@ class TestActionEventEmission:
 
         import os
         import stat
+
         os.chmod(events_dir, stat.S_IRUSR | stat.S_IXUSR)
 
         try:

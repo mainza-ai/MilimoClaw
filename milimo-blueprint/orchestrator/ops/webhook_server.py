@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """
 Ops Claw Webhook Server for real-time incident ingestion.
 
@@ -43,13 +45,23 @@ class _WebhookHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == "/health":
-            self._send_json(200, {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()})
+            self._send_json(
+                200,
+                {
+                    "status": "healthy",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+            )
         else:
             self._send_json(404, {"error": "Not found"})
 
     def do_POST(self) -> None:
         content_length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(content_length).decode("utf-8") if content_length > 0 else "{}"
+        body = (
+            self.rfile.read(content_length).decode("utf-8")
+            if content_length > 0
+            else "{}"
+        )
 
         try:
             payload = json.loads(body)
@@ -91,7 +103,7 @@ class _WebhookHandler(BaseHTTPRequestHandler):
     def _parse_sentry_alert(self, payload: dict) -> dict:
         """Parse Sentry webhook payload."""
         # Sentry v1 webhook format
-        action = payload.get("action", "created")
+        payload.get("action", "created")
         data = payload.get("data", {})
         issue = data.get("issue", {})
 
@@ -114,7 +126,9 @@ class _WebhookHandler(BaseHTTPRequestHandler):
         return {
             "alert_id": f"vercel-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
             "source": "vercel",
-            "severity": "warning" if payload.get("deployment", {}).get("state") == "ERROR" else "info",
+            "severity": "warning"
+            if payload.get("deployment", {}).get("state") == "ERROR"
+            else "info",
             "title": f"Vercel deployment {payload.get('deployment', {}).get('state', 'unknown')}",
             "description": f"Deployment {payload.get('deployment', {}).get('uid', '')} for {payload.get('name', '')}",
             "url": payload.get("deployment", {}).get("url", ""),
@@ -214,7 +228,9 @@ class OpsWebhookServer:
 
         self._server = HTTPServer((self.host, self.port), _WebhookHandler)
         self._running = True
-        self._thread = threading.Thread(target=self._serve, daemon=True, name="ops-webhook")
+        self._thread = threading.Thread(
+            target=self._serve, daemon=True, name="ops-webhook"
+        )
         self._thread.start()
         logger.info("Ops webhook server started on %s:%d", self.host, self.port)
 

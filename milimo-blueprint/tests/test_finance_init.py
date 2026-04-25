@@ -1,8 +1,9 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """Tests for Finance Claw Filesystem Initialization."""
 
 import json
 import sys
-import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -15,8 +16,6 @@ from finance.finance_init import (
     FinanceLogEntry,
     PaymentEventsLog,
     PaymentEvent,
-    InitResult,
-    ValidationResult,
     REQUIRED_DIRS,
     REQUIRED_FILES,
 )
@@ -227,7 +226,13 @@ class TestFinanceOperationalLog:
         log_path = tmp_path / "logs" / "operational.log"
         log = FinanceOperationalLog(log_path)
 
-        timestamps = ['2026-04-03T04:15:59', '2026-04-02T04:15:59', '2026-04-01T04:15:59', '2026-03-31T04:15:59', '2026-03-30T04:15:59']
+        timestamps = [
+            "2026-04-03T04:15:59",
+            "2026-04-02T04:15:59",
+            "2026-04-01T04:15:59",
+            "2026-03-31T04:15:59",
+            "2026-03-30T04:15:59",
+        ]
         for i in range(5):
             entry = FinanceLogEntry(
                 timestamp=timestamps[i],
@@ -341,7 +346,13 @@ class TestPaymentEventsLog:
         log_path = tmp_path / "logs" / "payment-events.log"
         log = PaymentEventsLog(log_path)
 
-        timestamps = ['2026-04-03T04:15:59', '2026-04-02T04:15:59', '2026-04-01T04:15:59', '2026-03-31T04:15:59', '2026-03-30T04:15:59']
+        timestamps = [
+            "2026-04-03T04:15:59",
+            "2026-04-02T04:15:59",
+            "2026-04-01T04:15:59",
+            "2026-03-31T04:15:59",
+            "2026-03-30T04:15:59",
+        ]
         for i in range(5):
             event = PaymentEvent(
                 timestamp=timestamps[i],
@@ -380,7 +391,12 @@ class TestPaymentEventsLog:
         log_path = tmp_path / "logs" / "payment-events.log"
         log = PaymentEventsLog(log_path)
 
-        event_types = ["invoice_sent", "payment_overdue", "payment_overdue", "invoice_sent"]
+        event_types = [
+            "invoice_sent",
+            "payment_overdue",
+            "payment_overdue",
+            "invoice_sent",
+        ]
         for i, event_type in enumerate(event_types):
             event = PaymentEvent(
                 timestamp="2026-04-04T04:13:39",

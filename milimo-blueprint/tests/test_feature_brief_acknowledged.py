@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -8,9 +7,7 @@ Tests for FIX 4: feature_brief_acknowledged message type and SLA enforcement.
 Per spec Rule 6: Build Claw must send feature_brief_acknowledged within 10 minutes
 of receiving feature_brief from Ops Claw.
 """
-import time
-from pathlib import Path
-from typing import Any
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -98,7 +95,7 @@ class TestFeatureBriefAcknowledgedSLA:
             },
         }
 
-        with patch.object(dispatcher, "_send_overdue_ack_warning") as mock_warning:
+        with patch.object(dispatcher, "_send_overdue_ack_warning"):
             with patch("threading.Timer") as mock_timer:
                 mock_timer_instance = MagicMock()
                 mock_timer.return_value = mock_timer_instance

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -28,14 +27,13 @@ import os
 import statistics
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 import urllib.request
 import urllib.error
 
-import yaml
 
 logger = logging.getLogger("milimo.latency_monitor")
 
@@ -43,6 +41,7 @@ logger = logging.getLogger("milimo.latency_monitor")
 # ---------------------------------------------------------------------------
 # Types
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class LatencySample:
@@ -126,6 +125,7 @@ class LatencyMatrix:
 # Latency Monitor
 # ---------------------------------------------------------------------------
 
+
 class LatencyMonitor:
     """
     Monitors inter-region latency for mesh routing.
@@ -165,7 +165,9 @@ class LatencyMonitor:
         self.sample_window = sample_window
         self.probe_timeout_ms = probe_timeout_ms
 
-        self._samples: dict[str, list[LatencySample]] = {r: [] for r in self.target_regions}
+        self._samples: dict[str, list[LatencySample]] = {
+            r: [] for r in self.target_regions
+        }
         self._stats: dict[str, LatencyStats] = {}
         self._running = False
         self._thread: Optional[threading.Thread] = None
@@ -228,7 +230,9 @@ class LatencyMonitor:
                 request = urllib.request.Request(endpoint, method="HEAD")
                 request.add_header("User-Agent", "MilimoClaw-LatencyMonitor/1.0")
 
-                response = urllib.request.urlopen(request, timeout=self.probe_timeout_ms / 1000)
+                response = urllib.request.urlopen(
+                    request, timeout=self.probe_timeout_ms / 1000
+                )
                 latency_ms = (time.time() - start_time) * 1000
 
                 if response.status < 400:
@@ -279,7 +283,7 @@ class LatencyMonitor:
             self._samples[target].append(sample)
 
             if len(self._samples[target]) > self.sample_window:
-                self._samples[target] = self._samples[target][-self.sample_window:]
+                self._samples[target] = self._samples[target][-self.sample_window :]
 
             self._update_stats(target)
 
@@ -362,7 +366,9 @@ class LatencyMonitor:
             matrix=matrix,
         )
 
-    def get_optimal_route(self, final_target: str, intermediate_regions: Optional[list[str]] = None) -> list[str]:
+    def get_optimal_route(
+        self, final_target: str, intermediate_regions: Optional[list[str]] = None
+    ) -> list[str]:
         """
         Find optimal route to a target region.
 
@@ -411,7 +417,9 @@ class LatencyMonitor:
 
         return [self.region, final_target]
 
-    def is_region_healthy(self, target_region: str, max_latency_ms: float = 500.0) -> bool:
+    def is_region_healthy(
+        self, target_region: str, max_latency_ms: float = 500.0
+    ) -> bool:
         """Check if a region is healthy (acceptable latency)."""
         latency = self.get_latency(target_region)
         if latency == float("inf"):
@@ -433,7 +441,7 @@ class LatencyMonitor:
             data = json.loads(history_file.read_text())
             for target, samples_data in data.get("samples", {}).items():
                 samples = [LatencySample(**s) for s in samples_data]
-                self._samples[target] = samples[-self.sample_window:]
+                self._samples[target] = samples[-self.sample_window :]
 
             logger.debug("Loaded historical latency data for %s", self.region)
 

@@ -1,25 +1,21 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-/**
- * Jest tests for Audit Logger with rotation
- */
-
 import { AuditLogger, type AuditEntry } from "../warroom/audit";
 
-const mockExistsSync = jest.fn();
-const mockMkdirSync = jest.fn();
-const mockWriteFileSync = jest.fn();
-const mockAppendFileSync = jest.fn();
-const mockReadFileSync = jest.fn();
-const mockReaddirSync = jest.fn();
-const mockStatSync = jest.fn();
-const mockRenameSync = jest.fn();
-const mockUnlinkSync = jest.fn();
-const mockGzipSync = jest.fn();
-const mockGunzipSync = jest.fn();
+const mockExistsSync = vi.fn();
+const mockMkdirSync = vi.fn();
+const mockWriteFileSync = vi.fn();
+const mockAppendFileSync = vi.fn();
+const mockReadFileSync = vi.fn();
+const mockReaddirSync = vi.fn();
+const mockStatSync = vi.fn();
+const mockRenameSync = vi.fn();
+const mockUnlinkSync = vi.fn();
+const mockGzipSync = vi.fn();
+const mockGunzipSync = vi.fn();
 
-jest.mock("node:fs", () => ({
+vi.mock("node:fs", () => ({
   existsSync: (...args: unknown[]) => mockExistsSync(...args),
   mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
   writeFileSync: (...args: unknown[]) => mockWriteFileSync(...args),
@@ -31,12 +27,12 @@ jest.mock("node:fs", () => ({
   unlinkSync: (...args: unknown[]) => mockUnlinkSync(...args),
 }));
 
-jest.mock("node:zlib", () => ({
+vi.mock("node:zlib", () => ({
   gzipSync: (...args: unknown[]) => mockGzipSync(...args),
   gunzipSync: (...args: unknown[]) => mockGunzipSync(...args),
 }));
 
-jest.mock("node:os", () => ({
+vi.mock("node:os", () => ({
   homedir: () => "/home/test",
 }));
 
@@ -44,7 +40,7 @@ describe("AuditLogger", () => {
   const squadId = "test-squad";
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockExistsSync.mockReturnValue(true);
     mockMkdirSync.mockReturnValue(undefined);
     mockAppendFileSync.mockReturnValue(undefined);
@@ -60,10 +56,9 @@ describe("AuditLogger", () => {
 
       new AuditLogger(squadId);
 
-      expect(mockMkdirSync).toHaveBeenCalledWith(
-        expect.stringContaining(".milimo/audit"),
-        { recursive: true }
-      );
+      expect(mockMkdirSync).toHaveBeenCalledWith(expect.stringContaining(".milimo/audit"), {
+        recursive: true,
+      });
     });
 
     it("skips directory creation if exists", () => {
@@ -88,7 +83,7 @@ describe("AuditLogger", () => {
       expect(mockAppendFileSync).toHaveBeenCalledWith(
         expect.stringContaining("warroom.log"),
         expect.stringContaining("test_action"),
-        "utf8"
+        "utf8",
       );
     });
 
@@ -117,8 +112,10 @@ describe("AuditLogger", () => {
 
     it("returns parsed log entries", () => {
       mockReadFileSync.mockReturnValue(
-        JSON.stringify({ actionType: "action1", timestamp: "2026-01-01T00:00:00Z" }) + "\n" +
-        JSON.stringify({ actionType: "action2", timestamp: "2026-01-01T00:01:00Z" }) + "\n"
+        JSON.stringify({ actionType: "action1", timestamp: "2026-01-01T00:00:00Z" }) +
+          "\n" +
+          JSON.stringify({ actionType: "action2", timestamp: "2026-01-01T00:01:00Z" }) +
+          "\n",
       );
 
       const logger = new AuditLogger(squadId);
@@ -131,7 +128,9 @@ describe("AuditLogger", () => {
     it("limits returned entries", () => {
       const entries = Array(100)
         .fill(null)
-        .map((_, i) => JSON.stringify({ actionType: `action${i}`, timestamp: "2026-01-01T00:00:00Z" }))
+        .map((_, i) =>
+          JSON.stringify({ actionType: `action${i}`, timestamp: "2026-01-01T00:00:00Z" }),
+        )
         .join("\n");
 
       mockReadFileSync.mockReturnValue(entries + "\n");
@@ -146,8 +145,18 @@ describe("AuditLogger", () => {
   describe("searchLogs", () => {
     it("searches by query text", () => {
       mockReadFileSync.mockReturnValue(
-        JSON.stringify({ actionType: "approved_action", timestamp: "2026-01-01T00:00:00Z", decision: "APPROVED" }) + "\n" +
-        JSON.stringify({ actionType: "rejected_action", timestamp: "2026-01-01T00:01:00Z", decision: "REJECTED" }) + "\n"
+        JSON.stringify({
+          actionType: "approved_action",
+          timestamp: "2026-01-01T00:00:00Z",
+          decision: "APPROVED",
+        }) +
+          "\n" +
+          JSON.stringify({
+            actionType: "rejected_action",
+            timestamp: "2026-01-01T00:01:00Z",
+            decision: "REJECTED",
+          }) +
+          "\n",
       );
       mockReaddirSync.mockReturnValue([]);
 
@@ -160,9 +169,12 @@ describe("AuditLogger", () => {
 
     it("filters by date range", () => {
       mockReadFileSync.mockReturnValue(
-        JSON.stringify({ actionType: "action1", timestamp: "2026-01-01T00:00:00Z" }) + "\n" +
-        JSON.stringify({ actionType: "action2", timestamp: "2026-01-15T00:00:00Z" }) + "\n" +
-        JSON.stringify({ actionType: "action3", timestamp: "2026-02-01T00:00:00Z" }) + "\n"
+        JSON.stringify({ actionType: "action1", timestamp: "2026-01-01T00:00:00Z" }) +
+          "\n" +
+          JSON.stringify({ actionType: "action2", timestamp: "2026-01-15T00:00:00Z" }) +
+          "\n" +
+          JSON.stringify({ actionType: "action3", timestamp: "2026-02-01T00:00:00Z" }) +
+          "\n",
       );
       mockReaddirSync.mockReturnValue([]);
 
@@ -178,8 +190,18 @@ describe("AuditLogger", () => {
 
     it("filters by claw role", () => {
       mockReadFileSync.mockReturnValue(
-        JSON.stringify({ actionType: "action1", timestamp: "2026-01-01T00:00:00Z", clawRole: "content" }) + "\n" +
-        JSON.stringify({ actionType: "action2", timestamp: "2026-01-01T00:01:00Z", clawRole: "finance" }) + "\n"
+        JSON.stringify({
+          actionType: "action1",
+          timestamp: "2026-01-01T00:00:00Z",
+          clawRole: "content",
+        }) +
+          "\n" +
+          JSON.stringify({
+            actionType: "action2",
+            timestamp: "2026-01-01T00:01:00Z",
+            clawRole: "finance",
+          }) +
+          "\n",
       );
       mockReaddirSync.mockReturnValue([]);
 
@@ -192,8 +214,18 @@ describe("AuditLogger", () => {
 
     it("filters by decision", () => {
       mockReadFileSync.mockReturnValue(
-        JSON.stringify({ actionType: "action1", timestamp: "2026-01-01T00:00:00Z", decision: "APPROVED" }) + "\n" +
-        JSON.stringify({ actionType: "action2", timestamp: "2026-01-01T00:01:00Z", decision: "REJECTED" }) + "\n"
+        JSON.stringify({
+          actionType: "action1",
+          timestamp: "2026-01-01T00:00:00Z",
+          decision: "APPROVED",
+        }) +
+          "\n" +
+          JSON.stringify({
+            actionType: "action2",
+            timestamp: "2026-01-01T00:01:00Z",
+            decision: "REJECTED",
+          }) +
+          "\n",
       );
       mockReaddirSync.mockReturnValue([]);
 

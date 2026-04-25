@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -14,7 +13,6 @@ Tests verify:
   - Squad override validation
 """
 
-import os
 import sys
 import unittest
 from pathlib import Path
@@ -25,7 +23,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from orchestrator.privacy_router import (
     InferenceBackend,
     PrivacyRouter,
-    RoutingDecision,
 )
 
 # Path to the default privacy policy

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -8,12 +7,9 @@ Ops Claw — Unit Tests
 Comprehensive unit tests for Ops Claw components.
 """
 
-import json
 import sys
-import tempfile
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -30,19 +26,18 @@ from ops.ops_init import (
     CommsLogEntry,
 )
 from ops.signal_dispatcher import OpsSignalDispatcher, PricingNotConfirmedError
-from ops.approval_handler import OpsApprovalHandler, OpsApprovalAction
-from ops.intake_manager import IntakeManager, TriageScore, ClientBrief
+from ops.approval_handler import OpsApprovalHandler
+from ops.intake_manager import IntakeManager, TriageScore
 from ops.health_scorer import ClientHealthScorer, ClientHealthScore
-from ops.project_manager import ProjectManager, ProjectStatus, DeadlineRisk
-from ops.scope_monitor import ScopeMonitor, ScopeCreepDetection
-from ops.comms_manager import CommsManager, ClientMessage
-from ops.ops_scheduler import OpsScheduler
+from ops.project_manager import ProjectManager, ProjectStatus
+from ops.scope_monitor import ScopeMonitor
 from ops.ops_claw import OpsClaw, MockMeshGateway
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Mock Classes
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class MockInferenceClient:
     """Mock inference client for testing."""
@@ -52,11 +47,13 @@ class MockInferenceClient:
         self.calls: list[dict] = []
 
     def complete(self, prompt: str, data_type: str, max_tokens: int = 100) -> str:
-        self.calls.append({
-            "prompt": prompt,
-            "data_type": data_type,
-            "max_tokens": max_tokens,
-        })
+        self.calls.append(
+            {
+                "prompt": prompt,
+                "data_type": data_type,
+                "max_tokens": max_tokens,
+            }
+        )
         return self.responses.get(data_type, '{"result": "mocked"}')
 
 
@@ -88,6 +85,7 @@ class MockDispatcher:
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixtures
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def temp_sandbox(tmp_path: Path) -> Path:
@@ -134,7 +132,11 @@ def mock_gateway() -> MockMeshGateway:
 
 
 @pytest.fixture
-def dispatcher(mock_gateway: MockMeshGateway, operational_log: OpsOperationalLog, temp_sandbox: Path) -> OpsSignalDispatcher:
+def dispatcher(
+    mock_gateway: MockMeshGateway,
+    operational_log: OpsOperationalLog,
+    temp_sandbox: Path,
+) -> OpsSignalDispatcher:
     """Create a signal dispatcher."""
     return OpsSignalDispatcher(
         gateway=mock_gateway,
@@ -154,8 +156,8 @@ def inference_client() -> MockInferenceClient:
 # Test OpsFilesystemInit
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestOpsFilesystemInit:
 
+class TestOpsFilesystemInit:
     def test_initialize_creates_directories(self, fs: OpsFilesystemInit):
         assert (fs._base / "active").is_dir()
         assert (fs._base / "prospects").is_dir()
@@ -183,7 +185,9 @@ class TestOpsFilesystemInit:
     def test_create_project_dirs(self, fs: OpsFilesystemInit):
         fs.create_client_dirs("client-123")
         fs.create_project_dirs("client-123", "project-456")
-        assert (fs._base / "active" / "client-123" / "projects" / "project-456").is_dir()
+        assert (
+            fs._base / "active" / "client-123" / "projects" / "project-456"
+        ).is_dir()
 
     def test_get_template(self, fs: OpsFilesystemInit):
         template = fs.get_template("welcome-message.md")
@@ -198,8 +202,8 @@ class TestOpsFilesystemInit:
 # Test OpsOperationalLog
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestOpsOperationalLog:
 
+class TestOpsOperationalLog:
     def test_append_and_read(self, operational_log: OpsOperationalLog):
         entry = OpsLogEntry(
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -216,12 +220,14 @@ class TestOpsOperationalLog:
 
     def test_read_by_action_type(self, operational_log: OpsOperationalLog):
         for i in range(3):
-            operational_log.append(OpsLogEntry(
-                timestamp=datetime.now(timezone.utc).isoformat(),
-                action_type="type_a" if i < 2 else "type_b",
-                entity_id=f"entity-{i}",
-                outcome="success",
-            ))
+            operational_log.append(
+                OpsLogEntry(
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    action_type="type_a" if i < 2 else "type_b",
+                    entity_id=f"entity-{i}",
+                    outcome="success",
+                )
+            )
 
         type_a_count = operational_log.count_by_type("type_a", days=1)
         assert type_a_count == 2
@@ -231,17 +237,19 @@ class TestOpsOperationalLog:
 # Test OpsCommsLog
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestOpsCommsLog:
 
+class TestOpsCommsLog:
     def test_append_and_get_client_history(self, comms_log: OpsCommsLog):
-        comms_log.append(CommsLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            direction="received",
-            client_id="client-1",
-            project_id=None,
-            channel="email",
-            content_preview="Hello, I have a question...",
-        ))
+        comms_log.append(
+            CommsLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                direction="received",
+                client_id="client-1",
+                project_id=None,
+                channel="email",
+                content_preview="Hello, I have a question...",
+            )
+        )
 
         history = comms_log.get_client_history("client-1")
         assert len(history) == 1
@@ -249,23 +257,27 @@ class TestOpsCommsLog:
     def test_get_response_times(self, comms_log: OpsCommsLog):
         now = datetime.now(timezone.utc)
 
-        comms_log.append(CommsLogEntry(
-            timestamp=(now - timedelta(hours=5)).isoformat(),
-            direction="received",
-            client_id="client-1",
-            project_id=None,
-            channel="email",
-            content_preview="Question",
-        ))
+        comms_log.append(
+            CommsLogEntry(
+                timestamp=(now - timedelta(hours=5)).isoformat(),
+                direction="received",
+                client_id="client-1",
+                project_id=None,
+                channel="email",
+                content_preview="Question",
+            )
+        )
 
-        comms_log.append(CommsLogEntry(
-            timestamp=(now - timedelta(hours=4)).isoformat(),
-            direction="sent",
-            client_id="client-1",
-            project_id=None,
-            channel="email",
-            content_preview="Response",
-        ))
+        comms_log.append(
+            CommsLogEntry(
+                timestamp=(now - timedelta(hours=4)).isoformat(),
+                direction="sent",
+                client_id="client-1",
+                project_id=None,
+                channel="email",
+                content_preview="Response",
+            )
+        )
 
         times = comms_log.get_response_times("client-1")
         assert len(times) == 1
@@ -276,8 +288,8 @@ class TestOpsCommsLog:
 # Test OpsSignalDispatcher
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestOpsSignalDispatcher:
 
+class TestOpsSignalDispatcher:
     def test_send_pricing_query(
         self,
         dispatcher: OpsSignalDispatcher,
@@ -349,8 +361,8 @@ class TestOpsSignalDispatcher:
 # Test OpsApprovalHandler
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestOpsApprovalHandler:
 
+class TestOpsApprovalHandler:
     def test_queue_review(self, approval_handler: OpsApprovalHandler):
         action_id = approval_handler.queue_review(
             action_type="welcome_message",
@@ -419,6 +431,8 @@ class TestOpsApprovalHandler:
         approval_handler.add_urgency_flag(action_id, hours_waiting=24)
 
         action = approval_handler.get_action(action_id)
+        assert action is not None
+        assert action.urgency_flag is not None
         assert "24h" in action.urgency_flag
 
     def test_add_urgency_flag_48h(self, approval_handler: OpsApprovalHandler):
@@ -432,6 +446,8 @@ class TestOpsApprovalHandler:
         approval_handler.add_urgency_flag(action_id, hours_waiting=48)
 
         action = approval_handler.get_action(action_id)
+        assert action is not None
+        assert action.urgency_flag is not None
         assert "closing" in action.urgency_flag.lower()
 
 
@@ -439,8 +455,8 @@ class TestOpsApprovalHandler:
 # Test IntakeManager
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestIntakeManager:
 
+class TestIntakeManager:
     def test_triage_score_calculation(self):
         score = TriageScore(
             inquiry_id="test",
@@ -477,7 +493,9 @@ class TestIntakeManager:
             operational_log=operational_log,
         )
 
-        score = manager.score_inquiry("Test inquiry about web development", "web development")
+        score = manager.score_inquiry(
+            "Test inquiry about web development", "web development"
+        )
 
         assert score.budget_signal == 9.0
         assert score.scope_clarity == 8.0
@@ -518,10 +536,10 @@ class TestIntakeManager:
 # Test ClientHealthScorer
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestClientHealthScorer:
 
+class TestClientHealthScorer:
     def test_health_score_weights(self):
-        health = ClientHealthScore(
+        ClientHealthScore(
             client_id="test",
             score=0.0,
             health_level="healthy",
@@ -531,7 +549,7 @@ class TestClientHealthScorer:
             communication_sentiment=8.0,
         )
 
-        expected = (8.0 * 0.3) + (10.0 * 0.25) + (10.0 * 0.25) + (8.0 * 0.2)
+        (8.0 * 0.3) + (10.0 * 0.25) + (10.0 * 0.25) + (8.0 * 0.2)
 
     def test_at_risk_threshold(
         self,
@@ -568,7 +586,9 @@ class TestClientHealthScorer:
         }
         inference = MockInferenceClient(responses)
         gateway = MockMeshGateway()
-        dispatcher = OpsSignalDispatcher(gateway, operational_log, "test-squad", fs._base / "pricing_confirmed")
+        dispatcher = OpsSignalDispatcher(
+            gateway, operational_log, "test-squad", fs._base / "pricing_confirmed"
+        )
 
         scorer = ClientHealthScorer(
             fs=fs,
@@ -581,32 +601,40 @@ class TestClientHealthScorer:
 
         fs.create_client_dirs("client-at-risk")
         profile_file = fs.get_client_path("active", "client-at-risk") / "profile.json"
-        fs.write_json_atomic(profile_file, {"client_id": "client-at-risk", "name": "Test"})
+        fs.write_json_atomic(
+            profile_file, {"client_id": "client-at-risk", "name": "Test"}
+        )
 
         base_time = datetime.now(timezone.utc)
         for i in range(5):
-            comms_log.append(CommsLogEntry(
-                timestamp=(base_time - timedelta(hours=72 + i*72)).isoformat(),
-                direction="received",
-                client_id="client-at-risk",
-                project_id=None,
-                channel="email",
-                content_preview="Very frustrated, this is unacceptable",
-            ))
-            comms_log.append(CommsLogEntry(
-                timestamp=(base_time - timedelta(hours=48 + i*72)).isoformat(),
-                direction="sent",
-                client_id="client-at-risk",
-                project_id=None,
-                channel="email",
-                content_preview="We apologize for the delay",
-            ))
+            comms_log.append(
+                CommsLogEntry(
+                    timestamp=(base_time - timedelta(hours=72 + i * 72)).isoformat(),
+                    direction="received",
+                    client_id="client-at-risk",
+                    project_id=None,
+                    channel="email",
+                    content_preview="Very frustrated, this is unacceptable",
+                )
+            )
+            comms_log.append(
+                CommsLogEntry(
+                    timestamp=(base_time - timedelta(hours=48 + i * 72)).isoformat(),
+                    direction="sent",
+                    client_id="client-at-risk",
+                    project_id=None,
+                    channel="email",
+                    content_preview="We apologize for the delay",
+                )
+            )
 
         health = scorer.score_client("client-at-risk")
 
         if health.score < 6.0:
             review_queue = approval_handler.get_review_queue()
-            at_risk_actions = [a for a in review_queue if a.action_type == "client_at_risk"]
+            at_risk_actions = [
+                a for a in review_queue if a.action_type == "client_at_risk"
+            ]
             assert len(at_risk_actions) >= 1
 
 
@@ -614,8 +642,8 @@ class TestClientHealthScorer:
 # Test ProjectManager
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestProjectManager:
 
+class TestProjectManager:
     def test_check_deadlines_elevated_risk(
         self,
         fs: OpsFilesystemInit,
@@ -681,7 +709,9 @@ class TestProjectManager:
         approval_handler: OpsApprovalHandler,
     ):
         gateway = MockMeshGateway()
-        dispatcher = OpsSignalDispatcher(gateway, operational_log, "test-squad", fs._base / "pricing_confirmed")
+        dispatcher = OpsSignalDispatcher(
+            gateway, operational_log, "test-squad", fs._base / "pricing_confirmed"
+        )
 
         manager = ProjectManager(
             fs=fs,
@@ -710,10 +740,13 @@ class TestProjectManager:
 
         manager.confirm_client_receipt("project-1")
 
-        complete_calls = [c for c in gateway.calls if c.get("message_type") == "project_complete"]
+        complete_calls = [
+            c for c in gateway.calls if c.get("message_type") == "project_complete"
+        ]
         assert len(complete_calls) == 1
 
         updated_status = fs.read_json(project_dir / "status.json")
+        assert updated_status is not None
         assert updated_status["client_confirmed"] is True
         assert updated_status["status"] == "completed"
 
@@ -722,8 +755,8 @@ class TestProjectManager:
 # Test ScopeMonitor
 # ───────────────────────────────────────────────────────────────
 
-class TestScopeMonitor:
 
+class TestScopeMonitor:
     def test_detection_threshold(
         self,
         fs: OpsFilesystemInit,
@@ -768,10 +801,13 @@ class TestScopeMonitor:
         fs.create_client_dirs("client-1")
         fs.create_project_dirs("client-1", "project-1")
         project_dir = fs.get_project_path("client-1", "project-1")
-        fs.write_json_atomic(project_dir / "brief.json", {
-            "raw_text": "Original scope: 5 page website",
-            "scope_description": "5 page website",
-        })
+        fs.write_json_atomic(
+            project_dir / "brief.json",
+            {
+                "raw_text": "Original scope: 5 page website",
+                "scope_description": "5 page website",
+            },
+        )
 
         detection = monitor.check_message(
             client_id="client-1",
@@ -791,14 +827,11 @@ class TestScopeMonitor:
 # Test OpsScheduler
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestOpsScheduler:
 
+class TestOpsScheduler:
     def test_seconds_until_positive(self):
         now = datetime.now(timezone.utc)
-        future = now + timedelta(hours=2)
-
-        target_hour = future.hour
-        target_minute = future.minute
+        now + timedelta(hours=2)
 
         pass
 
@@ -807,8 +840,8 @@ class TestOpsScheduler:
 # Test OpsClaw
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestOpsClaw:
 
+class TestOpsClaw:
     def test_startup_initializes_components(
         self,
         temp_sandbox: Path,

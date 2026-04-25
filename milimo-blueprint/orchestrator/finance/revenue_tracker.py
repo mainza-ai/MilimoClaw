@@ -8,7 +8,7 @@ Tracks all revenue and maintains summary files.
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta, date
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Protocol
 import json

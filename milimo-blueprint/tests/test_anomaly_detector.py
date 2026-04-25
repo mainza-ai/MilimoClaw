@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -6,11 +5,10 @@
 Unit tests for Anomaly Detector.
 """
 
-from __future__ import annotations
-
 import json
 import shutil
 import tempfile
+from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -33,7 +31,7 @@ from orchestrator.analytics.baseline_manager import (
 
 
 @pytest.fixture
-def temp_sandbox() -> Path:
+def temp_sandbox() -> Iterator[Path]:
     """Create a temporary sandbox directory for testing."""
     sandbox = Path(tempfile.mkdtemp(prefix="anomaly_test_"))
     yield sandbox
@@ -69,11 +67,13 @@ def anomaly_detector(
     """Create anomaly detector with mock dispatcher."""
 
     def mock_dispatcher(message_type: str, target_claw: str, payload: dict) -> None:
-        dispatched_alerts.append({
-            "message_type": message_type,
-            "target_claw": target_claw,
-            "payload": payload,
-        })
+        dispatched_alerts.append(
+            {
+                "message_type": message_type,
+                "target_claw": target_claw,
+                "payload": payload,
+            }
+        )
 
     return AnomalyDetector(
         fs=fs,
@@ -234,13 +234,17 @@ class TestAnomalyDetector:
 
         assert severity == "mild"
 
-    def test_classify_severity_significant_positive(self, anomaly_detector: AnomalyDetector):
+    def test_classify_severity_significant_positive(
+        self, anomaly_detector: AnomalyDetector
+    ):
         """Test severity classification for significant positive anomalies."""
         severity = anomaly_detector._classify_severity(3.5, "positive")
 
         assert severity == "significant"
 
-    def test_classify_severity_extreme_positive(self, anomaly_detector: AnomalyDetector):
+    def test_classify_severity_extreme_positive(
+        self, anomaly_detector: AnomalyDetector
+    ):
         """Test severity classification for extreme positive anomalies."""
         severity = anomaly_detector._classify_severity(6.0, "positive")
 
@@ -252,13 +256,17 @@ class TestAnomalyDetector:
 
         assert severity == "mild"
 
-    def test_classify_severity_significant_negative(self, anomaly_detector: AnomalyDetector):
+    def test_classify_severity_significant_negative(
+        self, anomaly_detector: AnomalyDetector
+    ):
         """Test severity classification for significant negative anomalies."""
         severity = anomaly_detector._classify_severity(0.25, "negative")
 
         assert severity == "significant"
 
-    def test_classify_severity_extreme_negative(self, anomaly_detector: AnomalyDetector):
+    def test_classify_severity_extreme_negative(
+        self, anomaly_detector: AnomalyDetector
+    ):
         """Test severity classification for extreme negative anomalies."""
         severity = anomaly_detector._classify_severity(0.15, "negative")
 
@@ -279,7 +287,9 @@ class TestAnomalyDetector:
             "engagement_data": {"engagement_rate": 0.01},
         }
 
-        result_extreme = anomaly_detector.check_content_signal(signal_extreme, baselines)
+        result_extreme = anomaly_detector.check_content_signal(
+            signal_extreme, baselines
+        )
         assert result_extreme is not None
         assert result_extreme.requires_attention is True
 
@@ -290,7 +300,9 @@ class TestAnomalyDetector:
             "engagement_data": {"engagement_rate": 0.50},
         }
 
-        result_positive = anomaly_detector.check_content_signal(signal_positive, baselines)
+        result_positive = anomaly_detector.check_content_signal(
+            signal_positive, baselines
+        )
         assert result_positive is not None
         assert result_positive.requires_attention is False
 
@@ -451,9 +463,7 @@ class TestAnomalyDetector:
 class TestAnomalyThresholds:
     """Tests for anomaly threshold boundaries."""
 
-    def test_threshold_at_exactly_2x(
-        self, anomaly_detector: AnomalyDetector
-    ):
+    def test_threshold_at_exactly_2x(self, anomaly_detector: AnomalyDetector):
         """Test anomaly detected at exactly 2.0x threshold."""
         baselines = {
             "test:test:metric": create_content_baseline(mean=1.0),
@@ -470,9 +480,7 @@ class TestAnomalyThresholds:
 
         assert result is not None
 
-    def test_threshold_just_below_2x(
-        self, anomaly_detector: AnomalyDetector
-    ):
+    def test_threshold_just_below_2x(self, anomaly_detector: AnomalyDetector):
         """Test no anomaly just below 2.0x threshold."""
         baselines = {
             "test:test:metric": create_content_baseline(mean=1.0),
@@ -489,9 +497,7 @@ class TestAnomalyThresholds:
 
         assert result is None
 
-    def test_threshold_at_exactly_0_5x(
-        self, anomaly_detector: AnomalyDetector
-    ):
+    def test_threshold_at_exactly_0_5x(self, anomaly_detector: AnomalyDetector):
         """Test anomaly detected at exactly 0.5x threshold."""
         baselines = {
             "test:test:metric": create_content_baseline(mean=1.0),
@@ -508,9 +514,7 @@ class TestAnomalyThresholds:
 
         assert result is not None
 
-    def test_threshold_just_above_0_5x(
-        self, anomaly_detector: AnomalyDetector
-    ):
+    def test_threshold_just_above_0_5x(self, anomaly_detector: AnomalyDetector):
         """Test no anomaly just above 0.5x threshold."""
         baselines = {
             "test:test:metric": create_content_baseline(mean=1.0),

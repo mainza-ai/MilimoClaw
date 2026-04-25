@@ -1,10 +1,10 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """Tests for Finance Claw Pricing Engine."""
 
 import json
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -26,12 +26,20 @@ class MockInferenceClient:
         self.calls: list[dict] = []
 
     def complete(self, prompt: str, data_type: str, max_tokens: int = 800) -> str:
-        self.calls.append({"prompt": prompt, "data_type": data_type, "max_tokens": max_tokens})
+        self.calls.append(
+            {"prompt": prompt, "data_type": data_type, "max_tokens": max_tokens}
+        )
         if self.should_fail:
             raise RuntimeError("Inference failed")
         if self.response:
             return self.response
-        return json.dumps({"estimated_hours": 15, "recommended_rate": 120, "scope_notes": "Test estimate"})
+        return json.dumps(
+            {
+                "estimated_hours": 15,
+                "recommended_rate": 120,
+                "scope_notes": "Test estimate",
+            }
+        )
 
 
 class MockMeshGateway:
@@ -49,14 +57,16 @@ class MockMeshGateway:
         message_id: str,
         timestamp: str,
     ) -> bool:
-        self.sent_messages.append({
-            "message_type": message_type,
-            "recipient_role": recipient_role,
-            "sender_role": sender_role,
-            "payload": payload,
-            "message_id": message_id,
-            "timestamp": timestamp,
-        })
+        self.sent_messages.append(
+            {
+                "message_type": message_type,
+                "recipient_role": recipient_role,
+                "sender_role": sender_role,
+                "payload": payload,
+                "message_id": message_id,
+                "timestamp": timestamp,
+            }
+        )
         return True
 
 
@@ -199,7 +209,9 @@ class TestPricingEngine:
         assert rules["default_hourly_rate"] == 150
         assert rules["floor_multiplier"] == 0.75
 
-    def test_load_historical_calibration_returns_empty_when_no_history(self, pricing_engine):
+    def test_load_historical_calibration_returns_empty_when_no_history(
+        self, pricing_engine
+    ):
         """load_historical_calibration returns empty when no history."""
         historical = pricing_engine.load_historical_calibration("medium")
 
@@ -277,7 +289,9 @@ class TestPricingEngine:
         }
         pricing_engine.handle_pricing_query(message)
 
-        pricing_engine.update_actual_cost("proj-actual", actual_hours=25, actual_cost=2500)
+        pricing_engine.update_actual_cost(
+            "proj-actual", actual_hours=25, actual_cost=2500
+        )
 
         history_path = fs.get_pricing_history_path("proj-actual")
         assert history_path.exists()
@@ -297,12 +311,16 @@ class TestPricingEngine:
         }
         estimate = pricing_engine.handle_pricing_query(message)
 
-        pricing_engine.update_actual_cost("proj-accuracy", actual_hours=22, actual_cost=2200)
+        pricing_engine.update_actual_cost(
+            "proj-accuracy", actual_hours=22, actual_cost=2200
+        )
 
         history_path = fs.get_pricing_history_path("proj-accuracy")
         data = json.loads(history_path.read_text())
 
-        expected_accuracy = 100 - abs((22 - estimate.estimated_hours) / estimate.estimated_hours * 100)
+        expected_accuracy = 100 - abs(
+            (22 - estimate.estimated_hours) / estimate.estimated_hours * 100
+        )
         assert abs(data["accuracy_pct"] - expected_accuracy) < 1
 
     def test_logged_to_operational_log(self, pricing_engine, operational_log):
@@ -323,12 +341,16 @@ class TestPricingEngine:
         """data_quality is 'complete' when history exists."""
         history_dir = fs.base / "pricing" / "history"
         history_dir.mkdir(parents=True, exist_ok=True)
-        (history_dir / "old-proj.json").write_text(json.dumps({
-            "complexity_estimate": "low",
-            "estimated_hours": 8,
-            "actual_hours": 9,
-            "accuracy_pct": 88,
-        }))
+        (history_dir / "old-proj.json").write_text(
+            json.dumps(
+                {
+                    "complexity_estimate": "low",
+                    "estimated_hours": 8,
+                    "actual_hours": 9,
+                    "accuracy_pct": 88,
+                }
+            )
+        )
 
         message = {
             "project_id": "proj-quality",

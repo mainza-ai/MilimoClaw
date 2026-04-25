@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -15,26 +14,22 @@ Tests cover:
 """
 
 import json
-import tempfile
-import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from orchestrator.content.content_init import (
     ContentFilesystemInit,
     ContentOperationalLog,
-    LogEntry,
 )
 from orchestrator.content.content_generator import (
     ContentGenerator,
     Draft,
     DraftContext,
-    ContentPlan,
 )
-from orchestrator.privacy_router import PrivacyRouter, InferenceBackend, RoutingDecision
+from orchestrator.privacy_router import PrivacyRouter, InferenceBackend
 from orchestrator.tool_registry import ToolRegistry
 from orchestrator.tool_builder import BuiltTool
 
@@ -145,16 +140,30 @@ class TestContentGenerator:
         log_path = tmp_path / "logs" / "operational.log"
         op_log = ContentOperationalLog(log_path)
 
-        router = PrivacyRouter.from_dict({
-            "policy_version": "1.0",
-            "default_backend": "local-nim",
-            "routes": [
-                {"data_type": "client_facing_draft", "description": "Client drafts", "backend": "cloud"},
-                {"data_type": "internal_ideation", "description": "Internal content", "backend": "local-nim"},
-            ],
-        })
+        router = PrivacyRouter.from_dict(
+            {
+                "policy_version": "1.0",
+                "default_backend": "local-nim",
+                "routes": [
+                    {
+                        "data_type": "client_facing_draft",
+                        "description": "Client drafts",
+                        "backend": "cloud",
+                    },
+                    {
+                        "data_type": "internal_ideation",
+                        "description": "Internal content",
+                        "backend": "local-nim",
+                    },
+                ],
+            }
+        )
 
-        registry = ToolRegistry(squad_id="test-squad", claw_role="content", registry_dir=str(tmp_path / "tools"))
+        registry = ToolRegistry(
+            squad_id="test-squad",
+            claw_role="content",
+            registry_dir=str(tmp_path / "tools"),
+        )
 
         return fs, op_log, router, registry
 
@@ -212,7 +221,7 @@ class TestContentGenerator:
         generator = ContentGenerator(router, registry, op_log, fs)
 
         context = DraftContext(topic="Test", client_id="client-1")
-        draft = await generator.generate_draft("twitter", context, "campaign")
+        await generator.generate_draft("twitter", context, "campaign")
 
         routing = router.route(role="content", data_type="client_facing_draft")
         assert routing.backend == InferenceBackend.CLOUD
@@ -225,7 +234,7 @@ class TestContentGenerator:
         generator = ContentGenerator(router, registry, op_log, fs)
 
         context = DraftContext(topic="Internal content")
-        draft = await generator.generate_draft("twitter", context, "post")
+        await generator.generate_draft("twitter", context, "post")
 
         routing = router.route(role="content", data_type="internal_ideation")
         assert routing.backend == InferenceBackend.LOCAL_NIM
@@ -258,8 +267,7 @@ class TestContentGenerator:
         generator = ContentGenerator(router, registry, op_log, fs)
 
         with patch.object(
-            generator, "_classify_tone",
-            side_effect=RuntimeError("Tool failed")
+            generator, "_classify_tone", side_effect=RuntimeError("Tool failed")
         ):
             context = DraftContext(topic="Test")
             draft = await generator.generate_draft("twitter", context, "post")
@@ -324,13 +332,19 @@ class TestQueueDraftForReview:
         log_path = tmp_path / "logs" / "operational.log"
         op_log = ContentOperationalLog(log_path)
 
-        router = PrivacyRouter.from_dict({
-            "policy_version": "1.0",
-            "default_backend": "local-nim",
-            "routes": [],
-        })
+        router = PrivacyRouter.from_dict(
+            {
+                "policy_version": "1.0",
+                "default_backend": "local-nim",
+                "routes": [],
+            }
+        )
 
-        registry = ToolRegistry(squad_id="test-squad", claw_role="content", registry_dir=str(tmp_path / "tools"))
+        registry = ToolRegistry(
+            squad_id="test-squad",
+            claw_role="content",
+            registry_dir=str(tmp_path / "tools"),
+        )
 
         return fs, op_log, router, registry
 
@@ -344,7 +358,9 @@ class TestQueueDraftForReview:
         mock_action.id = "act_test123"
         mock_war_room.queue_action.return_value = mock_action
 
-        generator = ContentGenerator(router, registry, op_log, fs, war_room=mock_war_room)
+        generator = ContentGenerator(
+            router, registry, op_log, fs, war_room=mock_war_room
+        )
 
         draft = Draft(
             draft_id="draft-queue-test",
@@ -371,7 +387,9 @@ class TestQueueDraftForReview:
         mock_action.id = "act_test456"
         mock_war_room.queue_action.return_value = mock_action
 
-        generator = ContentGenerator(router, registry, op_log, fs, war_room=mock_war_room)
+        generator = ContentGenerator(
+            router, registry, op_log, fs, war_room=mock_war_room
+        )
 
         draft = Draft(
             draft_id="draft-payload-test",
@@ -409,7 +427,9 @@ class TestQueueDraftForReview:
         mock_action.id = "act_log_test"
         mock_war_room.queue_action.return_value = mock_action
 
-        generator = ContentGenerator(router, registry, op_log, fs, war_room=mock_war_room)
+        generator = ContentGenerator(
+            router, registry, op_log, fs, war_room=mock_war_room
+        )
 
         draft = Draft(
             draft_id="draft-log-test",
@@ -458,7 +478,9 @@ class TestQueueDraftForReview:
         mock_action.id = "act_own_content"
         mock_war_room.queue_action.return_value = mock_action
 
-        generator = ContentGenerator(router, registry, op_log, fs, war_room=mock_war_room)
+        generator = ContentGenerator(
+            router, registry, op_log, fs, war_room=mock_war_room
+        )
 
         draft = Draft(
             draft_id="draft-own-content",
@@ -490,23 +512,33 @@ class TestBriefToDraftFlow:
 
         brief_path = fs.get_brief_path("active", "brief-test123")
         brief_path.parent.mkdir(parents=True, exist_ok=True)
-        brief_path.write_text(json.dumps({
-            "brief_id": "brief-test123",
-            "client_id": "client-acme",
-            "project_id": "proj-456",
-            "brief_text": "Create engaging social media campaign",
-            "tone_requirements": "professional yet approachable",
-            "platform_targets": ["twitter", "linkedin"],
-            "deadline": "2026-04-01",
-        }))
+        brief_path.write_text(
+            json.dumps(
+                {
+                    "brief_id": "brief-test123",
+                    "client_id": "client-acme",
+                    "project_id": "proj-456",
+                    "brief_text": "Create engaging social media campaign",
+                    "tone_requirements": "professional yet approachable",
+                    "platform_targets": ["twitter", "linkedin"],
+                    "deadline": "2026-04-01",
+                }
+            )
+        )
 
-        router = PrivacyRouter.from_dict({
-            "policy_version": "1.0",
-            "default_backend": "local-nim",
-            "routes": [],
-        })
+        router = PrivacyRouter.from_dict(
+            {
+                "policy_version": "1.0",
+                "default_backend": "local-nim",
+                "routes": [],
+            }
+        )
 
-        registry = ToolRegistry(squad_id="test-squad", claw_role="content", registry_dir=str(tmp_path / "tools"))
+        registry = ToolRegistry(
+            squad_id="test-squad",
+            claw_role="content",
+            registry_dir=str(tmp_path / "tools"),
+        )
 
         return fs, op_log, router, registry
 
@@ -547,30 +579,44 @@ class TestDailyPlan:
 
         brief1_path = fs.get_brief_path("active", "brief-1")
         brief1_path.parent.mkdir(parents=True, exist_ok=True)
-        brief1_path.write_text(json.dumps({
-            "brief_id": "brief-1",
-            "client_id": "client-a",
-            "project_id": "proj-1",
-            "brief_text": "Brief 1",
-            "platform_targets": ["twitter"],
-        }))
+        brief1_path.write_text(
+            json.dumps(
+                {
+                    "brief_id": "brief-1",
+                    "client_id": "client-a",
+                    "project_id": "proj-1",
+                    "brief_text": "Brief 1",
+                    "platform_targets": ["twitter"],
+                }
+            )
+        )
 
         brief2_path = fs.get_brief_path("active", "brief-2")
-        brief2_path.write_text(json.dumps({
-            "brief_id": "brief-2",
-            "client_id": "client-b",
-            "project_id": "proj-2",
-            "brief_text": "Brief 2",
-            "platform_targets": ["linkedin", "instagram"],
-        }))
+        brief2_path.write_text(
+            json.dumps(
+                {
+                    "brief_id": "brief-2",
+                    "client_id": "client-b",
+                    "project_id": "proj-2",
+                    "brief_text": "Brief 2",
+                    "platform_targets": ["linkedin", "instagram"],
+                }
+            )
+        )
 
-        router = PrivacyRouter.from_dict({
-            "policy_version": "1.0",
-            "default_backend": "local-nim",
-            "routes": [],
-        })
+        router = PrivacyRouter.from_dict(
+            {
+                "policy_version": "1.0",
+                "default_backend": "local-nim",
+                "routes": [],
+            }
+        )
 
-        registry = ToolRegistry(squad_id="test-squad", claw_role="content", registry_dir=str(tmp_path / "tools"))
+        registry = ToolRegistry(
+            squad_id="test-squad",
+            claw_role="content",
+            registry_dir=str(tmp_path / "tools"),
+        )
 
         return fs, op_log, router, registry
 
@@ -667,7 +713,9 @@ class TestPromptBuilding:
         generator = ContentGenerator(MagicMock(), MagicMock(), MagicMock(), fs)
 
         context = DraftContext()
-        prompt = generator._build_prompt("linkedin", context, style_guide="Use Oxford comma. Be concise.")
+        prompt = generator._build_prompt(
+            "linkedin", context, style_guide="Use Oxford comma. Be concise."
+        )
 
         assert "Oxford comma" in prompt
 

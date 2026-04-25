@@ -13,7 +13,15 @@
 
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { existsSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync, mkdirSync } from "node:fs";
+import {
+  existsSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+  mkdirSync,
+} from "node:fs";
 
 export interface Logger {
   info: (message: string) => void;
@@ -39,8 +47,8 @@ export interface PendingAction {
   priority?: string;
 }
 
-export async function cliActionApprove(options: ActionCliOptions & { actionId: string }): Promise<void> {
-  const { logger, pluginConfig, actionId } = options;
+export function cliActionApprove(options: ActionCliOptions & { actionId: string }): Promise<void> {
+  const { logger, actionId } = options;
 
   const home = homedir();
   const meshDir = join(home, ".milimo", "mesh");
@@ -78,24 +86,28 @@ export async function cliActionApprove(options: ActionCliOptions & { actionId: s
     });
 
     logger.info(`✓ Action approved: ${actionId}`);
-    logger.info(`  Claw: ${action.sender_role.toUpperCase()}`);
-    logger.info(`  Type: ${action.message_type}`);
+    logger.info(` Claw: ${action.sender_role.toUpperCase()}`);
+    logger.info(` Type: ${action.message_type}`);
 
     if (action.message_type === "tool_proposal" && action.payload?.tool_name) {
-      logger.info(`  Tool: ${action.payload.tool_name as string}`);
+      logger.info(` Tool: ${action.payload.tool_name as string}`);
     }
 
     if (action.payload?.amount) {
-      logger.info(`  Amount: $${action.payload.amount as number}`);
+      logger.info(` Amount: $${action.payload.amount as number}`);
     }
   } catch (error) {
     logger.error(`Failed to approve action: ${(error as Error).message}`);
     process.exit(1);
   }
+
+  return Promise.resolve();
 }
 
-export async function cliActionBlock(options: ActionCliOptions & { actionId: string; reason?: string }): Promise<void> {
-  const { logger, pluginConfig, actionId, reason } = options;
+export function cliActionBlock(
+  options: ActionCliOptions & { actionId: string; reason?: string },
+): Promise<void> {
+  const { logger, actionId, reason } = options;
 
   const home = homedir();
   const meshDir = join(home, ".milimo", "mesh");
@@ -141,16 +153,18 @@ export async function cliActionBlock(options: ActionCliOptions & { actionId: str
     });
 
     logger.info(`✗ Action blocked: ${actionId}`);
-    logger.info(`  Claw: ${action.sender_role.toUpperCase()}`);
-    logger.info(`  Type: ${action.message_type}`);
+    logger.info(` Claw: ${action.sender_role.toUpperCase()}`);
+    logger.info(` Type: ${action.message_type}`);
 
     if (reason) {
-      logger.info(`  Reason: ${reason}`);
+      logger.info(` Reason: ${reason}`);
     }
   } catch (error) {
     logger.error(`Failed to block action: ${(error as Error).message}`);
     process.exit(1);
   }
+
+  return Promise.resolve();
 }
 
 export function listPendingActions(): PendingAction[] {

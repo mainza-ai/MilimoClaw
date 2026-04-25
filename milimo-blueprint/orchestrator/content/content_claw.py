@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -26,7 +25,6 @@ Outbound messages dispatched:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -37,7 +35,7 @@ from .content_init import (
     ContentOperationalLog,
     LogEntry,
 )
-from .content_generator import ContentGenerator, DraftContext
+from .content_generator import ContentGenerator
 from .brief_manager import BriefManager
 from .approval_handler import ContentApprovalHandler
 from .platform_publisher import PlatformPublisher
@@ -115,7 +113,7 @@ class ContentClaw:
         if not validation.valid:
             logger.warning(
                 "Filesystem validation issues: %s",
-                validation.missing_dirs + validation.missing_files,
+                validation.missing_paths,
             )
 
         # 2. Operational log
@@ -139,10 +137,13 @@ class ContentClaw:
         )
 
         # 4. Content generator
+        assert self._privacy_router is not None
+        assert self._tool_registry is not None
+        assert self._operational_log is not None
+        assert self._fs is not None
         self._generator = ContentGenerator(
-            privacy_router=self._privacy_router or PrivacyRouter(),
-            tool_registry=self._tool_registry
-            or ToolRegistry(self._base_path / "tools"),
+            privacy_router=self._privacy_router,
+            tool_registry=self._tool_registry,
             operational_log=self._operational_log,
             fs=self._fs,
             war_room=self._war_room,
@@ -152,7 +153,7 @@ class ContentClaw:
         self._brief_manager = BriefManager(
             fs=self._fs,
             operational_log=self._operational_log,
-            mesh_sender=self._mesh_sender,
+            mesh_client=self._mesh_sender,
         )
 
         # 6. Approval handler
@@ -173,7 +174,7 @@ class ContentClaw:
         self._performance_monitor = PerformanceMonitor(
             fs=self._fs,
             operational_log=self._operational_log,
-            mesh_sender=self._mesh_sender,
+            mesh_client=self._mesh_sender,
             war_room=self._war_room,
         )
 
@@ -554,7 +555,7 @@ class ContentClaw:
         }
 
         if task_type == "generate_draft":
-            brief_data = payload.get("brief", {})
+            payload.get("brief", {})
             if self._generator and self._brief_manager:
                 result["status"] = "queued"
                 result["message"] = "Draft generation queued"
@@ -567,14 +568,15 @@ class ContentClaw:
 
     def _log_and_respond(self, message: dict[str, Any], result: dict[str, Any]) -> None:
         """Log action and send response via mesh."""
-        self._operational_log.append(
-            LogEntry(
-                action_type="assistant_message",
-                entity_id=message.get("message_type", "unknown"),
-                outcome="success",
-                details=result,
+        if self._operational_log is not None:
+            self._operational_log.append(
+                LogEntry(
+                    action_type="assistant_message",
+                    entity_id=message.get("message_type", "unknown"),
+                    outcome="success",
+                    details=result,
+                )
             )
-        )
         if self._mesh_sender:
             self._mesh_sender(
                 {

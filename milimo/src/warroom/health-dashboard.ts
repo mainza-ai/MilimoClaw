@@ -47,9 +47,6 @@ interface SquadHealth {
   last_updated: string;
 }
 
-type HealthEventHandler = (health: SquadHealth) => void;
-type AlertEventHandler = (alert: SquadHealth["alerts"][0]) => void;
-
 const STATUS_ICONS: Record<string, string> = {
   healthy: "🟢",
   good: "🟡",
@@ -79,7 +76,8 @@ class HealthDashboard extends EventEmitter {
   constructor(squadId: string = "default") {
     super();
     this.squadId = squadId;
-    this.blueprintDir = process.env.MILIMO_BLUEPRINT_DIR || join(homedir(), ".milimo", "blueprints", squadId);
+    this.blueprintDir =
+      process.env.MILIMO_BLUEPRINT_DIR || join(homedir(), ".milimo", "blueprints", squadId);
     this.healthPath = join(homedir(), ".milimo", "health", "health.json");
   }
 
@@ -89,10 +87,10 @@ class HealthDashboard extends EventEmitter {
     }
 
     this.updateInterval = setInterval(() => {
-      this.update();
+      void this.update();
     }, intervalMs);
 
-    this.update();
+    void this.update();
   }
 
   stop(): void {
@@ -117,7 +115,7 @@ class HealthDashboard extends EventEmitter {
     if (previousHealth) {
       for (const alert of health.alerts) {
         const isNew = !previousHealth.alerts.some(
-          (a) => a.role === alert.role && a.level === alert.level
+          (a) => a.role === alert.role && a.level === alert.level,
         );
 
         if (isNew) {
@@ -164,13 +162,17 @@ class HealthDashboard extends EventEmitter {
     const icon = STATUS_ICONS[this.lastHealth.overall_status] || "⚪";
     const lines: string[] = [];
 
-    lines.push(`${icon} Squad Health: ${this.lastHealth.overall_score.toFixed(1)} (${this.lastHealth.overall_status})`);
+    lines.push(
+      `${icon} Squad Health: ${this.lastHealth.overall_score.toFixed(1)} (${this.lastHealth.overall_status})`,
+    );
     lines.push(`Squad: ${this.lastHealth.squad_id}`);
     lines.push("");
 
     for (const claw of this.lastHealth.claws) {
       const clawIcon = STATUS_ICONS[claw.status] || "⚪";
-      lines.push(`${clawIcon} ${claw.role.padEnd(12)} ${claw.score.toFixed(1).padStart(5)}  ${claw.status}`);
+      lines.push(
+        `${clawIcon} ${claw.role.padEnd(12)} ${claw.score.toFixed(1).padStart(5)}  ${claw.status}`,
+      );
     }
 
     if (this.lastHealth.alerts.length > 0) {
@@ -260,7 +262,9 @@ function createHealthWidget(health: SquadHealth): string {
   const lines: string[] = [];
 
   lines.push("┌─────────────────────────────────────────┐");
-  lines.push(`│  Squad Health          ${STATUS_ICONS[health.overall_status]} ${health.overall_status.toUpperCase().padEnd(10)}│`);
+  lines.push(
+    `│  Squad Health          ${STATUS_ICONS[health.overall_status]} ${health.overall_status.toUpperCase().padEnd(10)}│`,
+  );
   lines.push(`│  Score: ${health.overall_score.toFixed(1).padEnd(33)}│`);
   lines.push("├─────────────────────────────────────────┤");
 
@@ -286,12 +290,6 @@ function renderMetricGauge(value: number, max: number, label: string): string {
   return `${label.padEnd(15)} [${"=".repeat(filled)}${" ".repeat(empty)}] ${value.toFixed(1)}/${max}`;
 }
 
-export {
-  HealthDashboard,
-  createHealthWidget,
-  renderMetricGauge,
-  STATUS_ICONS,
-  STATUS_COLORS,
-};
+export { HealthDashboard, createHealthWidget, renderMetricGauge, STATUS_ICONS, STATUS_COLORS };
 
 export type { SquadHealth, ClawHealth, HealthMetrics };

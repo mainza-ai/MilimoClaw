@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -38,6 +37,7 @@ logger = logging.getLogger("milimo.region_detector")
 # ---------------------------------------------------------------------------
 # Types
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class RegionInfo:
@@ -104,6 +104,7 @@ class RegionConfig:
 # Region Detector
 # ---------------------------------------------------------------------------
 
+
 class RegionDetector:
     """
     Detects the optimal region for a claw.
@@ -121,8 +122,18 @@ class RegionDetector:
         "us-west-2": {"code": "usw2", "country": "US", "lat": 45.52, "lon": -122.68},
         "eu-west-1": {"code": "euw1", "country": "IE", "lat": 53.35, "lon": -6.26},
         "eu-central-1": {"code": "euc1", "country": "DE", "lat": 50.11, "lon": 8.68},
-        "ap-southeast-1": {"code": "apse1", "country": "SG", "lat": 1.35, "lon": 103.82},
-        "ap-northeast-1": {"code": "apne1", "country": "JP", "lat": 35.69, "lon": 139.69},
+        "ap-southeast-1": {
+            "code": "apse1",
+            "country": "SG",
+            "lat": 1.35,
+            "lon": 103.82,
+        },
+        "ap-northeast-1": {
+            "code": "apne1",
+            "country": "JP",
+            "lat": 35.69,
+            "lon": 139.69,
+        },
         "sa-east-1": {"code": "sae1", "country": "BR", "lat": -23.55, "lon": -46.63},
     }
 
@@ -161,8 +172,12 @@ class RegionDetector:
                     data = yaml.safe_load(f) or {}
                     regions = data.get("regions", {})
                     for region_id, region_data in regions.items():
-                        self._regions_config[region_id] = RegionConfig.from_dict(region_id, region_data)
-                    logger.info("Loaded %d region configurations", len(self._regions_config))
+                        self._regions_config[region_id] = RegionConfig.from_dict(
+                            region_id, region_data
+                        )
+                    logger.info(
+                        "Loaded %d region configurations", len(self._regions_config)
+                    )
         except Exception as e:
             logger.warning("Failed to load regions config: %s", e)
 
@@ -188,7 +203,9 @@ class RegionDetector:
         self._cache = region_info
         self._cache_time = datetime.now(timezone.utc)
 
-        logger.info("Detected region: %s (confidence: %.2f)", region_id, region_info.confidence)
+        logger.info(
+            "Detected region: %s (confidence: %.2f)", region_id, region_info.confidence
+        )
         return region_info
 
     def _is_cache_valid(self) -> bool:
@@ -256,7 +273,9 @@ class RegionDetector:
 
         return targets
 
-    def _probe_region_latency(self, region_id: str, config: dict[str, Any]) -> Optional[float]:
+    def _probe_region_latency(
+        self, region_id: str, config: dict[str, Any]
+    ) -> Optional[float]:
         """Probe latency to a specific region."""
         endpoint = config.get("endpoint", "")
         if not endpoint:
@@ -267,7 +286,9 @@ class RegionDetector:
             request = urllib.request.Request(endpoint, method="HEAD")
             request.add_header("User-Agent", "MilimoClaw-RegionDetector/1.0")
 
-            response = urllib.request.urlopen(request, timeout=self.probe_timeout_ms / 1000)
+            response = urllib.request.urlopen(
+                request, timeout=self.probe_timeout_ms / 1000
+            )
             latency_ms = (time.time() - start_time) * 1000
 
             if response.status < 400:
@@ -286,7 +307,9 @@ class RegionDetector:
                 request = urllib.request.Request(service_url)
                 request.add_header("User-Agent", "MilimoClaw-RegionDetector/1.0")
 
-                response = urllib.request.urlopen(request, timeout=self.probe_timeout_ms / 1000)
+                response = urllib.request.urlopen(
+                    request, timeout=self.probe_timeout_ms / 1000
+                )
                 data = json.loads(response.read().decode())
 
                 return self._map_geolocation_to_region(data)
@@ -304,7 +327,13 @@ class RegionDetector:
         lat = float(geo_data.get("latitude", geo_data.get("lat", 0)))
         lon = float(geo_data.get("longitude", geo_data.get("lon", 0)))
 
-        logger.debug("Geolocation: country=%s, city=%s, lat=%.2f, lon=%.2f", country, city, lat, lon)
+        logger.debug(
+            "Geolocation: country=%s, city=%s, lat=%.2f, lon=%.2f",
+            country,
+            city,
+            lat,
+            lon,
+        )
 
         best_region = None
         best_distance = float("inf")
@@ -374,7 +403,9 @@ class RegionDetector:
 
     def get_all_regions(self) -> list[str]:
         """Get list of all known regions."""
-        return list(set(list(self.KNOWN_REGIONS.keys()) + list(self._regions_config.keys())))
+        return list(
+            set(list(self.KNOWN_REGIONS.keys()) + list(self._regions_config.keys()))
+        )
 
     def get_optimal_relay(self, region_id: Optional[str] = None) -> str:
         """Get the optimal relay endpoint for a region."""

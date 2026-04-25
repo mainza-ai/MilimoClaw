@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -27,7 +26,7 @@ import json
 import logging
 import os
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -46,8 +45,9 @@ try:
         Ed25519PrivateKey,
         Ed25519PublicKey,
     )
-    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives import serialization  # noqa: F401
     from cryptography.exceptions import InvalidSignature
+
     PROVENANCE_AVAILABLE = True
 except ImportError:
     PROVENANCE_AVAILABLE = False
@@ -265,7 +265,9 @@ class ToolRegistry:
             claw_role=tool.claw_role,
             generated_at=datetime.now(timezone.utc).isoformat(),
             generation_model="local-nim",
-            trigger_pattern=str(tool.proposal.trigger_pattern.pattern_type) if tool.proposal else "",
+            trigger_pattern=str(tool.proposal.trigger_pattern.pattern_type)
+            if tool.proposal
+            else "",
             backtest_result={
                 "baseline_score": tool.baseline_score,
                 "tool_score": tool.tool_score,
@@ -291,7 +293,9 @@ class ToolRegistry:
 
         return provenance
 
-    def _sign_provenance(self, provenance: ToolProvenance, private_key_bytes: bytes) -> str:
+    def _sign_provenance(
+        self, provenance: ToolProvenance, private_key_bytes: bytes
+    ) -> str:
         """Sign provenance data with Ed25519 private key."""
         if not PROVENANCE_AVAILABLE:
             return ""
@@ -446,10 +450,12 @@ class ToolRegistry:
             )
 
         # Record check
-        monitoring["checks"].append({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "value": current_metric_value,
-        })
+        monitoring["checks"].append(
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "value": current_metric_value,
+            }
+        )
 
         return RollbackDecision(
             should_rollback=False,

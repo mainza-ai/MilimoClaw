@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """
 Build Claw issue manager.
 
@@ -87,13 +89,15 @@ class IssueManager:
         for attempt, backoff in enumerate(RATE_LIMIT_BACKOFF_SECONDS):
             try:
                 issues = self._github.get_open_issues()
-                self._log.append(BuildLogEntry(
-                    timestamp=datetime.now(timezone.utc).isoformat(),
-                    action_type="issues_fetched",
-                    entity_id="github",
-                    outcome="success",
-                    details={"count": len(issues)},
-                ))
+                self._log.append(
+                    BuildLogEntry(
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        action_type="issues_fetched",
+                        entity_id="github",
+                        outcome="success",
+                        details={"count": len(issues)},
+                    )
+                )
                 return issues
             except Exception as exc:
                 if "rate limit" in str(exc).lower():
@@ -101,7 +105,9 @@ class IssueManager:
                         logger.warning("GitHub rate limited, backing off %ds", backoff)
                         time.sleep(backoff)
                     else:
-                        logger.error("GitHub rate limit exhausted after %d attempts", attempt + 1)
+                        logger.error(
+                            "GitHub rate limit exhausted after %d attempts", attempt + 1
+                        )
                         return []
                 else:
                     raise
@@ -126,7 +132,7 @@ class IssueManager:
 
         # Use inference for complexity estimation
         prompt = f"""Score this issue complexity (S/M/L/XL) and estimate hours.
-Title: {issue.get('title', '')}
+Title: {issue.get("title", "")}
 Body: {body[:500]}
 Respond with format: TIER HOURS (e.g., M 8)"""
 
@@ -152,17 +158,19 @@ Respond with format: TIER HOURS (e.g., M 8)"""
             missing_elements=missing,
         )
 
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="issue_scored",
-            entity_id=str(issue.get("number", 0)),
-            outcome="success",
-            details={
-                "tier": tier,
-                "hours": hours,
-                "clarity": clarity,
-            },
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="issue_scored",
+                entity_id=str(issue.get("number", 0)),
+                outcome="success",
+                details={
+                    "tier": tier,
+                    "hours": hours,
+                    "clarity": clarity,
+                },
+            )
+        )
         return score
 
     # ------------------------------------------------------------------
@@ -185,18 +193,20 @@ Respond with format: TIER HOURS (e.g., M 8)"""
 
         for issue in issues:
             # Skip questions
-            labels = [l.get("name", "") for l in issue.get("labels", [])]
+            labels = [lbl.get("name", "") for lbl in issue.get("labels", [])]
             if "question" in labels:
                 continue
 
             score = self.score_issue_complexity(issue)
-            scored.append({
-                "issue_number": score.issue_number,
-                "title": score.issue_title,
-                "complexity_tier": score.complexity_tier,
-                "estimated_hours": score.estimated_hours,
-                "clarity_score": score.clarity_score,
-            })
+            scored.append(
+                {
+                    "issue_number": score.issue_number,
+                    "title": score.issue_title,
+                    "complexity_tier": score.complexity_tier,
+                    "estimated_hours": score.estimated_hours,
+                    "clarity_score": score.clarity_score,
+                }
+            )
             total_hours += score.estimated_hours
 
         plan = SprintPlan(
@@ -226,16 +236,18 @@ Respond with format: TIER HOURS (e.g., M 8)"""
             retention_context=None,
         )
 
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="sprint_plan_generated",
-            entity_id=plan.plan_id,
-            outcome="success",
-            details={
-                "issue_count": len(scored),
-                "total_hours": total_hours,
-            },
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="sprint_plan_generated",
+                entity_id=plan.plan_id,
+                outcome="success",
+                details={
+                    "issue_count": len(scored),
+                    "total_hours": total_hours,
+                },
+            )
+        )
         return plan
 
     # ------------------------------------------------------------------
@@ -272,12 +284,14 @@ Respond with format: TIER HOURS (e.g., M 8)"""
         velocity_data = self._read_velocity_data()
 
         sprints = velocity_data.get("sprints", [])
-        sprints.append({
-            "sprint_id": sprint_id,
-            "estimated_hours": estimated_hours,
-            "actual_hours": actual_hours,
-            "completed_at": datetime.now(timezone.utc).isoformat(),
-        })
+        sprints.append(
+            {
+                "sprint_id": sprint_id,
+                "estimated_hours": estimated_hours,
+                "actual_hours": actual_hours,
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         velocity_data["sprints"] = sprints
 
         # Recalculate average
@@ -292,17 +306,19 @@ Respond with format: TIER HOURS (e.g., M 8)"""
 
         self._fs.atomic_write_json(velocity_path, velocity_data)
 
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="velocity_updated",
-            entity_id=sprint_id,
-            outcome="success",
-            details={
-                "estimated": estimated_hours,
-                "actual": actual_hours,
-                "avg_hours": velocity_data["avg_hours_per_week"],
-            },
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="velocity_updated",
+                entity_id=sprint_id,
+                outcome="success",
+                details={
+                    "estimated": estimated_hours,
+                    "actual": actual_hours,
+                    "avg_hours": velocity_data["avg_hours_per_week"],
+                },
+            )
+        )
 
     def _read_velocity_data(self) -> dict[str, Any]:
         velocity_path = self._fs.base / "context" / "sprint" / "velocity.json"
@@ -337,17 +353,19 @@ Respond with format: TIER HOURS (e.g., M 8)"""
             now = datetime.now(timezone.utc)
             days_until = (deadline_dt - now).total_seconds() / 86400
             if days_until < 3:
-                self._log.append(BuildLogEntry(
-                    timestamp=now.isoformat(),
-                    action_type="deadline_risk_flagged",
-                    entity_id=project_id,
-                    outcome="warning",
-                    details={
-                        "deadline": deadline,
-                        "days_remaining": round(days_until, 1),
-                        "severity": "high",
-                    },
-                ))
+                self._log.append(
+                    BuildLogEntry(
+                        timestamp=now.isoformat(),
+                        action_type="deadline_risk_flagged",
+                        entity_id=project_id,
+                        outcome="warning",
+                        details={
+                            "deadline": deadline,
+                            "days_remaining": round(days_until, 1),
+                            "severity": "high",
+                        },
+                    )
+                )
         except (ValueError, TypeError):
             pass
 
@@ -360,13 +378,15 @@ Respond with format: TIER HOURS (e.g., M 8)"""
         except Exception:
             issue_number = 0
 
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="feature_brief_processed",
-            entity_id=project_id,
-            outcome="success",
-            details={
-                "client_id": client_id,
-                "issue_number": issue_number,
-            },
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="feature_brief_processed",
+                entity_id=project_id,
+                outcome="success",
+                details={
+                    "client_id": client_id,
+                    "issue_number": issue_number,
+                },
+            )
+        )

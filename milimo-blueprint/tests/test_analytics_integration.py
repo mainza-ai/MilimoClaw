@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -9,15 +8,13 @@ Milimo Claw — Analytics Integration Tests
 All tests must pass before the claw is considered minimally functional.
 """
 
-from __future__ import annotations
-
 import json
 import shutil
 import tempfile
 import time
+from collections.abc import Iterator
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -33,8 +30,7 @@ from orchestrator.analytics.signal_dispatcher import SignalDispatcher
 
 
 @pytest.fixture
-def temp_sandbox() -> Path:
-    """Create a temporary sandbox directory for testing."""
+def temp_sandbox() -> Iterator[Path]:
     sandbox = Path(tempfile.mkdtemp(prefix="analytics_test_"))
     yield sandbox
     shutil.rmtree(sandbox, ignore_errors=True)
@@ -57,11 +53,13 @@ def operational_log(fs: AnalyticsFilesystemInit) -> AnalyticsOperationalLog:
 class TestMVRSequence:
     """Minimum Viable First Run test sequence."""
 
-    def test_mvr_step_01_performance_signal_stored(self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog):
+    def test_mvr_step_01_performance_signal_stored(
+        self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog
+    ):
         """Step 01: Inject mock performance_signal — confirm stored in data/."""
         from orchestrator.analytics.signal_processor import InboundSignal
 
-        dispatcher = SignalDispatcher(operational_log, fs)
+        SignalDispatcher(operational_log, fs)
         processor = SignalProcessor(fs, operational_log)
 
         signal = InboundSignal(
@@ -96,16 +94,21 @@ class TestMVRSequence:
                         if perf_file.exists():
                             found = True
                             content = perf_file.read_text()
-                            assert "test-signal-001" in content or "engagement_rate" in content
+                            assert (
+                                "test-signal-001" in content
+                                or "engagement_rate" in content
+                            )
 
         assert found, "Performance signal not stored"
 
-    def test_mvr_step_02_data_written_to_correct_path(self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog):
+    def test_mvr_step_02_data_written_to_correct_path(
+        self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog
+    ):
         """Step 02: Confirm JSONL written to data/content-performance/{platform}/."""
         from orchestrator.analytics.signal_processor import InboundSignal
 
         dispatcher = SignalDispatcher(operational_log, fs)
-        processor = SignalProcessor(fs, operational_log, dispatcher)
+        processor = SignalProcessor(fs, operational_log, dispatcher._send)  # type: ignore[arg-type]
 
         signal = InboundSignal(
             signal_id="test-signal-002",
@@ -132,9 +135,11 @@ class TestMVRSequence:
         jsonl_files = list(twitter_dir.rglob("*.jsonl"))
         assert len(jsonl_files) > 0
 
-    def test_mvr_step_03_query_received(self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog):
+    def test_mvr_step_03_query_received(
+        self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog
+    ):
         """Step 03: Inject mock content_performance_query — confirm received."""
-        dispatcher = SignalDispatcher(operational_log, fs)
+        SignalDispatcher(operational_log, fs)
         handler = QueryHandler(fs, operational_log)
 
         query = {
@@ -153,12 +158,14 @@ class TestMVRSequence:
         assert response is not None
         assert response.query_type == "content_performance_query"
 
-    def test_mvr_step_04_query_response_within_sla(self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog):
+    def test_mvr_step_04_query_response_within_sla(
+        self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog
+    ):
         """Step 04: Confirm response dispatched within 2 minutes (120 seconds)."""
         from orchestrator.analytics.signal_processor import InboundSignal
 
         dispatcher = SignalDispatcher(operational_log, fs)
-        processor = SignalProcessor(fs, operational_log, dispatcher)
+        processor = SignalProcessor(fs, operational_log, dispatcher._send)  # type: ignore[arg-type]
         handler = QueryHandler(fs, operational_log)
 
         for i in range(3):
@@ -195,12 +202,14 @@ class TestMVRSequence:
         assert response is not None
         assert elapsed < 120, f"Query took {elapsed}s, exceeds 2-minute SLA"
 
-    def test_mvr_step_05_seven_days_of_signals(self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog):
+    def test_mvr_step_05_seven_days_of_signals(
+        self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog
+    ):
         """Step 05: Inject 7 days of mock signals — all stored correctly."""
         from orchestrator.analytics.signal_processor import InboundSignal
 
         dispatcher = SignalDispatcher(operational_log, fs)
-        processor = SignalProcessor(fs, operational_log, dispatcher)
+        processor = SignalProcessor(fs, operational_log, dispatcher._send)  # type: ignore[arg-type]
 
         base_date = datetime.now(timezone.utc) - timedelta(days=7)
 
@@ -235,7 +244,9 @@ class TestMVRSequence:
 
         assert signal_count >= 7, f"Expected at least 7 signals, found {signal_count}"
 
-    def test_mvr_step_06_manual_report_generation(self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog):
+    def test_mvr_step_06_manual_report_generation(
+        self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog
+    ):
         """Step 06: Trigger report generation manually — confirm no exceptions."""
         report_gen = ReportGenerator(fs, operational_log, squad_id="test-squad")
 
@@ -245,7 +256,9 @@ class TestMVRSequence:
         except Exception as e:
             pytest.fail(f"Report generation raised exception: {e}")
 
-    def test_mvr_step_07_report_file_written(self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog):
+    def test_mvr_step_07_report_file_written(
+        self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog
+    ):
         """Step 07: Confirm weekly-intelligence.json exists and is valid JSON."""
         report_gen = ReportGenerator(fs, operational_log, squad_id="test-squad")
         report_gen.generate()
@@ -262,7 +275,9 @@ class TestMVRSequence:
         except json.JSONDecodeError as e:
             pytest.fail(f"Report is not valid JSON: {e}")
 
-    def test_mvr_step_08_content_claw_can_read_report(self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog):
+    def test_mvr_step_08_content_claw_can_read_report(
+        self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog
+    ):
         """Step 08: Simulate Content Claw file read — confirm access."""
         report_gen = ReportGenerator(fs, operational_log, squad_id="test-squad")
         report_gen.generate()
@@ -275,7 +290,9 @@ class TestMVRSequence:
 
         assert "content_performance" in data
 
-    def test_mvr_step_09_ops_claw_can_read_report(self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog):
+    def test_mvr_step_09_ops_claw_can_read_report(
+        self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog
+    ):
         """Step 09: Simulate Ops Claw file read — confirm access."""
         report_gen = ReportGenerator(fs, operational_log, squad_id="test-squad")
         report_gen.generate()
@@ -288,7 +305,9 @@ class TestMVRSequence:
 
         assert "client_health" in data
 
-    def test_mvr_step_10_health_signal_below_threshold(self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog):
+    def test_mvr_step_10_health_signal_below_threshold(
+        self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog
+    ):
         """Step 10: Inject client_health_signal with score 5.0."""
         from orchestrator.analytics.signal_processor import InboundSignal
 
@@ -307,7 +326,9 @@ class TestMVRSequence:
                 recommended_action=payload.get("recommended_action", ""),
             )
 
-        processor = SignalProcessor(fs, operational_log, alert_dispatcher=alert_callback)
+        processor = SignalProcessor(
+            fs, operational_log, alert_dispatcher=alert_callback
+        )
 
         signal = InboundSignal(
             signal_id="health-signal-010",
@@ -327,7 +348,9 @@ class TestMVRSequence:
         assert dispatched_alerts[0]["message_type"] == "client_health_alert"
         assert dispatched_alerts[0]["recipient_role"] == "ops"
 
-    def test_mvr_step_11_health_alert_dispatched_immediately(self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog):
+    def test_mvr_step_11_health_alert_dispatched_immediately(
+        self, fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog
+    ):
         """Step 11: Confirm client_health_alert sent to Ops Claw immediately."""
         dispatched_alerts: list[dict] = []
 

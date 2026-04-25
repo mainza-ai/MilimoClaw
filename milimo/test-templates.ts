@@ -1,14 +1,14 @@
-import { cliInit } from './src/commands/init.js';
-import { cliBlueprintList } from './src/commands/blueprint.js';
-import * as path from 'path';
+import { cliInit } from "./src/commands/init.js";
+import { cliBlueprintList } from "./src/commands/blueprint.js";
+import * as path from "path";
 
 const pluginConfig = {
-  blueprintDir: path.resolve(__dirname, '../milimo-blueprint'),
-  squadName: 'test-squad',
-  clawRole: 'content',
+  blueprintDir: path.resolve(__dirname, "../milimo-blueprint"),
+  squadName: "test-squad",
+  clawRole: "content",
   debugMode: true,
-  pluginDir: path.resolve(__dirname, '..'),
-  meshSecret: 'test-secret'
+  pluginDir: path.resolve(__dirname, ".."),
+  meshSecret: "test-secret",
 };
 
 const logger = {
@@ -20,19 +20,26 @@ const logger = {
 };
 
 async function run() {
-  console.log('--- BLUEPRINT LIST TEST ---');
+  console.log("--- BLUEPRINT LIST TEST ---");
   await cliBlueprintList({ json: false, logger, pluginConfig: pluginConfig as any });
 
-  console.log('\n--- INIT TEMPLATE TEST ---');
+  console.log("\n--- INIT TEMPLATE TEST ---");
   try {
-    const fs = await import('fs');
-    if (fs.existsSync('/tmp/.milimo/state.json')) {
-      fs.unlinkSync('/tmp/.milimo/state.json');
+    const fs = await import("fs");
+    if (fs.existsSync("/tmp/.milimo/state.json")) {
+      fs.unlinkSync("/tmp/.milimo/state.json");
     }
-  } catch(err) {}
+  } catch (err) {}
 
-  process.env.HOME = '/tmp'; // isolate state
-  await cliInit({ squad: 'my-agency', role: 'content', template: 'content-agency', solo: false, logger, pluginConfig: pluginConfig as any });
+  process.env.HOME = "/tmp"; // isolate state
+  await cliInit({
+    squad: "my-agency",
+    role: "content",
+    template: "content-agency",
+    solo: false,
+    logger,
+    pluginConfig: pluginConfig as any,
+  });
 }
 
 run().catch(console.error);

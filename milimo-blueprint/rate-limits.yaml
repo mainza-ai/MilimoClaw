@@ -55,19 +55,19 @@ tiers:
 always_require_approval:
   - trigger: "invoice_over_500"
     description: "Any invoice >$500"
-  
+
   - trigger: "client_offboarding"
     description: "Client offboarding"
-  
+
   - trigger: "brand_voice_change"
     description: "Brand voice modifications"
-  
+
   - trigger: "payment_execution"
     description: "Payment execution"
-  
+
   - trigger: "rate_change"
     description: "Pricing rate changes"
-  
+
   - trigger: "external_data_sharing"
     description: "Sharing squad data externally"
 
@@ -77,13 +77,13 @@ always_require_approval:
 auto_approvable:
   - trigger: "social_post_draft"
     description: "Social media draft approval"
-  
+
   - trigger: "internal_draft"
     description: "Internal draft approval"
-  
+
   - trigger: "task_completion"
     description: "Task completion confirmation"
-  
+
   - trigger: "routine_report"
     description: "Weekly routine reports"
 
@@ -94,7 +94,7 @@ behavior:
   on_limit_exceeded:
     action: "require_manual_approval"
     message: "Daily auto-approval limit reached. Manual approval required."
-  
+
   # Notification settings
   notifications:
     warn_at_remaining: 3
@@ -116,13 +116,13 @@ monitoring:
     - "denied_requests"
     - "current_remaining"
     - "utilization_percent"
-  
+
   # Alert thresholds
   alerts:
     high_utilization:
       threshold: 80
       severity: "warning"
-    
+
     limit_reached:
       threshold: 100
       severity: "info"

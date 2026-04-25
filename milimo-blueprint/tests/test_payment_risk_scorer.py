@@ -1,9 +1,9 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """Tests for Finance Claw Payment Risk Scorer."""
 
-import json
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -118,7 +118,7 @@ class TestPaymentRiskScorer:
         """Score < 4.0 is classified as 'high' risk."""
         for i in range(3):
             event = PaymentEvent(
-                timestamp=f"2026-03-0{i+1}T10:00:00",
+                timestamp=f"2026-03-0{i + 1}T10:00:00",
                 event_type="payment_overdue",
                 invoice_id=f"inv-{i}",
                 client_id="bad-client",
@@ -140,7 +140,10 @@ class TestPaymentRiskScorer:
         score = risk_scorer.score("bad-client")
 
         assert score.overdue_count == 3
-        assert "overdue" in score.factors[0].lower() or "low on-time" in score.factors[0].lower()
+        assert (
+            "overdue" in score.factors[0].lower()
+            or "low on-time" in score.factors[0].lower()
+        )
 
     def test_medium_risk_classification(self, risk_scorer):
         """Score 4.0-7.0 is classified as 'medium' risk."""
@@ -172,7 +175,7 @@ class TestPaymentRiskScorer:
         """on_time_rate is calculated correctly."""
         for i in range(5):
             event = PaymentEvent(
-                timestamp=f"2026-03-{10+i:02d}T10:00:00",
+                timestamp=f"2026-03-{10 + i:02d}T10:00:00",
                 event_type="invoice_sent",
                 invoice_id=f"inv-{i}",
                 client_id="on-time-client",
@@ -182,7 +185,7 @@ class TestPaymentRiskScorer:
             risk_scorer.payment_events_log.append(event)
 
             paid_event = PaymentEvent(
-                timestamp=f"2026-03-{15+i:02d}T10:00:00",
+                timestamp=f"2026-03-{15 + i:02d}T10:00:00",
                 event_type="payment_received",
                 invoice_id=f"inv-{i}",
                 client_id="on-time-client",
@@ -228,7 +231,7 @@ class TestPaymentRiskScorer:
 
         for i in range(2):
             event = PaymentEvent(
-                timestamp=f"2026-03-0{i+1}T10:00:00",
+                timestamp=f"2026-03-0{i + 1}T10:00:00",
                 event_type="invoice_sent",
                 invoice_id=f"inv-{i}",
                 client_id="fallback-client",
@@ -238,7 +241,7 @@ class TestPaymentRiskScorer:
             risk_scorer.payment_events_log.append(event)
 
             paid_event = PaymentEvent(
-                timestamp=f"2026-03-{10+i:02d}T10:00:00",
+                timestamp=f"2026-03-{10 + i:02d}T10:00:00",
                 event_type="payment_received",
                 invoice_id=f"inv-{i}",
                 client_id="fallback-client",
@@ -256,7 +259,7 @@ class TestPaymentRiskScorer:
         """Factors mention low on-time rate."""
         for i in range(3):
             event = PaymentEvent(
-                timestamp=f"2026-03-0{i+1}T10:00:00",
+                timestamp=f"2026-03-0{i + 1}T10:00:00",
                 event_type="payment_overdue",
                 invoice_id=f"inv-{i}",
                 client_id="factor-client",
@@ -321,7 +324,7 @@ class TestPaymentRiskScorer:
         """Score is always clamped to 0-10."""
         for i in range(10):
             event = PaymentEvent(
-                timestamp=f"2026-03-{1+i:02d}T10:00:00",
+                timestamp=f"2026-03-{1 + i:02d}T10:00:00",
                 event_type="payment_overdue",
                 invoice_id=f"inv-{i}",
                 client_id="clamp-client",

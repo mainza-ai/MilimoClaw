@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -14,16 +13,22 @@ Replaces fabricated/mock data with actual platform metrics.
 
 from __future__ import annotations
 
-import json
 import logging
 import threading
-import time
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
+from datetime import datetime, timezone
 from typing import Any
 
-from .data_collectors import YouTubeDataCollector, GoogleAnalyticsCollector, GenericAPICollector, CollectorResult
-from .analytics_init import AnalyticsFilesystemInit, AnalyticsLogEntry, AnalyticsOperationalLog
+from .data_collectors import (
+    YouTubeDataCollector,
+    GoogleAnalyticsCollector,
+    GenericAPICollector,
+    CollectorResult,
+)
+from .analytics_init import (
+    AnalyticsFilesystemInit,
+    AnalyticsLogEntry,
+    AnalyticsOperationalLog,
+)
 
 logger = logging.getLogger("milimo.analytics.collection_workers")
 
@@ -45,7 +50,7 @@ class CollectionWorker:
         self.fs = fs
         self.operational_log = operational_log
         self._running = False
-        self._collectors: dict[str, Any] = {}
+        self._collectors: dict[str, dict[str, Any]] = {}
         self._timers: list[threading.Timer] = []
         self._collection_history: list[dict[str, Any]] = []
 
@@ -89,7 +94,9 @@ class CollectionWorker:
                 "interval_hours": interval_hours,
                 "enabled": True,
             }
-            logger.info("Google Analytics collector registered (interval: %dh)", interval_hours)
+            logger.info(
+                "Google Analytics collector registered (interval: %dh)", interval_hours
+            )
         else:
             logger.warning("Google Analytics collector not configured — skipping")
 
@@ -114,7 +121,9 @@ class CollectionWorker:
             "interval_hours": interval_hours,
             "enabled": True,
         }
-        logger.info("Generic collector '%s' registered (interval: %dh)", name, interval_hours)
+        logger.info(
+            "Generic collector '%s' registered (interval: %dh)", name, interval_hours
+        )
 
     def start(self) -> None:
         """Start all collection workers on their schedules."""
@@ -163,8 +172,14 @@ class CollectionWorker:
 
     def collect_now(self, source: str | None = None) -> list[CollectorResult]:
         """Trigger immediate collection for all or a specific source."""
-        results = []
-        targets = {source: self._collectors[source]} if source else self._collectors.items()
+        results: list[CollectorResult] = []
+        if source:
+            config = self._collectors.get(source)
+            if not config:
+                return results
+            targets: list[tuple[str, dict[str, Any]]] = [(source, config)]
+        else:
+            targets = list(self._collectors.items())
 
         for name, config in targets:
             if not config["enabled"]:
@@ -183,7 +198,6 @@ class CollectionWorker:
                     results.append(result)
                     results.append(events_result)
                 else:
-                    # Generic REST API collector — use the collector's configured endpoint
                     result = collector.collect("")
                     results.append(result)
 
@@ -191,9 +205,15 @@ class CollectionWorker:
 
             except Exception as e:
                 logger.error("Collection failed for %s: %s", name, e)
-                results.append(CollectorResult(
-                    source=name, success=False, records_collected=0, data=[], error=str(e)
-                ))
+                results.append(
+                    CollectorResult(
+                        source=name,
+                        success=False,
+                        records_collected=0,
+                        data=[],
+                        error=str(e),
+                    )
+                )
 
         return results
 
@@ -205,8 +225,12 @@ class CollectionWorker:
             summary[name] = {
                 "enabled": config["enabled"],
                 "interval_hours": config["interval_hours"],
-                "last_collection": collector._last_collection.isoformat() if collector._last_collection else None,
-                "configured": collector.is_configured() if hasattr(collector, "is_configured") else True,
+                "last_collection": collector._last_collection.isoformat()
+                if collector._last_collection
+                else None,
+                "configured": collector.is_configured()
+                if hasattr(collector, "is_configured")
+                else True,
             }
         return summary
 
@@ -237,17 +261,21 @@ class CollectionWorker:
         timer.start()
         self._timers.append(timer)
 
-        logger.info("Scheduled %s collection every %d hours", name, config["interval_hours"])
+        logger.info(
+            "Scheduled %s collection every %d hours", name, config["interval_hours"]
+        )
 
     def _log_collection_result(self, source: str, result: CollectorResult) -> None:
         """Log collection result to operational log."""
-        self._collection_history.append({
-            "source": result.source,
-            "success": result.success,
-            "records": result.records_collected,
-            "error": result.error,
-            "collected_at": result.collected_at,
-        })
+        self._collection_history.append(
+            {
+                "source": result.source,
+                "success": result.success,
+                "records": result.records_collected,
+                "error": result.error,
+                "collected_at": result.collected_at,
+            }
+        )
 
         self.operational_log.append(
             AnalyticsLogEntry(
@@ -264,6 +292,8 @@ class CollectionWorker:
         )
 
         if result.success:
-            logger.info("Collected %d records from %s", result.records_collected, source)
+            logger.info(
+                "Collected %d records from %s", result.records_collected, source
+            )
         else:
             logger.warning("Collection from %s failed: %s", source, result.error)

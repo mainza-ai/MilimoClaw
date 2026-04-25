@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -64,7 +63,9 @@ MIN_ACTIONS_FOR_PATTERN = 5
 class EvolutionPattern:
     """A detected pattern that may warrant a new evolved tool."""
 
-    pattern_type: str  # classifier | optimizer | predictor | generator_variant | anomaly_detector
+    pattern_type: (
+        str  # classifier | optimizer | predictor | generator_variant | anomaly_detector
+    )
     trigger_description: str  # plain-language description of the observation
     metric_target: str  # which metric this tool should improve
     data_sources: list[str] = field(default_factory=list)  # log fields / signals used
@@ -169,7 +170,10 @@ class PatternDetector:
 
         for edit_field, edit_count in summary.common_edits.items():
             frequency = edit_count / max(summary.total_actions, 1)
-            if frequency >= EDIT_FREQUENCY_THRESHOLD and edit_count >= MIN_ACTIONS_FOR_PATTERN:
+            if (
+                frequency >= EDIT_FREQUENCY_THRESHOLD
+                and edit_count >= MIN_ACTIONS_FOR_PATTERN
+            ):
                 # Determine the specific edits for this field
                 edit_values: dict[str, int] = {}
                 for action in edited_actions:
@@ -190,12 +194,18 @@ class PatternDetector:
                         metric_target="approval_rate",
                         data_sources=[f"operation_log.edits.{edit_field}"],
                         confidence=confidence,
-                        action_type=self._most_common_type_for_edit(edited_actions, edit_field),
+                        action_type=self._most_common_type_for_edit(
+                            edited_actions, edit_field
+                        ),
                         details={
                             "edit_field": edit_field,
                             "edit_frequency": frequency,
                             "common_corrections": dict(
-                                sorted(edit_values.items(), key=lambda x: x[1], reverse=True)[:5]
+                                sorted(
+                                    edit_values.items(),
+                                    key=lambda x: x[1],
+                                    reverse=True,
+                                )[:5]
                             ),
                         },
                     )
@@ -290,8 +300,8 @@ class PatternDetector:
                 hourly_rates[hour] = approved / len(outcomes)
 
         if hourly_rates:
-            best_hour = max(hourly_rates, key=hourly_rates.get)
-            worst_hour = min(hourly_rates, key=hourly_rates.get)
+            best_hour = max(hourly_rates, key=lambda k: hourly_rates[k])
+            worst_hour = min(hourly_rates, key=lambda k: hourly_rates[k])
             spread = hourly_rates[best_hour] - hourly_rates[worst_hour]
 
             if spread > 0.2:
@@ -418,7 +428,8 @@ class PatternDetector:
                             ),
                             metric_target="cross_signal_utilization",
                             data_sources=[
-                                f"cross_signal.{sender}.{f}" for f in sorted(data_fields)[:5]
+                                f"cross_signal.{sender}.{f}"
+                                for f in sorted(data_fields)[:5]
                             ],
                             confidence=confidence,
                             details={
@@ -441,10 +452,12 @@ class PatternDetector:
         type_counts: dict[str, int] = {}
         for action in edited_actions:
             if edit_field in action.edits:
-                type_counts[action.action_type] = type_counts.get(action.action_type, 0) + 1
+                type_counts[action.action_type] = (
+                    type_counts.get(action.action_type, 0) + 1
+                )
         if not type_counts:
             return ""
-        return max(type_counts, key=type_counts.get)
+        return max(type_counts, key=lambda k: type_counts[k])
 
 
 # ---------------------------------------------------------------------------

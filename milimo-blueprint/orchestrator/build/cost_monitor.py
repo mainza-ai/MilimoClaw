@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """
 Build Claw cost monitor.
 
@@ -15,7 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
@@ -96,25 +98,32 @@ class CostMonitor:
             alerts_path = self._fs.base / "logs" / "cost-alerts.log"
             alerts_path.parent.mkdir(parents=True, exist_ok=True)
             with alerts_path.open("a") as f:
-                f.write(json.dumps({
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "total_cost_usd": total_cost,
-                    "baseline_cost_usd": baseline,
-                    "drift_pct": round(drift_pct, 4),
-                    "alert": True,
-                }) + "\n")
+                f.write(
+                    json.dumps(
+                        {
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "total_cost_usd": total_cost,
+                            "baseline_cost_usd": baseline,
+                            "drift_pct": round(drift_pct, 4),
+                            "alert": True,
+                        }
+                    )
+                    + "\n"
+                )
 
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="cost_daily_check",
-            entity_id="cost-monitoring",
-            outcome="alert" if is_alert else "ok",
-            details={
-                "total_cost": total_cost,
-                "baseline": baseline,
-                "drift_pct": round(drift_pct, 4),
-            },
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="cost_daily_check",
+                entity_id="cost-monitoring",
+                outcome="alert" if is_alert else "ok",
+                details={
+                    "total_cost": total_cost,
+                    "baseline": baseline,
+                    "drift_pct": round(drift_pct, 4),
+                },
+            )
+        )
 
         return CostCheckResult(
             total_cost_usd=total_cost,

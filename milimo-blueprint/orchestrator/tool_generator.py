@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -22,17 +21,14 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 import subprocess
 import sys
 import tempfile
 import textwrap
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
-from string import Template
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 logger = logging.getLogger("milimo.tool_generator")
 

@@ -11,7 +11,7 @@ All sends go through the inter-claw mesh gateway.
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Protocol
 
 from .finance_init import FinanceOperationalLog, FinanceLogEntry
 

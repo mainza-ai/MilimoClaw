@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -16,18 +15,22 @@ import json
 import logging
 import signal
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 from typing import Any, Literal
 
-from .analytics_init import AnalyticsFilesystemInit, AnalyticsLogEntry, AnalyticsOperationalLog
+from .analytics_init import (
+    AnalyticsFilesystemInit,
+    AnalyticsLogEntry,
+    AnalyticsOperationalLog,
+)
 
 logger = logging.getLogger("milimo.query_handler")
 
 
 class QueryTimeoutError(Exception):
     """Raised when query processing exceeds the SLA timeout."""
+
     pass
 
 
@@ -167,7 +170,9 @@ class QueryHandler:
         """Signal handler for timeout."""
         raise QueryTimeoutError("Query processing exceeded timeout")
 
-    def _with_timeout(self, func, timeout_seconds: int, *args, **kwargs) -> tuple[Any, bool]:
+    def _with_timeout(
+        self, func, timeout_seconds: int, *args, **kwargs
+    ) -> tuple[Any, bool]:
         """
         Execute function with timeout enforcement.
 
@@ -232,14 +237,21 @@ class QueryHandler:
             )
 
             if timed_out:
-                logger.warning("Query %s timed out, returning partial response", query_id)
+                logger.warning(
+                    "Query %s timed out, returning partial response", query_id
+                )
                 response = QueryResponse(
                     query_id=query_id,
                     query_type=message_type,
                     responding_to=raw_message.get("message_id", ""),
                     requesting_claw=requesting_claw,
                     data_quality="partial",
-                    data={"error": "Query processing timed out", "partial_result": result.data if result and hasattr(result, 'data') else None},
+                    data={
+                        "error": "Query processing timed out",
+                        "partial_result": result.data
+                        if result and hasattr(result, "data")
+                        else None,
+                    },
                     generated_at=datetime.now(timezone.utc).isoformat(),
                     processing_time_ms=int((time.monotonic() - start_time) * 1000),
                 )
@@ -288,7 +300,9 @@ class QueryHandler:
                 action_type="query_answered",
                 entity_id=query_id,
                 source_claw=requesting_claw,
-                outcome="success" if response.data_quality not in ["error", "partial"] else "failed",
+                outcome="success"
+                if response.data_quality not in ["error", "partial"]
+                else "failed",
                 details={
                     "data_quality": response.data_quality,
                     "processing_time_ms": response.processing_time_ms,
@@ -376,7 +390,9 @@ class QueryHandler:
                                     record = json.loads(line)
                                     received_at = record.get("received_at", "")
                                     try:
-                                        record_time = datetime.fromisoformat(received_at)
+                                        record_time = datetime.fromisoformat(
+                                            received_at
+                                        )
                                         if record_time < cutoff:
                                             continue
                                         days_with_data.add(received_at[:10])
@@ -385,11 +401,15 @@ class QueryHandler:
 
                                     content_type = record.get("content_type", "unknown")
                                     engagement_data = record.get("engagement_data", {})
-                                    engagement_rate = engagement_data.get("engagement_rate")
+                                    engagement_rate = engagement_data.get(
+                                        "engagement_rate"
+                                    )
                                     if isinstance(engagement_rate, (int, float)):
                                         if content_type not in format_engagement:
                                             format_engagement[content_type] = []
-                                        format_engagement[content_type].append(float(engagement_rate))
+                                        format_engagement[content_type].append(
+                                            float(engagement_rate)
+                                        )
 
                                 except json.JSONDecodeError:
                                     continue
@@ -411,11 +431,13 @@ class QueryHandler:
         for content_type, rates in format_engagement.items():
             if rates:
                 avg_engagement = sum(rates) / len(rates)
-                top_formats.append({
-                    "format": content_type,
-                    "avg_engagement": round(avg_engagement, 4),
-                    "sample_count": len(rates),
-                })
+                top_formats.append(
+                    {
+                        "format": content_type,
+                        "avg_engagement": round(avg_engagement, 4),
+                        "sample_count": len(rates),
+                    }
+                )
 
         top_formats.sort(key=lambda x: x["avg_engagement"], reverse=True)
         top_formats = top_formats[:10]
@@ -451,7 +473,7 @@ class QueryHandler:
         Correlates feature shipping with client health changes.
         """
         cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
-        
+
         delivery_path = self.fs.get_data_path("delivery-velocity", "velocity.jsonl")
         health_dir = self.fs.get_data_path("client-health")
 
@@ -540,12 +562,14 @@ class QueryHandler:
         for client_id, scores in health_by_client.items():
             if len(scores) >= 2:
                 delta = scores[-1] - scores[0]
-                retention_correlation.append({
-                    "client_id": client_id,
-                    "health_delta": round(delta, 2),
-                    "initial_score": scores[0],
-                    "final_score": scores[-1],
-                })
+                retention_correlation.append(
+                    {
+                        "client_id": client_id,
+                        "health_delta": round(delta, 2),
+                        "initial_score": scores[0],
+                        "final_score": scores[-1],
+                    }
+                )
 
         return QueryResponse(
             query_id=str(hash(query_id) % 10000),
@@ -588,7 +612,10 @@ class QueryHandler:
         )
 
     def _count_days_collected(
-        self, data_type: Literal["content-performance", "client-health", "revenue", "delivery-velocity"]
+        self,
+        data_type: Literal[
+            "content-performance", "client-health", "revenue", "delivery-velocity"
+        ],
     ) -> int:
         """Count unique dates in a data directory."""
         dates: set[str] = set()

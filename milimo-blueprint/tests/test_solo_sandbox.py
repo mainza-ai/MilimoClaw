@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -6,11 +5,9 @@
 Tests for solo_sandbox.py - Sandbox Initializer
 """
 
-import tempfile
 from pathlib import Path
 from typing import Any
 
-import pytest
 import yaml
 
 from orchestrator.solo_sandbox import (
@@ -66,6 +63,7 @@ VALID_CONFIG: dict[str, Any] = {
 
 
 # ---------------------------------------------------------------------------
+
 
 class TestInitSoloSandbox:
     """Tests for init_solo_sandbox function."""

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -22,14 +21,10 @@ from __future__ import annotations
 import ast
 import json
 import logging
-import multiprocessing
-import resource
 import subprocess
 import sys
 import tempfile
-import traceback
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -258,6 +253,7 @@ class SandboxRunner:
         # Platform detection for memory limits
         # macOS has different resource limits than Linux
         import platform
+
         is_macos = platform.system() == "Darwin"
         memory_limit = self._config.memory_limit_mb * 1024 * 1024
 

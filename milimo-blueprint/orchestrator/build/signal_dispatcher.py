@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """
 Build Claw signal dispatcher.
 
@@ -15,8 +17,8 @@ from __future__ import annotations
 import json
 import logging
 import threading
-from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -86,13 +88,19 @@ class BuildSignalDispatcher:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         self._send_message(message)
-        self._log.append(BuildLogEntry(
-            timestamp=message["timestamp"],
-            action_type="deploy_complete_sent",
-            entity_id=project_id,
-            outcome="success",
-            details={"project_id": project_id, "deploy_url": deploy_url, "version": version},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=message["timestamp"],
+                action_type="deploy_complete_sent",
+                entity_id=project_id,
+                outcome="success",
+                details={
+                    "project_id": project_id,
+                    "deploy_url": deploy_url,
+                    "version": version,
+                },
+            )
+        )
 
     def send_shipping_summary(
         self,
@@ -117,13 +125,15 @@ class BuildSignalDispatcher:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         self._send_message(message)
-        self._log.append(BuildLogEntry(
-            timestamp=message["timestamp"],
-            action_type="shipping_summary_sent",
-            entity_id=week_of,
-            outcome="success",
-            details={"prs_merged": prs_merged, "issues_resolved": issues_resolved},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=message["timestamp"],
+                action_type="shipping_summary_sent",
+                entity_id=week_of,
+                outcome="success",
+                details={"prs_merged": prs_merged, "issues_resolved": issues_resolved},
+            )
+        )
 
     def send_behavior_query(
         self,
@@ -149,13 +159,15 @@ class BuildSignalDispatcher:
             lookback_days=lookback_days,
         )
         self._send_message(message)
-        self._log.append(BuildLogEntry(
-            timestamp=message["timestamp"],
-            action_type="behavior_query_sent",
-            entity_id=query_id,
-            outcome="success",
-            details={"query": query, "lookback_days": lookback_days},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=message["timestamp"],
+                action_type="behavior_query_sent",
+                entity_id=query_id,
+                outcome="success",
+                details={"query": query, "lookback_days": lookback_days},
+            )
+        )
         return query_id
 
     def send_feature_brief_acknowledged(
@@ -166,7 +178,9 @@ class BuildSignalDispatcher:
         missing_elements: list[str] | None = None,
     ) -> None:
         if clarity_score not in ("clear", "low"):
-            raise ValueError(f"Invalid clarity_score: {clarity_score!r}. Must be 'clear' or 'low'.")
+            raise ValueError(
+                f"Invalid clarity_score: {clarity_score!r}. Must be 'clear' or 'low'."
+            )
 
         payload: dict[str, Any] = {
             "project_id": project_id,
@@ -185,13 +199,15 @@ class BuildSignalDispatcher:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         self._send_message(message)
-        self._log.append(BuildLogEntry(
-            timestamp=message["timestamp"],
-            action_type="feature_brief_acknowledged",
-            entity_id=project_id,
-            outcome="success",
-            details={"clarity_score": clarity_score},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=message["timestamp"],
+                action_type="feature_brief_acknowledged",
+                entity_id=project_id,
+                outcome="success",
+                details={"clarity_score": clarity_score},
+            )
+        )
 
     # ------------------------------------------------------------------
     # Inbound handlers
@@ -204,7 +220,9 @@ class BuildSignalDispatcher:
         10 minutes, _send_overdue_ack_warning is triggered.
         """
         if message.get("message_type") != "feature_brief":
-            raise ValueError(f"Expected message_type 'feature_brief', got '{message.get('message_type')}'")
+            raise ValueError(
+                f"Expected message_type 'feature_brief', got '{message.get('message_type')}'"
+            )
 
         payload = message.get("payload", {})
         project_id = payload.get("project_id", "unknown")
@@ -219,18 +237,20 @@ class BuildSignalDispatcher:
         timer.start()
         self._sla_timers[project_id] = timer
 
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="feature_brief_received",
-            entity_id=project_id,
-            outcome="success",
-            details={
-                "feature_name": payload.get("feature_name"),
-                "description": payload.get("description", "")[:100],
-                "sla_timer_started": True,
-                "sla_seconds": FEATURE_BRIEF_SLA_SECONDS,
-            },
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="feature_brief_received",
+                entity_id=project_id,
+                outcome="success",
+                details={
+                    "feature_name": payload.get("feature_name"),
+                    "description": payload.get("description", "")[:100],
+                    "sla_timer_started": True,
+                    "sla_seconds": FEATURE_BRIEF_SLA_SECONDS,
+                },
+            )
+        )
 
     def handle_retention_signals(self, message: dict[str, Any]) -> None:
         payload = message.get("payload", {})
@@ -240,23 +260,27 @@ class BuildSignalDispatcher:
         signals_path.parent.mkdir(parents=True, exist_ok=True)
         self._fs.atomic_write_json(signals_path, payload)
 
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="retention_signals_received",
-            entity_id=payload.get("feature_id", "unknown"),
-            outcome="success",
-            details={"signal_type": payload.get("signal_type")},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="retention_signals_received",
+                entity_id=payload.get("feature_id", "unknown"),
+                outcome="success",
+                details={"signal_type": payload.get("signal_type")},
+            )
+        )
 
     def handle_behavior_query_response(self, message: dict[str, Any]) -> None:
         self._pending_query = None
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="behavior_query_response_received",
-            entity_id=message.get("message_id", "unknown"),
-            outcome="success",
-            details={},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="behavior_query_response_received",
+                entity_id=message.get("message_id", "unknown"),
+                outcome="success",
+                details={},
+            )
+        )
 
     # ------------------------------------------------------------------
     # Query state
@@ -289,13 +313,15 @@ class BuildSignalDispatcher:
         feature_name: str,
         changes: list[str],
     ) -> None:
-        self._shipping_data.append({
-            "pr_id": pr_id,
-            "issue_number": issue_number,
-            "feature_name": feature_name,
-            "changes": changes,
-            "merged_at": datetime.now(timezone.utc).isoformat(),
-        })
+        self._shipping_data.append(
+            {
+                "pr_id": pr_id,
+                "issue_number": issue_number,
+                "feature_name": feature_name,
+                "changes": changes,
+                "merged_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
     def get_accumulated_shipping_summary(self) -> dict[str, Any]:
         return {
@@ -326,18 +352,21 @@ class BuildSignalDispatcher:
         Uses the canonical mesh inbox path (~/.milimo/mesh/inbox/{recipient}/)
         so that the recipient's InboxPoller can actually read it.
         """
-        from pathlib import Path
 
         recipient_role = message.get("recipient_role", "unknown")
         mesh_inbox = Path.home() / ".milimo" / "mesh" / "inbox" / recipient_role
         mesh_inbox.mkdir(parents=True, exist_ok=True)
 
-        msg_id = message.get("message_id", f"msg-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}")
+        msg_id = message.get(
+            "message_id", f"msg-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+        )
         path = mesh_inbox / f"{msg_id}.json"
         path.write_text(json.dumps(message, indent=2))
         logger.info("Fallback message written to %s", path)
 
-    def _send_overdue_ack_warning(self, feature_brief_id: str, claw: str = "build") -> None:
+    def _send_overdue_ack_warning(
+        self, feature_brief_id: str, claw: str = "build"
+    ) -> None:
         """Send a preliminary acknowledgment when feature brief response is overdue.
 
         Sends a low-clarity acknowledgment and logs the delayed event.
@@ -348,17 +377,19 @@ class BuildSignalDispatcher:
             clarity_score="low",
         )
 
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="feature_brief_ack_delayed",
-            entity_id=feature_brief_id,
-            outcome="delayed",
-            details={
-                "claw": claw,
-                "severity": "warning",
-                "message": f"Feature brief {feature_brief_id} acknowledgment overdue",
-            },
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="feature_brief_ack_delayed",
+                entity_id=feature_brief_id,
+                outcome="delayed",
+                details={
+                    "claw": claw,
+                    "severity": "warning",
+                    "message": f"Feature brief {feature_brief_id} acknowledgment overdue",
+                },
+            )
+        )
         logger.info("Sent overdue ack warning for %s in %s", feature_brief_id, claw)
 
     # ------------------------------------------------------------------

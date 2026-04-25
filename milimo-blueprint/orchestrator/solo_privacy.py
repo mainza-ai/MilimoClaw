@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -22,8 +21,10 @@ logger = logging.getLogger("milimo.solo_privacy")
 
 # ---------------------------------------------------------------------------
 
+
 class Route(Enum):
     """Inference route options."""
+
     CLOUD = "cloud"
     LOCAL = "local"
     VLLM = "vllm"
@@ -31,6 +32,7 @@ class Route(Enum):
 
 class FallbackStrategy(Enum):
     """Fallback strategy when budget is exceeded."""
+
     LOCAL = "local"
     VLLM = "vllm"
     CLOUD = "cloud"
@@ -39,6 +41,7 @@ class FallbackStrategy(Enum):
 
 class PrivacyPolicyViolationError(Exception):
     """Raised when attempting to override a locked route."""
+
     pass
 
 
@@ -60,9 +63,11 @@ DEFAULT_ROUTES: dict[str, Route] = {
 
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class RoutingDecision:
     """Result of a routing decision."""
+
     data_type: str
     route: Route
     reason: str
@@ -74,6 +79,7 @@ class RoutingDecision:
 @dataclass
 class CostGuard:
     """Daily cloud token budget management."""
+
     daily_budget: int = 50000
     alert_percent: float = 80.0
     fallback_strategy: FallbackStrategy = FallbackStrategy.LOCAL
@@ -154,9 +160,9 @@ class CostGuard:
                 next_section = trimmed.find("\n\n", idx + len(marker) + 200)
                 if next_section != -1:
                     trimmed = (
-                        trimmed[:idx + len(marker) + 200] +
-                        "\n[context trimmed — cost guard active]\n\n" +
-                        trimmed[next_section:]
+                        trimmed[: idx + len(marker) + 200]
+                        + "\n[context trimmed — cost guard active]\n\n"
+                        + trimmed[next_section:]
                     )
 
         logger.info(
@@ -168,6 +174,7 @@ class CostGuard:
 
 
 # ---------------------------------------------------------------------------
+
 
 class SoloPrivacyRouter:
     """
@@ -199,7 +206,9 @@ class SoloPrivacyRouter:
         self.cost_guard = CostGuard(
             daily_budget=cost_guard_config.get("daily_cloud_token_budget", 50000),
             alert_percent=cost_guard_config.get("alert_at_percent", 80.0),
-            fallback_strategy=FallbackStrategy(cost_guard_config.get("fallback_on_exceed", "local")),
+            fallback_strategy=FallbackStrategy(
+                cost_guard_config.get("fallback_on_exceed", "local")
+            ),
             never_block=cost_guard_config.get("never_block_claw_action", True),
         )
 
@@ -259,7 +268,9 @@ class SoloPrivacyRouter:
                 desired_route = Route(route_str)
             except ValueError:
                 desired_route = Route.LOCAL
-                logger.warning(f"Unknown route '{route_str}' for {data_type}, defaulting to local")
+                logger.warning(
+                    f"Unknown route '{route_str}' for {data_type}, defaulting to local"
+                )
         elif data_type in DEFAULT_ROUTES:
             desired_route = DEFAULT_ROUTES[data_type]
         else:

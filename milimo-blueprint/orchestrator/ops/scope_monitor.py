@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -20,7 +19,6 @@ import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from .ops_init import OpsFilesystemInit, OpsOperationalLog, OpsLogEntry
@@ -39,7 +37,9 @@ class ScopeCreepDetection:
     original_scope: str
     new_request: str
     confidence: float
-    detected_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    detected_at: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -119,7 +119,9 @@ class ScopeMonitor:
                 timestamp=datetime.now(timezone.utc).isoformat(),
                 action_type="scope_creep_detected",
                 entity_id=project_id,
-                outcome="flagged" if detection.confidence > self.DETECTION_THRESHOLD else "logged",
+                outcome="flagged"
+                if detection.confidence > self.DETECTION_THRESHOLD
+                else "logged",
                 details={
                     "confidence": detection.confidence,
                     "new_request": detection.new_request[:200],
@@ -184,11 +186,15 @@ Respond in JSON format:
         return None
 
     def _handle_high_confidence_detection(self, detection: ScopeCreepDetection) -> None:
-        detection_file = self._fs.get_project_path(
-            detection.client_id, detection.project_id
-        ) / "scope_creep"
+        detection_file = (
+            self._fs.get_project_path(detection.client_id, detection.project_id)
+            / "scope_creep"
+        )
         detection_file.mkdir(parents=True, exist_ok=True)
-        detection_file = detection_file / f"detection_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
+        detection_file = (
+            detection_file
+            / f"detection_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
+        )
         self._fs.write_json_atomic(detection_file, detection.to_dict())
 
         self._dispatcher.send_pricing_query(
@@ -235,9 +241,13 @@ Respond in JSON format:
         change_order = change_order.replace("{{new_request}}", new_request)
 
         if additional_cost is not None:
-            change_order = change_order.replace("{{additional_cost}}", f"${additional_cost:,.2f}")
+            change_order = change_order.replace(
+                "{{additional_cost}}", f"${additional_cost:,.2f}"
+            )
         else:
-            change_order = change_order.replace("{{additional_cost}}", "PENDING - awaiting pricing")
+            change_order = change_order.replace(
+                "{{additional_cost}}", "PENDING - awaiting pricing"
+            )
 
         change_order = change_order.replace("{{revised_timeline}}", "TBD")
 
@@ -323,7 +333,11 @@ Output only the personalized change order."""
         if not brief_data:
             return None
 
-        return brief_data.get("raw_text") or brief_data.get("scope_description") or brief_data.get("brief_text")
+        return (
+            brief_data.get("raw_text")
+            or brief_data.get("scope_description")
+            or brief_data.get("brief_text")
+        )
 
     def get_pending_change_orders(self) -> dict[str, dict[str, Any]]:
         return dict(self._pending_change_orders)

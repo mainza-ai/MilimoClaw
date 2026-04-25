@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -162,7 +161,7 @@ class PrivacyRouter:
                     role,
                     data_type,
                     role_override.force_backend.value,
-                    f"role_override_force",
+                    "role_override_force",
                 )
                 return RoutingDecision(
                     backend=role_override.force_backend,
@@ -178,7 +177,7 @@ class PrivacyRouter:
                     role,
                     data_type,
                     InferenceBackend.LOCAL_NIM.value,
-                    f"role_override_local_type",
+                    "role_override_local_type",
                 )
                 return RoutingDecision(
                     backend=InferenceBackend.LOCAL_NIM,
@@ -196,7 +195,7 @@ class PrivacyRouter:
                         role,
                         data_type,
                         InferenceBackend.LOCAL_NIM.value,
-                        f"role_cloud_block",
+                        "role_cloud_block",
                     )
                     return RoutingDecision(
                         backend=InferenceBackend.LOCAL_NIM,
@@ -213,7 +212,7 @@ class PrivacyRouter:
                 role,
                 data_type,
                 rule.backend.value,
-                f"policy_rule",
+                "policy_rule",
             )
             return RoutingDecision(
                 backend=rule.backend,
@@ -236,7 +235,7 @@ class PrivacyRouter:
             role,
             data_type,
             self._policy.default_backend.value,
-            f"unclassified_fallback",
+            "unclassified_fallback",
         )
 
         return RoutingDecision(

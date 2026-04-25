@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """
 Build Claw approval handler.
 
@@ -58,6 +60,7 @@ class PRActivityLog:
 
     def append(self, event_type: str, pr_id: str, details: dict) -> None:
         import fcntl
+
         entry = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "event_type": event_type,
@@ -101,6 +104,7 @@ class DeployActivityLog:
 
     def append(self, event_type: str, deploy_id: str, details: dict) -> None:
         import fcntl
+
         entry = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "event_type": event_type,
@@ -171,13 +175,15 @@ class BuildApprovalHandler:
         )
         self._pending_actions[action_id] = action
         self._pr_log.append("review_queued", pr_id, {"title": pr_title})
-        self._log.append(BuildLogEntry(
-            timestamp=action.created_at,
-            action_type="pr_review_queued",
-            entity_id=pr_id,
-            outcome="queued",
-            details={"pr_id": pr_id, "mode": "REVIEW"},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=action.created_at,
+                action_type="pr_review_queued",
+                entity_id=pr_id,
+                outcome="queued",
+                details={"pr_id": pr_id, "mode": "REVIEW"},
+            )
+        )
         return action_id
 
     # ------------------------------------------------------------------
@@ -205,13 +211,15 @@ class BuildApprovalHandler:
         )
         self._pending_actions[action_id] = action
         self._pr_log.append("hold_queued", pr_id, {"title": pr_title})
-        self._log.append(BuildLogEntry(
-            timestamp=action.created_at,
-            action_type="pr_merge_hold_queued",
-            entity_id=pr_id,
-            outcome="queued",
-            details={"pr_id": pr_id, "mode": "HOLD"},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=action.created_at,
+                action_type="pr_merge_hold_queued",
+                entity_id=pr_id,
+                outcome="queued",
+                details={"pr_id": pr_id, "mode": "HOLD"},
+            )
+        )
         return action_id
 
     # ------------------------------------------------------------------
@@ -241,13 +249,15 @@ class BuildApprovalHandler:
         )
         self._pending_actions[action_id] = action
         self._deploy_log.append("hold_queued", deploy_id, {"version": version})
-        self._log.append(BuildLogEntry(
-            timestamp=action.created_at,
-            action_type="deploy_hold_queued",
-            entity_id=deploy_id,
-            outcome="queued",
-            details={"deploy_id": deploy_id, "mode": "HOLD"},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=action.created_at,
+                action_type="deploy_hold_queued",
+                entity_id=deploy_id,
+                outcome="queued",
+                details={"deploy_id": deploy_id, "mode": "HOLD"},
+            )
+        )
         return action_id
 
     # ------------------------------------------------------------------
@@ -276,13 +286,15 @@ class BuildApprovalHandler:
             },
         )
         self._pending_actions[action_id] = action
-        self._log.append(BuildLogEntry(
-            timestamp=action.created_at,
-            action_type="sprint_plan_queued",
-            entity_id=plan_id,
-            outcome="queued",
-            details={"plan_id": plan_id, "total_hours": total_hours},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=action.created_at,
+                action_type="sprint_plan_queued",
+                entity_id=plan_id,
+                outcome="queued",
+                details={"plan_id": plan_id, "total_hours": total_hours},
+            )
+        )
         return action_id
 
     # ------------------------------------------------------------------
@@ -305,13 +317,15 @@ class BuildApprovalHandler:
             metadata={"pr_id": pr_id, "vulns": vulns},
         )
         self._pending_actions[action_id] = action
-        self._log.append(BuildLogEntry(
-            timestamp=action.created_at,
-            action_type="security_pr_queued",
-            entity_id=pr_id,
-            outcome="queued",
-            details={"pr_id": pr_id},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=action.created_at,
+                action_type="security_pr_queued",
+                entity_id=pr_id,
+                outcome="queued",
+                details={"pr_id": pr_id},
+            )
+        )
         return action_id
 
     # ------------------------------------------------------------------
@@ -334,13 +348,15 @@ class BuildApprovalHandler:
             metadata={"review_id": review_id, "findings": findings},
         )
         self._pending_actions[action_id] = action
-        self._log.append(BuildLogEntry(
-            timestamp=action.created_at,
-            action_type="dependency_review_queued",
-            entity_id=review_id,
-            outcome="queued",
-            details={"review_id": review_id},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=action.created_at,
+                action_type="dependency_review_queued",
+                entity_id=review_id,
+                outcome="queued",
+                details={"review_id": review_id},
+            )
+        )
         return action_id
 
     # ------------------------------------------------------------------
@@ -364,13 +380,15 @@ class BuildApprovalHandler:
         if action.mode == "REVIEW":
             if next_step_fn:
                 next_step_fn()
-            self._log.append(BuildLogEntry(
-                timestamp=datetime.now(timezone.utc).isoformat(),
-                action_type=f"{action.action_type}_approved",
-                entity_id=action.entity_id,
-                outcome="approved",
-                details={"action_id": action_id},
-            ))
+            self._log.append(
+                BuildLogEntry(
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    action_type=f"{action.action_type}_approved",
+                    entity_id=action.entity_id,
+                    outcome="approved",
+                    details={"action_id": action_id},
+                )
+            )
             del self._pending_actions[action_id]
             return ApprovalResult(
                 executed=True,
@@ -416,13 +434,15 @@ class BuildApprovalHandler:
         if execute_fn:
             result = execute_fn()
 
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type=f"{action.action_type}_released",
-            entity_id=action.entity_id,
-            outcome="released",
-            details={"action_id": action_id},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type=f"{action.action_type}_released",
+                entity_id=action.entity_id,
+                outcome="released",
+                details={"action_id": action_id},
+            )
+        )
         del self._pending_actions[action_id]
         return ApprovalResult(
             executed=True,
@@ -441,13 +461,15 @@ class BuildApprovalHandler:
                 details={"error": f"Action {action_id} not found"},
             )
 
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type=f"{action.action_type}_blocked",
-            entity_id=action.entity_id,
-            outcome="blocked",
-            details={"reason": reason},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type=f"{action.action_type}_blocked",
+                entity_id=action.entity_id,
+                outcome="blocked",
+                details={"reason": reason},
+            )
+        )
         return ApprovalResult(
             executed=False,
             decision="blocked",
@@ -465,13 +487,15 @@ class BuildApprovalHandler:
                 details={"error": f"Action {action_id} not found"},
             )
 
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type=f"{action.action_type}_cancelled",
-            entity_id=action.entity_id,
-            outcome="cancelled",
-            details={},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type=f"{action.action_type}_cancelled",
+                entity_id=action.entity_id,
+                outcome="cancelled",
+                details={},
+            )
+        )
         return ApprovalResult(
             executed=False,
             decision="cancelled",
@@ -486,10 +510,11 @@ class BuildApprovalHandler:
     def get_pending_action(self, action_id: str) -> BuildApprovalAction | None:
         return self._pending_actions.get(action_id)
 
-    def get_pending_actions_by_type(self, action_type: str) -> list[BuildApprovalAction]:
+    def get_pending_actions_by_type(
+        self, action_type: str
+    ) -> list[BuildApprovalAction]:
         return [
-            a for a in self._pending_actions.values()
-            if a.action_type == action_type
+            a for a in self._pending_actions.values() if a.action_type == action_type
         ]
 
     def get_all_pending_actions(self) -> list[BuildApprovalAction]:

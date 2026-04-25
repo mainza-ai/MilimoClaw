@@ -59,22 +59,22 @@ interface BlueprintInfo {
  * Helper to call Python logic safely using spawnSync.
  */
 function callPython(blueprintDir: string, code: string): string {
-	const safeCode = `import sys; sys.path.insert(0, ${JSON.stringify(blueprintDir)}); ${code}`;
-	const result = spawnSync(
-		"python3",
-		["-c", safeCode],
-		{ cwd: blueprintDir, encoding: "utf-8", timeout: 30000 },
-	);
+  const safeCode = `import sys; sys.path.insert(0, ${JSON.stringify(blueprintDir)}); ${code}`;
+  const result = spawnSync("python3", ["-c", safeCode], {
+    cwd: blueprintDir,
+    encoding: "utf-8",
+    timeout: 30000,
+  });
 
-	if (result.error) {
-		throw result.error;
-	}
+  if (result.error) {
+    throw result.error;
+  }
 
-	if (result.status !== 0) {
-		throw new Error(`Python command failed: ${result.stderr}`);
-	}
+  if (result.status !== 0) {
+    throw new Error(`Python command failed: ${result.stderr}`);
+  }
 
-	return result.stdout.trim();
+  return result.stdout.trim();
 }
 
 function discoverBlueprints(blueprintDir: string): BlueprintInfo[] {
@@ -115,7 +115,7 @@ function discoverBlueprints(blueprintDir: string): BlueprintInfo[] {
 
 // ── Blueprint List ────────────────────────────────────────────────────
 
-export async function cliBlueprintList(opts: BlueprintListOptions): Promise<void> {
+export function cliBlueprintList(opts: BlueprintListOptions): Promise<void> {
   const { logger, pluginConfig } = opts;
   const blueprintDir = pluginConfig.blueprintDir;
   const blueprints = discoverBlueprints(blueprintDir);
@@ -137,8 +137,14 @@ export async function cliBlueprintList(opts: BlueprintListOptions): Promise<void
   }
 
   if (opts.json) {
-    logger.info(JSON.stringify({ catalog: blueprints, active: { version: currentVersion, tools: activeInventory } }, null, 2));
-    return;
+    logger.info(
+      JSON.stringify(
+        { catalog: blueprints, active: { version: currentVersion, tools: activeInventory } },
+        null,
+        2,
+      ),
+    );
+    return Promise.resolve();
   }
 
   logger.info("");
@@ -152,12 +158,14 @@ export async function cliBlueprintList(opts: BlueprintListOptions): Promise<void
     logger.info(`  Claw Role:     ${state.clawRole}`);
     logger.info(`  Current Ver:   v${currentVersion}`);
     logger.info("");
-    
+
     logger.info("  Evolved Tools:");
     if (activeInventory && Object.keys(activeInventory).length > 0) {
       for (const [name, tool] of Object.entries<any>(activeInventory)) {
         const mark = tool.status === "deployed" ? "🟢" : "🔴";
-        logger.info(`    ${mark} ${name.padEnd(20)} v${tool.version} (+${tool.performance_delta.toFixed(1)}% uplift)`);
+        logger.info(
+          `    ${mark} ${name.padEnd(20)} v${tool.version} (+${tool.performance_delta.toFixed(1)}% uplift)`,
+        );
       }
     } else {
       logger.info("    (no evolved tools deployed yet)");
@@ -175,7 +183,7 @@ export async function cliBlueprintList(opts: BlueprintListOptions): Promise<void
       logger.info(`      ${bp.name.padEnd(18)} ${bp.description}`);
     }
   }
-  
+
   // List templates
   const templates = blueprints.filter((b) => b.type === "template");
   if (templates.length > 0) {
@@ -186,20 +194,21 @@ export async function cliBlueprintList(opts: BlueprintListOptions): Promise<void
   }
 
   logger.info("");
-  logger.info(`  Blueprint directory: ${blueprintDir}`);
+  logger.info(` Blueprint directory: ${blueprintDir}`);
   logger.info("");
+  return Promise.resolve();
 }
 
 // ── Blueprint Fork ────────────────────────────────────────────────────
 
-export async function cliBlueprintFork(opts: BlueprintForkOptions): Promise<void> {
+export function cliBlueprintFork(opts: BlueprintForkOptions): Promise<void> {
   const { logger, pluginConfig } = opts;
   const state = loadMilimoState();
   const blueprintDir = pluginConfig.blueprintDir;
 
   if (!state) {
     logger.error("No Milimo Claw configuration found. Run 'openclaw milimo init' first.");
-    return;
+    return Promise.resolve();
   }
 
   const targetName = opts.into ?? `${opts.source.replace(/^@/, "").replace(/\//, "-")}-fork`;
@@ -212,10 +221,10 @@ export async function cliBlueprintFork(opts: BlueprintForkOptions): Promise<void
   try {
     const code = `from orchestrator.marketplace_manager import MarketplaceManager; mgr = MarketplaceManager(); snapshot = mgr.download('${opts.source}'); import json; print(json.dumps(snapshot.to_dict()) if snapshot else 'None')`;
     const result = callPython(blueprintDir, code);
-    
+
     if (result === "None") {
-      logger.error(`  ✗ Blueprint ${opts.source} not found in marketplace.`);
-      return;
+      logger.error(` ✗ Blueprint ${opts.source} not found in marketplace.`);
+      return Promise.resolve();
     }
 
     const snapshot = JSON.parse(result);
@@ -230,24 +239,25 @@ export async function cliBlueprintFork(opts: BlueprintForkOptions): Promise<void
     logger.error(`  ✗ Error forking blueprint: ${(err as Error).message}`);
   }
   logger.info("");
+  return Promise.resolve();
 }
 
 // ── Blueprint Diff ────────────────────────────────────────────────────
 
-export async function cliBlueprintDiff(opts: BlueprintDiffOptions): Promise<void> {
+export function cliBlueprintDiff(opts: BlueprintDiffOptions): Promise<void> {
   const { logger, pluginConfig } = opts;
   const state = loadMilimoState();
   const blueprintDir = pluginConfig.blueprintDir;
 
   if (!state) {
     logger.error("No Milimo Claw configuration found. Run 'openclaw milimo init' first.");
-    return;
+    return Promise.resolve();
   }
 
   logger.info("");
-  logger.info("  ┌─────────────────────────────────────────────────────┐");
-  logger.info("  │           🦀  BLUEPRINT DIFF  🦀                    │");
-  logger.info("  └─────────────────────────────────────────────────────┘");
+  logger.info(" ┌─────────────────────────────────────────────────────┐");
+  logger.info(" │ 🦀 BLUEPRINT DIFF 🦀 │");
+  logger.info(" └─────────────────────────────────────────────────────┘");
   logger.info("");
   logger.info(`  Versions: ${opts.versionA} ↔ ${opts.versionB}`);
   logger.info("");
@@ -286,25 +296,31 @@ export async function cliBlueprintDiff(opts: BlueprintDiffOptions): Promise<void
       }
     }
 
-    if (diff.tools_added.length === 0 && diff.tools_removed.length === 0 && diff.tools_modified.length === 0 && Object.keys(diff.policy_changes).length === 0) {
+    if (
+      diff.tools_added.length === 0 &&
+      diff.tools_removed.length === 0 &&
+      diff.tools_modified.length === 0 &&
+      Object.keys(diff.policy_changes).length === 0
+    ) {
       logger.info("  No significant changes detected.");
     }
   } catch (err) {
     logger.error(`  ✗ Error diffing blueprints: ${(err as Error).message}`);
   }
   logger.info("");
+  return Promise.resolve();
 }
 
 // ── Blueprint Publish ─────────────────────────────────────────────────
 
-export async function cliBlueprintPublish(opts: BlueprintPublishOptions): Promise<void> {
+export function cliBlueprintPublish(opts: BlueprintPublishOptions): Promise<void> {
   const { logger, pluginConfig } = opts;
   const state = loadMilimoState();
   const blueprintDir = pluginConfig.blueprintDir;
 
   if (!state) {
     logger.error("No Milimo Claw configuration found. Run 'openclaw milimo init' first.");
-    return;
+    return Promise.resolve();
   }
 
   const displayName = opts.name ?? `${state.squadName}-${state.clawRole}-blueprint`;
@@ -322,29 +338,30 @@ export async function cliBlueprintPublish(opts: BlueprintPublishOptions): Promis
   try {
     const code = `from orchestrator.blueprint_manager import BlueprintManager; from orchestrator.marketplace_manager import MarketplaceManager; mgr = BlueprintManager('${state.squadName}', '${state.clawRole}', '${blueprintDir}'); market = MarketplaceManager(); snapshot = mgr.export(); id = market.publish(snapshot, '${opts.price}', '${displayName}', '${state.squadName}'); print(id)`;
     const result = callPython(blueprintDir, code);
-    
+
     logger.info(`  ✓ Published to marketplace with ID: ${result}`);
   } catch (err) {
     logger.error(`  ✗ Error publishing blueprint: ${(err as Error).message}`);
   }
   logger.info("");
+  return Promise.resolve();
 }
 
 // ── Blueprint Rollback ────────────────────────────────────────────────
 
-export async function cliBlueprintRollback(opts: BlueprintRollbackOptions): Promise<void> {
+export function cliBlueprintRollback(opts: BlueprintRollbackOptions): Promise<void> {
   const { logger, pluginConfig } = opts;
   const state = loadMilimoState();
   const blueprintDir = pluginConfig.blueprintDir;
 
   if (!state) {
     logger.error("No Milimo Claw configuration found. Run 'openclaw milimo init' first.");
-    return;
+    return Promise.resolve();
   }
 
   if (!opts.to) {
     logger.error("--to <version> is required for rollback.");
-    return;
+    return Promise.resolve();
   }
 
   logger.info("");
@@ -357,7 +374,7 @@ export async function cliBlueprintRollback(opts: BlueprintRollbackOptions): Prom
   try {
     const code = `from orchestrator.blueprint_manager import BlueprintManager; mgr = BlueprintManager('${state.squadName}', '${state.clawRole}', '${blueprintDir}'); print(mgr.rollback('${opts.to}', '${opts.reason || ""}'))`;
     const result = callPython(blueprintDir, code);
-    
+
     if (result === "True") {
       // Sync local state
       state.blueprintVersion = opts.to;
@@ -371,14 +388,20 @@ export async function cliBlueprintRollback(opts: BlueprintRollbackOptions): Prom
   }
 
   logger.info("");
+  return Promise.resolve();
 }
 
 // ── Blueprint Search ─────────────────────────────────────────────────
 
-export async function cliBlueprintSearch(opts: { query?: string; category?: string; logger: PluginLogger; pluginConfig: MilimoConfig }): Promise<void> {
+export function cliBlueprintSearch(opts: {
+  query?: string;
+  category?: string;
+  logger: PluginLogger;
+  pluginConfig: MilimoConfig;
+}): Promise<void> {
   const { logger, pluginConfig } = opts;
   const blueprintDir = pluginConfig.blueprintDir;
-  
+
   logger.info("");
   logger.info("  🔍 Searching Blueprint Marketplace...");
   if (opts.query) logger.info(`     Query:    ${opts.query}`);
@@ -404,18 +427,23 @@ export async function cliBlueprintSearch(opts: { query?: string; category?: stri
     logger.error(`  ✗ Error searching marketplace: ${(err as Error).message}`);
   }
   logger.info("");
+  return Promise.resolve();
 }
 
 // ── Blueprint Merge ──────────────────────────────────────────────────
 
-export async function cliBlueprintMerge(opts: { incoming: string; logger: PluginLogger; pluginConfig: MilimoConfig }): Promise<void> {
+export function cliBlueprintMerge(opts: {
+  incoming: string;
+  logger: PluginLogger;
+  pluginConfig: MilimoConfig;
+}): Promise<void> {
   const { logger, pluginConfig } = opts;
   const state = loadMilimoState();
   const blueprintDir = pluginConfig.blueprintDir;
 
   if (!state) {
     logger.error("No Milimo Claw configuration found. Run 'openclaw milimo init' first.");
-    return;
+    return Promise.resolve();
   }
 
   logger.info("");
@@ -425,20 +453,25 @@ export async function cliBlueprintMerge(opts: { incoming: string; logger: Plugin
   try {
     const code = `from orchestrator.blueprint_manager import BlueprintManager; from orchestrator.blueprint_merger import BlueprintMerger; from orchestrator.marketplace_manager import MarketplaceManager; mgr = BlueprintManager('${state.squadName}', '${state.clawRole}', '${blueprintDir}'); market = MarketplaceManager(); base = mgr._load_snapshot(mgr.current_version()); incoming_snap = market.download('${opts.incoming}') or mgr._load_snapshot('${opts.incoming}'); merged = BlueprintMerger.merge(base, incoming_snap); mgr.bump_version('merged with ${opts.incoming}'); import json; snapshot_file = mgr._versions_dir / f'v{mgr.current_version()}.json'; merged.meta.version = mgr.current_version(); with snapshot_file.open("w") as f: json.dump(merged.to_dict(), f, indent=2, default=str); print(mgr.current_version())`;
     const result = callPython(blueprintDir, code);
-    
+
     logger.info(`  ✓ Successfully merged. New version: v${result}`);
   } catch (err) {
     logger.error(`  ✗ Error during merge: ${(err as Error).message}`);
   }
   logger.info("");
+  return Promise.resolve();
 }
 
 // ── Blueprint Info ───────────────────────────────────────────────────
 
-export async function cliBlueprintInfo(opts: { blueprintId: string; logger: PluginLogger; pluginConfig: MilimoConfig }): Promise<void> {
+export function cliBlueprintInfo(opts: {
+  blueprintId: string;
+  logger: PluginLogger;
+  pluginConfig: MilimoConfig;
+}): Promise<void> {
   const { logger, pluginConfig } = opts;
   const blueprintDir = pluginConfig.blueprintDir;
-  
+
   logger.info("");
   logger.info(`  ℹ️  Fetching blueprint details: ${opts.blueprintId}`);
   logger.info("");
@@ -446,10 +479,10 @@ export async function cliBlueprintInfo(opts: { blueprintId: string; logger: Plug
   try {
     const code = `from orchestrator.marketplace_manager import MarketplaceManager; mgr = MarketplaceManager(); info = mgr.get_listing('${opts.blueprintId}'); import json; print(json.dumps(info) if info else 'None')`;
     const result = callPython(blueprintDir, code);
-    
+
     if (result === "None") {
-      logger.error(`  ✗ Blueprint ${opts.blueprintId} not found.`);
-      return;
+      logger.error(` ✗ Blueprint ${opts.blueprintId} not found.`);
+      return Promise.resolve();
     }
 
     const info = JSON.parse(result);
@@ -466,9 +499,10 @@ export async function cliBlueprintInfo(opts: { blueprintId: string; logger: Plug
       logger.info(`  Tags:        ${info.tags.join(", ")}`);
     }
   } catch (err) {
-    logger.error(`  ✗ Error fetching info: ${(err as Error).message}`);
+    logger.error(` ✗ Error fetching info: ${(err as Error).message}`);
   }
   logger.info("");
+  return Promise.resolve();
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────

@@ -119,7 +119,10 @@ export function validateSquadName(name: string): { valid: boolean; error?: strin
   }
 
   if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
-    return { valid: false, error: "Squad name can only contain letters, numbers, hyphens, and underscores" };
+    return {
+      valid: false,
+      error: "Squad name can only contain letters, numbers, hyphens, and underscores",
+    };
   }
 
   return { valid: true };

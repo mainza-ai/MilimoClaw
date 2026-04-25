@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -318,7 +317,9 @@ class UnixSocketGateway(GatewayAdapter):
         message.id = f"req-{self._request_id}"
 
         try:
-            payload = json.dumps({"method": message.method, "params": message.params, "id": message.id})
+            payload = json.dumps(
+                {"method": message.method, "params": message.params, "id": message.id}
+            )
             self._socket.sendall(payload.encode() + b"\n")
 
             # Read response
@@ -372,7 +373,9 @@ class WebSocketGateway(GatewayAdapter):
         try:
             import websocket
         except ImportError:
-            logger.error("websocket-client not installed. Run: pip install websocket-client")
+            logger.error(
+                "websocket-client not installed. Run: pip install websocket-client"
+            )
             return False
 
         self.state = ConnectionState.CONNECTING
@@ -482,7 +485,9 @@ class WebSocketGateway(GatewayAdapter):
 
             # Wait for response
             if event.wait(timeout=self.config.timeout_ms / 1000):
-                response: Optional[GatewayResponse] = self._responses.pop(request_id, None)
+                response: Optional[GatewayResponse] = self._responses.pop(
+                    request_id, None
+                )
                 self._response_events.pop(request_id, None)
 
                 if response is None or response.error:
@@ -491,7 +496,9 @@ class WebSocketGateway(GatewayAdapter):
                         success=False,
                         message_id=message.get("message_id", ""),
                         error_code=err.get("code", "E999") if err else "E001",
-                        error_message=err.get("message", "Unknown error") if err else "No response",
+                        error_message=err.get("message", "Unknown error")
+                        if err
+                        else "No response",
                     )
 
                 self._last_message_time = datetime.now(timezone.utc)
@@ -591,7 +598,9 @@ class FileBasedGateway(GatewayAdapter):
 
         try:
             self._inbox.mkdir(parents=True, exist_ok=True)
-            (self._base_dir / "outbox" / self.config.role).mkdir(parents=True, exist_ok=True)
+            (self._base_dir / "outbox" / self.config.role).mkdir(
+                parents=True, exist_ok=True
+            )
             (self._base_dir / "delivered").mkdir(parents=True, exist_ok=True)
             (self._base_dir / "rejected").mkdir(parents=True, exist_ok=True)
             (self._base_dir / "inbox" / "war_room").mkdir(parents=True, exist_ok=True)
@@ -705,7 +714,12 @@ class FileBasedGateway(GatewayAdapter):
 
                 # Write rejection reason
                 (target.with_suffix(".rejected.json")).write_text(
-                    json.dumps({"reason": reason, "timestamp": datetime.now(timezone.utc).isoformat()})
+                    json.dumps(
+                        {
+                            "reason": reason,
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
                 )
                 return True
             except OSError:

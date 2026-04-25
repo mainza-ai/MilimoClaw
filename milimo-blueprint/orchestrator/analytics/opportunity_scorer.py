@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -18,10 +17,13 @@ import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 from typing import Any, Callable
 
-from .analytics_init import AnalyticsFilesystemInit, AnalyticsLogEntry, AnalyticsOperationalLog
+from .analytics_init import (
+    AnalyticsFilesystemInit,
+    AnalyticsLogEntry,
+    AnalyticsOperationalLog,
+)
 
 logger = logging.getLogger("milimo.opportunity_scorer")
 
@@ -88,12 +90,18 @@ class OpportunityScorer:
         all_opportunities.extend(self.platform_timing_opportunities())
         all_opportunities.extend(self.client_segment_opportunities())
 
-        filtered = [o for o in all_opportunities if o.confidence >= self.MIN_CONFIDENCE_THRESHOLD]
+        filtered = [
+            o
+            for o in all_opportunities
+            if o.confidence >= self.MIN_CONFIDENCE_THRESHOLD
+        ]
         filtered.sort(key=lambda x: x.confidence, reverse=True)
 
         self.write_opportunity_scores(filtered)
 
-        high_confidence = [o for o in filtered if o.confidence >= self.IMMEDIATE_DISPATCH_THRESHOLD]
+        high_confidence = [
+            o for o in filtered if o.confidence >= self.IMMEDIATE_DISPATCH_THRESHOLD
+        ]
         for opp in high_confidence:
             self.dispatch_high_confidence(opp)
 
@@ -155,13 +163,19 @@ class OpportunityScorer:
                                     record = json.loads(line)
                                     content_type = record.get("content_type", "unknown")
                                     engagement_data = record.get("engagement_data", {})
-                                    engagement_rate = engagement_data.get("engagement_rate", 0)
+                                    engagement_rate = engagement_data.get(
+                                        "engagement_rate", 0
+                                    )
 
-                                    format_counts[content_type] = format_counts.get(content_type, 0) + 1
+                                    format_counts[content_type] = (
+                                        format_counts.get(content_type, 0) + 1
+                                    )
                                     if content_type not in format_engagement:
                                         format_engagement[content_type] = []
                                     if isinstance(engagement_rate, (int, float)):
-                                        format_engagement[content_type].append(float(engagement_rate))
+                                        format_engagement[content_type].append(
+                                            float(engagement_rate)
+                                        )
                                 except json.JSONDecodeError:
                                     continue
                     except Exception as e:
@@ -172,18 +186,31 @@ class OpportunityScorer:
         trend_data = self._get_trend_data()
 
         for content_type, trend_score in trend_data.items():
-            usage_ratio = (format_counts.get(content_type, 0) / total_content) if total_content > 0 else 0
+            usage_ratio = (
+                (format_counts.get(content_type, 0) / total_content)
+                if total_content > 0
+                else 0
+            )
 
             if trend_score > 0.7 and usage_ratio < 0.1:
                 avg_engagement = 0.0
-                if content_type in format_engagement and format_engagement[content_type]:
-                    avg_engagement = sum(format_engagement[content_type]) / len(format_engagement[content_type])
+                if (
+                    content_type in format_engagement
+                    and format_engagement[content_type]
+                ):
+                    avg_engagement = sum(format_engagement[content_type]) / len(
+                        format_engagement[content_type]
+                    )
 
-                confidence = self._calculate_content_confidence(trend_score, usage_ratio, avg_engagement)
+                confidence = self._calculate_content_confidence(
+                    trend_score, usage_ratio, avg_engagement
+                )
 
                 if confidence >= self.MIN_CONFIDENCE_THRESHOLD:
                     description = f"{content_type} trending but underutilized by squad"
-                    recommended_action = f"Increase {content_type} output to capture trend momentum"
+                    recommended_action = (
+                        f"Increase {content_type} output to capture trend momentum"
+                    )
 
                     opp = ScoredOpportunity(
                         opportunity_id=str(uuid.uuid4())[:12],
@@ -195,7 +222,9 @@ class OpportunityScorer:
                         squad_readiness=0.8 if avg_engagement > 0 else 0.5,
                         recommended_action=recommended_action,
                         target_claw="content",
-                        expires_at=(datetime.now(timezone.utc) + timedelta(days=14)).isoformat(),
+                        expires_at=(
+                            datetime.now(timezone.utc) + timedelta(days=14)
+                        ).isoformat(),
                     )
                     opportunities.append(opp)
 
@@ -235,15 +264,25 @@ class OpportunityScorer:
                                     record = json.loads(line)
                                     publish_time = record.get("publish_time", "")
                                     engagement_data = record.get("engagement_data", {})
-                                    engagement_rate = engagement_data.get("engagement_rate")
+                                    engagement_rate = engagement_data.get(
+                                        "engagement_rate"
+                                    )
 
-                                    if publish_time and isinstance(engagement_rate, (int, float)):
+                                    if publish_time and isinstance(
+                                        engagement_rate, (int, float)
+                                    ):
                                         try:
-                                            hour = datetime.fromisoformat(publish_time).hour
+                                            hour = datetime.fromisoformat(
+                                                publish_time
+                                            ).hour
                                             if hour not in hour_engagement:
                                                 hour_engagement[hour] = []
-                                            hour_engagement[hour].append(float(engagement_rate))
-                                            hour_counts[hour] = hour_counts.get(hour, 0) + 1
+                                            hour_engagement[hour].append(
+                                                float(engagement_rate)
+                                            )
+                                            hour_counts[hour] = (
+                                                hour_counts.get(hour, 0) + 1
+                                            )
                                         except ValueError:
                                             continue
                                 except json.JSONDecodeError:
@@ -253,16 +292,21 @@ class OpportunityScorer:
 
         if hour_engagement:
             avg_by_hour = {
-                h: sum(rates) / len(rates)
-                for h, rates in hour_engagement.items()
+                h: sum(rates) / len(rates) for h, rates in hour_engagement.items()
             }
 
             if avg_by_hour:
-                sorted_hours = sorted(avg_by_hour.items(), key=lambda x: x[1], reverse=True)
+                sorted_hours = sorted(
+                    avg_by_hour.items(), key=lambda x: x[1], reverse=True
+                )
                 best_hours = [h for h, _ in sorted_hours[:3]]
 
                 total_posts = sum(hour_counts.values())
-                best_hour_usage = sum(hour_counts.get(h, 0) for h in best_hours) / total_posts if total_posts > 0 else 0
+                best_hour_usage = (
+                    sum(hour_counts.get(h, 0) for h in best_hours) / total_posts
+                    if total_posts > 0
+                    else 0
+                )
 
                 if best_hour_usage < 0.3 and len(sorted_hours) >= 2:
                     best_hour = sorted_hours[0][0]
@@ -321,15 +365,19 @@ class OpportunityScorer:
                     if scores:
                         avg_score = sum(scores) / len(scores)
                         if avg_score >= 8.0:
-                            healthy_clients.append({
-                                "client_id": client_id,
-                                "score": avg_score,
-                            })
+                            healthy_clients.append(
+                                {
+                                    "client_id": client_id,
+                                    "score": avg_score,
+                                }
+                            )
                         elif avg_score < 6.0:
-                            at_risk_clients.append({
-                                "client_id": client_id,
-                                "score": avg_score,
-                            })
+                            at_risk_clients.append(
+                                {
+                                    "client_id": client_id,
+                                    "score": avg_score,
+                                }
+                            )
                 except Exception as e:
                     logger.warning("Failed to read %s: %s", health_file, e)
 
@@ -367,7 +415,10 @@ class OpportunityScorer:
     def dispatch_high_confidence(self, opportunity: ScoredOpportunity) -> None:
         """Dispatch high-confidence opportunity to target claw."""
         if not self.dispatcher:
-            logger.warning("No dispatcher configured for opportunity %s", opportunity.opportunity_id)
+            logger.warning(
+                "No dispatcher configured for opportunity %s",
+                opportunity.opportunity_id,
+            )
             return
 
         message_type_map = {
@@ -421,7 +472,11 @@ class OpportunityScorer:
             "opportunities": [o.to_dict() for o in opportunities],
             "total_count": len(opportunities),
             "high_confidence_count": len(
-                [o for o in opportunities if o.confidence >= self.IMMEDIATE_DISPATCH_THRESHOLD]
+                [
+                    o
+                    for o in opportunities
+                    if o.confidence >= self.IMMEDIATE_DISPATCH_THRESHOLD
+                ]
             ),
         }
 
@@ -447,6 +502,8 @@ class OpportunityScorer:
         """Calculate confidence score for content format opportunity."""
         trend_factor = trend_score * 0.4
         gap_factor = (1 - usage_ratio) * 0.3
-        engagement_factor = min(avg_engagement / 0.1, 1.0) * 0.3 if avg_engagement > 0 else 0.15
+        engagement_factor = (
+            min(avg_engagement / 0.1, 1.0) * 0.3 if avg_engagement > 0 else 0.15
+        )
 
         return min(trend_factor + gap_factor + engagement_factor, 1.0)

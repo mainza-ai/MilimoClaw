@@ -7,9 +7,8 @@ Finance Claw Payment Risk Scorer.
 Scores client payment risk before invoice is shown to operator.
 """
 
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Protocol
+from dataclasses import dataclass
+from typing import Protocol
 
 from .finance_init import PaymentEventsLog
 
@@ -168,10 +167,10 @@ class PaymentRiskScorer:
         return f"""Score this client's payment risk (0-10, higher is safer).
 
 Client: {client_id}
-Total Invoices: {metrics['total_invoices']}
-On-Time Rate: {metrics['on_time_rate']:.1%}
-Average Days Late: {metrics['avg_days_late']:.1f}
-Overdue Count: {metrics['overdue_count']}
+Total Invoices: {metrics["total_invoices"]}
+On-Time Rate: {metrics["on_time_rate"]:.1%}
+Average Days Late: {metrics["avg_days_late"]:.1f}
+Overdue Count: {metrics["overdue_count"]}
 
 Return only a number between 0 and 10."""
 

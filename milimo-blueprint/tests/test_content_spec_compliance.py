@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -17,10 +16,9 @@ Tests cover the critical spec requirements identified in the audit:
 
 import json
 import threading
-import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -32,12 +30,9 @@ from orchestrator.content.content_init import (
 from orchestrator.content.content_generator import (
     ContentGenerator,
     Draft,
-    DraftContext,
 )
 from orchestrator.content.brief_manager import (
     BriefManager,
-    ContentBrief,
-    BriefError,
 )
 from orchestrator.content.approval_handler import (
     ContentApprovalHandler,
@@ -52,12 +47,9 @@ from orchestrator.content.platform_publisher import (
     PlatformCredentials,
 )
 from orchestrator.content.content_scheduler import ContentScheduler
-from orchestrator.content.brand_voice import BrandVoiceManager
 from orchestrator.privacy_router import PrivacyRouter
 from orchestrator.tool_registry import ToolRegistry
 from orchestrator.contracts import (
-    ContractValidator,
-    ClawMessage,
     MESSAGE_TYPE_SCHEMAS,
     VALID_MESSAGE_TYPES,
 )
@@ -73,11 +65,13 @@ class TestDraftReadyMessage:
         log_path = tmp_path / "logs" / "operational.log"
         op_log = ContentOperationalLog(log_path)
 
-        router = PrivacyRouter.from_dict({
-            "policy_version": "1.0",
-            "default_backend": "local-nim",
-            "routes": [],
-        })
+        router = PrivacyRouter.from_dict(
+            {
+                "policy_version": "1.0",
+                "default_backend": "local-nim",
+                "routes": [],
+            }
+        )
 
         registry = ToolRegistry(
             squad_id="test-squad",
@@ -135,7 +129,9 @@ class TestDraftReadyMessage:
         mock_action.id = "act_draft_ready"
         mock_war_room.queue_action.return_value = mock_action
 
-        generator = ContentGenerator(router, registry, op_log, fs, war_room=mock_war_room)
+        generator = ContentGenerator(
+            router, registry, op_log, fs, war_room=mock_war_room
+        )
 
         draft = Draft(
             draft_id="draft-ready-test",
@@ -148,7 +144,7 @@ class TestDraftReadyMessage:
             brief_id="brief-xyz",
         )
 
-        action_id = await generator.queue_draft_for_review(draft)
+        await generator.queue_draft_for_review(draft)
 
         mock_war_room.send_message.assert_called_once()
         sent_message = mock_war_room.send_message.call_args[0][0]
@@ -275,7 +271,9 @@ class TestClientHealthSignalHandler:
 
         scheduler.handle_client_health_signal(message)
 
-        health_path = fs.BASE / "intelligence" / "analytics-feed" / "health_client-health.json"
+        health_path = (
+            fs.BASE / "intelligence" / "analytics-feed" / "health_client-health.json"
+        )
         assert health_path.exists()
 
         data = json.loads(health_path.read_text())
@@ -297,7 +295,9 @@ class TestClientHealthSignalHandler:
 
         scheduler.handle_client_health_signal(message)
 
-        entries = op_log.read_recent(days=1, action_type="client_health_signal_received")
+        entries = op_log.read_recent(
+            days=1, action_type="client_health_signal_received"
+        )
         assert len(entries) == 1
         assert entries[0].client_id == "client-log"
         assert entries[0].details["health_score"] == 0.7
@@ -316,7 +316,9 @@ class TestClientHealthSignalHandler:
 
         scheduler.handle_client_health_signal(message)
 
-        entries = op_log.read_recent(days=1, action_type="client_health_signal_received")
+        entries = op_log.read_recent(
+            days=1, action_type="client_health_signal_received"
+        )
         assert len(entries) == 1
         assert entries[0].details["health_score"] == 0.25
 
@@ -358,7 +360,9 @@ class TestRevisionRequestRegeneration:
                 "project_id": "proj-1",
                 "draft_id": "draft-rev",
                 "revision_notes": "Make it more engaging and add a call to action",
-                "deadline": (datetime.now(timezone.utc) + timedelta(days=1)).isoformat(),
+                "deadline": (
+                    datetime.now(timezone.utc) + timedelta(days=1)
+                ).isoformat(),
             }
         }
 
@@ -465,7 +469,9 @@ class TestPerformanceSignalSLA:
 
         monitor.send_performance_signal("post-sla-exceeded", data)
 
-        entries = op_log.read_recent(days=1, action_type="performance_signal_sla_warning")
+        entries = op_log.read_recent(
+            days=1, action_type="performance_signal_sla_warning"
+        )
         assert len(entries) == 1
         assert entries[0].details["elapsed_hours"] > 1
 
@@ -555,13 +561,15 @@ class TestBriefAutoAcknowledgmentTimer:
         if timer:
             timer.cancel()
 
-        manager._log.append(LogEntry(
-            action_type="brief_auto_acknowledged",
-            entity_id=brief.brief_id,
-            outcome="success",
-            client_id=brief.client_id,
-            details={"reason": "sla_safety"},
-        ))
+        manager._log.append(
+            LogEntry(
+                action_type="brief_auto_acknowledged",
+                entity_id=brief.brief_id,
+                outcome="success",
+                client_id=brief.client_id,
+                details={"reason": "sla_safety"},
+            )
+        )
 
         entries = op_log.read_recent(days=1, action_type="brief_auto_acknowledged")
         assert len(entries) == 1
@@ -594,10 +602,7 @@ class TestThreadSafety:
             except Exception as e:
                 errors.append(e)
 
-        threads = [
-            threading.Thread(target=add_schedules, args=(i,))
-            for i in range(5)
-        ]
+        threads = [threading.Thread(target=add_schedules, args=(i,)) for i in range(5)]
 
         for t in threads:
             t.start()
@@ -639,10 +644,7 @@ class TestThreadSafety:
             except Exception as e:
                 errors.append(e)
 
-        threads = [
-            threading.Thread(target=receive_briefs, args=(i,))
-            for i in range(3)
-        ]
+        threads = [threading.Thread(target=receive_briefs, args=(i,)) for i in range(3)]
 
         for t in threads:
             t.start()
@@ -717,7 +719,9 @@ class TestSpecEdgeCases:
                 processed_content="content",
                 status="pending",
             )
-            (pending_dir / f"draft-unapproved-{i}.json").write_text(json.dumps(draft.to_dict()))
+            (pending_dir / f"draft-unapproved-{i}.json").write_text(
+                json.dumps(draft.to_dict())
+            )
 
         pending_count = len(list(pending_dir.glob("*.json")))
         assert pending_count == 10
@@ -749,12 +753,16 @@ class TestSpecEdgeCases:
         with patch.object(
             publisher,
             "_retry_with_backoff",
-            return_value=type("obj", (object,), {
-                "success": False,
-                "platform": "twitter",
-                "error": "API unavailable after 8 retries",
-                "retry_count": 8,
-            })(),
+            return_value=type(
+                "obj",
+                (object,),
+                {
+                    "success": False,
+                    "platform": "twitter",
+                    "error": "API unavailable after 8 retries",
+                    "retry_count": 8,
+                },
+            )(),
         ):
             try:
                 publisher.publish(draft, credentials)
@@ -785,7 +793,9 @@ class TestSpecEdgeCases:
                 processed_content="content",
                 status="rejected",
             )
-            (rejected_dir / f"draft-rejected-{i}.json").write_text(json.dumps(draft.to_dict()))
+            (rejected_dir / f"draft-rejected-{i}.json").write_text(
+                json.dumps(draft.to_dict())
+            )
 
         pending_draft = Draft(
             draft_id="draft-final-reject-test",
@@ -801,7 +811,7 @@ class TestSpecEdgeCases:
         pending_path.parent.mkdir(parents=True, exist_ok=True)
         pending_path.write_text(json.dumps(pending_draft.to_dict()))
 
-        result = handler.handle_block(
+        handler.handle_block(
             pending_draft.draft_id,
             "action-reject",
             "Off brand",

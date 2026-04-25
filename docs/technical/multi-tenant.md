@@ -68,7 +68,7 @@ interface Tenant {
   slug: string;                  // URL-safe identifier
   type: 'university' | 'enterprise' | 'accelerator' | 'custom';
   status: 'active' | 'suspended' | 'trial' | 'cancelled';
-  
+
   // Branding
   branding: {
     logoUrl: string;
@@ -78,7 +78,7 @@ interface Tenant {
     customCss?: string;
     customDomain?: string;
   };
-  
+
   // Limits
   limits: {
     maxSquads: number;
@@ -88,7 +88,7 @@ interface Tenant {
     maxApiCallsPerMonth: number;
     features: string[];
   };
-  
+
   // Billing
   billing: {
     plan: 'trial' | 'starter' | 'professional' | 'enterprise';
@@ -96,7 +96,7 @@ interface Tenant {
     stripeSubscriptionId?: string;
     billingEmail: string;
   };
-  
+
   // Settings
   settings: {
     ssoEnabled: boolean;
@@ -105,7 +105,7 @@ interface Tenant {
     customBlueprintsEnabled: boolean;
     whitelabeledMobileApp: boolean;
   };
-  
+
   // Metadata
   createdAt: Date;
   updatedAt: Date;

@@ -1,25 +1,20 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-/**
- * Jest tests for OperatorNotifier
- */
-
-import { join } from "node:path";
 import { OperatorNotifier, type NotificationPayload } from "../warroom/notifier";
 
-const mockSpawnSync = jest.fn();
-jest.mock("node:child_process", () => ({
+const mockSpawnSync = vi.fn();
+vi.mock("node:child_process", () => ({
   spawnSync: (...args: unknown[]) => mockSpawnSync(...args),
 }));
 
-const mockExistsSync = jest.fn();
-const mockMkdirSync = jest.fn();
-const mockReadFileSync = jest.fn();
-const mockWriteFileSync = jest.fn();
-const mockUnlinkSync = jest.fn();
+const mockExistsSync = vi.fn();
+const mockMkdirSync = vi.fn();
+const mockReadFileSync = vi.fn();
+const mockWriteFileSync = vi.fn();
+const mockUnlinkSync = vi.fn();
 
-jest.mock("node:fs", () => ({
+vi.mock("node:fs", () => ({
   existsSync: (...args: unknown[]) => mockExistsSync(...args),
   mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
   readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
@@ -27,7 +22,7 @@ jest.mock("node:fs", () => ({
   unlinkSync: (...args: unknown[]) => mockUnlinkSync(...args),
 }));
 
-jest.mock("node:os", () => ({
+vi.mock("node:os", () => ({
   homedir: () => "/home/test",
 }));
 
@@ -51,7 +46,7 @@ describe("OperatorNotifier", () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockSpawnSync.mockReset();
     mockExistsSync.mockReset();
     mockMkdirSync.mockReset();
@@ -104,7 +99,11 @@ describe("OperatorNotifier", () => {
       const notifier = new OperatorNotifier(true);
       const result = notifier.notify(holdPayload);
 
-      expect(mockSpawnSync).toHaveBeenCalledWith("osascript", expect.arrayContaining(["-e"]), expect.any(Object));
+      expect(mockSpawnSync).toHaveBeenCalledWith(
+        "osascript",
+        expect.arrayContaining(["-e"]),
+        expect.any(Object),
+      );
       expect(result).toEqual({ delivered: true, method: "osascript" });
 
       Object.defineProperty(process, "platform", { value: originalPlatform, configurable: true });
@@ -119,7 +118,11 @@ describe("OperatorNotifier", () => {
       const notifier = new OperatorNotifier(true);
       const result = notifier.notify(holdPayload);
 
-      expect(mockSpawnSync).toHaveBeenCalledWith("notify-send", expect.any(Array), expect.any(Object));
+      expect(mockSpawnSync).toHaveBeenCalledWith(
+        "notify-send",
+        expect.any(Array),
+        expect.any(Object),
+      );
       expect(result).toEqual({ delivered: true, method: "notify-send" });
 
       Object.defineProperty(process, "platform", { value: originalPlatform, configurable: true });

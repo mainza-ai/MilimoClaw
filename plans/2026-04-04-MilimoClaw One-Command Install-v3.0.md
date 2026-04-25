@@ -1,7 +1,7 @@
 # MilimoClaw One-Command Install — Definitive Implementation Plan
 
-**Version:** 3.0  
-**Date:** 2026-04-04  
+**Version:** 3.0
+**Date:** 2026-04-04
 **Status:** Ready for review
 
 ---

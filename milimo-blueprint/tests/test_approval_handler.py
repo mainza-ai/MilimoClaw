@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -16,7 +15,6 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 
 from orchestrator.content.content_init import (
     ContentFilesystemInit,
@@ -25,9 +23,6 @@ from orchestrator.content.content_init import (
 from orchestrator.content.content_generator import Draft
 from orchestrator.content.approval_handler import (
     ContentApprovalHandler,
-    ApprovalResult,
-    EditDelta,
-    RejectionAlert,
     REQUEUE_THRESHOLD,
     REJECTION_ALERT_THRESHOLD,
 )
@@ -168,7 +163,9 @@ class TestHandleApprove:
         """Scheduled draft writes to calendar."""
         fs, op_log, handler, draft = self._create_test_env(tmp_path)
 
-        draft.scheduled_time = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
+        draft.scheduled_time = (
+            datetime.now(timezone.utc) + timedelta(hours=2)
+        ).isoformat()
         pending_path = fs.get_draft_path("pending", draft.draft_id)
         pending_path.write_text(json.dumps(draft.to_dict()))
 
@@ -220,7 +217,9 @@ class TestHandleEdit:
         """Minor edit below threshold auto-approves."""
         fs, op_log, handler, draft = self._create_test_env(tmp_path)
 
-        minor_edit = "This is the original content that needs some editing work completed."
+        minor_edit = (
+            "This is the original content that needs some editing work completed."
+        )
 
         result = handler.handle_edit(draft.draft_id, minor_edit, "action-edit1")
 
@@ -253,7 +252,9 @@ class TestHandleEdit:
 
         handler.handle_edit(draft.draft_id, major_edit, "action-edit3")
 
-        original_path = fs.BASE / "drafts" / "pending" / f"{draft.draft_id}_original.json"
+        original_path = (
+            fs.BASE / "drafts" / "pending" / f"{draft.draft_id}_original.json"
+        )
         assert original_path.exists()
 
     def test_edit_logs_to_operational(self, tmp_path: Path):
@@ -371,7 +372,9 @@ class TestRejectionAlert:
                 processed_content="content",
                 status="rejected",
             )
-            (rejected_dir / f"draft-rejected-{i}.json").write_text(json.dumps(draft.to_dict()))
+            (rejected_dir / f"draft-rejected-{i}.json").write_text(
+                json.dumps(draft.to_dict())
+            )
 
         pending_draft = Draft(
             draft_id="draft-final-reject",

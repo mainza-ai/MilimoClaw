@@ -1,11 +1,6 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-/**
- * Jest tests for Action CLI commands
- */
-
-import { join } from "node:path";
 import {
   cliActionApprove,
   cliActionBlock,
@@ -15,20 +10,20 @@ import {
 } from "../commands/action";
 
 const mockLogger: Logger = {
-  info: jest.fn(),
-  error: jest.fn(),
-  warn: jest.fn(),
+  info: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
 };
 
-const mockExistsSync = jest.fn();
-const mockReaddirSync = jest.fn();
-const mockReadFileSync = jest.fn();
-const mockRenameSync = jest.fn();
-const mockWriteFileSync = jest.fn();
-const mockUnlinkSync = jest.fn();
-const mockMkdirSync = jest.fn();
+const mockExistsSync = vi.fn();
+const mockReaddirSync = vi.fn();
+const mockReadFileSync = vi.fn();
+const mockRenameSync = vi.fn();
+const mockWriteFileSync = vi.fn();
+const mockUnlinkSync = vi.fn();
+const mockMkdirSync = vi.fn();
 
-jest.mock("node:fs", () => ({
+vi.mock("node:fs", () => ({
   existsSync: (...args: unknown[]) => mockExistsSync(...args),
   readdirSync: (...args: unknown[]) => mockReaddirSync(...args),
   readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
@@ -38,8 +33,9 @@ jest.mock("node:fs", () => ({
   mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
 }));
 
-jest.mock("node:os", () => ({
-  homedir: () => "/home/test",
+vi.mock("node:os", () => ({
+  homedir: () => "/tmp/milimo-test-home",
+  tmpdir: () => "/tmp",
 }));
 
 describe("Action CLI", () => {
@@ -54,12 +50,12 @@ describe("Action CLI", () => {
     squad_id: "test-squad",
     timestamp: "2026-03-20T10:00:00Z",
     needs_approval: true,
-    file_path: "/home/test/.milimo/mesh/inbox/war_room/msg_001.json",
+    file_path: `/tmp/milimo-test-home/.milimo/mesh/inbox/war_room/msg_001.json`,
     priority: "REVIEW",
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.restoreAllMocks();
     mockExistsSync.mockReset();
     mockReaddirSync.mockReset();
     mockReadFileSync.mockReset();
@@ -81,14 +77,12 @@ describe("Action CLI", () => {
     it("returns pending actions from inbox", () => {
       mockExistsSync.mockReturnValue(true);
       mockReaddirSync.mockReturnValue(["msg_001.json", "msg_002.json"]);
-      mockReadFileSync
-        .mockReturnValueOnce(JSON.stringify(mockAction))
-        .mockReturnValueOnce(
-          JSON.stringify({
-            ...mockAction,
-            message_id: "act_456",
-          }),
-        );
+      mockReadFileSync.mockReturnValueOnce(JSON.stringify(mockAction)).mockReturnValueOnce(
+        JSON.stringify({
+          ...mockAction,
+          message_id: "act_456",
+        }),
+      );
 
       const actions = listPendingActions();
 
@@ -127,42 +121,42 @@ describe("Action CLI", () => {
   });
 
   describe("cliActionApprove", () => {
-    it("exits with error if inbox does not exist", async () => {
+    it("exits with error if inbox does not exist", () => {
       mockExistsSync.mockReturnValue(false);
 
-      const exitSpy = jest.spyOn(process, "exit").mockImplementation(() => {
+      const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
         throw new Error("exit");
-      });
+      }) as never);
 
-      await expect(
+      expect(() =>
         cliActionApprove({
           actionId: "act_123",
           logger: mockLogger,
           pluginConfig,
         }),
-      ).rejects.toThrow("exit");
+      ).toThrow("exit");
 
       expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining("No pending actions"));
 
       exitSpy.mockRestore();
     });
 
-    it("exits with error if action not found", async () => {
+    it("exits with error if action not found", () => {
       mockExistsSync.mockReturnValue(true);
       mockReaddirSync.mockReturnValue(["msg_001.json"]);
       mockReadFileSync.mockReturnValue(JSON.stringify({ message_id: "act_other" }));
 
-      const exitSpy = jest.spyOn(process, "exit").mockImplementation(() => {
+      const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
         throw new Error("exit");
-      });
+      }) as never);
 
-      await expect(
+      expect(() =>
         cliActionApprove({
           actionId: "act_123",
           logger: mockLogger,
           pluginConfig,
         }),
-      ).rejects.toThrow("exit");
+      ).toThrow("exit");
 
       expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining("Action not found"));
 
@@ -206,20 +200,20 @@ describe("Action CLI", () => {
   });
 
   describe("cliActionBlock", () => {
-    it("exits with error if inbox does not exist", async () => {
+    it("exits with error if inbox does not exist", () => {
       mockExistsSync.mockReturnValue(false);
 
-      const exitSpy = jest.spyOn(process, "exit").mockImplementation(() => {
+      const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
         throw new Error("exit");
-      });
+      }) as never);
 
-      await expect(
+      expect(() =>
         cliActionBlock({
           actionId: "act_123",
           logger: mockLogger,
           pluginConfig,
         }),
-      ).rejects.toThrow("exit");
+      ).toThrow("exit");
 
       expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining("No pending actions"));
 

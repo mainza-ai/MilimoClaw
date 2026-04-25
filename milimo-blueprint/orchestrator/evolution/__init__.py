@@ -3,7 +3,12 @@
 
 """Evolution package for self-evolution engine components."""
 
-from .sandbox_runner import SandboxRunner, BacktestResult, SandboxConfig, _meets_threshold
+from .sandbox_runner import (
+    SandboxRunner,
+    BacktestResult,
+    SandboxConfig,
+    _meets_threshold,
+)
 
 __all__ = [
     "SandboxRunner",

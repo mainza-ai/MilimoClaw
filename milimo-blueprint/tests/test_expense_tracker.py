@@ -1,10 +1,10 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """Tests for Finance Claw Expense Tracker."""
 
 import json
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -231,8 +231,12 @@ class TestExpenseTracker:
         categories_dir = fs_path / "expenses" / "categories"
         categories_dir.mkdir(parents=True, exist_ok=True)
 
-        (categories_dir / "office_supplies.json").write_text(json.dumps({"total": 150, "count": 3}))
-        (categories_dir / "software_subscriptions.json").write_text(json.dumps({"total": 500, "count": 2}))
+        (categories_dir / "office_supplies.json").write_text(
+            json.dumps({"total": 150, "count": 3})
+        )
+        (categories_dir / "software_subscriptions.json").write_text(
+            json.dumps({"total": 500, "count": 2})
+        )
 
         summary = expense_tracker.get_category_summary()
 
@@ -272,9 +276,8 @@ class TestExpenseTracker:
 
     def test_file_locking_on_append(self, expense_tracker, fs_path):
         """Expense log uses file locking for thread safety."""
-        import fcntl
 
-        expense = expense_tracker.log_expense(
+        expense_tracker.log_expense(
             description="Lock test",
             amount=100,
             expense_date="2026-03-01",

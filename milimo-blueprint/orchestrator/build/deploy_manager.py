@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """
 Build Claw deploy manager.
 
@@ -14,7 +16,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
@@ -72,7 +74,9 @@ class DeployManager:
     def stage_deployment(self, pr: PRRecord) -> DeployRecord:
         """Create a deploy HOLD action. Does NOT trigger deployment."""
         deploy_id = f"deploy-{uuid.uuid4().hex[:8]}"
-        version = f"v{pr.issue_number}.{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+        version = (
+            f"v{pr.issue_number}.{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+        )
 
         deploy = DeployRecord(
             deploy_id=deploy_id,
@@ -97,13 +101,15 @@ class DeployManager:
         self._fs.atomic_write_json(deploy_path, self._deploy_to_dict(deploy))
 
         self._deploy_log.append("staged", deploy_id, {"version": version})
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="deployment_staged",
-            entity_id=deploy_id,
-            outcome="success",
-            details={"version": version, "pr_id": pr.pr_id},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="deployment_staged",
+                entity_id=deploy_id,
+                outcome="success",
+                details={"version": version, "pr_id": pr.pr_id},
+            )
+        )
         return deploy
 
     # ------------------------------------------------------------------
@@ -150,13 +156,15 @@ class DeployManager:
             )
 
             self._deploy_log.append("deployed", deploy_id, {"url": deploy_url})
-            self._log.append(BuildLogEntry(
-                timestamp=datetime.now(timezone.utc).isoformat(),
-                action_type="deployment_completed",
-                entity_id=deploy_id,
-                outcome="success",
-                details={"deploy_url": deploy_url},
-            ))
+            self._log.append(
+                BuildLogEntry(
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    action_type="deployment_completed",
+                    entity_id=deploy_id,
+                    outcome="success",
+                    details={"deploy_url": deploy_url},
+                )
+            )
             return DeployRecord(**deploy_data)
 
         else:
@@ -166,13 +174,15 @@ class DeployManager:
             self._fs.atomic_write_json(deploy_path, deploy_data)
 
             self._deploy_log.append("failed", deploy_id, {"status": status})
-            self._log.append(BuildLogEntry(
-                timestamp=datetime.now(timezone.utc).isoformat(),
-                action_type="deployment_failed",
-                entity_id=deploy_id,
-                outcome="failed",
-                details={"status": status},
-            ))
+            self._log.append(
+                BuildLogEntry(
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    action_type="deployment_failed",
+                    entity_id=deploy_id,
+                    outcome="failed",
+                    details={"status": status},
+                )
+            )
             return DeployRecord(**deploy_data)
 
     # ------------------------------------------------------------------
@@ -188,13 +198,15 @@ class DeployManager:
             self._fs.atomic_write_json(deploy_path, deploy_data)
 
         self._deploy_log.append("cancelled", deploy_id, {})
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="deployment_cancelled",
-            entity_id=deploy_id,
-            outcome="cancelled",
-            details={},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="deployment_cancelled",
+                entity_id=deploy_id,
+                outcome="cancelled",
+                details={},
+            )
+        )
 
     # ------------------------------------------------------------------
     # Internal

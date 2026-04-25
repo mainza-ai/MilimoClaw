@@ -1,11 +1,11 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """Tests for Finance Claw Scheduler."""
 
 import json
 import sys
-import threading
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -37,6 +37,7 @@ class MockRevenueTracker:
 
     def generate_weekly_summary(self):
         from finance.revenue_tracker import RevenueSummary
+
         self.summary_calls += 1
         self.last_summary = RevenueSummary(
             week_start="2026-03-15",
@@ -116,8 +117,13 @@ class TestFinanceScheduler:
 
     @pytest.fixture
     def scheduler(
-        self, payment_monitor, revenue_tracker, expense_tracker,
-        approval_handler, operational_log, fs_path
+        self,
+        payment_monitor,
+        revenue_tracker,
+        expense_tracker,
+        approval_handler,
+        operational_log,
+        fs_path,
     ):
         return FinanceScheduler(
             payment_monitor=payment_monitor,
@@ -207,7 +213,9 @@ class TestFinanceScheduler:
             "payment_risk_level": "low",
             "due_date": "2026-04-01",
             "status": "approved",
-            "approved_at": (datetime.now(timezone.utc) - timedelta(hours=50)).isoformat(),
+            "approved_at": (
+                datetime.now(timezone.utc) - timedelta(hours=50)
+            ).isoformat(),
         }
         (approved_dir / "inv-stale.json").write_text(json.dumps(stale_invoice))
 
@@ -217,7 +225,9 @@ class TestFinanceScheduler:
         stale_entries = [e for e in entries if "hold_stale" in e.action_type]
         assert len(stale_entries) >= 1
 
-    def test_check_hold_staleness_escalates_7days(self, scheduler, fs_path, operational_log):
+    def test_check_hold_staleness_escalates_7days(
+        self, scheduler, fs_path, operational_log
+    ):
         """_check_hold_staleness escalates invoices stuck > 7 days."""
         approved_dir = fs_path / "invoices" / "approved"
         approved_dir.mkdir(parents=True, exist_ok=True)
@@ -234,7 +244,9 @@ class TestFinanceScheduler:
             "status": "approved",
             "approved_at": (datetime.now(timezone.utc) - timedelta(days=8)).isoformat(),
         }
-        (approved_dir / "inv-very-stale.json").write_text(json.dumps(very_stale_invoice))
+        (approved_dir / "inv-very-stale.json").write_text(
+            json.dumps(very_stale_invoice)
+        )
 
         scheduler._check_hold_staleness()
 
@@ -244,7 +256,6 @@ class TestFinanceScheduler:
 
     def test_is_quarter_start(self, scheduler):
         """_is_quarter_start returns True for quarter starts."""
-        original_datetime = datetime
 
         class MockDatetime:
             @staticmethod
@@ -253,9 +264,11 @@ class TestFinanceScheduler:
                     year = 2026
                     month = 1
                     day = 1
+
                 return MockDate()
 
         import finance.finance_scheduler as fs_module
+
         original = fs_module.datetime
         fs_module.datetime = MockDatetime
 
@@ -295,27 +308,41 @@ class TestFinanceScheduler:
 
         scheduler.stop()
 
-    def test_daily_check_exception_logged(self, scheduler, payment_monitor, operational_log):
+    def test_daily_check_exception_logged(
+        self, scheduler, payment_monitor, operational_log
+    ):
         """Daily check exceptions are logged."""
-        payment_monitor.check_all_sent_invoices = lambda: (_ for _ in ()).throw(RuntimeError("Test error"))
+        payment_monitor.check_all_sent_invoices = lambda: (_ for _ in ()).throw(
+            RuntimeError("Test error")
+        )
 
         scheduler._run_daily_payment_check()
 
         entries = operational_log.read_recent(days=1)
-        failed_entries = [e for e in entries if e.action_type == "daily_payment_check_failed"]
+        failed_entries = [
+            e for e in entries if e.action_type == "daily_payment_check_failed"
+        ]
         assert len(failed_entries) >= 1
 
-    def test_weekly_summary_exception_logged(self, scheduler, revenue_tracker, operational_log):
+    def test_weekly_summary_exception_logged(
+        self, scheduler, revenue_tracker, operational_log
+    ):
         """Weekly summary exceptions are logged."""
-        revenue_tracker.generate_weekly_summary = lambda: (_ for _ in ()).throw(RuntimeError("Test error"))
+        revenue_tracker.generate_weekly_summary = lambda: (_ for _ in ()).throw(
+            RuntimeError("Test error")
+        )
 
         scheduler._run_weekly_summary()
 
         entries = operational_log.read_recent(days=1)
-        failed_entries = [e for e in entries if e.action_type == "weekly_summary_failed"]
+        failed_entries = [
+            e for e in entries if e.action_type == "weekly_summary_failed"
+        ]
         assert len(failed_entries) >= 1
 
-    def test_quarterly_prep_with_uncategorized(self, scheduler, expense_tracker, approval_handler):
+    def test_quarterly_prep_with_uncategorized(
+        self, scheduler, expense_tracker, approval_handler
+    ):
         """Quarterly prep queues review for uncategorized expenses."""
         from finance.expense_tracker import ExpenseEntry
 

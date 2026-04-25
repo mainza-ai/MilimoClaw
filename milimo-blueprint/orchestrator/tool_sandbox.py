@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -22,16 +21,14 @@ from __future__ import annotations
 
 import json
 import logging
-import resource
 import subprocess
 import sys
 import tempfile
-import threading
 import traceback
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 logger = logging.getLogger("milimo.tool_sandbox")
 
@@ -140,7 +137,9 @@ class SandboxedExecutor:
                     # Note: More restrictive limits would require containerization
                 )
 
-                execution_time = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
+                execution_time = (
+                    datetime.now(timezone.utc) - start_time
+                ).total_seconds() * 1000
 
                 if result.returncode != 0:
                     return ExecutionResult(
@@ -173,7 +172,9 @@ class SandboxedExecutor:
                 )
 
             except subprocess.TimeoutExpired:
-                execution_time = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
+                execution_time = (
+                    datetime.now(timezone.utc) - start_time
+                ).total_seconds() * 1000
                 return ExecutionResult(
                     success=False,
                     error=f"Execution timeout after {self.config.max_execution_time_ms}ms",
@@ -182,7 +183,9 @@ class SandboxedExecutor:
                 )
 
             except Exception as e:
-                execution_time = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
+                execution_time = (
+                    datetime.now(timezone.utc) - start_time
+                ).total_seconds() * 1000
                 return ExecutionResult(
                     success=False,
                     error=str(e),
@@ -198,7 +201,7 @@ class SandboxedExecutor:
         input_data: dict[str, Any],
     ) -> str:
         """Create a wrapper script that executes the tool."""
-        return f'''
+        return f"""
 import sys
 import json
 import resource
@@ -230,7 +233,7 @@ try:
     print(json.dumps(result, default=str))
 except Exception as e:
     print(json.dumps({{"__error__": str(e), "__type__": type(e).__name__}}))
-'''
+"""
 
     def _build_env(self) -> dict[str, str]:
         """Build environment for subprocess."""
@@ -318,7 +321,9 @@ class ToolSandbox:
             if validation == "exact":
                 case_result["passed"] = exec_result.output == expected
             elif validation == "partial":
-                case_result["passed"] = self._partial_match(exec_result.output, expected)
+                case_result["passed"] = self._partial_match(
+                    exec_result.output, expected
+                )
             elif validation == "custom":
                 validator = test_case.get("validator")
                 if validator and callable(validator):

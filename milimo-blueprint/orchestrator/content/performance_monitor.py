@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -18,7 +17,6 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 from typing import Any, Literal
 
 from .content_init import (
@@ -37,7 +35,7 @@ logger = logging.getLogger("milimo.performance_monitor")
 
 COLLECTION_SCHEDULE_HOURS = [1, 24, 168]  # 1hr, 24hr, 7 days
 ANOMALY_HIGH_THRESHOLD = 2.0  # >2x baseline
-ANOMALY_LOW_THRESHOLD = 0.5   # <0.5x baseline
+ANOMALY_LOW_THRESHOLD = 0.5  # <0.5x baseline
 
 
 # ---------------------------------------------------------------------------
@@ -157,16 +155,18 @@ class PerformanceMonitor:
             self._schedules[post_id] = schedule
             self._published_at[post_id] = publish_time
 
-        self._log.append(LogEntry(
-            action_type="performance_monitoring_scheduled",
-            entity_id=post_id,
-            outcome="success",
-            platform=platform,
-            client_id=client_id,
-            details={
-                "collection_points": schedule.collection_points,
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="performance_monitoring_scheduled",
+                entity_id=post_id,
+                outcome="success",
+                platform=platform,
+                client_id=client_id,
+                details={
+                    "collection_points": schedule.collection_points,
+                },
+            )
+        )
 
         logger.info(
             "Scheduled performance monitoring for post %s on %s",
@@ -227,7 +227,9 @@ class PerformanceMonitor:
             platform=data.platform,
             content_type=schedule.content_type if schedule else "post",
             client_id=schedule.client_id if schedule else None,
-            publish_time=schedule.publish_time if schedule else datetime.now(timezone.utc).isoformat(),
+            publish_time=schedule.publish_time
+            if schedule
+            else datetime.now(timezone.utc).isoformat(),
             collected_at=data.collected_at,
             engagement_data={
                 "likes": data.likes,
@@ -285,17 +287,19 @@ class PerformanceMonitor:
                         post_id,
                         elapsed_hours,
                     )
-                    self._log.append(LogEntry(
-                        action_type="performance_signal_sla_warning",
-                        entity_id=post_id,
-                        outcome="warning",
-                        platform=data.platform,
-                        client_id=schedule.client_id if schedule else None,
-                        details={
-                            "elapsed_hours": elapsed_hours,
-                            "sla_hours": self.PERFORMANCE_SIGNAL_SLA_HOURS,
-                        },
-                    ))
+                    self._log.append(
+                        LogEntry(
+                            action_type="performance_signal_sla_warning",
+                            entity_id=post_id,
+                            outcome="warning",
+                            platform=data.platform,
+                            client_id=schedule.client_id if schedule else None,
+                            details={
+                                "elapsed_hours": elapsed_hours,
+                                "sla_hours": self.PERFORMANCE_SIGNAL_SLA_HOURS,
+                            },
+                        )
+                    )
             except Exception as e:
                 logger.warning("Failed to check SLA timing: %s", e)
 
@@ -323,19 +327,21 @@ class PerformanceMonitor:
             self._mesh.send(signal)
             self._signal_sent_at[post_id] = datetime.now(timezone.utc).isoformat()
 
-        self._log.append(LogEntry(
-            action_type="performance_signal_sent",
-            entity_id=post_id,
-            outcome="success",
-            platform=data.platform,
-            client_id=schedule.client_id if schedule else None,
-            details={
-                "likes": data.likes,
-                "shares": data.shares,
-                "reach": data.reach,
-                "sla_met": True,
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="performance_signal_sent",
+                entity_id=post_id,
+                outcome="success",
+                platform=data.platform,
+                client_id=schedule.client_id if schedule else None,
+                details={
+                    "likes": data.likes,
+                    "shares": data.shares,
+                    "reach": data.reach,
+                    "sla_met": True,
+                },
+            )
+        )
 
         logger.info("Sent performance signal for post %s", post_id)
 
@@ -398,16 +404,18 @@ class PerformanceMonitor:
             },
         )
 
-        self._log.append(LogEntry(
-            action_type="anomaly_flagged",
-            entity_id=anomaly.post_id,
-            outcome="success",
-            platform=anomaly.platform,
-            details={
-                "direction": anomaly.direction,
-                "ratio": anomaly.ratio,
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="anomaly_flagged",
+                entity_id=anomaly.post_id,
+                outcome="success",
+                platform=anomaly.platform,
+                details={
+                    "direction": anomaly.direction,
+                    "ratio": anomaly.ratio,
+                },
+            )
+        )
 
         logger.info("Flagged anomaly in War Room: %s", anomaly.message)
 
@@ -431,16 +439,18 @@ class PerformanceMonitor:
                 if record.get("platform") != platform:
                     continue
 
-                collected_at = datetime.fromisoformat(record["collected_at"].replace("Z", "+00:00"))
+                collected_at = datetime.fromisoformat(
+                    record["collected_at"].replace("Z", "+00:00")
+                )
                 if collected_at < thirty_days_ago:
                     continue
 
                 engagement = record.get("engagement_data", {})
                 total_engagement += (
-                    engagement.get("likes", 0) +
-                    engagement.get("shares", 0) +
-                    engagement.get("comments", 0) +
-                    engagement.get("click_through", 0)
+                    engagement.get("likes", 0)
+                    + engagement.get("shares", 0)
+                    + engagement.get("comments", 0)
+                    + engagement.get("click_through", 0)
                 )
                 count += 1
 

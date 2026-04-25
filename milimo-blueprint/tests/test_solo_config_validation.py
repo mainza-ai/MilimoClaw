@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -10,9 +9,8 @@ This file tests:
 - FIX 7: Cost guard with lighter_prompt fallback
 - FIX 8: deadline_risk and deadline_critical action types
 """
-import tempfile
+
 from pathlib import Path
-from typing import Any
 
 import pytest
 import yaml
@@ -32,7 +30,9 @@ class TestEvolutionScheduleConfiguration:
 
         assert schedule.get("content") == "02:05", "Content should be at 02:05"
         assert schedule.get("ops") == "02:15", "Ops should be at 02:15"
-        assert schedule.get("analytics_evolution") == "02:25", "Analytics should be at 02:25"
+        assert schedule.get("analytics_evolution") == "02:25", (
+            "Analytics should be at 02:25"
+        )
         assert schedule.get("build") == "02:35", "Build should be at 02:35"
         assert schedule.get("finance") == "03:00", "Finance should be at 03:00"
 
@@ -70,7 +70,9 @@ class TestEvolutionScheduleConfiguration:
 
         assert ops_time - content_time == 10, "10-minute gap from content to ops"
         assert analytics_time - ops_time == 10, "10-minute gap from ops to analytics"
-        assert build_time - analytics_time == 10, "10-minute gap from analytics to build"
+        assert build_time - analytics_time == 10, (
+            "10-minute gap from analytics to build"
+        )
         assert finance_time - build_time == 25, "25-minute gap from build to finance"
 
     def test_evolution_min_thresholds_defined(self):
@@ -136,7 +138,11 @@ class TestCostGuardConfiguration:
             fallback_strategy=FallbackStrategy.LIGHTER_PROMPT,
         )
 
-        prompt = "TASK: Generate code\n\nCODEBASE CONTEXT: " + "x" * 1000 + "\n\nMore instructions"
+        prompt = (
+            "TASK: Generate code\n\nCODEBASE CONTEXT: "
+            + "x" * 1000
+            + "\n\nMore instructions"
+        )
         max_tokens = 4000
 
         trimmed, reduced = guard.apply_lighter_prompt_strategy(prompt, max_tokens)
@@ -153,21 +159,27 @@ class TestCostGuardConfiguration:
             fallback_strategy=FallbackStrategy.LIGHTER_PROMPT,
         )
 
-        prompt = """
+        prompt = (
+            """
 TASK: Fix the bug
 
 CODEBASE CONTEXT:
 This is a large codebase with many files...
-""" + "x" * 500 + """
+"""
+            + "x" * 500
+            + """
 
 More context here.
 
 COMMUNICATION HISTORY:
 Email thread about the project...
-""" + "y" * 500 + """
+"""
+            + "y" * 500
+            + """
 
 End of prompt.
 """
+        )
         trimmed, _ = guard.apply_lighter_prompt_strategy(prompt, 4000)
 
         # Should contain markers for trimmed sections
@@ -206,9 +218,7 @@ class TestOpsDeadlineActionTypes:
             data = yaml.safe_load(f)
 
         ops_modes = (
-            data.get("operator_policy", {})
-            .get("approval_modes", {})
-            .get("ops", {})
+            data.get("operator_policy", {}).get("approval_modes", {}).get("ops", {})
         )
 
         assert ops_modes.get("deadline_risk") == "REVIEW"
@@ -221,9 +231,7 @@ class TestOpsDeadlineActionTypes:
             data = yaml.safe_load(f)
 
         ops_modes = (
-            data.get("operator_policy", {})
-            .get("approval_modes", {})
-            .get("ops", {})
+            data.get("operator_policy", {}).get("approval_modes", {}).get("ops", {})
         )
 
         assert ops_modes.get("deadline_critical") == "HOLD"
@@ -236,9 +244,7 @@ class TestOpsDeadlineActionTypes:
             data = yaml.safe_load(f)
 
         ops_modes = (
-            data.get("operator_policy", {})
-            .get("approval_modes", {})
-            .get("ops", {})
+            data.get("operator_policy", {}).get("approval_modes", {}).get("ops", {})
         )
 
         assert "deadline_flag" not in ops_modes, (
@@ -256,10 +262,7 @@ class TestApprovalModesStructure:
         with config_path.open("r") as f:
             data = yaml.safe_load(f)
 
-        approval_modes = (
-            data.get("operator_policy", {})
-            .get("approval_modes", {})
-        )
+        approval_modes = data.get("operator_policy", {}).get("approval_modes", {})
 
         assert approval_modes is not None
         assert isinstance(approval_modes, dict)
@@ -271,10 +274,7 @@ class TestApprovalModesStructure:
         with config_path.open("r") as f:
             data = yaml.safe_load(f)
 
-        approval_modes = (
-            data.get("operator_policy", {})
-            .get("approval_modes", {})
-        )
+        approval_modes = data.get("operator_policy", {}).get("approval_modes", {})
 
         required_claws = ["content", "ops", "analytics", "finance", "build"]
         for claw in required_claws:

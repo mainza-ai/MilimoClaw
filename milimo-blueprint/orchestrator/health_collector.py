@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -36,6 +35,7 @@ logger = logging.getLogger("milimo.health_collector")
 # ---------------------------------------------------------------------------
 # Types
 # ---------------------------------------------------------------------------
+
 
 class HealthStatus(str, Enum):
     """Health status levels."""
@@ -139,6 +139,7 @@ class SquadHealth:
 # ---------------------------------------------------------------------------
 # Health Scorer
 # ---------------------------------------------------------------------------
+
 
 class HealthScorer:
     """Calculates health scores from metrics."""
@@ -258,6 +259,7 @@ class HealthScorer:
 # Health Collector
 # ---------------------------------------------------------------------------
 
+
 class HealthCollector:
     """
     Collects health metrics from all squad claws.
@@ -289,6 +291,7 @@ class HealthCollector:
             self._storage_dir = Path(storage_dir)
         else:
             import os
+
             home = os.environ.get("HOME", os.environ.get("USERPROFILE", "/tmp"))
             self._storage_dir = Path(home) / ".milimo" / "health"
 
@@ -343,8 +346,12 @@ class HealthCollector:
         # Heartbeat latency
         if hasattr(node, "last_heartbeat") and node.last_heartbeat:
             try:
-                last_hb = datetime.fromisoformat(node.last_heartbeat.replace("Z", "+00:00"))
-                metrics.heartbeat_latency_ms = (datetime.now(timezone.utc) - last_hb).total_seconds() * 1000
+                last_hb = datetime.fromisoformat(
+                    node.last_heartbeat.replace("Z", "+00:00")
+                )
+                metrics.heartbeat_latency_ms = (
+                    datetime.now(timezone.utc) - last_hb
+                ).total_seconds() * 1000
             except Exception:
                 metrics.heartbeat_latency_ms = float("inf")
 
@@ -419,26 +426,32 @@ class HealthCollector:
         with self._lock:
             for role, health in self._health.items():
                 if health.status == HealthStatus.CRITICAL:
-                    new_alerts.append({
-                        "role": role,
-                        "level": "critical",
-                        "message": f"{role} is in critical condition (score: {health.score})",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    })
+                    new_alerts.append(
+                        {
+                            "role": role,
+                            "level": "critical",
+                            "message": f"{role} is in critical condition (score: {health.score})",
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
                 elif health.status == HealthStatus.DEGRADED:
-                    new_alerts.append({
-                        "role": role,
-                        "level": "warning",
-                        "message": f"{role} is degraded (score: {health.score})",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    })
+                    new_alerts.append(
+                        {
+                            "role": role,
+                            "level": "warning",
+                            "message": f"{role} is degraded (score: {health.score})",
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
                 elif health.status == HealthStatus.OFFLINE:
-                    new_alerts.append({
-                        "role": role,
-                        "level": "critical",
-                        "message": f"{role} is offline",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    })
+                    new_alerts.append(
+                        {
+                            "role": role,
+                            "level": "critical",
+                            "message": f"{role} is offline",
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
 
         self._alerts = new_alerts
 
@@ -450,7 +463,9 @@ class HealthCollector:
             data = {
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "squad_id": self.mesh.squad_id,
-                "claws": {role: health.to_dict() for role, health in self._health.items()},
+                "claws": {
+                    role: health.to_dict() for role, health in self._health.items()
+                },
                 "alerts": self._alerts,
             }
 

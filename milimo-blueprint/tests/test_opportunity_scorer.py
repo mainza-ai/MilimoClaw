@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -6,14 +5,13 @@
 Unit tests for Opportunity Scorer.
 """
 
-from __future__ import annotations
-
 import json
 import shutil
 import tempfile
+from collections.abc import Iterator
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import pytest
 
@@ -28,7 +26,7 @@ from orchestrator.analytics.opportunity_scorer import (
 
 
 @pytest.fixture
-def temp_sandbox() -> Path:
+def temp_sandbox() -> Iterator[Path]:
     sandbox = Path(tempfile.mkdtemp(prefix="opp_test_"))
     yield sandbox
     shutil.rmtree(sandbox, ignore_errors=True)
@@ -52,13 +50,18 @@ def dispatched_signals() -> list[dict[str, Any]]:
 
 
 @pytest.fixture
-def mock_dispatcher(dispatched_signals: list[dict[str, Any]]) -> callable:
+def mock_dispatcher(
+    dispatched_signals: list[dict[str, Any]],
+) -> Callable[[str, str, dict], None]:
     def dispatcher(message_type: str, target_claw: str, payload: dict) -> None:
-        dispatched_signals.append({
-            "message_type": message_type,
-            "target_claw": target_claw,
-            "payload": payload,
-        })
+        dispatched_signals.append(
+            {
+                "message_type": message_type,
+                "target_claw": target_claw,
+                "payload": payload,
+            }
+        )
+
     return dispatcher
 
 
@@ -66,7 +69,7 @@ def mock_dispatcher(dispatched_signals: list[dict[str, Any]]) -> callable:
 def opportunity_scorer(
     fs: AnalyticsFilesystemInit,
     operational_log: AnalyticsOperationalLog,
-    mock_dispatcher: callable,
+    mock_dispatcher: Callable[[str, str, dict], None],
 ) -> OpportunityScorer:
     return OpportunityScorer(
         fs=fs,
@@ -86,7 +89,9 @@ def create_performance_data(fs: AnalyticsFilesystemInit) -> None:
             "received_at": (datetime.now(timezone.utc) - timedelta(days=i)).isoformat(),
             "content_type": "article",
             "engagement_data": {"engagement_rate": 0.05 + i * 0.01},
-            "publish_time": (datetime.now(timezone.utc) - timedelta(days=i, hours=10)).isoformat(),
+            "publish_time": (
+                datetime.now(timezone.utc) - timedelta(days=i, hours=10)
+            ).isoformat(),
         }
         records.append(json.dumps(record))
     perf_file.write_text("\n".join(records) + "\n")
@@ -101,7 +106,9 @@ def create_client_health_data(fs: AnalyticsFilesystemInit) -> None:
         for i in range(3):
             record = {
                 "signal_id": f"health-{client_num}-{i}",
-                "received_at": (datetime.now(timezone.utc) - timedelta(days=i)).isoformat(),
+                "received_at": (
+                    datetime.now(timezone.utc) - timedelta(days=i)
+                ).isoformat(),
                 "health_score": score - i * 0.1,
             }
             records.append(json.dumps(record))
@@ -220,7 +227,7 @@ class TestOpportunityScorer:
         assert isinstance(opportunities, list)
 
     def test_platform_timing_opportunities_returns_list(
-        self, fs: AnalyticsFileformatInit, opportunity_scorer: OpportunityScorer
+        self, fs: AnalyticsFilesystemInit, opportunity_scorer: OpportunityScorer
     ):
         create_performance_data(fs)
         opportunities = opportunity_scorer.platform_timing_opportunities()
@@ -238,7 +245,11 @@ class TestOpportunityScorer:
     ):
         create_client_health_data(fs)
         opportunities = opportunity_scorer.client_segment_opportunities()
-        at_risk_opps = [o for o in opportunities if "at-risk" in o.description.lower() or "risk" in o.description.lower()]
+        at_risk_opps = [
+            o
+            for o in opportunities
+            if "at-risk" in o.description.lower() or "risk" in o.description.lower()
+        ]
         assert len(at_risk_opps) > 0 or len(opportunities) >= 0
 
     def test_empty_result_when_no_data(self, opportunity_scorer: OpportunityScorer):
@@ -263,8 +274,12 @@ class TestOpportunityScorer:
             for i in range(len(opportunities) - 1):
                 assert opportunities[i].confidence >= opportunities[i + 1].confidence
 
-    def test_immediate_dispatch_threshold_is_0_85(self, opportunity_scorer: OpportunityScorer):
+    def test_immediate_dispatch_threshold_is_0_85(
+        self, opportunity_scorer: OpportunityScorer
+    ):
         assert opportunity_scorer.IMMEDIATE_DISPATCH_THRESHOLD == 0.85
 
-    def test_min_confidence_threshold_is_0_3(self, opportunity_scorer: OpportunityScorer):
+    def test_min_confidence_threshold_is_0_3(
+        self, opportunity_scorer: OpportunityScorer
+    ):
         assert opportunity_scorer.MIN_CONFIDENCE_THRESHOLD == 0.3

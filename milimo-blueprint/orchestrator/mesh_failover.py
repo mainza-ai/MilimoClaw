@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -22,14 +21,12 @@ Usage:
 
 from __future__ import annotations
 
-import json
 import logging
 import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from pathlib import Path
 from typing import Any, Callable, Optional
 
 logger = logging.getLogger("milimo.mesh_failover")
@@ -38,6 +35,7 @@ logger = logging.getLogger("milimo.mesh_failover")
 # ---------------------------------------------------------------------------
 # Types
 # ---------------------------------------------------------------------------
+
 
 class FailoverState(str, Enum):
     """Failover operational states."""
@@ -158,8 +156,7 @@ class VersionVector:
         all_nodes = set(self.counters.keys()) | set(other.counters.keys())
         for node in all_nodes:
             merged.counters[node] = max(
-                self.counters.get(node, 0),
-                other.counters.get(node, 0)
+                self.counters.get(node, 0), other.counters.get(node, 0)
             )
 
         merged.timestamp = datetime.now(timezone.utc).isoformat()
@@ -192,6 +189,7 @@ class VersionVector:
 # ---------------------------------------------------------------------------
 # Failover Manager
 # ---------------------------------------------------------------------------
+
 
 class FailoverManager:
     """
@@ -228,7 +226,9 @@ class FailoverManager:
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
-        self._event_handlers: dict[FailoverEvent, list[Callable[[FailoverRecord], None]]] = {}
+        self._event_handlers: dict[
+            FailoverEvent, list[Callable[[FailoverRecord], None]]
+        ] = {}
 
     def start(self) -> None:
         """Start failover monitoring."""
@@ -264,16 +264,21 @@ class FailoverManager:
         now = datetime.now(timezone.utc)
 
         for role, node in topology.items():
-            health = self._node_health.get(role, NodeHealth(
-                role=role,
-                region=self._get_node_region(node),
-                status="online",
-                last_heartbeat="",
-                consecutive_failures=0,
-            ))
+            health = self._node_health.get(
+                role,
+                NodeHealth(
+                    role=role,
+                    region=self._get_node_region(node),
+                    status="online",
+                    last_heartbeat="",
+                    consecutive_failures=0,
+                ),
+            )
 
             if node.last_heartbeat:
-                last_hb = datetime.fromisoformat(node.last_heartbeat.replace("Z", "+00:00"))
+                last_hb = datetime.fromisoformat(
+                    node.last_heartbeat.replace("Z", "+00:00")
+                )
                 elapsed_ms = (now - last_hb).total_seconds() * 1000
 
                 if elapsed_ms > self.heartbeat_timeout_ms:
@@ -289,7 +294,9 @@ class FailoverManager:
         """Get region for a node."""
         return getattr(node, "region", "unknown")
 
-    def _handle_node_timeout(self, role: str, health: NodeHealth, elapsed_ms: float) -> None:
+    def _handle_node_timeout(
+        self, role: str, health: NodeHealth, elapsed_ms: float
+    ) -> None:
         """Handle a node heartbeat timeout."""
         health.consecutive_failures += 1
         health.last_failure_reason = f"Heartbeat timeout: {elapsed_ms:.0f}ms"
@@ -297,11 +304,17 @@ class FailoverManager:
         if health.status == "online":
             health.status = "unhealthy"
             logger.warning("Node %s is unhealthy (timeout: %.0fms)", role, elapsed_ms)
-            self._emit_event(FailoverEvent.NODE_OFFLINE, {"role": role, "reason": "timeout"})
+            self._emit_event(
+                FailoverEvent.NODE_OFFLINE, {"role": role, "reason": "timeout"}
+            )
 
         elif health.status == "unhealthy" and health.consecutive_failures >= 3:
             health.status = "offline"
-            logger.error("Node %s is offline after %d failures", role, health.consecutive_failures)
+            logger.error(
+                "Node %s is offline after %d failures",
+                role,
+                health.consecutive_failures,
+            )
             self._update_failover_state()
 
     def _check_region_health(self) -> None:
@@ -315,12 +328,28 @@ class FailoverManager:
             regions[region].append(role)
 
         for region_id, nodes in regions.items():
-            online = sum(1 for r in nodes if self._node_health.get(
-                r, NodeHealth(role=r, region=region_id, status="unknown", last_heartbeat="", consecutive_failures=0)
-            ).status == "online")
+            online = sum(
+                1
+                for r in nodes
+                if self._node_health.get(
+                    r,
+                    NodeHealth(
+                        role=r,
+                        region=region_id,
+                        status="unknown",
+                        last_heartbeat="",
+                        consecutive_failures=0,
+                    ),
+                ).status
+                == "online"
+            )
 
             total = len(nodes)
-            status = "healthy" if online == total else ("degraded" if online > 0 else "isolated")
+            status = (
+                "healthy"
+                if online == total
+                else ("degraded" if online > 0 else "isolated")
+            )
 
             self._region_health[region_id] = RegionHealth(
                 region_id=region_id,
@@ -357,19 +386,26 @@ class FailoverManager:
 
         if isolated_regions > 0 and healthy_regions > 0:
             self.state = FailoverState.PARTITION
-            logger.error("Network partition detected: %d regions isolated", isolated_regions)
-            self._emit_event(FailoverEvent.PARTITION_DETECTED, {
-                "isolated_regions": [r for r, h in self._region_health.items() if h.status == "isolated"],
-            })
+            logger.error(
+                "Network partition detected: %d regions isolated", isolated_regions
+            )
+            self._emit_event(
+                FailoverEvent.PARTITION_DETECTED,
+                {
+                    "isolated_regions": [
+                        r
+                        for r, h in self._region_health.items()
+                        if h.status == "isolated"
+                    ],
+                },
+            )
 
     def _attempt_recovery(self) -> None:
         """Attempt recovery from failover states."""
         if self.state == FailoverState.NORMAL:
             return
 
-        all_healthy = all(
-            h.status == "healthy" for h in self._region_health.values()
-        )
+        all_healthy = all(h.status == "healthy" for h in self._region_health.values())
 
         if all_healthy:
             self._handle_recovery()
@@ -395,7 +431,9 @@ class FailoverManager:
         with self._lock:
             for recipient, messages in self._pending_messages.items():
                 for msg in messages:
-                    logger.info("Replaying message to %s: %s", recipient, msg.get("message_id"))
+                    logger.info(
+                        "Replaying message to %s: %s", recipient, msg.get("message_id")
+                    )
                     self.mesh.send_message(msg)
 
             self._pending_messages.clear()
@@ -413,9 +451,13 @@ class FailoverManager:
         else:
             self.state = FailoverState.FAILOVER_ACTIVE
 
-    def _emit_event(self, event_type: FailoverEvent, details: dict[str, Any]) -> FailoverRecord:
+    def _emit_event(
+        self, event_type: FailoverEvent, details: dict[str, Any]
+    ) -> FailoverRecord:
         """Emit a failover event."""
-        event_id = f"{event_type.value}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+        event_id = (
+            f"{event_type.value}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+        )
 
         record = FailoverRecord(
             event_id=event_id,
@@ -462,7 +504,9 @@ class FailoverManager:
         """Get health status for all regions."""
         return dict(self._region_health)
 
-    def on_event(self, event_type: FailoverEvent, handler: Callable[[FailoverRecord], None]) -> None:
+    def on_event(
+        self, event_type: FailoverEvent, handler: Callable[[FailoverRecord], None]
+    ) -> None:
         """Register a handler for a failover event."""
         if event_type not in self._event_handlers:
             self._event_handlers[event_type] = []
@@ -476,7 +520,9 @@ class FailoverManager:
         """Get current version vector."""
         return self._version_vector
 
-    def resolve_conflict(self, local: dict[str, Any], remote: dict[str, Any]) -> dict[str, Any]:
+    def resolve_conflict(
+        self, local: dict[str, Any], remote: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Resolve conflict between two versions of data.
 
@@ -490,7 +536,11 @@ class FailoverManager:
         elif remote_ts > local_ts:
             return remote
         else:
-            return local if local.get("_node_id", "") > remote.get("_node_id", "") else remote
+            return (
+                local
+                if local.get("_node_id", "") > remote.get("_node_id", "")
+                else remote
+            )
 
 
 # ---------------------------------------------------------------------------

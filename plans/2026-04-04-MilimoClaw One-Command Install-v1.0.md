@@ -131,7 +131,7 @@ The `openclaw milimo` command only works inside the sandbox. Users on the host m
 
 ## Recommended Approach
 
-**Phase 1-4 should be implemented immediately** — they address the root causes of the installation friction without requiring external changes (OpenClaw registry, NemoClaw custom images). 
+**Phase 1-4 should be implemented immediately** — they address the root causes of the installation friction without requiring external changes (OpenClaw registry, NemoClaw custom images).
 
 **Phase 5 (CLI wrapper) should be implemented next** — it gives users a clean entry point.
 

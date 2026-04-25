@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -16,11 +15,12 @@ Supported sources:
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
@@ -33,6 +33,7 @@ logger = logging.getLogger("milimo.analytics.collectors")
 @dataclass
 class CollectorResult:
     """Result from a data collection run."""
+
     source: str
     success: bool
     records_collected: int
@@ -92,7 +93,11 @@ class YouTubeDataCollector:
             # Step 2: Collect stats for each video
             all_records = []
             for video in videos:
-                video_id = video["id"]["videoId"] if "videoId" in video.get("id", {}) else video.get("id", "")
+                video_id = (
+                    video["id"]["videoId"]
+                    if "videoId" in video.get("id", {})
+                    else video.get("id", "")
+                )
                 stats = self._get_video_stats(video_id)
                 if stats:
                     record = {
@@ -121,7 +126,11 @@ class YouTubeDataCollector:
         except Exception as e:
             logger.error("YouTube collection failed: %s", e)
             return CollectorResult(
-                source="youtube", success=False, records_collected=0, data=[], error=str(e)
+                source="youtube",
+                success=False,
+                records_collected=0,
+                data=[],
+                error=str(e),
             )
 
     def collect_channel_analytics(self) -> CollectorResult:
@@ -148,8 +157,11 @@ class YouTubeDataCollector:
             response = self._api_request(full_url)
             if not response or "items" not in response or not response["items"]:
                 return CollectorResult(
-                    source="youtube", success=False, records_collected=0,
-                    data=[], error="Channel not found",
+                    source="youtube",
+                    success=False,
+                    records_collected=0,
+                    data=[],
+                    error="Channel not found",
                 )
 
             channel_data = response["items"][0]
@@ -179,7 +191,11 @@ class YouTubeDataCollector:
         except Exception as e:
             logger.error("YouTube channel analytics failed: %s", e)
             return CollectorResult(
-                source="youtube", success=False, records_collected=0, data=[], error=str(e)
+                source="youtube",
+                success=False,
+                records_collected=0,
+                data=[],
+                error=str(e),
             )
 
     def _get_channel_videos(self, max_results: int) -> list[dict[str, Any]]:
@@ -234,14 +250,14 @@ class YouTubeDataCollector:
             except HTTPError as e:
                 if e.code == 429 and attempt < 2:
                     # Rate limited — wait and retry
-                    time.sleep(2 ** attempt)
+                    time.sleep(2**attempt)
                     continue
                 logger.error("YouTube API HTTP error %d: %s", e.code, e.reason)
                 return None
             except URLError as e:
                 logger.error("YouTube API URL error: %s", e.reason)
                 if attempt < 2:
-                    time.sleep(2 ** attempt)
+                    time.sleep(2**attempt)
                     continue
                 return None
             except Exception as e:
@@ -249,7 +265,9 @@ class YouTubeDataCollector:
                 return None
         return None
 
-    def _persist_records(self, records: list[dict], filename: str = "video_stats.jsonl") -> None:
+    def _persist_records(
+        self, records: list[dict], filename: str = "video_stats.jsonl"
+    ) -> None:
         """Persist collected records to disk."""
         filepath = self.data_dir / filename
         with open(filepath, "a") as f:
@@ -300,8 +318,12 @@ class GoogleAnalyticsCollector:
         data_dir: Path | None = None,
     ) -> None:
         self.property_id = property_id or os.environ.get("GA4_PROPERTY_ID", "")
-        self.credentials_path = credentials_path or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
-        self.data_dir = data_dir or Path.home() / ".milimo" / "analytics" / "google_analytics"
+        self.credentials_path = credentials_path or os.environ.get(
+            "GOOGLE_APPLICATION_CREDENTIALS", ""
+        )
+        self.data_dir = (
+            data_dir or Path.home() / ".milimo" / "analytics" / "google_analytics"
+        )
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self._access_token: str | None = None
         self._token_expiry: datetime | None = None
@@ -335,8 +357,14 @@ class GoogleAnalyticsCollector:
             payload = {
                 "dateRanges": [{"startDate": f"{days}daysAgo", "endDate": "today"}],
                 "dimensions": [{"name": "pagePath"}, {"name": "date"}],
-                "metrics": [{"name": "screenPageViews"}, {"name": "activeUsers"}, {"name": "averageSessionDuration"}],
-                "orderBys": [{"metric": {"metricName": "screenPageViews"}, "desc": True}],
+                "metrics": [
+                    {"name": "screenPageViews"},
+                    {"name": "activeUsers"},
+                    {"name": "averageSessionDuration"},
+                ],
+                "orderBys": [
+                    {"metric": {"metricName": "screenPageViews"}, "desc": True}
+                ],
                 "limit": 1000,
             }
 
@@ -344,7 +372,10 @@ class GoogleAnalyticsCollector:
             response = self._api_request(url, payload, token)
             if not response or "rows" not in response:
                 return CollectorResult(
-                    source="google_analytics", success=True, records_collected=0, data=[]
+                    source="google_analytics",
+                    success=True,
+                    records_collected=0,
+                    data=[],
                 )
 
             records = []
@@ -354,9 +385,15 @@ class GoogleAnalyticsCollector:
                 record = {
                     "page_path": dims[0].get("value", "") if len(dims) > 0 else "",
                     "date": dims[1].get("value", "") if len(dims) > 1 else "",
-                    "page_views": int(metrics[0].get("value", 0)) if len(metrics) > 0 else 0,
-                    "active_users": int(metrics[1].get("value", 0)) if len(metrics) > 1 else 0,
-                    "avg_session_duration": float(metrics[2].get("value", 0)) if len(metrics) > 2 else 0,
+                    "page_views": int(metrics[0].get("value", 0))
+                    if len(metrics) > 0
+                    else 0,
+                    "active_users": int(metrics[1].get("value", 0))
+                    if len(metrics) > 1
+                    else 0,
+                    "avg_session_duration": float(metrics[2].get("value", 0))
+                    if len(metrics) > 2
+                    else 0,
                     "collected_at": datetime.now(timezone.utc).isoformat(),
                 }
                 records.append(record)
@@ -415,7 +452,10 @@ class GoogleAnalyticsCollector:
             response = self._api_request(url, payload, token)
             if not response or "rows" not in response:
                 return CollectorResult(
-                    source="google_analytics", success=True, records_collected=0, data=[]
+                    source="google_analytics",
+                    success=True,
+                    records_collected=0,
+                    data=[],
                 )
 
             records = []
@@ -425,8 +465,12 @@ class GoogleAnalyticsCollector:
                 record = {
                     "event_name": dims[0].get("value", "") if len(dims) > 0 else "",
                     "date": dims[1].get("value", "") if len(dims) > 1 else "",
-                    "event_count": int(metrics[0].get("value", 0)) if len(metrics) > 0 else 0,
-                    "active_users": int(metrics[1].get("value", 0)) if len(metrics) > 1 else 0,
+                    "event_count": int(metrics[0].get("value", 0))
+                    if len(metrics) > 0
+                    else 0,
+                    "active_users": int(metrics[1].get("value", 0))
+                    if len(metrics) > 1
+                    else 0,
                     "collected_at": datetime.now(timezone.utc).isoformat(),
                 }
                 records.append(record)
@@ -453,7 +497,11 @@ class GoogleAnalyticsCollector:
 
     def _get_access_token(self) -> str | None:
         """Get OAuth2 access token from service account credentials."""
-        if self._access_token and self._token_expiry and datetime.now(timezone.utc) < self._token_expiry:
+        if (
+            self._access_token
+            and self._token_expiry
+            and datetime.now(timezone.utc) < self._token_expiry
+        ):
             return self._access_token
 
         try:
@@ -462,20 +510,24 @@ class GoogleAnalyticsCollector:
 
             client_email = credentials.get("client_email", "")
             private_key = credentials.get("private_key", "")
-            token_uri = credentials.get("token_uri", "https://oauth2.googleapis.com/token")
+            token_uri = credentials.get(
+                "token_uri", "https://oauth2.googleapis.com/token"
+            )
 
             if not client_email or not private_key:
                 logger.error("Invalid service account credentials")
                 return None
 
             # Build JWT assertion for service account auth
-            import hmac
             import base64
-            import hashlib
 
             # Header
             header = {"alg": "RS256", "typ": "JWT"}
-            header_b64 = base64.urlsafe_b64encode(json.dumps(header).encode()).rstrip(b"=").decode()
+            header_b64 = (
+                base64.urlsafe_b64encode(json.dumps(header).encode())
+                .rstrip(b"=")
+                .decode()
+            )
 
             # Payload (JWT claim set)
             now = int(time.time())
@@ -486,7 +538,11 @@ class GoogleAnalyticsCollector:
                 "exp": now + 3600,
                 "iat": now,
             }
-            payload_b64 = base64.urlsafe_b64encode(json.dumps(payload_data).encode()).rstrip(b"=").decode()
+            payload_b64 = (
+                base64.urlsafe_b64encode(json.dumps(payload_data).encode())
+                .rstrip(b"=")
+                .decode()
+            )
 
             # Sign (simplified — in production use cryptography library)
             signing_input = f"{header_b64}.{payload_b64}".encode()
@@ -520,8 +576,13 @@ class GoogleAnalyticsCollector:
         try:
             from cryptography.hazmat.primitives import hashes, serialization
             from cryptography.hazmat.primitives.asymmetric import padding
+            from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 
-            key = serialization.load_pem_private_key(private_key_pem.encode(), password=None)
+            key = serialization.load_pem_private_key(
+                private_key_pem.encode(), password=None
+            )
+            if not isinstance(key, RSAPrivateKey):
+                raise TypeError("Expected RSA private key")
             signature = key.sign(data, padding.PKCS1v15(), hashes.SHA256())
             return base64.urlsafe_b64encode(signature).rstrip(b"=").decode()
         except ImportError:
@@ -531,7 +592,9 @@ class GoogleAnalyticsCollector:
             logger.error("RSA signing failed: %s", e)
             return None
 
-    def _api_request(self, url: str, payload: dict, token: str) -> dict[str, Any] | None:
+    def _api_request(
+        self, url: str, payload: dict, token: str
+    ) -> dict[str, Any] | None:
         """Make GA4 API request."""
         try:
             body = json.dumps(payload).encode("utf-8")
@@ -547,20 +610,28 @@ class GoogleAnalyticsCollector:
             with urlopen(req, timeout=60) as response:
                 return json.loads(response.read().decode("utf-8"))
         except HTTPError as e:
-            logger.error("GA4 API HTTP error %d: %s", e.code, e.read().decode("utf-8", errors="replace"))
+            logger.error(
+                "GA4 API HTTP error %d: %s",
+                e.code,
+                e.read().decode("utf-8", errors="replace"),
+            )
             return None
         except Exception as e:
             logger.error("GA4 API request failed: %s", e)
             return None
 
-    def _persist_records(self, records: list[dict], filename: str = "data.jsonl") -> None:
+    def _persist_records(
+        self, records: list[dict], filename: str = "data.jsonl"
+    ) -> None:
         """Persist collected records to disk."""
         filepath = self.data_dir / filename
         with open(filepath, "a") as f:
             for record in records:
                 f.write(json.dumps(record) + "\n")
 
-    def get_collected_data(self, lookback_days: int = 30, metric: str = "page_views") -> list[dict[str, Any]]:
+    def get_collected_data(
+        self, lookback_days: int = 30, metric: str = "page_views"
+    ) -> list[dict[str, Any]]:
         """Read collected data from disk within lookback window."""
         cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
         records = []
@@ -612,7 +683,9 @@ class GenericAPICollector:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self._last_collection: datetime | None = None
 
-    def collect(self, endpoint: str, params: dict[str, Any] | None = None) -> CollectorResult:
+    def collect(
+        self, endpoint: str, params: dict[str, Any] | None = None
+    ) -> CollectorResult:
         """Collect data from a REST endpoint."""
         try:
             url = f"{self.base_url}/{endpoint.lstrip('/')}"
@@ -638,7 +711,11 @@ class GenericAPICollector:
         except Exception as e:
             logger.error("Generic API collection (%s) failed: %s", self.name, e)
             return CollectorResult(
-                source=self.name, success=False, records_collected=0, data=[], error=str(e)
+                source=self.name,
+                success=False,
+                records_collected=0,
+                data=[],
+                error=str(e),
             )
 
     def _persist_records(self, records: list[dict]) -> None:
@@ -650,7 +727,7 @@ class GenericAPICollector:
 
     def get_collected_data(self, lookback_days: int = 30) -> list[dict[str, Any]]:
         """Read collected data from disk within lookback window."""
-        cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+        datetime.now(timezone.utc) - timedelta(days=lookback_days)
         records = []
 
         for json_file in self.data_dir.glob("*.json"):

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """
 Build Claw scheduler.
 
@@ -93,22 +95,26 @@ class BuildScheduler:
             return
         try:
             self._error_monitor.run_error_check()
-            self._log.append(BuildLogEntry(
-                timestamp=datetime.now(timezone.utc).isoformat(),
-                action_type="error_monitoring_pass",
-                entity_id="monitoring",
-                outcome="success",
-                details={"interval_seconds": ERROR_MONITOR_INTERVAL},
-            ))
+            self._log.append(
+                BuildLogEntry(
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    action_type="error_monitoring_pass",
+                    entity_id="monitoring",
+                    outcome="success",
+                    details={"interval_seconds": ERROR_MONITOR_INTERVAL},
+                )
+            )
         except Exception as exc:
             logger.error("Error monitoring failed: %s", exc)
-            self._log.append(BuildLogEntry(
-                timestamp=datetime.now(timezone.utc).isoformat(),
-                action_type="error_monitoring_pass",
-                entity_id="monitoring",
-                outcome="error",
-                details={"error": str(exc)},
-            ))
+            self._log.append(
+                BuildLogEntry(
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    action_type="error_monitoring_pass",
+                    entity_id="monitoring",
+                    outcome="error",
+                    details={"error": str(exc)},
+                )
+            )
         finally:
             self._schedule_error_monitoring()
 
@@ -129,13 +135,15 @@ class BuildScheduler:
             return
         try:
             self._cost_monitor.run_daily_check()
-            self._log.append(BuildLogEntry(
-                timestamp=datetime.now(timezone.utc).isoformat(),
-                action_type="cost_monitoring_pass",
-                entity_id="costs",
-                outcome="success",
-                details={},
-            ))
+            self._log.append(
+                BuildLogEntry(
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    action_type="cost_monitoring_pass",
+                    entity_id="costs",
+                    outcome="success",
+                    details={},
+                )
+            )
         except Exception as exc:
             logger.error("Cost monitoring failed: %s", exc)
         finally:
@@ -162,13 +170,15 @@ class BuildScheduler:
             return
         try:
             self._dependency_auditor.run_full_audit()
-            self._log.append(BuildLogEntry(
-                timestamp=datetime.now(timezone.utc).isoformat(),
-                action_type="dependency_audit",
-                entity_id="dependencies",
-                outcome="success",
-                details={},
-            ))
+            self._log.append(
+                BuildLogEntry(
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    action_type="dependency_audit",
+                    entity_id="dependencies",
+                    outcome="success",
+                    details={},
+                )
+            )
         except Exception as exc:
             logger.error("Dependency audit failed: %s", exc)
         finally:
@@ -194,13 +204,15 @@ class BuildScheduler:
             return
         try:
             self._doc_maintainer.generate_weekly_devlog()
-            self._log.append(BuildLogEntry(
-                timestamp=datetime.now(timezone.utc).isoformat(),
-                action_type="devlog_generated",
-                entity_id="docs",
-                outcome="success",
-                details={},
-            ))
+            self._log.append(
+                BuildLogEntry(
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    action_type="devlog_generated",
+                    entity_id="docs",
+                    outcome="success",
+                    details={},
+                )
+            )
         except Exception as exc:
             logger.error("Devlog generation failed: %s", exc)
         finally:

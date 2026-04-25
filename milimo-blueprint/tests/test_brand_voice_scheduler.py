@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -9,9 +8,8 @@ Tests for Brand Voice Manager and Content Scheduler.
 import json
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 
 from orchestrator.content.content_init import (
     ContentFilesystemInit,
@@ -25,7 +23,6 @@ from orchestrator.content.brand_voice import (
 )
 from orchestrator.content.content_scheduler import (
     ContentScheduler,
-    MORNING_PLANNING_TIME,
 )
 from orchestrator.content.brief_manager import BriefManager
 
@@ -55,7 +52,10 @@ class TestVoiceProfile:
             client_id="client-2",
             profile_name="Brand Voice",
             tone_descriptors=["professional", "warm"],
-            vocabulary_preferences={"preferred": ["industry terms"], "avoid": ["jargon"]},
+            vocabulary_preferences={
+                "preferred": ["industry terms"],
+                "avoid": ["jargon"],
+            },
             sentence_length="short",
             example_approved_posts=["Post 1", "Post 2"],
         )
@@ -154,7 +154,7 @@ class TestBrandVoiceManager:
             manager.update_profile_from_approval("client-fifo", f"Post {i}")
 
         profile = manager.load_profile("client-fifo")
-
+        assert profile is not None
         assert len(profile.example_approved_posts) == MAX_APPROVED_EXAMPLES
 
     def test_update_profile_from_rejection_adds_post(self, tmp_path: Path):
@@ -181,7 +181,7 @@ class TestBrandVoiceManager:
             manager.update_profile_from_rejection("client-reject-fifo", f"Post {i}")
 
         profile = manager.load_profile("client-reject-fifo")
-
+        assert profile is not None
         assert len(profile.example_rejected_posts) == MAX_REJECTED_EXAMPLES
 
     def test_apply_voice_with_profile(self, tmp_path: Path):
@@ -193,7 +193,11 @@ class TestBrandVoiceManager:
         content = "This is the original content"
         rewritten = manager.apply_voice(content, "client-voice")
 
-        assert "professional" in rewritten.lower() or "warm" in rewritten.lower() or content in rewritten
+        assert (
+            "professional" in rewritten.lower()
+            or "warm" in rewritten.lower()
+            or content in rewritten
+        )
 
     def test_apply_voice_without_profile_returns_original(self, tmp_path: Path):
         """apply_voice returns original if no profile."""
@@ -276,7 +280,9 @@ class TestContentScheduler:
                 "project_id": "proj-1",
                 "client_id": "client-1",
                 "brief_text": "Test brief",
-                "deadline": (datetime.now(timezone.utc) + timedelta(days=1)).isoformat(),
+                "deadline": (
+                    datetime.now(timezone.utc) + timedelta(days=1)
+                ).isoformat(),
                 "tone_requirements": "pro",
                 "platform_targets": ["twitter"],
             }

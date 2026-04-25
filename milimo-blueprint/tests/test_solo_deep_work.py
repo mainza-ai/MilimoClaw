@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -7,8 +6,6 @@ Tests for solo_deep_work.py - Deep Work Mode
 """
 
 import json
-import tempfile
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +43,7 @@ VALID_CONFIG: dict[str, Any] = {
 
 
 # ---------------------------------------------------------------------------
+
 
 class TestActivateDeepWorkMode:
     """Tests for activate_deep_work_mode function."""
@@ -97,8 +95,7 @@ class TestActivateDeepWorkMode:
         )
 
         content_change = next(
-            (c for c in result["policy_changes"] if c["claw"] == "content"),
-            None
+            (c for c in result["policy_changes"] if c["claw"] == "content"), None
         )
 
         assert content_change is not None

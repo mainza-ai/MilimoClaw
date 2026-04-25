@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Build Claw — Sentry Client
 
@@ -17,7 +20,6 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
-import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -96,7 +98,7 @@ class SentryClient:
         method: str,
         endpoint: str,
         **kwargs,
-    ) -> dict[str, Any] | list[Any]:
+    ) -> Any:
         if httpx is None:
             raise RuntimeError("httpx not installed. Run: pip install httpx")
 
@@ -347,6 +349,9 @@ class SentryClient:
                 "SentryClient: org and project required for sourcemap upload"
             )
             return False
+
+        if httpx is None:
+            raise RuntimeError("httpx not installed")
 
         try:
             with open(sourcemap_path, "rb") as f:

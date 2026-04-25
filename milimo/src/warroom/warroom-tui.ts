@@ -19,7 +19,6 @@ import { EvolutionManager } from "./evolution.js";
 import { DigestScheduler, type DigestBrief } from "./digest.js";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
 
 interface ClawHealth {
   name: string;
@@ -376,14 +375,14 @@ Press H to close this help.
 
         if (msg.message_type === "tool_proposal") {
           const toolName = msg.payload?.tool_name ?? "unknown";
-          lines.push(`      Tool: ${toolName}`);
+          lines.push(` Tool: ${JSON.stringify(toolName)}`);
           if (msg.payload?.estimated_improvement) {
-            lines.push(`      Expected: +${msg.payload.estimated_improvement}% uplift`);
+            lines.push(` Expected: +${JSON.stringify(msg.payload.estimated_improvement)}% uplift`);
           }
         } else if (msg.message_type === "deliverable") {
-          lines.push(`      Type: ${msg.payload?.type ?? msg.message_type}`);
+          lines.push(` Type: ${JSON.stringify(msg.payload?.type ?? msg.message_type)}`);
           if (msg.payload?.amount) {
-            lines.push(`      Amount: $${msg.payload.amount}`);
+            lines.push(` Amount: $${JSON.stringify(msg.payload.amount)}`);
           }
         } else {
           lines.push(`      Type: ${msg.message_type}`);
@@ -636,7 +635,7 @@ Press H to close this help.
       } else {
         this.revenueData = null;
       }
-    } catch (error) {
+    } catch {
       this.revenueData = null;
     }
   }

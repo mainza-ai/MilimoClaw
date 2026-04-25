@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -6,11 +5,9 @@
 Unit tests for Analytics Scheduler.
 """
 
-from __future__ import annotations
-
 import shutil
 import tempfile
-import time
+from collections.abc import Iterator
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
@@ -25,7 +22,7 @@ from orchestrator.analytics.analytics_scheduler import AnalyticsScheduler
 
 
 @pytest.fixture
-def temp_sandbox() -> Path:
+def temp_sandbox() -> Iterator[Path]:
     sandbox = Path(tempfile.mkdtemp(prefix="scheduler_test_"))
     yield sandbox
     shutil.rmtree(sandbox, ignore_errors=True)
@@ -132,13 +129,17 @@ class TestAnalyticsScheduler:
         assert scheduler._running is True
         scheduler.stop()
 
-    def test_scheduler_logs_start(self, scheduler: AnalyticsScheduler, operational_log: AnalyticsOperationalLog):
+    def test_scheduler_logs_start(
+        self, scheduler: AnalyticsScheduler, operational_log: AnalyticsOperationalLog
+    ):
         scheduler.start()
         entries = operational_log.read_recent(days=1)
         assert any(e.action_type == "scheduler_started" for e in entries)
         scheduler.stop()
 
-    def test_scheduler_logs_stop(self, scheduler: AnalyticsScheduler, operational_log: AnalyticsOperationalLog):
+    def test_scheduler_logs_stop(
+        self, scheduler: AnalyticsScheduler, operational_log: AnalyticsOperationalLog
+    ):
         scheduler.start()
         scheduler.stop()
         entries = operational_log.read_recent(days=1)
@@ -170,7 +171,7 @@ class TestAnalyticsScheduler:
 
     def test_self_rescheduling_after_execution(self, scheduler: AnalyticsScheduler):
         scheduler.start()
-        initial_timers = dict(scheduler._timers)
+        dict(scheduler._timers)
         for name, timer in scheduler._timers.items():
             assert timer.is_alive() or True
         scheduler.stop()
@@ -184,7 +185,11 @@ class TestAnalyticsScheduler:
         mock_opportunity_scorer: dict[str, Any],
     ):
         log_path = fs.get_log_path("operational.log")
-        old_entry = '{"timestamp": "' + (datetime.now(timezone.utc) - timedelta(days=10)).isoformat() + '", "action_type": "baseline_recalculation", "entity_id": "test", "source_claw": null, "outcome": "success", "details": {}}\n'
+        old_entry = (
+            '{"timestamp": "'
+            + (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
+            + '", "action_type": "baseline_recalculation", "entity_id": "test", "source_claw": null, "outcome": "success", "details": {}}\n'
+        )
         log_path.write_text(old_entry)
 
         sched = AnalyticsScheduler(
@@ -215,7 +220,9 @@ class TestAnalyticsScheduler:
             call_count[0] += 1
 
         scheduler._running = True
-        scheduler._schedule_next("test_job", test_fn, target_hour=23, target_minute=59, target_weekday=None)
+        scheduler._schedule_next(
+            "test_job", test_fn, target_hour=23, target_minute=59, target_weekday=None
+        )
         assert "test_job" in scheduler._timers
         scheduler._timers["test_job"].cancel()
 
@@ -226,6 +233,8 @@ class TestAnalyticsScheduler:
             call_count[0] += 1
 
         scheduler._running = True
-        scheduler._schedule_next("weekly_job", test_fn, target_hour=1, target_minute=0, target_weekday=6)
+        scheduler._schedule_next(
+            "weekly_job", test_fn, target_hour=1, target_minute=0, target_weekday=6
+        )
         assert "weekly_job" in scheduler._timers
         scheduler._timers["weekly_job"].cancel()

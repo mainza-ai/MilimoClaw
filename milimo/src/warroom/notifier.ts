@@ -88,7 +88,11 @@ export class OperatorNotifier {
     }
   }
 
-  private notifyMacOS(title: string, message: string, _payload: NotificationPayload): NotificationResult {
+  private notifyMacOS(
+    title: string,
+    message: string,
+    _payload: NotificationPayload,
+  ): NotificationResult {
     const script = `display notification "${this.escapeAppleScript(message)}" with title "${this.escapeAppleScript(title)}"`;
 
     try {
@@ -111,7 +115,11 @@ export class OperatorNotifier {
     }
   }
 
-  private notifyLinux(title: string, message: string, _payload: NotificationPayload): NotificationResult {
+  private notifyLinux(
+    title: string,
+    message: string,
+    _payload: NotificationPayload,
+  ): NotificationResult {
     try {
       const result = spawnSync("notify-send", [title, message], {
         encoding: "utf-8",

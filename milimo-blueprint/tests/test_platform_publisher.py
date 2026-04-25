@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -9,7 +8,6 @@ Tests for Platform Publisher and Performance Monitor.
 import json
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -21,22 +19,15 @@ from orchestrator.content.content_generator import Draft
 from orchestrator.content.platform_publisher import (
     PlatformPublisher,
     PlatformCredentials,
-    PublishResult,
     NotApprovedError,
     PlatformNotSupportedError,
-    RetryExhaustedError,
-    TwitterPublisher,
-    LinkedInPublisher,
 )
 from orchestrator.content.performance_monitor import (
     PerformanceMonitor,
     EngagementData,
-    AnomalyResult,
 )
 from orchestrator.content.publish_scheduler import (
     PublishScheduler,
-    ScheduledItem,
-    MissedPublish,
 )
 
 
@@ -125,7 +116,9 @@ class TestPlatformPublisher:
             status="approved",
         )
 
-        credentials = PlatformCredentials(platform="unknown_platform", access_token="token")
+        credentials = PlatformCredentials(
+            platform="unknown_platform", access_token="token"
+        )
 
         with pytest.raises(PlatformNotSupportedError):
             publisher.publish(draft, credentials)
@@ -461,7 +454,9 @@ class TestPublishScheduler:
 
         published_dir = fs.BASE / "calendar" / "published"
         published_dir.mkdir(parents=True, exist_ok=True)
-        (published_dir / "draft-sched-done.json").write_text(json.dumps({"draft_id": "draft-sched-done"}))
+        (published_dir / "draft-sched-done.json").write_text(
+            json.dumps({"draft_id": "draft-sched-done"})
+        )
 
         missed = scheduler.recover_missed_publishes()
 

@@ -26,21 +26,6 @@ interface VerifyOptions {
   pluginConfig: MilimoConfig;
 }
 
-interface AttestationInfo {
-  version: string;
-  blueprintId: string;
-  blueprintVersion: string;
-  contentHash: string;
-  timestamp: string;
-  author: {
-    squadId: string;
-    publicKey: string;
-    keyId: string;
-  };
-  parentAttestation?: string;
-  signature: string;
-}
-
 interface VerificationResult {
   valid: boolean;
   attestationId: string;
@@ -68,16 +53,9 @@ interface ChainResult {
 
 // ---------------------------------------------------------------------------
 
-function callPythonVerify(
-  blueprintDir: string,
-  code: string
-): string {
+function callPythonVerify(blueprintDir: string, code: string): string {
   const safeCode = `import sys; sys.path.insert(0, ${JSON.stringify(blueprintDir)}); ${code}`;
-  const result = spawnSync(
-    "python3",
-    ["-c", safeCode],
-    { cwd: blueprintDir, encoding: "utf-8" }
-  );
+  const result = spawnSync("python3", ["-c", safeCode], { cwd: blueprintDir, encoding: "utf-8" });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(result.stderr);
   return result.stdout.trim();
@@ -85,7 +63,7 @@ function callPythonVerify(
 
 // ---------------------------------------------------------------------------
 
-export async function cliVerify(opts: VerifyOptions): Promise<void> {
+export function cliVerify(opts: VerifyOptions): Promise<void> {
   const { logger, pluginConfig } = opts;
   const state = loadMilimoState();
   const blueprintDir = pluginConfig.blueprintDir;
@@ -100,15 +78,15 @@ export async function cliVerify(opts: VerifyOptions): Promise<void> {
     logger.error("  ✗ No blueprint specified and no active squad.");
     logger.info("    Run with --blueprint <id> or activate a squad first.");
     logger.info("");
-    return;
+    return Promise.resolve();
   }
 
   const blueprintId = opts.blueprintId || (state ? `${state.squadName}-${state.clawRole}` : "");
   const version = opts.version || (state ? state.blueprintVersion : "latest");
 
   if (opts.chain) {
-    await verifyChain(opts, blueprintDir, blueprintId, logger);
-    return;
+    void verifyChain(opts, blueprintDir, blueprintId, logger);
+    return Promise.resolve();
   }
 
   logger.info(`  Blueprint: ${blueprintId}`);
@@ -134,13 +112,13 @@ else:
     verifier = ProvenanceVerifier(strict_mode=${opts.strict ? "True" : "False"})
     result = verifier.verify(attestation)
     result_dict = result.to_dict()
-    
+
     # Verify content if we have the blueprint
     content_result = verifier.verify_content(attestation, snapshot)
     result_dict['content_valid'] = content_result.valid
     result_dict['content_expected_hash'] = content_result.expected_hash[:16] + '...'
     result_dict['content_computed_hash'] = content_result.computed_hash[:16] + '...'
-    
+
     print(json.dumps(result_dict))
 `;
 
@@ -153,24 +131,24 @@ else:
 
     if (opts.json) {
       logger.info(JSON.stringify(verifyResult, null, 2));
-      return;
+      return Promise.resolve();
     }
 
     renderVerificationResult(verifyResult, logger);
-
   } catch (err) {
-    logger.error(`  ✗ Verification failed: ${(err as Error).message}`);
+    logger.error(` ✗ Verification failed: ${(err as Error).message}`);
     logger.info("");
   }
+  return Promise.resolve();
 }
 
 // ---------------------------------------------------------------------------
 
-async function verifyChain(
+function verifyChain(
   opts: VerifyOptions,
   blueprintDir: string,
   blueprintId: string,
-  logger: PluginLogger
+  logger: PluginLogger,
 ): Promise<void> {
   logger.info("  Validating provenance chain...");
   logger.info("");
@@ -209,15 +187,15 @@ else:
 
     if (opts.json) {
       logger.info(JSON.stringify(chainResult, null, 2));
-      return;
+      return Promise.resolve();
     }
 
     renderChainResult(chainResult, logger);
-
   } catch (err) {
-    logger.error(`  ✗ Chain validation failed: ${(err as Error).message}`);
+    logger.error(` ✗ Chain validation failed: ${(err as Error).message}`);
     logger.info("");
   }
+  return Promise.resolve();
 }
 
 // ---------------------------------------------------------------------------
@@ -228,7 +206,7 @@ function renderVerificationResult(
     content_expected_hash: string;
     content_computed_hash: string;
   },
-  logger: PluginLogger
+  logger: PluginLogger,
 ): void {
   const statusIcon = result.valid ? "✅" : "❌";
   const statusText = result.valid ? "VALID" : "INVALID";
@@ -272,10 +250,7 @@ function renderVerificationResult(
 
 // ---------------------------------------------------------------------------
 
-function renderChainResult(
-  result: ChainResult,
-  logger: PluginLogger
-): void {
+function renderChainResult(result: ChainResult, logger: PluginLogger): void {
   const statusIcon = result.valid ? "✅" : "❌";
   const statusText = result.valid ? "VALID" : "INVALID";
 
@@ -333,7 +308,7 @@ interface KeygenOptions {
   pluginConfig: MilimoConfig;
 }
 
-export async function cliProvenanceKeygen(opts: KeygenOptions): Promise<void> {
+export function cliProvenanceKeygen(opts: KeygenOptions): Promise<void> {
   const { logger } = opts;
 
   logger.info("");
@@ -353,7 +328,7 @@ export async function cliProvenanceKeygen(opts: KeygenOptions): Promise<void> {
       logger.error(`  ✗ Key file already exists: ${keyFile}`);
       logger.info("    Use --force to regenerate.");
       logger.info("");
-      return;
+      return Promise.resolve();
     }
 
     fs.mkdirSync(keyDir, { recursive: true });
@@ -373,17 +348,16 @@ print(json.dumps({
 }))
 `;
 
-	const safeCode = `import sys; sys.path.insert(0, ${JSON.stringify(opts.pluginConfig.blueprintDir)}); ${code}`;
-	const result = spawnSync(
-		"python3",
-		["-c", safeCode],
-		{ cwd: opts.pluginConfig.blueprintDir, encoding: "utf-8" }
-	);
-	if (result.error) throw result.error;
-	if (result.status !== 0) throw new Error(result.stderr);
-	const keygenResult = result.stdout.trim();
+    const safeCode = `import sys; sys.path.insert(0, ${JSON.stringify(opts.pluginConfig.blueprintDir)}); ${code}`;
+    const result = spawnSync("python3", ["-c", safeCode], {
+      cwd: opts.pluginConfig.blueprintDir,
+      encoding: "utf-8",
+    });
+    if (result.error) throw result.error;
+    if (result.status !== 0) throw new Error(result.stderr);
+    const keygenResult = result.stdout.trim();
 
-	const keyInfo = JSON.parse(keygenResult) as {
+    const keyInfo = JSON.parse(keygenResult) as {
       success: boolean;
       key_file: string;
       public_key: string;
@@ -396,9 +370,9 @@ print(json.dumps({
     logger.info("");
     logger.info("  Your blueprint attestations will now be signed with this key.");
     logger.info("");
-
   } catch (err) {
-    logger.error(`  ✗ Key generation failed: ${(err as Error).message}`);
+    logger.error(` ✗ Key generation failed: ${(err as Error).message}`);
     logger.info("");
   }
+  return Promise.resolve();
 }

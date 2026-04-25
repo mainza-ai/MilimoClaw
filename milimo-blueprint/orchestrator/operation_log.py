@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -257,7 +256,9 @@ class OperationLog:
                 common_edits[edit_field] = common_edits.get(edit_field, 0) + 1
 
             for metric_name, metric_value in action.metrics.items():
-                metric_sums[metric_name] = metric_sums.get(metric_name, 0.0) + metric_value
+                metric_sums[metric_name] = (
+                    metric_sums.get(metric_name, 0.0) + metric_value
+                )
                 metric_counts[metric_name] = metric_counts.get(metric_name, 0) + 1
 
         approved_count = by_outcome.get("approved", 0) + by_outcome.get("auto", 0)
@@ -270,9 +271,7 @@ class OperationLog:
             approval_rate=approved_count / total,
             edit_rate=edited_count / total,
             common_edits=common_edits,
-            metric_averages={
-                k: metric_sums[k] / metric_counts[k] for k in metric_sums
-            },
+            metric_averages={k: metric_sums[k] / metric_counts[k] for k in metric_sums},
         )
 
     # ── Housekeeping ──────────────────────────────────────────────────
@@ -281,7 +280,9 @@ class OperationLog:
         """Count total recorded actions."""
         if not self._operations_file.exists():
             return 0
-        return sum(1 for line in self._operations_file.read_text().strip().split("\n") if line)
+        return sum(
+            1 for line in self._operations_file.read_text().strip().split("\n") if line
+        )
 
     def clear(self) -> None:
         """Clear all log files (for testing)."""

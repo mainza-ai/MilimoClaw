@@ -1,0 +1,7 @@
+{
+  "include": ["orchestrator", "tests", "test_marketplace.py"],
+  "extraPaths": [".", "orchestrator"],
+  "pythonVersion": "3.11",
+  "reportMissingModuleSource": false,
+  "typeCheckingMode": "basic"
+}

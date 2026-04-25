@@ -94,10 +94,10 @@ class Output(TypedDict):
 def run(input_data: Input) -> Output:
     """
     Detect {{detection_target}} in the input data.
-    
+
     Args:
         input_data: Data to analyze for anomalies
-        
+
     Returns:
         Detection result with severity and remediation
     """

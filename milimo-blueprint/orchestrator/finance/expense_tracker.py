@@ -10,7 +10,7 @@ Logs expenses and classifies them for tax preparation.
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Protocol
 import uuid
 import json
 
@@ -339,11 +339,11 @@ Return only the category name."""
 
     def _update_category_summary(self, expense: ExpenseEntry) -> None:
         """Update category summary file."""
-        self._update_category_summary_by_category(
-            expense.tax_category, expense.amount
-        )
+        self._update_category_summary_by_category(expense.tax_category, expense.amount)
 
-    def _update_category_summary_by_category(self, category: str, amount: float) -> None:
+    def _update_category_summary_by_category(
+        self, category: str, amount: float
+    ) -> None:
         """Update a specific category summary."""
         category_path = self.fs_path / "expenses" / "categories" / f"{category}.json"
         category_path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,10 +1,12 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """Tests for Finance Invoice Manager - Two-Stage Approval."""
 
 import json
 import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -15,16 +17,23 @@ from finance.finance_init import (
     PaymentEventsLog,
 )
 from finance.signal_dispatcher import FinanceSignalDispatcher
-from finance.invoice_manager import InvoiceManager, Invoice
+from finance.invoice_manager import InvoiceManager
 
 
 class MockInferenceClient:
     """Mock inference client."""
 
     def complete(self, prompt: str, data_type: str, max_tokens: int = 800) -> str:
-        return json.dumps([
-            {"description": "Development work", "quantity": 1, "unit_price": 1500, "total": 1500}
-        ])
+        return json.dumps(
+            [
+                {
+                    "description": "Development work",
+                    "quantity": 1,
+                    "unit_price": 1500,
+                    "total": 1500,
+                }
+            ]
+        )
 
 
 class MockStripeClient:
@@ -34,9 +43,16 @@ class MockStripeClient:
         self.calls: list[dict] = []
 
     def create_invoice(
-        self, customer_id: str, amount: float, currency: str, description: str, due_date: str
+        self,
+        customer_id: str,
+        amount: float,
+        currency: str,
+        description: str,
+        due_date: str,
     ) -> dict:
-        self.calls.append({"method": "create", "customer_id": customer_id, "amount": amount})
+        self.calls.append(
+            {"method": "create", "customer_id": customer_id, "amount": amount}
+        )
         return {"id": "st_test_123"}
 
     def send_invoice(self, invoice_id: str) -> dict:
@@ -50,13 +66,23 @@ class MockMeshGateway:
     def __init__(self):
         self.sent_messages: list[dict] = []
 
-    def send(self, message_type: str, recipient_role: str, sender_role: str, payload: dict, message_id: str, timestamp: str) -> bool:
-        self.sent_messages.append({
-            "message_type": message_type,
-            "recipient_role": recipient_role,
-            "sender_role": sender_role,
-            "payload": payload,
-        })
+    def send(
+        self,
+        message_type: str,
+        recipient_role: str,
+        sender_role: str,
+        payload: dict,
+        message_id: str,
+        timestamp: str,
+    ) -> bool:
+        self.sent_messages.append(
+            {
+                "message_type": message_type,
+                "recipient_role": recipient_role,
+                "sender_role": sender_role,
+                "payload": payload,
+            }
+        )
         return True
 
 
@@ -105,7 +131,13 @@ class TestInvoiceManagerTwoStageApproval:
 
     @pytest.fixture
     def invoice_manager(
-        self, fs, inference_client, dispatcher, risk_scorer, operational_log, payment_events_log
+        self,
+        fs,
+        inference_client,
+        dispatcher,
+        risk_scorer,
+        operational_log,
+        payment_events_log,
     ):
         return InvoiceManager(
             fs=fs,
@@ -205,7 +237,9 @@ class TestInvoiceManagerTwoStageApproval:
         stripe_client = MockStripeClient()
 
         with pytest.raises(FileNotFoundError, match="not found in approved"):
-            invoice_manager.handle_stage2_hold_release(invoice.invoice_id, stripe_client)
+            invoice_manager.handle_stage2_hold_release(
+                invoice.invoice_id, stripe_client
+            )
 
     def test_stage1_block_archives_with_reason(self, invoice_manager, fs):
         """handle_stage1_block archives with reason."""
@@ -245,8 +279,9 @@ class TestInvoiceManagerTwoStageApproval:
             delivered_at="2026-03-21",
         )
 
-        from datetime import datetime
-        expected_due = (datetime.now(timezone.utc) + timedelta(days=14)).strftime("%Y-%m-%d")
+        expected_due = (datetime.now(timezone.utc) + timedelta(days=14)).strftime(
+            "%Y-%m-%d"
+        )
 
         assert invoice.due_date == expected_due
 

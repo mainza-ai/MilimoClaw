@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -127,7 +126,9 @@ def test_detect_filesystem_config_respects_claws_to_init():
     from orchestrator.solo_init import detect_filesystem_config
 
     # Request only 3 claws
-    fs_config = detect_filesystem_config("test-squad", claws_to_init=["content", "ops", "analytics"])
+    fs_config = detect_filesystem_config(
+        "test-squad", claws_to_init=["content", "ops", "analytics"]
+    )
 
     assert len(fs_config.claw_paths) == 3
     assert "content" in fs_config.claw_paths

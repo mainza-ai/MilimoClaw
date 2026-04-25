@@ -1,54 +1,56 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-/**
- * Jest tests for RealtimeBridge
- */
-
-import { EventEmitter } from "node:events";
-import { RealtimeBridge, type RealtimeEvent, type ActionQueuedEvent } from "../warroom/realtime-bridge";
+import { RealtimeBridge, type RealtimeEvent } from "../warroom/realtime-bridge";
 
 const mockWss = {
-  on: jest.fn(),
-  close: jest.fn(),
+  on: vi.fn(),
+  close: vi.fn(),
 };
 
 const mockServer = {
-  listen: jest.fn((port, cb) => cb?.()),
-  close: jest.fn(),
+  listen: vi.fn(),
+  close: vi.fn(),
 };
 
-jest.mock("node:http", () => ({
-  createServer: jest.fn(() => mockServer),
+vi.mock("node:http", () => ({
+  createServer: () => mockServer,
 }));
 
-jest.mock("ws", () => ({
-  WebSocketServer: jest.fn(() => mockWss),
+vi.mock("ws", () => ({
+  WebSocketServer: function () {
+    return mockWss;
+  },
   WebSocket: {
     OPEN: 1,
   },
 }));
 
-jest.mock("node:fs", () => ({
-  existsSync: jest.fn(() => false),
-  readdirSync: jest.fn(() => []),
-  readFileSync: jest.fn(),
-  watch: jest.fn(() => ({ close: jest.fn() })),
+vi.mock("node:fs", () => ({
+  existsSync: vi.fn(() => false),
+  readdirSync: vi.fn(() => []),
+  readFileSync: vi.fn(),
+  watch: vi.fn(() => ({ close: vi.fn() })),
 }));
 
-const mockedFs = jest.requireMock("node:fs");
+vi.mock("node:os", () => ({
+  homedir: vi.fn(() => "/home/test"),
+}));
 
 describe("RealtimeBridge", () => {
   const defaultOptions = {
-    port: 9876,
+    port: 0,
     squadId: "test-squad",
     blueprintDir: "/tmp/test",
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    mockWss.on.mockClear();
-    mockServer.listen.mockClear();
+    vi.restoreAllMocks();
+    mockWss.on.mockReset();
+    mockWss.close.mockReset();
+    mockServer.listen.mockReset();
+    mockServer.close.mockReset();
+    mockServer.listen.mockImplementation((_port: number, cb: () => void) => cb());
   });
 
   describe("constructor", () => {
@@ -81,7 +83,7 @@ describe("RealtimeBridge", () => {
 
       bridge.start();
 
-      expect(mockServer.listen).toHaveBeenCalledWith(9876, expect.any(Function));
+      expect(mockServer.listen).toHaveBeenCalledWith(0, expect.any(Function));
       expect(mockWss.on).toHaveBeenCalledWith("connection", expect.any(Function));
     });
 
@@ -127,38 +129,46 @@ describe("RealtimeBridge", () => {
   describe("event handlers", () => {
     it("registers action handler", () => {
       const bridge = new RealtimeBridge(defaultOptions);
-      const handler = jest.fn();
+      const handler = vi.fn();
 
       bridge.onAction(handler);
 
-      expect((bridge as unknown as { actionHandlers: unknown[] }).actionHandlers).toContain(handler);
+      expect((bridge as unknown as { actionHandlers: unknown[] }).actionHandlers).toContain(
+        handler,
+      );
     });
 
     it("registers status handler", () => {
       const bridge = new RealtimeBridge(defaultOptions);
-      const handler = jest.fn();
+      const handler = vi.fn();
 
       bridge.onHealthUpdate(handler);
 
-      expect((bridge as unknown as { statusHandlers: unknown[] }).statusHandlers).toContain(handler);
+      expect((bridge as unknown as { statusHandlers: unknown[] }).statusHandlers).toContain(
+        handler,
+      );
     });
 
     it("registers evolution handler", () => {
       const bridge = new RealtimeBridge(defaultOptions);
-      const handler = jest.fn();
+      const handler = vi.fn();
 
       bridge.onEvolutionEvent(handler);
 
-      expect((bridge as unknown as { evolutionHandlers: unknown[] }).evolutionHandlers).toContain(handler);
+      expect((bridge as unknown as { evolutionHandlers: unknown[] }).evolutionHandlers).toContain(
+        handler,
+      );
     });
 
     it("registers revenue handler", () => {
       const bridge = new RealtimeBridge(defaultOptions);
-      const handler = jest.fn();
+      const handler = vi.fn();
 
       bridge.onRevenueUpdate(handler);
 
-      expect((bridge as unknown as { revenueHandlers: unknown[] }).revenueHandlers).toContain(handler);
+      expect((bridge as unknown as { revenueHandlers: unknown[] }).revenueHandlers).toContain(
+        handler,
+      );
     });
   });
 
@@ -168,16 +178,20 @@ describe("RealtimeBridge", () => {
 
       const mockClient1 = {
         readyState: 1,
-        send: jest.fn(),
+        send: vi.fn(),
       };
 
       const mockClient2 = {
         readyState: 1,
-        send: jest.fn(),
+        send: vi.fn(),
       };
 
-      (bridge as unknown as { clients: Set<{ readyState: number; send: jest.Mock }> }).clients.add(mockClient1 as unknown as { readyState: number; send: jest.Mock });
-      (bridge as unknown as { clients: Set<{ readyState: number; send: jest.Mock }> }).clients.add(mockClient2 as unknown as { readyState: number; send: jest.Mock });
+      (bridge as unknown as { clients: Set<{ readyState: number; send: vi.Mock }> }).clients.add(
+        mockClient1 as unknown as { readyState: number; send: vi.Mock },
+      );
+      (bridge as unknown as { clients: Set<{ readyState: number; send: vi.Mock }> }).clients.add(
+        mockClient2 as unknown as { readyState: number; send: vi.Mock },
+      );
 
       const event: RealtimeEvent = {
         type: "action_queued",
@@ -203,16 +217,20 @@ describe("RealtimeBridge", () => {
 
       const mockClient1 = {
         readyState: 1,
-        send: jest.fn(),
+        send: vi.fn(),
       };
 
       const mockClient2 = {
         readyState: 0,
-        send: jest.fn(),
+        send: vi.fn(),
       };
 
-      (bridge as unknown as { clients: Set<{ readyState: number; send: jest.Mock }> }).clients.add(mockClient1 as unknown as { readyState: number; send: jest.Mock });
-      (bridge as unknown as { clients: Set<{ readyState: number; send: jest.Mock }> }).clients.add(mockClient2 as unknown as { readyState: number; send: jest.Mock });
+      (bridge as unknown as { clients: Set<{ readyState: number; send: vi.Mock }> }).clients.add(
+        mockClient1 as unknown as { readyState: number; send: vi.Mock },
+      );
+      (bridge as unknown as { clients: Set<{ readyState: number; send: vi.Mock }> }).clients.add(
+        mockClient2 as unknown as { readyState: number; send: vi.Mock },
+      );
 
       const event: RealtimeEvent = {
         type: "action_queued",

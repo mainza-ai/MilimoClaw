@@ -14,7 +14,9 @@ describe("Role selection conditional logic", () => {
         clawRole: "solo" as const,
         activeClaws: ["content", "ops", "analytics", "finance", "build"],
       };
-      expect(formatRoleDisplay(config as any)).toBe("Solo (content, ops, analytics, finance, build)");
+      expect(formatRoleDisplay(config as any)).toBe(
+        "Solo (content, ops, analytics, finance, build)",
+      );
     });
 
     it("returns role name unchanged for mesh mode", () => {
@@ -60,7 +62,7 @@ describe("Role selection conditional logic", () => {
 
   describe("ClawRole type", () => {
     it("includes 'solo' as a valid ClawRole", () => {
-      const role: "solo" = "solo";
+      const role = "solo" as const;
       expect(role).toBe("solo");
     });
 

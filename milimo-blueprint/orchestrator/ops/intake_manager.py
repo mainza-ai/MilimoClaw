@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -23,7 +22,6 @@ import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from .ops_init import OpsFilesystemInit, OpsOperationalLog, OpsLogEntry
@@ -43,7 +41,9 @@ class TriageScore:
     niche_fit: float
     combined_score: float
     routing: str  # "draft_welcome" | "flag_for_review" | "auto_low"
-    scored_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    scored_at: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -83,7 +83,9 @@ class ClientBrief:
     deliverables: list[str] = field(default_factory=list)
     clarity_score: float = 0.0
     gaps: list[str] = field(default_factory=list)
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_at: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -161,7 +163,9 @@ class IntakeManager:
         inquiry_file = inquiry_dir / "inquiry.json"
         self._fs.write_json_atomic(inquiry_file, raw_inquiry)
 
-        inquiry_text = raw_inquiry.get("message", "") or raw_inquiry.get("inquiry_text", "")
+        inquiry_text = raw_inquiry.get("message", "") or raw_inquiry.get(
+            "inquiry_text", ""
+        )
         triage_score = self.score_inquiry(inquiry_text, self._squad_niche)
         triage_score.inquiry_id = inquiry_id
 
@@ -169,9 +173,13 @@ class IntakeManager:
         self._fs.write_json_atomic(triage_file, triage_score.to_dict())
 
         if triage_score.combined_score >= self.WELCOME_DRAFT_THRESHOLD:
-            client_name = raw_inquiry.get("name") or raw_inquiry.get("client_name", "there")
+            client_name = raw_inquiry.get("name") or raw_inquiry.get(
+                "client_name", "there"
+            )
             welcome_draft = self.draft_welcome_message(inquiry_id, client_name)
-            questionnaire_draft = self.draft_intake_questionnaire(inquiry_id, inquiry_text)
+            questionnaire_draft = self.draft_intake_questionnaire(
+                inquiry_id, inquiry_text
+            )
 
             combined_content = f"WELCOME MESSAGE:\n{welcome_draft}\n\nINTAKE QUESTIONNAIRE:\n{questionnaire_draft}"
 
@@ -192,7 +200,7 @@ class IntakeManager:
             self._approval_handler.queue_review(
                 action_type="inquiry_review",
                 entity_id=inquiry_id,
-                content=f"Inquiry requires operator review before drafting response.",
+                content="Inquiry requires operator review before drafting response.",
                 context={
                     "triage_score": triage_score.combined_score,
                     "budget_signal": triage_score.budget_signal,
@@ -214,7 +222,10 @@ class IntakeManager:
                 action_type="inquiry_received",
                 entity_id=inquiry_id,
                 outcome="success",
-                details={"triage_score": triage_score.combined_score, "routing": triage_score.routing},
+                details={
+                    "triage_score": triage_score.combined_score,
+                    "routing": triage_score.routing,
+                },
             )
         )
 
@@ -307,7 +318,9 @@ Output only the personalized message, nothing else."""
             return response.strip()
         except Exception as e:
             logger.warning("Welcome message drafting failed: %s", e)
-            return template.replace("{{client_name}}", client_name or "there").replace("{{squad_name}}", "Milimo Claw")
+            return template.replace("{{client_name}}", client_name or "there").replace(
+                "{{squad_name}}", "Milimo Claw"
+            )
 
     def draft_intake_questionnaire(self, inquiry_id: str, inquiry_context: str) -> str:
         template = self._fs.get_template("intake-questionnaire.md")
@@ -342,7 +355,9 @@ Output only the questionnaire."""
         brief_quality = self._check_brief_quality(response_text)
 
         if brief_quality["gaps"]:
-            clarifying_question = self._draft_clarifying_question(inquiry_id, brief_quality["gaps"])
+            clarifying_question = self._draft_clarifying_question(
+                inquiry_id, brief_quality["gaps"]
+            )
             self._approval_handler.queue_review(
                 action_type="clarifying_question",
                 entity_id=inquiry_id,
@@ -360,15 +375,20 @@ Output only the questionnaire."""
             )
             return None
 
-        brief = self._create_brief_from_response(inquiry_id, response_text, brief_quality)
+        brief = self._create_brief_from_response(
+            inquiry_id, response_text, brief_quality
+        )
 
         response_file = prospect_dir / "client_response.json"
-        self._fs.write_json_atomic(response_file, {
-            "inquiry_id": inquiry_id,
-            "response_text": response_text,
-            "received_at": datetime.now(timezone.utc).isoformat(),
-            "brief_id": brief.brief_id,
-        })
+        self._fs.write_json_atomic(
+            response_file,
+            {
+                "inquiry_id": inquiry_id,
+                "response_text": response_text,
+                "received_at": datetime.now(timezone.utc).isoformat(),
+                "brief_id": brief.brief_id,
+            },
+        )
 
         self._dispatcher.send_pricing_query(
             project_id=brief.project_id,
@@ -384,7 +404,10 @@ Output only the questionnaire."""
                 action_type="brief_received",
                 entity_id=brief.brief_id,
                 outcome="success",
-                details={"project_id": brief.project_id, "clarity_score": brief.clarity_score},
+                details={
+                    "project_id": brief.project_id,
+                    "clarity_score": brief.clarity_score,
+                },
             )
         )
 
@@ -433,12 +456,12 @@ Respond in JSON format:
         }
 
     def _draft_clarifying_question(self, inquiry_id: str, gaps: list[str]) -> str:
-        template = self._fs.get_template("intake-questionnaire.md")
+        self._fs.get_template("intake-questionnaire.md")
 
         prompt = f"""Draft a clarifying question for a client based on gaps in their brief.
 
 GAPS TO ADDRESS:
-{chr(10).join(f'- {g}' for g in gaps)}
+{chr(10).join(f"- {g}" for g in gaps)}
 
 Create a friendly, professional message asking for clarification.
 Keep it concise (under 150 words)."""
@@ -542,7 +565,9 @@ Keep it concise (under 150 words)."""
 
         self._dispatcher.mark_pricing_confirmed(project_id)
 
-        proposal_draft = self._draft_proposal(project_id, floor_price, ceiling_price, scope_notes)
+        proposal_draft = self._draft_proposal(
+            project_id, floor_price, ceiling_price, scope_notes
+        )
 
         self._approval_handler.queue_review(
             action_type="proposal",
@@ -566,7 +591,11 @@ Keep it concise (under 150 words)."""
         )
 
     def _draft_proposal(
-        self, project_id: str, floor_price: float, ceiling_price: float, scope_notes: str
+        self,
+        project_id: str,
+        floor_price: float,
+        ceiling_price: float,
+        scope_notes: str,
     ) -> str:
         template = self._fs.get_template("proposal-template.md")
 
@@ -602,12 +631,15 @@ Keep it concise (under 150 words)."""
         self._fs.write_json_atomic(brief_file, brief.to_dict())
 
         status_file = project_dir / "status.json"
-        self._fs.write_json_atomic(status_file, {
-            "project_id": project_id,
-            "client_id": client_id,
-            "status": "active",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        })
+        self._fs.write_json_atomic(
+            status_file,
+            {
+                "project_id": project_id,
+                "client_id": client_id,
+                "status": "active",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
 
         self._operational_log.append(
             OpsLogEntry(
@@ -623,51 +655,61 @@ Keep it concise (under 150 words)."""
         self, client_id: str, new_message: dict[str, Any], window_minutes: int = 30
     ) -> bool:
         from datetime import timedelta
-        
+
         prospect_dir = self._fs._base / "prospects"
         if not prospect_dir.exists():
             return False
-        
+
         cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=window_minutes)
-        
+
         for inquiry_dir in prospect_dir.iterdir():
             if not inquiry_dir.is_dir():
                 continue
-            
+
             comms_dir = inquiry_dir / "comms"
             if not comms_dir.exists():
                 continue
-            
+
             for comms_file in comms_dir.glob("*.json"):
                 try:
                     data = json.loads(comms_file.read_text())
                     if data.get("client_id") != client_id:
                         continue
-                    
+
                     msg_time_str = data.get("timestamp", "")
                     if not msg_time_str:
                         continue
-                    
+
                     msg_time = datetime.fromisoformat(msg_time_str)
                     if msg_time >= cutoff_time:
-                        grouped_file = comms_dir / f"grouped_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
-                        self._fs.write_json_atomic(grouped_file, {
-                            "grouped": True,
-                            "original_message": data,
-                            "new_message": new_message,
-                            "grouped_at": datetime.now(timezone.utc).isoformat(),
-                        })
+                        grouped_file = (
+                            comms_dir
+                            / f"grouped_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
+                        )
+                        self._fs.write_json_atomic(
+                            grouped_file,
+                            {
+                                "grouped": True,
+                                "original_message": data,
+                                "new_message": new_message,
+                                "grouped_at": datetime.now(timezone.utc).isoformat(),
+                            },
+                        )
                         return True
                 except (json.JSONDecodeError, ValueError, OSError):
                     continue
-        
+
         return False
 
     def _check_inquiry_staleness(self) -> None:
         review_queue = self._approval_handler.get_review_queue()
 
         for action in review_queue:
-            if action.action_type not in ("welcome_message", "inquiry_review", "proposal"):
+            if action.action_type not in (
+                "welcome_message",
+                "inquiry_review",
+                "proposal",
+            ):
                 continue
 
             if not action.timestamp:
@@ -675,10 +717,14 @@ Keep it concise (under 150 words)."""
 
             try:
                 action_time = datetime.fromisoformat(action.timestamp)
-                hours_waiting = (datetime.now(timezone.utc) - action_time).total_seconds() / 3600
+                hours_waiting = (
+                    datetime.now(timezone.utc) - action_time
+                ).total_seconds() / 3600
 
                 if hours_waiting >= 24:
-                    self._approval_handler.add_urgency_flag(action.action_id, int(hours_waiting))
+                    self._approval_handler.add_urgency_flag(
+                        action.action_id, int(hours_waiting)
+                    )
             except ValueError:
                 continue
 

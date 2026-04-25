@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Build Claw documentation maintainer.
 
@@ -14,7 +17,6 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from .build_init import BuildFilesystemInit, BuildOperationalLog, BuildLogEntry
@@ -81,7 +83,9 @@ class DocMaintainer:
         else:
             entry_text = f"- {pr_title} (#{pr_number})"
 
-        entry = f"\n## {datetime.now(timezone.utc).strftime('%Y-%m-%d')}\n\n{entry_text}\n"
+        entry = (
+            f"\n## {datetime.now(timezone.utc).strftime('%Y-%m-%d')}\n\n{entry_text}\n"
+        )
 
         if changelog_path.exists():
             existing = changelog_path.read_text()
@@ -89,13 +93,15 @@ class DocMaintainer:
         else:
             changelog_path.write_text(f"# Changelog\n{entry}")
 
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="changelog_updated",
-            entity_id=f"pr-{pr_number}",
-            outcome="success",
-            details={"pr_title": pr_title, "pr_type": pr_type},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="changelog_updated",
+                entity_id=f"pr-{pr_number}",
+                outcome="success",
+                details={"pr_title": pr_title, "pr_type": pr_type},
+            )
+        )
 
         return f"CHANGELOG.md updated with PR #{pr_number}"
 
@@ -105,16 +111,16 @@ class DocMaintainer:
 
     def generate_weekly_devlog(self) -> str:
         """Generate a weekly development summary log."""
-        week_start = datetime.now(timezone.utc).strftime('%Y-%W')
+        week_start = datetime.now(timezone.utc).strftime("%Y-%W")
 
         # Collect recent activity
         recent_logs = self._log.read_recent(days=7)
-        merged_prs = [l for l in recent_logs if l.action_type == "pr_merged"]
-        deploys = [l for l in recent_logs if l.action_type == "deploy_completed"]
-        issues = [l for l in recent_logs if l.action_type == "issue_closed"]
+        merged_prs = [log for log in recent_logs if log.action_type == "pr_merged"]
+        deploys = [log for log in recent_logs if log.action_type == "deploy_completed"]
+        issues = [log for log in recent_logs if log.action_type == "issue_closed"]
 
         devlog = f"# Weekly Devlog — Week {week_start}\n\n"
-        devlog += f"## Summary\n"
+        devlog += "## Summary\n"
         devlog += f"- PRs merged: {len(merged_prs)}\n"
         devlog += f"- Deploys: {len(deploys)}\n"
         devlog += f"- Issues closed: {len(issues)}\n\n"
@@ -146,13 +152,15 @@ class DocMaintainer:
                 notable_changes=shipping["notable_changes"],
             )
 
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="devlog_generated",
-            entity_id=f"week-{week_start}",
-            outcome="success",
-            details={"pr_count": len(merged_prs), "deploy_count": len(deploys)},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="devlog_generated",
+                entity_id=f"week-{week_start}",
+                outcome="success",
+                details={"pr_count": len(merged_prs), "deploy_count": len(deploys)},
+            )
+        )
 
         return devlog
 
@@ -176,9 +184,9 @@ class DocMaintainer:
         drifted_docs = []
 
         for f in changed_files:
-            if f.endswith(('.py', '.ts', '.js')):
+            if f.endswith((".py", ".ts", ".js")):
                 # Check if corresponding docs exist
-                doc_path = self._fs.base_path / "docs" / f.replace('/', '_') + ".md"
+                doc_path = self._fs.base / "docs" / (f.replace("/", "_") + ".md")
                 if doc_path.exists():
                     # Simple heuristic: if code changed, docs might be stale
                     drifted_docs.append(f)
@@ -194,6 +202,5 @@ class DocMaintainer:
         if self._inference is None:
             return "# API Documentation\n\nAuto-generation unavailable."
 
-        prompt = f"Generate API documentation for the following code:\n\n```python\n{code_content}\n```"
         # Inference call would go here
         return "# API Documentation\n\nGenerated from source code."

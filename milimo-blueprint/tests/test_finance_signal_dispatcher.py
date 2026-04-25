@@ -1,7 +1,9 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """Tests for Finance Signal Dispatcher."""
 
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -29,14 +31,16 @@ class MockMeshGateway:
     ) -> bool:
         if self.should_fail:
             raise RuntimeError("Gateway error")
-        self.sent_messages.append({
-            "message_type": message_type,
-            "recipient_role": recipient_role,
-            "sender_role": sender_role,
-            "payload": payload,
-            "message_id": message_id,
-            "timestamp": timestamp,
-        })
+        self.sent_messages.append(
+            {
+                "message_type": message_type,
+                "recipient_role": recipient_role,
+                "sender_role": sender_role,
+                "payload": payload,
+                "message_id": message_id,
+                "timestamp": timestamp,
+            }
+        )
         return True
 
 
@@ -59,9 +63,7 @@ class TestFinanceSignalDispatcher:
     def dispatcher(self, gateway, operational_log):
         return FinanceSignalDispatcher(gateway, operational_log)
 
-    def test_send_pricing_response_sends_correct_message(
-        self, dispatcher, gateway
-    ):
+    def test_send_pricing_response_sends_correct_message(self, dispatcher, gateway):
         """Pricing response has correct message_type and recipient."""
         dispatcher.send_pricing_response(
             project_id="proj-123",
@@ -80,9 +82,7 @@ class TestFinanceSignalDispatcher:
         assert msg["payload"]["floor_price"] == 1000.0
         assert msg["payload"]["ceiling_price"] == 1500.0
 
-    def test_send_pricing_response_data_quality_estimated(
-        self, dispatcher, gateway
-    ):
+    def test_send_pricing_response_data_quality_estimated(self, dispatcher, gateway):
         """Pricing response includes data_quality field."""
         dispatcher.send_pricing_response(
             project_id="proj-123",
@@ -95,9 +95,7 @@ class TestFinanceSignalDispatcher:
         msg = gateway.sent_messages[0]
         assert msg["payload"]["data_quality"] == "estimated"
 
-    def test_send_invoice_ready_sends_correct_message(
-        self, dispatcher, gateway
-    ):
+    def test_send_invoice_ready_sends_correct_message(self, dispatcher, gateway):
         """Invoice ready has correct message_type and recipient."""
         dispatcher.send_invoice_ready(
             project_id="proj-123",
@@ -117,9 +115,7 @@ class TestFinanceSignalDispatcher:
         assert msg["payload"]["invoice_id"] == "inv-789"
         assert msg["payload"]["due_date"] == "2026-04-05"
 
-    def test_send_payment_overdue_sends_correct_message(
-        self, dispatcher, gateway
-    ):
+    def test_send_payment_overdue_sends_correct_message(self, dispatcher, gateway):
         """Payment overdue has correct message_type and recipient."""
         dispatcher.send_payment_overdue(
             client_id="client-456",

@@ -42,7 +42,7 @@ interface AuditEntry {
   details?: Record<string, unknown>;
 }
 
-export async function cliLogsSearch(options: LogsSearchOptions): Promise<void> {
+export function cliLogsSearch(options: LogsSearchOptions): Promise<void> {
   const { logger, query, from, to, clawRole, decision, limit = 100, json, squad } = options;
 
   const squadId = squad || process.env.MILIMO_SQUAD || "default";
@@ -51,7 +51,7 @@ export async function cliLogsSearch(options: LogsSearchOptions): Promise<void> {
 
   if (!existsSync(auditDir)) {
     logger.error(`No audit logs found for squad: ${squadId}`);
-    return;
+    return Promise.resolve();
   }
 
   const results: AuditEntry[] = [];
@@ -74,7 +74,17 @@ export async function cliLogsSearch(options: LogsSearchOptions): Promise<void> {
     for (const file of files) {
       if (results.length >= limit) break;
       const filePath = join(auditDir, file);
-      searchInFile(filePath, fromDate, toDate, query, clawRole, decision, limit, results, file.endsWith(".gz"));
+      searchInFile(
+        filePath,
+        fromDate,
+        toDate,
+        query,
+        clawRole,
+        decision,
+        limit,
+        results,
+        file.endsWith(".gz"),
+      );
     }
   } catch (error) {
     logger.error(`Failed to read rotated logs: ${(error as Error).message}`);
@@ -103,6 +113,7 @@ export async function cliLogsSearch(options: LogsSearchOptions): Promise<void> {
       }
     }
   }
+  return Promise.resolve();
 }
 
 function searchInFile(
@@ -161,7 +172,7 @@ function searchInFile(
   }
 }
 
-export async function cliLogsList(options: {
+export function cliLogsList(options: {
   squad?: string;
   logger: Logger;
   pluginConfig: { blueprintDir: string };
@@ -174,7 +185,7 @@ export async function cliLogsList(options: {
 
   if (!existsSync(auditDir)) {
     logger.error(`No audit logs found for squad: ${squadId}`);
-    return;
+    return Promise.resolve();
   }
 
   try {
@@ -185,7 +196,7 @@ export async function cliLogsList(options: {
 
     if (files.length === 0) {
       logger.info("No log files found.");
-      return;
+      return Promise.resolve();
     }
 
     logger.info(`Log files for squad ${squadId}:\n`);
@@ -199,4 +210,5 @@ export async function cliLogsList(options: {
   } catch (error) {
     logger.error(`Failed to list logs: ${(error as Error).message}`);
   }
+  return Promise.resolve();
 }

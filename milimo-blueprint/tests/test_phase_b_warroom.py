@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -10,11 +9,11 @@ and REVIEW/HOLD approval mechanics.
 
 These tests run after Phase A passes.
 """
-import json
+
 import tempfile
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -37,13 +36,13 @@ def _make_test_config() -> dict[str, Any]:
                     "social_post_draft": "AUTO",
                     "client_proposal_draft": "REVIEW",
                 },
-        "ops": {
-            "new_client_inquiry": "REVIEW",
-            "welcome_message": "AUTO",
-            "deadline_risk": "REVIEW",
-            "deadline_critical": "HOLD",
-            "scope_change": "HOLD",
-        },
+                "ops": {
+                    "new_client_inquiry": "REVIEW",
+                    "welcome_message": "AUTO",
+                    "deadline_risk": "REVIEW",
+                    "deadline_critical": "HOLD",
+                    "scope_change": "HOLD",
+                },
                 "finance": {
                     "invoice_generation": "REVIEW",
                     "invoice_send": "HOLD",
@@ -59,7 +58,6 @@ def _make_test_config() -> dict[str, Any]:
 
 
 class TestWarRoomInitialization:
-
     def test_b1_war_room_tui_renders_five_claw_health_panel(self):
         """
         War Room TUI initializes with health panel showing all 5 claws.
@@ -72,7 +70,7 @@ class TestWarRoomInitialization:
         with tempfile.TemporaryDirectory() as tmpdir:
             war_room = SoloWarRoom(config=config, log_dir=Path(tmpdir))
 
-            health_panel = war_room.get_stats()
+            war_room.get_stats()
             stats = war_room.get_stats()
 
             assert "hold_count" in stats
@@ -101,7 +99,6 @@ class TestWarRoomInitialization:
 
 
 class TestQueuePriorityOrdering:
-
     def test_b3_mock_review_action_appears_in_queue(self):
         """
         Injecting a mock REVIEW action produces a queued entry
@@ -146,23 +143,31 @@ class TestQueuePriorityOrdering:
         with tempfile.TemporaryDirectory() as tmpdir:
             war_room = SoloWarRoom(config=config, log_dir=Path(tmpdir))
 
-            review_action = war_room.queue_action(
+            war_room.queue_action(
                 claw="content",
                 action_type="client_proposal_draft",
-                payload={"entity_id": "draft_001", "summary": "REVIEW action inserted first"},
+                payload={
+                    "entity_id": "draft_001",
+                    "summary": "REVIEW action inserted first",
+                },
             )
 
-            hold_action = war_room.queue_action(
+            war_room.queue_action(
                 claw="finance",
                 action_type="invoice_send",
-                payload={"entity_id": "invoice_001", "summary": "HOLD action inserted second"},
+                payload={
+                    "entity_id": "invoice_001",
+                    "summary": "HOLD action inserted second",
+                },
             )
 
             queue = war_room.get_pending()
             modes = [a.priority for a in queue]
 
             hold_idx = next(i for i, p in enumerate(modes) if p == ActionPriority.HOLD)
-            review_idx = next(i for i, p in enumerate(modes) if p == ActionPriority.REVIEW)
+            review_idx = next(
+                i for i, p in enumerate(modes) if p == ActionPriority.REVIEW
+            )
 
             assert hold_idx < review_idx, (
                 "HOLD items must appear before REVIEW items in queue. "
@@ -171,7 +176,6 @@ class TestQueuePriorityOrdering:
 
 
 class TestApprovalMechanics:
-
     def test_b5_approve_review_executes_and_moves_to_processed(self):
         """
         Approving a REVIEW action:
@@ -198,7 +202,7 @@ class TestApprovalMechanics:
                 },
             )
 
-            execute_fn = MagicMock()
+            MagicMock()
             approved = war_room.approve(action.id)
 
             assert approved is not None
@@ -272,7 +276,7 @@ class TestApprovalMechanics:
                 },
             )
 
-            execute_fn = MagicMock()
+            MagicMock()
 
             approved = war_room.approve(hold_action.id)
 
@@ -302,7 +306,6 @@ class TestApprovalMechanics:
 
 
 class TestAutoExecution:
-
     def test_auto_priority_executes_immediately(self):
         """
         AUTO priority actions execute immediately upon queueing.
@@ -334,7 +337,6 @@ class TestAutoExecution:
 
 
 class TestBlockMechanics:
-
     def test_block_action_removes_from_queue(self):
         """
         Blocking an action:

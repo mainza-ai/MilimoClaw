@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -19,9 +18,8 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
-from typing import Any, Literal
+from datetime import datetime, timezone
+from typing import Any
 import time
 
 from .content_init import (
@@ -41,21 +39,25 @@ logger = logging.getLogger("milimo.platform_publisher")
 
 class PublishError(Exception):
     """Base exception for publishing errors."""
+
     pass
 
 
 class NotApprovedError(PublishError):
     """Draft is not approved for publishing."""
+
     pass
 
 
 class PlatformNotSupportedError(PublishError):
     """Platform not in supported list."""
+
     pass
 
 
 class RetryExhaustedError(PublishError):
     """All retry attempts exhausted."""
+
     pass
 
 
@@ -67,6 +69,7 @@ class RetryExhaustedError(PublishError):
 @dataclass
 class PlatformCredentials:
     """Credentials for a platform."""
+
     platform: str
     access_token: str
     access_token_secret: str | None = None
@@ -99,7 +102,9 @@ class EngagementData:
     click_through: int = 0
     saves: int = 0
     comments: int = 0
-    collected_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    collected_at: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -228,7 +233,9 @@ class InstagramPublisher:
             raise PublishError("Instagram requires a media_url for publishing")
 
         # Step 1: Create media container
-        create_url = f"https://graph.facebook.com/v18.0/{credentials.access_token}/media"
+        create_url = (
+            f"https://graph.facebook.com/v18.0/{credentials.access_token}/media"
+        )
         params = {
             "image_url": media_url,
             "caption": content,
@@ -403,7 +410,9 @@ class PlatformPublisher:
 
         schedule_id = f"sched_{draft.draft_id}"
 
-        scheduled_path = self._fs.BASE / "calendar" / "scheduled" / f"{schedule_id}.json"
+        scheduled_path = (
+            self._fs.BASE / "calendar" / "scheduled" / f"{schedule_id}.json"
+        )
         scheduled_path.parent.mkdir(parents=True, exist_ok=True)
 
         scheduled_data = {
@@ -419,19 +428,23 @@ class PlatformPublisher:
 
         scheduled_path.write_text(json.dumps(scheduled_data, indent=2))
 
-        self._log.append(LogEntry(
-            action_type="publish_scheduled",
-            entity_id=draft.draft_id,
-            outcome="success",
-            platform=draft.platform,
-            client_id=draft.client_id,
-            details={
-                "schedule_id": schedule_id,
-                "publish_time": publish_time,
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="publish_scheduled",
+                entity_id=draft.draft_id,
+                outcome="success",
+                platform=draft.platform,
+                client_id=draft.client_id,
+                details={
+                    "schedule_id": schedule_id,
+                    "publish_time": publish_time,
+                },
+            )
+        )
 
-        logger.info("Scheduled draft %s for publish at %s", draft.draft_id, publish_time)
+        logger.info(
+            "Scheduled draft %s for publish at %s", draft.draft_id, publish_time
+        )
 
         return schedule_id
 
@@ -489,29 +502,38 @@ class PlatformPublisher:
             published_path.write_text(json.dumps(draft.to_dict(), indent=2))
             approved_path.unlink()
 
-        publish_record_path = self._fs.BASE / "calendar" / "published" / f"{draft.draft_id}.json"
+        publish_record_path = (
+            self._fs.BASE / "calendar" / "published" / f"{draft.draft_id}.json"
+        )
         publish_record_path.parent.mkdir(parents=True, exist_ok=True)
-        publish_record_path.write_text(json.dumps({
-            "draft_id": draft.draft_id,
-            "post_id": result.post_id,
-            "url": result.url,
-            "platform": result.platform,
-            "client_id": draft.client_id,
-            "published_at": result.published_at,
-        }, indent=2))
+        publish_record_path.write_text(
+            json.dumps(
+                {
+                    "draft_id": draft.draft_id,
+                    "post_id": result.post_id,
+                    "url": result.url,
+                    "platform": result.platform,
+                    "client_id": draft.client_id,
+                    "published_at": result.published_at,
+                },
+                indent=2,
+            )
+        )
 
-        self._log.append(LogEntry(
-            action_type="content_published",
-            entity_id=draft.draft_id,
-            outcome="success",
-            platform=draft.platform,
-            client_id=draft.client_id,
-            details={
-                "post_id": result.post_id,
-                "url": result.url,
-                "retry_count": result.retry_count,
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="content_published",
+                entity_id=draft.draft_id,
+                outcome="success",
+                platform=draft.platform,
+                client_id=draft.client_id,
+                details={
+                    "post_id": result.post_id,
+                    "url": result.url,
+                    "retry_count": result.retry_count,
+                },
+            )
+        )
 
         logger.info(
             "Draft %s published to %s: %s",
@@ -529,17 +551,19 @@ class PlatformPublisher:
             result.error,
         )
 
-        self._log.append(LogEntry(
-            action_type="publish_failed",
-            entity_id=draft.draft_id,
-            outcome="failed",
-            platform=draft.platform,
-            client_id=draft.client_id,
-            details={
-                "error": result.error,
-                "retry_count": result.retry_count,
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="publish_failed",
+                entity_id=draft.draft_id,
+                outcome="failed",
+                platform=draft.platform,
+                client_id=draft.client_id,
+                details={
+                    "error": result.error,
+                    "retry_count": result.retry_count,
+                },
+            )
+        )
 
         if self._war_room:
             self._war_room.queue_action(

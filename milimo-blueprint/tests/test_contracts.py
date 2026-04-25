@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -12,8 +11,6 @@ Tests cover:
 - New Content Claw message types
 """
 
-import pytest
-
 from orchestrator.contracts import (
     ClawMessage,
     ContractValidator,
@@ -21,7 +18,6 @@ from orchestrator.contracts import (
     VALID_MESSAGE_TYPES,
     VALID_ROLES,
     VALID_RECIPIENTS,
-    ValidationResult,
 )
 
 
@@ -69,17 +65,22 @@ class TestPayloadSchemaValidation:
 
     def _create_validator(self) -> ContractValidator:
         """Create a minimal validator for testing."""
-        return ContractValidator.from_dict({
-            "message_matrix": {
-                "ops": {"content": ["brief", "revision_request"]},
-                "content": {
-                    "analytics": ["content_performance_query", "performance_signal"],
-                    "ops": ["brief_acknowledged"],
+        return ContractValidator.from_dict(
+            {
+                "message_matrix": {
+                    "ops": {"content": ["brief", "revision_request"]},
+                    "content": {
+                        "analytics": [
+                            "content_performance_query",
+                            "performance_signal",
+                        ],
+                        "ops": ["brief_acknowledged"],
+                    },
+                    "analytics": {"content": ["client_health_signal"]},
                 },
-                "analytics": {"content": ["client_health_signal"]},
-            },
-            "message_types": {},
-        })
+                "message_types": {},
+            }
+        )
 
     def test_valid_brief_message_passes_schema_validation(self):
         """Brief message with all required fields passes validation."""
@@ -172,10 +173,12 @@ class TestPayloadSchemaValidation:
 
     def test_message_type_without_schema_passes(self):
         """Message type without defined schema passes validation."""
-        validator = ContractValidator.from_dict({
-            "message_matrix": {"ops": {"content": ["response"]}},
-            "message_types": {},
-        })
+        validator = ContractValidator.from_dict(
+            {
+                "message_matrix": {"ops": {"content": ["response"]}},
+                "message_types": {},
+            }
+        )
         message = ClawMessage(
             sender_role="ops",
             recipient_role="content",
@@ -194,17 +197,22 @@ class TestContentClawMessageTypes:
 
     def _create_validator(self) -> ContractValidator:
         """Create a validator with Content Claw message routes."""
-        return ContractValidator.from_dict({
-            "message_matrix": {
-                "ops": {"content": ["brief", "revision_request"]},
-                "content": {
-                    "analytics": ["content_performance_query", "performance_signal"],
-                    "ops": ["brief_acknowledged"],
+        return ContractValidator.from_dict(
+            {
+                "message_matrix": {
+                    "ops": {"content": ["brief", "revision_request"]},
+                    "content": {
+                        "analytics": [
+                            "content_performance_query",
+                            "performance_signal",
+                        ],
+                        "ops": ["brief_acknowledged"],
+                    },
+                    "analytics": {"content": ["client_health_signal"]},
                 },
-                "analytics": {"content": ["client_health_signal"]},
-            },
-            "message_types": {},
-        })
+                "message_types": {},
+            }
+        )
 
     def test_content_performance_query_valid(self):
         """Valid content_performance_query message passes."""
@@ -325,10 +333,12 @@ class TestContractValidatorBasics:
 
     def test_invalid_sender_role_rejected(self):
         """Message from invalid sender role is rejected."""
-        validator = ContractValidator.from_dict({
-            "message_matrix": {},
-            "message_types": {},
-        })
+        validator = ContractValidator.from_dict(
+            {
+                "message_matrix": {},
+                "message_types": {},
+            }
+        )
         message = ClawMessage(
             sender_role="invalid_role",
             recipient_role="content",
@@ -344,10 +354,12 @@ class TestContractValidatorBasics:
 
     def test_invalid_recipient_role_rejected(self):
         """Message to invalid recipient role is rejected."""
-        validator = ContractValidator.from_dict({
-            "message_matrix": {},
-            "message_types": {},
-        })
+        validator = ContractValidator.from_dict(
+            {
+                "message_matrix": {},
+                "message_types": {},
+            }
+        )
         message = ClawMessage(
             sender_role="ops",
             recipient_role="invalid_role",
@@ -363,10 +375,12 @@ class TestContractValidatorBasics:
 
     def test_invalid_message_type_rejected(self):
         """Message with invalid type is rejected."""
-        validator = ContractValidator.from_dict({
-            "message_matrix": {"ops": {"content": ["brief"]}},
-            "message_types": {},
-        })
+        validator = ContractValidator.from_dict(
+            {
+                "message_matrix": {"ops": {"content": ["brief"]}},
+                "message_types": {},
+            }
+        )
         message = ClawMessage(
             sender_role="ops",
             recipient_role="content",
@@ -382,10 +396,12 @@ class TestContractValidatorBasics:
 
     def test_unauthorized_route_rejected(self):
         """Message not in matrix is rejected."""
-        validator = ContractValidator.from_dict({
-            "message_matrix": {"ops": {"analytics": ["brief"]}},
-            "message_types": {},
-        })
+        validator = ContractValidator.from_dict(
+            {
+                "message_matrix": {"ops": {"analytics": ["brief"]}},
+                "message_types": {},
+            }
+        )
         message = ClawMessage(
             sender_role="ops",
             recipient_role="content",

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -14,19 +13,14 @@ Tests cover:
 """
 
 import json
-import tempfile
 import threading
-from datetime import datetime, timezone
 from pathlib import Path
 
-import pytest
 
 from orchestrator.content.content_init import (
     ContentFilesystemInit,
     ContentOperationalLog,
-    InitResult,
     LogEntry,
-    ValidationResult,
     generate_draft_id,
     generate_brief_id,
     generate_post_id,
@@ -74,7 +68,9 @@ class TestContentFilesystemInit:
         result2 = fs.initialize()
         assert result2.success is True
         assert len(result2.created) == 0
-        assert len(result2.already_existed) == len(result1.created) + len(result1.already_existed)
+        assert len(result2.already_existed) == len(result1.created) + len(
+            result1.already_existed
+        )
 
     def test_validate_returns_valid_on_complete_structure(self, tmp_path: Path):
         """Validation passes when all paths exist."""
@@ -110,7 +106,7 @@ class TestContentFilesystemInit:
         fs = ContentFilesystemInit(base_path=tmp_path)
 
         for status in ["pending", "approved", "rejected", "published"]:
-            path = fs.get_draft_path(status, "draft-123")
+            path = fs.get_draft_path(status, "draft-123")  # type: ignore[arg-type]
             assert status in str(path)
 
     def test_get_brief_path_returns_correct_path(self, tmp_path: Path):
@@ -126,7 +122,7 @@ class TestContentFilesystemInit:
         fs = ContentFilesystemInit(base_path=tmp_path)
 
         for status in ["active", "completed"]:
-            path = fs.get_brief_path(status, "brief-123")
+            path = fs.get_brief_path(status, "brief-123")  # type: ignore[arg-type]
             assert status in str(path)
 
     def test_get_voice_profile_path(self, tmp_path: Path):
@@ -201,7 +197,7 @@ class TestContentOperationalLog:
             op_log.append(entry)
 
         content = log_path.read_text()
-        lines = [l for l in content.strip().split("\n") if l]
+        lines = [line for line in content.strip().split("\n") if line]
 
         assert len(lines) == 5
 
@@ -330,7 +326,7 @@ class TestContentOperationalLog:
             thread.join()
 
         # All entries should be written
-        total_entries = op_log.count_by_type(None, days=1)
+        op_log.count_by_type("", days=1)
         # Use read_recent without filter
         all_entries = op_log.read_recent(days=1)
         assert len(all_entries) == num_threads * entries_per_thread

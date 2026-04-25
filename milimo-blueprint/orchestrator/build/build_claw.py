@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Build Claw main entry point.
 
@@ -29,8 +32,6 @@ from .build_init import (
     BASE,
     BuildFilesystemInit,
     BuildOperationalLog,
-    INFERENCE_FALLBACK_CHAIN,
-    BUILD_CATEGORIES,
 )
 from .build_scheduler import BuildScheduler
 from .signal_dispatcher import BuildSignalDispatcher
@@ -363,7 +364,8 @@ class BuildClaw:
             Dict with pipeline started status
         """
         # Step 1: Log and start SLA timer
-        self._dispatcher.handle_feature_brief(message)
+        if self._dispatcher:
+            self._dispatcher.handle_feature_brief(message)
 
         # Step 2 & 3: Generate sprint plan and queue for approval
         # Run in background thread to not block message processing
@@ -390,7 +392,10 @@ class BuildClaw:
         try:
             # Step 2: Generate sprint plan (fetches issues, scores complexity, queues for approval)
             logger.info("Starting sprint planning pipeline")
-            plan = self._issue_manager.generate_sprint_plan()
+            if self._issue_manager:
+                plan = self._issue_manager.generate_sprint_plan()
+            else:
+                return
             logger.info(
                 "Sprint plan generated: %s with %d issues",
                 plan.plan_id,
@@ -419,7 +424,12 @@ class BuildClaw:
 
         while waited < max_wait_seconds:
             try:
-                plan_path = self._fs.base / "context" / "sprint" / "current-plan.json"
+                if self._fs:
+                    plan_path = (
+                        self._fs.base / "context" / "sprint" / "current-plan.json"
+                    )
+                else:
+                    break
                 if plan_path.exists():
                     import json
 
@@ -459,7 +469,7 @@ class BuildClaw:
         3. Queue for merge hold
         """
         issues = plan_data.get("issues", [])
-        plan_id = plan_data.get("plan_id", "unknown")
+        plan_data.get("plan_id", "unknown")
 
         for idx, issue in enumerate(issues):
             try:
@@ -484,25 +494,26 @@ class BuildClaw:
                 )
 
                 # Resolve the issue (code generation + testing)
-                result = self._code_gen.resolve_issue(score)
-                logger.info(
-                    "Issue #%d resolved: %s (tests: %d passing, %d failing, %d attempts)",
-                    issue_number,
-                    result.status,
-                    result.tests_passing,
-                    result.tests_failing,
-                    result.attempts,
-                )
-
-                if result.status == "ready_for_pr":
-                    # Create PR
-                    pr = self._pr_manager.open_pr(result)
+                if self._code_gen:
+                    result = self._code_gen.resolve_issue(score)
                     logger.info(
-                        "PR created for issue #%d: %s (review_action: %s)",
+                        "Issue #%d resolved: %s (tests: %d passing, %d failing, %d attempts)",
                         issue_number,
-                        pr.pr_id,
-                        pr.review_action_id,
+                        result.status,
+                        result.tests_passing,
+                        result.tests_failing,
+                        result.attempts,
                     )
+
+                    if result.status == "ready_for_pr":
+                        if self._pr_manager:
+                            pr = self._pr_manager.open_pr(result)
+                            logger.info(
+                                "PR created for issue #%d: %s (review_action: %s)",
+                                issue_number,
+                                pr.pr_id,
+                                pr.review_action_id,
+                            )
 
             except Exception as e:
                 logger.error(
@@ -517,11 +528,23 @@ class BuildClaw:
     ) -> Any:
         """Handle operator approval/block decision."""
         if decision == "approve":
-            return self._approval_handler.handle_approve(action_id)
+            return (
+                self._approval_handler.handle_approve(action_id)
+                if self._approval_handler
+                else None
+            )
         elif decision == "block":
-            return self._approval_handler.handle_block(action_id, reason)
+            return (
+                self._approval_handler.handle_block(action_id, reason)
+                if self._approval_handler
+                else None
+            )
         elif decision == "cancel":
-            return self._approval_handler.handle_hold_cancel(action_id)
+            return (
+                self._approval_handler.handle_hold_cancel(action_id)
+                if self._approval_handler
+                else None
+            )
         else:
             raise ValueError(f"Unknown decision: {decision}")
 

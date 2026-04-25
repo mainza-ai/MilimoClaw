@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import {
   writeFileSync,
   existsSync,
@@ -9,7 +12,7 @@ import {
   renameSync,
   unlinkSync,
 } from "fs";
-import { join, basename } from "path";
+import { join } from "path";
 import { homedir } from "os";
 import { gzipSync, gunzipSync } from "zlib";
 
@@ -211,7 +214,15 @@ export class AuditLogger {
         if (results.length >= limit) break;
 
         const filePath = join(this.auditDir, file);
-        this.searchInFile(filePath, fromDate, toDate, query, options, results, file.endsWith(".gz"));
+        this.searchInFile(
+          filePath,
+          fromDate,
+          toDate,
+          query,
+          options,
+          results,
+          file.endsWith(".gz"),
+        );
       }
     } catch {
       // Ignore errors reading directory
@@ -286,6 +297,9 @@ export class AuditLogger {
   }
 }
 
-export function createAuditLogger(squadId: string, config?: Partial<AuditRotationConfig>): AuditLogger {
+export function createAuditLogger(
+  squadId: string,
+  config?: Partial<AuditRotationConfig>,
+): AuditLogger {
   return new AuditLogger(squadId, config);
 }

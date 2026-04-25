@@ -26,12 +26,13 @@ if [[ -z "${NO_COLOR:-}" && -t 1 ]]; then
   C_CYAN=$'\033[1;36m'
   C_RESET=$'\033[0m'
 else
+  # shellcheck disable=SC2034
   C_GREEN='' C_BOLD='' C_DIM='' C_RED='' C_YELLOW='' C_CYAN='' C_RESET=''
 fi
 
-info()    { printf "${C_CYAN}[INFO]${C_RESET}  %s\n" "$*"; }
-warn()    { printf "${C_YELLOW}[WARN]${C_RESET}  %s\n" "$*"; }
-ok()      { printf "  ${C_GREEN}✓${C_RESET}  %s\n" "$*"; }
+info() { printf "${C_CYAN}[INFO]${C_RESET}  %s\n" "$*"; }
+warn() { printf "${C_YELLOW}[WARN]${C_RESET}  %s\n" "$*"; }
+ok() { printf "  ${C_GREEN}✓${C_RESET}  %s\n" "$*"; }
 log_step() { printf "\n${C_GREEN}${C_BOLD}>>> %s${C_RESET}\n" "$*"; }
 
 command_exists() { command -v "$1" &>/dev/null; }
@@ -65,7 +66,8 @@ while [ $# -gt 0 ]; do
       shift
       ;;
     --sandbox-name)
-      shift; SANDBOX_NAME="$1"
+      shift
+      SANDBOX_NAME="$1"
       shift
       ;;
     -h | --help)
@@ -148,7 +150,7 @@ remove_local_files() {
     rm -rf "${HOME}/.milimo"
     ok "Removed ~/.milimo"
   else
-    info "~/.milimo does not exist"
+    info "$HOME/.milimo does not exist"
   fi
 
   # Remove legacy install paths

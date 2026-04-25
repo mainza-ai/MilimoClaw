@@ -96,7 +96,7 @@ class FinanceClaw:
     def __init__(
         self,
         squad_id: str,
-        inference_client: InferenceClient,
+        inference_client: Any,
         stripe_client: StripeClient,
         gateway: MeshGateway,
         base_path: Path | None = None,
@@ -290,7 +290,7 @@ class FinanceClaw:
         payload = raw_message.get("payload", {})
 
         operational_log = self._components.get("operational_log")
-        dispatcher = self._components.get("dispatcher")
+        self._components.get("dispatcher")
 
         receipt_entry = FinanceLogEntry(
             timestamp=datetime.now(timezone.utc).isoformat(),

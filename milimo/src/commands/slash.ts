@@ -116,7 +116,7 @@ function slashStatus(api: OpenClawPluginApi): PluginCommandResult {
   return { text: lines.join("\n") };
 }
 
-function slashRole(api: OpenClawPluginApi): PluginCommandResult {
+function slashRole(_api: OpenClawPluginApi): PluginCommandResult {
   const state = loadMilimoState();
 
   if (!state) {
@@ -285,7 +285,7 @@ function slashFinals(): PluginCommandResult {
   }
 }
 
-function slashApprove(actionId: string | undefined, api: OpenClawPluginApi): PluginCommandResult {
+function slashApprove(actionId: string | undefined, _api: OpenClawPluginApi): PluginCommandResult {
   if (!actionId) {
     return { text: "**❌ Error:** Usage: `/milimo approve <action_id>`" };
   }
@@ -322,7 +322,7 @@ function slashApprove(actionId: string | undefined, api: OpenClawPluginApi): Plu
   }
 }
 
-function slashVeto(actionId: string | undefined, api: OpenClawPluginApi): PluginCommandResult {
+function slashVeto(actionId: string | undefined, _api: OpenClawPluginApi): PluginCommandResult {
   if (!actionId) {
     return { text: "**❌ Error:** Usage: `/milimo veto <action_id>`" };
   }
@@ -359,7 +359,7 @@ function slashVeto(actionId: string | undefined, api: OpenClawPluginApi): Plugin
   }
 }
 
-function slashHealth(api: OpenClawPluginApi): PluginCommandResult {
+function slashHealth(_api: OpenClawPluginApi): PluginCommandResult {
   const state = loadMilimoState();
   if (!state) {
     return { text: "**❌ Error:** Not initialized. Run `openclaw milimo init` first." };
@@ -386,14 +386,13 @@ function slashHealth(api: OpenClawPluginApi): PluginCommandResult {
       status = "⚠";
     }
 
-    const statusColor = status === "●" ? "active" : status === "⚠" ? "error" : "idle";
     lines.push(` ${status} **${claw.toUpperCase()}** — ${tools} tools`);
   }
 
   return { text: lines.join("\n") };
 }
 
-function slashEvolution(api: OpenClawPluginApi): PluginCommandResult {
+function slashEvolution(_api: OpenClawPluginApi): PluginCommandResult {
   const state = loadMilimoState();
   if (!state) {
     return { text: "**❌ Error:** Not initialized. Run `openclaw milimo init` first." };

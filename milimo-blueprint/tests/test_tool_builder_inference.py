@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -6,8 +5,6 @@
 Tests for tool_builder.py - Inference-Based Tool Generation
 """
 
-import json
-import tempfile
 from pathlib import Path
 from typing import Any
 

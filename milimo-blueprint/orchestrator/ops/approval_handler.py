@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -148,7 +147,9 @@ class OpsApprovalHandler:
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
         self._write_action(action, self._review_queue_dir)
-        logger.info("Queued REVIEW action %s: %s for %s", action_id, action_type, entity_id)
+        logger.info(
+            "Queued REVIEW action %s: %s for %s", action_id, action_type, entity_id
+        )
         return action_id
 
     def queue_hold(
@@ -169,7 +170,9 @@ class OpsApprovalHandler:
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
         self._write_action(action, self._hold_queue_dir)
-        logger.info("Queued HOLD action %s: %s for %s", action_id, action_type, entity_id)
+        logger.info(
+            "Queued HOLD action %s: %s for %s", action_id, action_type, entity_id
+        )
         return action_id
 
     def log_auto(
@@ -266,7 +269,9 @@ class OpsApprovalHandler:
         if action.action_type == "welcome_message":
             self._log_inquiry_declined(action.entity_id, reason)
 
-        logger.info("BLOCKED action %s: %s (reason: %s)", action_id, action.action_type, reason)
+        logger.info(
+            "BLOCKED action %s: %s (reason: %s)", action_id, action.action_type, reason
+        )
         return True
 
     def handle_hold_release(
@@ -309,8 +314,13 @@ class OpsApprovalHandler:
             action.urgency_flag = "No decision in 24h — client may disengage"
 
         action.hours_waiting = float(hours_waiting)
-        self._write_action(action, self._review_queue_dir if action.mode == "REVIEW" else self._hold_queue_dir)
-        logger.info("Added urgency flag to action %s: %s", action_id, action.urgency_flag)
+        self._write_action(
+            action,
+            self._review_queue_dir if action.mode == "REVIEW" else self._hold_queue_dir,
+        )
+        logger.info(
+            "Added urgency flag to action %s: %s", action_id, action.urgency_flag
+        )
         return True
 
     def log_decision(self, action: OpsApprovalAction) -> None:
@@ -322,7 +332,9 @@ class OpsApprovalHandler:
             "mode": action.mode,
             "outcome": action.outcome,
             "content_preview": action.content[:200] if action.content else "",
-            "original_content_preview": action.original_content[:200] if action.original_content else None,
+            "original_content_preview": action.original_content[:200]
+            if action.original_content
+            else None,
             "context": action.context,
         }
 
@@ -337,11 +349,15 @@ class OpsApprovalHandler:
     def _log_inquiry_declined(self, inquiry_id: str, reason: str | None) -> None:
         declined_file = self._fs_base / "prospects" / inquiry_id / "declined.json"
         declined_file.parent.mkdir(parents=True, exist_ok=True)
-        declined_file.write_text(json.dumps({
-            "inquiry_id": inquiry_id,
-            "declined_at": datetime.now(timezone.utc).isoformat(),
-            "reason": reason or "welcome_message_blocked",
-        }))
+        declined_file.write_text(
+            json.dumps(
+                {
+                    "inquiry_id": inquiry_id,
+                    "declined_at": datetime.now(timezone.utc).isoformat(),
+                    "reason": reason or "welcome_message_blocked",
+                }
+            )
+        )
 
     def get_review_queue(self) -> list[OpsApprovalAction]:
         actions: list[OpsApprovalAction] = []

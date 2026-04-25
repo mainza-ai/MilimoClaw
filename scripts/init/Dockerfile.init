@@ -7,14 +7,16 @@
 FROM python:3.11-slim
 
 # Install iproute2 for network namespace operations (needed by OpenShell)
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    iproute2 \
-    && rm -rf /var/lib/apt/lists/*
+iproute2 \
+&& rm -rf /var/lib/apt/lists/*
 
 # Copy the config generation script
 COPY scripts/generate_openclaw_config.py /generate_openclaw_config.py
 
 # Init container runs as root — this is intentional for file locking
+# hadolint ignore=DL3002
 USER root
 
 ENTRYPOINT ["python3", "/generate_openclaw_config.py"]

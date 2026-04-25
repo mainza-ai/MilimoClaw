@@ -1,7 +1,7 @@
 # OpenShell IPC Technical Documentation
 
-**Version:** 1.0  
-**Date:** March 18, 2026  
+**Version:** 1.0
+**Date:** March 18, 2026
 **Status:** Draft
 
 ---
@@ -242,27 +242,27 @@ class GatewayAdapter(ABC):
     def connect(self) -> bool:
         """Establish connection to gateway."""
         pass
-    
+
     @abstractmethod
     def send(self, message: ClawMessage) -> SendResult:
         """Send message through gateway."""
         pass
-    
+
     @abstractmethod
     def receive(self, limit: int = 10) -> list[ClawMessage]:
         """Poll for pending messages."""
         pass
-    
+
     @abstractmethod
     def subscribe(self, handler: Callable[[ClawMessage], None]) -> str:
         """Subscribe to real-time notifications."""
         pass
-    
+
     @abstractmethod
     def unsubscribe(self, subscription_id: str) -> bool:
         """Cancel subscription."""
         pass
-    
+
     @abstractmethod
     def close(self) -> None:
         """Close gateway connection."""
@@ -285,7 +285,7 @@ class UnixSocketGateway(GatewayAdapter):
     def __init__(self, config: GatewayConfig):
         self.config = config
         self.sock: Optional[socket.socket] = None
-    
+
     def connect(self) -> bool:
         sock_path = self.config.endpoint.replace("unix://", "")
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -295,7 +295,7 @@ class UnixSocketGateway(GatewayAdapter):
             return True
         except socket.error:
             return False
-    
+
     def send(self, message: ClawMessage) -> SendResult:
         payload = json.dumps({
             "method": "SEND",
@@ -324,7 +324,7 @@ class WebSocketGateway(GatewayAdapter):
         self.ws: Optional[websocket.WebSocketApp] = None
         self.message_queue: queue.Queue = queue.Queue()
         self.subscriptions: dict[str, Callable] = {}
-    
+
     def connect(self) -> bool:
         ws_url = self.config.endpoint.replace("tcp://", "ws://")
         self.ws = websocket.WebSocketApp(
@@ -338,7 +338,7 @@ class WebSocketGateway(GatewayAdapter):
         self.thread.daemon = True
         self.thread.start()
         return True
-    
+
     def _on_message(self, ws, message):
         data = json.loads(message)
         if "event" in data and data["event"] in self.subscriptions:
@@ -367,14 +367,14 @@ class FileBasedGateway(GatewayAdapter):
         self.outbox = self.base_dir / "outbox" / config.role
         self.inbox.mkdir(parents=True, exist_ok=True)
         self.outbox.mkdir(parents=True, exist_ok=True)
-    
+
     def send(self, message: ClawMessage) -> SendResult:
         target_inbox = self.base_dir / "inbox" / message.recipient_role
         target_inbox.mkdir(parents=True, exist_ok=True)
-        
+
         filename = f"{message.timestamp.replace(':', '-')}_{message.message_id}.json"
         (target_inbox / filename).write_text(json.dumps(message.to_dict(), indent=2))
-        
+
         return SendResult(success=True, message_id=message.message_id)
 ```
 
@@ -558,13 +558,13 @@ def test_gateway_send():
 def test_gateway_round_trip():
     gateway_a = UnixSocketGateway(config_a)
     gateway_b = UnixSocketGateway(config_b)
-    
+
     gateway_a.connect()
     gateway_b.connect()
-    
+
     message = ClawMessage(...)
     gateway_a.send(message)
-    
+
     received = gateway_b.receive(limit=1)
     assert len(received) == 1
     assert received[0].message_id == message.message_id

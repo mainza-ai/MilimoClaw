@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Build Claw code generator.
 
@@ -15,7 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -28,8 +31,11 @@ logger = logging.getLogger(__name__)
 
 # Secret files to exclude from context
 SECRET_FILES = {
-    ".env", ".env.local", ".env.production",
-    "secrets.json", "credentials.json",
+    ".env",
+    ".env.local",
+    ".env.production",
+    "secrets.json",
+    "credentials.json",
 }
 
 # Enhancement: Hash-anchored line tagging (from OmO)
@@ -118,8 +124,8 @@ class CodeGenerator:
         """Generate code implementation using inference."""
         prompt = f"""Implement the following issue:
 
-Title: {issue.get('title', '')}
-Description: {issue.get('body', '')}
+Title: {issue.get("title", "")}
+Description: {issue.get("body", "")}
 
 Context:
 {context}
@@ -132,16 +138,18 @@ Provide the implementation with file paths and content."""
             temperature=0.1,
         )
 
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="code_generated",
-            entity_id=str(issue.get("number", 0)),
-            outcome="success",
-            details={
-                "data_type": "source_code_generation",
-                "response_length": len(str(response)),
-            },
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="code_generated",
+                entity_id=str(issue.get("number", 0)),
+                outcome="success",
+                details={
+                    "data_type": "source_code_generation",
+                    "response_length": len(str(response)),
+                },
+            )
+        )
         return str(response)
 
     # ------------------------------------------------------------------
@@ -193,13 +201,15 @@ Provide the implementation with file paths and content."""
                 content=file_contents[fname],
             )
 
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="branch_created",
-            entity_id=branch_name,
-            outcome="success",
-            details={"files_changed": files_changed},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="branch_created",
+                entity_id=branch_name,
+                outcome="success",
+                details={"files_changed": files_changed},
+            )
+        )
         return files_changed
 
     # ------------------------------------------------------------------
@@ -213,7 +223,15 @@ Provide the implementation with file paths and content."""
         # Try running pytest in the repo directory
         try:
             result = subprocess.run(
-                ["python", "-m", "pytest", "--tb=short", "-q", "--json", "--json-file=/tmp/test_results.json"],
+                [
+                    "python",
+                    "-m",
+                    "pytest",
+                    "--tb=short",
+                    "-q",
+                    "--json",
+                    "--json-file=/tmp/test_results.json",
+                ],
                 cwd=str(self._repo_path),
                 capture_output=True,
                 text=True,
@@ -224,6 +242,7 @@ Provide the implementation with file paths and content."""
                 # Parse pytest-json output for counts
                 try:
                     import json
+
                     json_path = Path("/tmp/test_results.json")
                     if json_path.exists():
                         data = json.loads(json_path.read_text())
@@ -277,7 +296,7 @@ Provide the implementation with file paths and content."""
         """Analyze test failure and generate fix."""
         prompt = f"""The following test failed:
 
-Issue: {issue.get('title', '')}
+Issue: {issue.get("title", "")}
 Context: {context[:1000]}
 Failure: {failure_output[:500]}
 
@@ -301,6 +320,7 @@ Provide a fix."""
         context = self.read_codebase_context(issue)
         branch_name = self._create_branch_name(score.issue_number)
 
+        failing = 0
         for attempt in range(1, self._max_fix_attempts + 1):
             implementation = self.generate_implementation(issue, context)
             files_changed = self.write_to_branch(branch_name, implementation)

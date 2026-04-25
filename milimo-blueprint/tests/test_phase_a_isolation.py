@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -15,6 +14,7 @@ before proceeding to Phase B, C, D, E, or F tests.
 """
 
 import json
+from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
@@ -160,7 +160,7 @@ def test_a1_build_sandbox_exists(ensure_sandbox_dirs):
 
 
 @pytest.fixture(scope="module")
-def written_report() -> Path:
+def written_report() -> Generator[Path, None, None]:
     """
     Write a valid weekly-intelligence.json to the Analytics reports dir.
     Used by A3-A6 read tests.

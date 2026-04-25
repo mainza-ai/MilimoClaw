@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -74,7 +73,13 @@ SIGNAL_SCHEMAS: dict[str, SignalSchema] = {
     "performance_signal": SignalSchema(
         message_type="performance_signal",
         allowed_senders=["content"],
-        required_payload_fields=["post_id", "platform", "engagement_data", "publish_time", "content_type"],
+        required_payload_fields=[
+            "post_id",
+            "platform",
+            "engagement_data",
+            "publish_time",
+            "content_type",
+        ],
         optional_payload_fields=["client_id"],
     ),
     "client_health_signal": SignalSchema(
@@ -86,7 +91,12 @@ SIGNAL_SCHEMAS: dict[str, SignalSchema] = {
     "client_onboarded": SignalSchema(
         message_type="client_onboarded",
         allowed_senders=["ops"],
-        required_payload_fields=["client_id", "niche", "project_type", "estimated_value"],
+        required_payload_fields=[
+            "client_id",
+            "niche",
+            "project_type",
+            "estimated_value",
+        ],
         optional_payload_fields=["onboarded_at"],
     ),
     "revenue_summary": SignalSchema(
@@ -99,7 +109,11 @@ SIGNAL_SCHEMAS: dict[str, SignalSchema] = {
         message_type="shipping_summary",
         allowed_senders=["build"],
         required_payload_fields=["prs_merged", "deploys"],
-        optional_payload_fields=["issues_closed", "velocity_delta", "avg_pr_cycle_hours"],
+        optional_payload_fields=[
+            "issues_closed",
+            "velocity_delta",
+            "avg_pr_cycle_hours",
+        ],
     ),
     "content_performance_query": SignalSchema(
         message_type="content_performance_query",
@@ -148,7 +162,9 @@ class SignalProcessor:
 
         schema = SIGNAL_SCHEMAS.get(message_type)
         if not schema:
-            raise SignalValidationError(f"Unknown message_type: {message_type}", "message_type")
+            raise SignalValidationError(
+                f"Unknown message_type: {message_type}", "message_type"
+            )
 
         sender = raw_message.get("sender_role")
         if sender not in schema.allowed_senders:
@@ -166,7 +182,9 @@ class SignalProcessor:
                 )
 
         signal_id = raw_message.get("message_id") or str(uuid.uuid4())[:12]
-        received_at = raw_message.get("timestamp") or datetime.now(timezone.utc).isoformat()
+        received_at = (
+            raw_message.get("timestamp") or datetime.now(timezone.utc).isoformat()
+        )
 
         signal = InboundSignal(
             signal_id=signal_id,
@@ -197,7 +215,11 @@ class SignalProcessor:
                 entity_id=signal_id,
                 source_claw=sender,
                 outcome="success",
-                details={"stored_path": str(signal.stored_path) if signal.stored_path else None},
+                details={
+                    "stored_path": str(signal.stored_path)
+                    if signal.stored_path
+                    else None
+                },
             )
         )
 
@@ -210,18 +232,26 @@ class SignalProcessor:
                 signal_id=str(uuid.uuid4()),
                 message_type="performance_signal",
                 source_claw=signal.get("sender_role", "unknown"),
-                received_at=signal.get("timestamp", datetime.now(timezone.utc).isoformat()),
+                received_at=signal.get(
+                    "timestamp", datetime.now(timezone.utc).isoformat()
+                ),
                 payload=signal.get("payload", signal),
             )
         platform = signal.payload.get("platform", "unknown")
         publish_time = signal.payload.get("publish_time", "")
-        
+
         try:
-            month_str = publish_time[:7] if publish_time else datetime.now(timezone.utc).strftime("%Y-%m")
+            month_str = (
+                publish_time[:7]
+                if publish_time
+                else datetime.now(timezone.utc).strftime("%Y-%m")
+            )
         except Exception:
             month_str = datetime.now(timezone.utc).strftime("%Y-%m")
 
-        path = self.fs.get_data_path("content-performance", f"{platform}/{month_str}/performance.jsonl")
+        path = self.fs.get_data_path(
+            "content-performance", f"{platform}/{month_str}/performance.jsonl"
+        )
         path.parent.mkdir(parents=True, exist_ok=True)
 
         record = {
@@ -239,20 +269,26 @@ class SignalProcessor:
             path,
         )
 
-    def handle_client_health_signal(self, signal: InboundSignal | dict[str, Any]) -> None:
+    def handle_client_health_signal(
+        self, signal: InboundSignal | dict[str, Any]
+    ) -> None:
         """Handle client_health_signal from Ops Claw. Dispatches alert if score < 6.0."""
         if isinstance(signal, dict):
             signal = InboundSignal(
                 signal_id=str(uuid.uuid4()),
                 message_type="client_health_signal",
                 source_claw=signal.get("sender_role", "unknown"),
-                received_at=signal.get("timestamp", datetime.now(timezone.utc).isoformat()),
+                received_at=signal.get(
+                    "timestamp", datetime.now(timezone.utc).isoformat()
+                ),
                 payload=signal.get("payload", signal),
             )
         client_id = signal.payload.get("client_id", "unknown")
         health_score = signal.payload.get("health_score", 0)
 
-        path = self.fs.get_data_path("client-health", f"{client_id}/health-history.jsonl")
+        path = self.fs.get_data_path(
+            "client-health", f"{client_id}/health-history.jsonl"
+        )
         path.parent.mkdir(parents=True, exist_ok=True)
 
         record = {
@@ -294,12 +330,16 @@ class SignalProcessor:
                 signal_id=str(uuid.uuid4()),
                 message_type="client_onboarded",
                 source_claw=signal.get("sender_role", "unknown"),
-                received_at=signal.get("timestamp", datetime.now(timezone.utc).isoformat()),
+                received_at=signal.get(
+                    "timestamp", datetime.now(timezone.utc).isoformat()
+                ),
                 payload=signal.get("payload", signal),
             )
         client_id = signal.payload.get("client_id", "unknown")
 
-        path = self.fs.get_data_path("client-health", f"{client_id}/health-history.jsonl")
+        path = self.fs.get_data_path(
+            "client-health", f"{client_id}/health-history.jsonl"
+        )
         path.parent.mkdir(parents=True, exist_ok=True)
 
         record = {
@@ -323,7 +363,9 @@ class SignalProcessor:
                 signal_id=str(uuid.uuid4()),
                 message_type="revenue_summary",
                 source_claw=signal.get("sender_role", "unknown"),
-                received_at=signal.get("timestamp", datetime.now(timezone.utc).isoformat()),
+                received_at=signal.get(
+                    "timestamp", datetime.now(timezone.utc).isoformat()
+                ),
                 payload=signal.get("payload", signal),
             )
         path = self.fs.get_data_path("revenue", "weekly-revenue.jsonl")
@@ -349,7 +391,9 @@ class SignalProcessor:
                 signal_id=str(uuid.uuid4()),
                 message_type="shipping_summary",
                 source_claw=signal.get("sender_role", "unknown"),
-                received_at=signal.get("timestamp", datetime.now(timezone.utc).isoformat()),
+                received_at=signal.get(
+                    "timestamp", datetime.now(timezone.utc).isoformat()
+                ),
                 payload=signal.get("payload", signal),
             )
         path = self.fs.get_data_path("delivery-velocity", "velocity.jsonl")
@@ -380,7 +424,9 @@ class SignalProcessor:
 
     def _get_jsonl_path(
         self,
-        data_type: Literal["content-performance", "client-health", "revenue", "delivery-velocity"],
+        data_type: Literal[
+            "content-performance", "client-health", "revenue", "delivery-velocity"
+        ],
         sub_keys: list[str],
     ) -> Path:
         """Build correct path for JSONL storage."""

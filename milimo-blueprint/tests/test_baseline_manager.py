@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -6,11 +5,10 @@
 Unit tests for Baseline Manager.
 """
 
-from __future__ import annotations
-
 import json
 import shutil
 import tempfile
+from collections.abc import Iterator
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -18,18 +16,15 @@ import pytest
 
 from orchestrator.analytics.analytics_init import (
     AnalyticsFilesystemInit,
-    AnalyticsOperationalLog,
 )
 from orchestrator.analytics.baseline_manager import (
     BaselineManager,
     ContentBaseline,
-    RevenueBaseline,
-    DeliveryBaseline,
 )
 
 
 @pytest.fixture
-def temp_sandbox() -> Path:
+def temp_sandbox() -> Iterator[Path]:
     """Create a temporary sandbox directory for testing."""
     sandbox = Path(tempfile.mkdtemp(prefix="baseline_test_"))
     yield sandbox
@@ -50,7 +45,9 @@ def baseline_manager(fs: AnalyticsFilesystemInit) -> BaselineManager:
     return BaselineManager(fs)
 
 
-def create_mock_performance_data(fs: AnalyticsFilesystemInit, num_records: int = 10) -> None:
+def create_mock_performance_data(
+    fs: AnalyticsFilesystemInit, num_records: int = 10
+) -> None:
     """Create mock performance data for testing."""
     platform_dir = fs.get_data_path("content-performance", "linkedin/2024-01")
     platform_dir.mkdir(parents=True, exist_ok=True)
@@ -69,14 +66,18 @@ def create_mock_performance_data(fs: AnalyticsFilesystemInit, num_records: int =
                 "engagement_rate": 0.05 + (i * 0.01),
                 "impressions": 1000 + (i * 100),
             },
-            "publish_time": (datetime.now(timezone.utc) - timedelta(days=i)).isoformat(),
+            "publish_time": (
+                datetime.now(timezone.utc) - timedelta(days=i)
+            ).isoformat(),
         }
         records.append(json.dumps(record))
 
     perf_file.write_text("\n".join(records) + "\n")
 
 
-def create_mock_revenue_data(fs: AnalyticsFilesystemInit, num_records: int = 10) -> None:
+def create_mock_revenue_data(
+    fs: AnalyticsFilesystemInit, num_records: int = 10
+) -> None:
     """Create mock revenue data for testing."""
     revenue_path = fs.get_data_path("revenue", "weekly-revenue.jsonl")
     revenue_path.parent.mkdir(parents=True, exist_ok=True)
@@ -85,7 +86,9 @@ def create_mock_revenue_data(fs: AnalyticsFilesystemInit, num_records: int = 10)
     for i in range(num_records):
         record = {
             "signal_id": f"revenue-{i}",
-            "received_at": (datetime.now(timezone.utc) - timedelta(days=i * 7)).isoformat(),
+            "received_at": (
+                datetime.now(timezone.utc) - timedelta(days=i * 7)
+            ).isoformat(),
             "week_total": 1000 + (i * 100),
             "invoices_paid": i,
             "invoices_pending": max(0, 3 - i),
@@ -95,7 +98,9 @@ def create_mock_revenue_data(fs: AnalyticsFilesystemInit, num_records: int = 10)
     revenue_path.write_text("\n".join(records) + "\n")
 
 
-def create_mock_delivery_data(fs: AnalyticsFilesystemInit, num_records: int = 10) -> None:
+def create_mock_delivery_data(
+    fs: AnalyticsFilesystemInit, num_records: int = 10
+) -> None:
     """Create mock delivery data for testing."""
     delivery_path = fs.get_data_path("delivery-velocity", "velocity.jsonl")
     delivery_path.parent.mkdir(parents=True, exist_ok=True)
@@ -202,12 +207,16 @@ class TestBaselineManager:
             days_ago = i
             record = {
                 "signal_id": f"signal-{i}",
-                "received_at": (datetime.now(timezone.utc) - timedelta(days=days_ago)).isoformat(),
+                "received_at": (
+                    datetime.now(timezone.utc) - timedelta(days=days_ago)
+                ).isoformat(),
                 "post_id": f"post-{i}",
                 "platform": "linkedin",
                 "content_type": "article",
                 "engagement_data": {"engagement_rate": 0.05 + (i * 0.001)},
-                "publish_time": (datetime.now(timezone.utc) - timedelta(days=days_ago)).isoformat(),
+                "publish_time": (
+                    datetime.now(timezone.utc) - timedelta(days=days_ago)
+                ).isoformat(),
             }
             records.append(json.dumps(record))
 

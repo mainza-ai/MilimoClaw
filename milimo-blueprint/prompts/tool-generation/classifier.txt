@@ -78,10 +78,10 @@ class Output(TypedDict):
 def run(input_data: Input) -> Output:
     """
     Classify the input into one of: {{target_classes}}
-    
+
     Args:
         input_data: Input data matching the schema
-        
+
     Returns:
         Classification result with confidence score
     """

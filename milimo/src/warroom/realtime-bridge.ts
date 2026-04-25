@@ -13,7 +13,7 @@
  */
 
 import { createServer, type Server as HttpServer } from "node:http";
-import { WebSocketServer, WebSocket, type RawData } from "ws";
+import { WebSocketServer, WebSocket } from "ws";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { existsSync, readdirSync, readFileSync, watch, type FSWatcher } from "node:fs";

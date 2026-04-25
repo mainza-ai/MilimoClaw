@@ -90,10 +90,10 @@ class Output(TypedDict):
 def run(input_data: Input) -> Output:
     """
     Generate {{content_type}} variants based on input.
-    
+
     Args:
         input_data: Context and parameters for generation
-        
+
     Returns:
         Generated variants with quality scores
     """

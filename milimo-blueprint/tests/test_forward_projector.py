@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -6,11 +5,10 @@
 Unit tests for Forward Projector.
 """
 
-from __future__ import annotations
-
 import json
 import shutil
 import tempfile
+from collections.abc import Iterator
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -24,7 +22,7 @@ from orchestrator.analytics.forward_projector import (
 
 
 @pytest.fixture
-def temp_sandbox() -> Path:
+def temp_sandbox() -> Iterator[Path]:
     sandbox = Path(tempfile.mkdtemp(prefix="projection_test_"))
     yield sandbox
     shutil.rmtree(sandbox, ignore_errors=True)
@@ -49,7 +47,9 @@ def create_revenue_data(fs: AnalyticsFilesystemInit, weeks: int) -> None:
     for i in range(weeks):
         record = {
             "signal_id": f"rev-{i}",
-            "received_at": (datetime.now(timezone.utc) - timedelta(weeks=i)).isoformat(),
+            "received_at": (
+                datetime.now(timezone.utc) - timedelta(weeks=i)
+            ).isoformat(),
             "week_total": 1000 + i * 100,
             "invoices_paid": i + 1,
         }
@@ -68,7 +68,9 @@ def create_content_data(fs: AnalyticsFilesystemInit, days: int) -> None:
             "received_at": (datetime.now(timezone.utc) - timedelta(days=i)).isoformat(),
             "content_type": "article",
             "engagement_data": {"engagement_rate": 0.05 + (i % 5) * 0.01},
-            "publish_time": (datetime.now(timezone.utc) - timedelta(days=i)).isoformat(),
+            "publish_time": (
+                datetime.now(timezone.utc) - timedelta(days=i)
+            ).isoformat(),
         }
         records.append(json.dumps(record))
     perf_file.write_text("\n".join(records) + "\n")
@@ -81,7 +83,9 @@ def create_delivery_data(fs: AnalyticsFilesystemInit, weeks: int) -> None:
     for i in range(weeks):
         record = {
             "signal_id": f"del-{i}",
-            "received_at": (datetime.now(timezone.utc) - timedelta(weeks=i)).isoformat(),
+            "received_at": (
+                datetime.now(timezone.utc) - timedelta(weeks=i)
+            ).isoformat(),
             "prs_merged": 5 + i,
             "deploys": 2 + (i // 2),
             "avg_pr_cycle_hours": 4.0 + i * 0.5,
@@ -115,7 +119,9 @@ class TestForwardProjector:
         projections = forward_projector.project_all()
         assert isinstance(projections, dict)
 
-    def test_project_revenue_returns_projection(self, forward_projector: ForwardProjector):
+    def test_project_revenue_returns_projection(
+        self, forward_projector: ForwardProjector
+    ):
         proj = forward_projector.project_revenue()
         assert proj is not None
         assert proj.metric == "revenue.week_total"
@@ -126,6 +132,7 @@ class TestForwardProjector:
     ):
         create_revenue_data(fs, weeks=5)
         proj = forward_projector.project_revenue()
+        assert proj is not None
         assert proj.confidence_level <= 0.5
 
     def test_projection_with_16_plus_weeks_returns_high_confidence(
@@ -133,6 +140,7 @@ class TestForwardProjector:
     ):
         create_revenue_data(fs, weeks=18)
         proj = forward_projector.project_revenue()
+        assert proj is not None
         assert proj.confidence_level >= 0.75
 
     def test_confidence_interval_wider_for_low_confidence(
@@ -144,29 +152,41 @@ class TestForwardProjector:
         high_width = ci_high[1] - ci_high[0]
         assert low_width > high_width
 
-    def test_calculate_confidence_level_0_3_weeks(self, forward_projector: ForwardProjector):
+    def test_calculate_confidence_level_0_3_weeks(
+        self, forward_projector: ForwardProjector
+    ):
         assert forward_projector._calculate_confidence_level(0) == 0.2
         assert forward_projector._calculate_confidence_level(3) == 0.2
 
-    def test_calculate_confidence_level_4_7_weeks(self, forward_projector: ForwardProjector):
+    def test_calculate_confidence_level_4_7_weeks(
+        self, forward_projector: ForwardProjector
+    ):
         assert forward_projector._calculate_confidence_level(4) == 0.5
         assert forward_projector._calculate_confidence_level(7) == 0.5
 
-    def test_calculate_confidence_level_8_15_weeks(self, forward_projector: ForwardProjector):
+    def test_calculate_confidence_level_8_15_weeks(
+        self, forward_projector: ForwardProjector
+    ):
         assert forward_projector._calculate_confidence_level(8) == 0.75
         assert forward_projector._calculate_confidence_level(15) == 0.75
 
-    def test_calculate_confidence_level_16_plus_weeks(self, forward_projector: ForwardProjector):
+    def test_calculate_confidence_level_16_plus_weeks(
+        self, forward_projector: ForwardProjector
+    ):
         assert forward_projector._calculate_confidence_level(16) == 0.90
         assert forward_projector._calculate_confidence_level(30) == 0.90
 
-    def test_project_content_engagement(self, fs: AnalyticsFilesystemInit, forward_projector: ForwardProjector):
+    def test_project_content_engagement(
+        self, fs: AnalyticsFilesystemInit, forward_projector: ForwardProjector
+    ):
         create_content_data(fs, days=14)
         proj = forward_projector.project_content_engagement("linkedin")
         assert proj is not None
         assert "content" in proj.metric
 
-    def test_project_delivery_velocity(self, fs: AnalyticsFilesystemInit, forward_projector: ForwardProjector):
+    def test_project_delivery_velocity(
+        self, fs: AnalyticsFilesystemInit, forward_projector: ForwardProjector
+    ):
         create_delivery_data(fs, weeks=10)
         proj = forward_projector.project_delivery_velocity()
         assert proj is not None
@@ -181,12 +201,15 @@ class TestForwardProjector:
         for i in range(12):
             record = {
                 "signal_id": f"rev-{i}",
-                "received_at": (datetime.now(timezone.utc) - timedelta(weeks=i)).isoformat(),
+                "received_at": (
+                    datetime.now(timezone.utc) - timedelta(weeks=i)
+                ).isoformat(),
                 "week_total": 2000 - i * 100,
             }
             records.append(json.dumps(record))
         revenue_path.write_text("\n".join(records) + "\n")
         proj = forward_projector.project_revenue()
+        assert proj is not None
         assert len(proj.risk_flags) >= 0
 
     def test_empty_projection_when_no_data(self, forward_projector: ForwardProjector):
@@ -207,7 +230,9 @@ class TestForwardProjector:
     def test_projection_weeks_is_always_4(self, forward_projector: ForwardProjector):
         assert forward_projector.PROJECTION_WEEKS == 4
 
-    def test_min_weeks_for_reliable_projection_is_8(self, forward_projector: ForwardProjector):
+    def test_min_weeks_for_reliable_projection_is_8(
+        self, forward_projector: ForwardProjector
+    ):
         assert forward_projector.MIN_WEEKS_FOR_RELIABLE_PROJECTION == 8
 
     def test_projection_from_mock_data(
@@ -215,5 +240,6 @@ class TestForwardProjector:
     ):
         create_revenue_data(fs, weeks=10)
         proj = forward_projector.project_revenue()
+        assert proj is not None
         assert proj.point_estimate > 0
         assert proj.confidence_interval_low < proj.confidence_interval_high

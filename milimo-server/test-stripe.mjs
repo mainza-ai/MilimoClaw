@@ -53,7 +53,7 @@ async function runTests() {
   try {
     const products = await stripe.products.list({ limit: 10 });
     console.log(`  ✅ Found ${products.data.length} products`);
-    
+
     for (const product of products.data) {
       const price = product.default_price;
       let priceStr = 'no price';
@@ -162,7 +162,7 @@ async function runTests() {
     try {
       const priceId = testProduct.default_price;
       const platformFee = Math.round(2500 * 0.10); // 10% fee
-      
+
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: [{
@@ -227,10 +227,10 @@ async function runTests() {
   console.log('┌─────────────────────────────────────────────────────┐');
   console.log('│                    Test Summary                     │');
   console.log('└─────────────────────────────────────────────────────┘');
-  
+
   const passed = results.filter(r => r.passed).length;
   const failed = results.filter(r => !r.passed).length;
-  
+
   console.log('');
   console.log(`Total: ${results.length} tests`);
   console.log(`✅ Passed: ${passed}`);

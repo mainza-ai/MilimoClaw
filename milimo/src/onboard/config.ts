@@ -9,15 +9,7 @@
  * Provides migration from legacy dual-file system.
  */
 
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-  unlinkSync,
-  readdirSync,
-  rmSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { ClawRole } from "../index.js";
 import { encryptConfig, decryptConfig } from "../lib/config-encryption.js";
@@ -106,18 +98,6 @@ function ensureConfigDir(): void {
   if (!existsSync(CONFIG_DIR)) {
     mkdirSync(CONFIG_DIR, { recursive: true });
   }
-}
-
-function validateConfig(data: unknown): data is MilimoConfig {
-  if (typeof data !== "object" || data === null) return false;
-  const cfg = data as Record<string, unknown>;
-  return (
-    typeof cfg["squadName"] === "string" &&
-    typeof cfg["clawRole"] === "string" &&
-    typeof cfg["template"] === "string" &&
-    typeof cfg["solo"] === "boolean" &&
-    Array.isArray(cfg["meshMembers"])
-  );
 }
 
 function loadLegacyState(): LegacyState | null {

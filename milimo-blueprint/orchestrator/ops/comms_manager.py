@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -18,14 +17,19 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .ops_init import OpsFilesystemInit, OpsOperationalLog, OpsLogEntry, OpsCommsLog, CommsLogEntry
+from .ops_init import (
+    OpsFilesystemInit,
+    OpsOperationalLog,
+    OpsLogEntry,
+    OpsCommsLog,
+    CommsLogEntry,
+)
 from .signal_dispatcher import OpsSignalDispatcher
 from .approval_handler import OpsApprovalHandler
 from .scope_monitor import ScopeMonitor
@@ -43,7 +47,9 @@ class ClientMessage:
     direction: str  # "inbound" | "outbound"
     channel: str
     content: str
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
     approved_action_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -161,7 +167,15 @@ class CommsManager:
         )
 
     def _detect_pricing_question(self, message_text: str) -> bool:
-        pricing_keywords = ["price", "cost", "budget", "how much", "rate", "charge", "fee"]
+        pricing_keywords = [
+            "price",
+            "cost",
+            "budget",
+            "how much",
+            "rate",
+            "charge",
+            "fee",
+        ]
 
         prompt = f"""Determine if this message is asking about pricing or cost.
 
@@ -192,8 +206,8 @@ Respond in JSON format:
         self, client_id: str, project_id: str | None, message_text: str
     ) -> None:
         holding_response = (
-            f"Hi, thanks for asking about pricing! "
-            f"Let me put together a proposal with exact figures and get back to you shortly."
+            "Hi, thanks for asking about pricing! "
+            "Let me put together a proposal with exact figures and get back to you shortly."
         )
 
         self._approval_handler.queue_review(
@@ -256,7 +270,7 @@ Output only the response message."""
             return response.strip()
         except Exception as e:
             logger.warning("Response drafting failed: %s", e)
-            return f"Thank you for your message. I'll review this and get back to you shortly."
+            return "Thank you for your message. I'll review this and get back to you shortly."
 
     def send_auto_response(self, client_id: str, message_text: str) -> None:
         self._comms_log.append(

@@ -203,7 +203,7 @@ export class RateLimiter extends EventEmitter {
   tryConsume(): RateLimitResult {
     this.refillIfNeeded();
 
-    const now = new Date();
+    new Date();
 
     // Pro tier has unlimited
     if (this.config.tier === Tier.PRO) {
@@ -351,7 +351,8 @@ export class RateLimiter extends EventEmitter {
     const nextBurstReset = this.getBurstReset(lastBurstRefillDate);
 
     if (now >= nextBurstReset) {
-      this.state.burstTokens = this.config.burstLimit === Infinity ? Infinity : this.config.burstLimit;
+      this.state.burstTokens =
+        this.config.burstLimit === Infinity ? Infinity : this.config.burstLimit;
       this.state.lastBurstRefill = now.toISOString();
       this.emit("refill", { type: "burst", tokens: this.state.burstTokens });
     }
@@ -411,8 +412,8 @@ export class RateLimiter extends EventEmitter {
             metrics: this.metrics,
           },
           null,
-          2
-        )
+          2,
+        ),
       );
     } catch (err) {
       this.emit("error", err);
@@ -487,7 +488,6 @@ export class RateLimitMetricsTracker {
       return 0;
     }
 
-    const latest = this.history[this.history.length - 1];
     const status = this.limiter.getStatus();
 
     if (status.dailyLimit === -1) {

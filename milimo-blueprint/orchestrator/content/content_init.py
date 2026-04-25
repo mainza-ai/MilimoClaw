@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -452,7 +451,9 @@ class ContentOperationalLog:
                             entry = LogEntry.from_dict(data)
 
                             # Filter by timestamp
-                            entry_time = datetime.fromisoformat(entry.timestamp).timestamp()
+                            entry_time = datetime.fromisoformat(
+                                entry.timestamp
+                            ).timestamp()
                             if entry_time < cutoff:
                                 continue
 

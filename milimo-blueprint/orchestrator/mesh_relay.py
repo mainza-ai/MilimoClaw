@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -26,14 +25,11 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
 import socket
-import ssl
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Callable, Optional
 from enum import Enum
 
@@ -43,6 +39,7 @@ logger = logging.getLogger("milimo.mesh_relay")
 # ---------------------------------------------------------------------------
 # Types
 # ---------------------------------------------------------------------------
+
 
 class RelayState(str, Enum):
     """Relay connection states."""
@@ -101,6 +98,7 @@ class RoutedMessage:
 # Relay Client
 # ---------------------------------------------------------------------------
 
+
 class RelayClient:
     """
     Client for connecting to a mesh relay.
@@ -122,7 +120,7 @@ class RelayClient:
     def connect(self) -> bool:
         """Connect to the relay server."""
         try:
-            import websocket
+            import websocket  # noqa: F401
         except ImportError:
             logger.error("websocket-client not installed")
             return False
@@ -177,7 +175,9 @@ class RelayClient:
             if msg_type == "auth_success":
                 self._connection_id = data.get("connection_id", "")
                 self.state = RelayState.READY
-                logger.info("Authenticated with relay, connection_id: %s", self._connection_id)
+                logger.info(
+                    "Authenticated with relay, connection_id: %s", self._connection_id
+                )
 
             elif msg_type == "message":
                 self._handle_routed_message(data)
@@ -271,7 +271,9 @@ class RelayClient:
         self._message_queue = self._message_queue[limit:]
         return messages
 
-    def subscribe(self, sender_role: str, handler: Callable[[dict[str, Any]], None]) -> None:
+    def subscribe(
+        self, sender_role: str, handler: Callable[[dict[str, Any]], None]
+    ) -> None:
         """Subscribe to messages from a specific role."""
         self._message_handlers[sender_role] = handler
 
@@ -281,7 +283,9 @@ class RelayClient:
             return False
 
         try:
-            self._ws.send(json.dumps({"type": "heartbeat", "connection_id": self._connection_id}))
+            self._ws.send(
+                json.dumps({"type": "heartbeat", "connection_id": self._connection_id})
+            )
             return True
         except Exception as e:
             logger.error("Heartbeat failed: %s", e)
@@ -306,6 +310,7 @@ class RelayClient:
 # ---------------------------------------------------------------------------
 # Relay Server (for self-hosted deployments)
 # ---------------------------------------------------------------------------
+
 
 class MeshRelay:
     """
@@ -338,25 +343,20 @@ class MeshRelay:
     def start(self) -> bool:
         """Start the relay server."""
         try:
-            import websocket
+            import websocket  # noqa: F401
         except ImportError:
             logger.error("websocket-client not installed")
             return False
 
         self._running = True
 
-        ssl_options = {}
         if self.tls_cert and self.tls_key:
-            ssl_options = {
-                "certfile": self.tls_cert,
-                "keyfile": self.tls_key,
-            }
+            pass
 
         def on_connect(ws: Any, path: str) -> None:
             self._handle_connection(ws)
 
         try:
-            import socketserver
             self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self._server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self._server_socket.bind(("0.0.0.0", self.port))
@@ -389,7 +389,11 @@ class MeshRelay:
                 if msg_type == "auth":
                     connection_id = self._authenticate_connection(ws, data)
                     if not connection_id:
-                        ws.send(json.dumps({"type": "error", "message": "Authentication failed"}))
+                        ws.send(
+                            json.dumps(
+                                {"type": "error", "message": "Authentication failed"}
+                            )
+                        )
                         return
 
                 elif msg_type == "route":
@@ -438,12 +442,18 @@ class MeshRelay:
             self._connections[connection_id] = connection
             self._role_index[f"{squad_id}:{role}"] = connection_id
 
-            ws.send(json.dumps({
-                "type": "auth_success",
-                "connection_id": connection_id,
-            }))
+            ws.send(
+                json.dumps(
+                    {
+                        "type": "auth_success",
+                        "connection_id": connection_id,
+                    }
+                )
+            )
 
-            logger.info("Authenticated connection: %s (%s/%s)", connection_id, squad_id, role)
+            logger.info(
+                "Authenticated connection: %s (%s/%s)", connection_id, squad_id, role
+            )
             return connection_id
 
     def _route_message(self, sender_id: str, data: dict[str, Any]) -> None:
@@ -474,7 +484,9 @@ class MeshRelay:
         """Handle heartbeat from connection."""
         with self._lock:
             if connection_id in self._connections:
-                self._connections[connection_id].last_activity = datetime.now(timezone.utc).isoformat()
+                self._connections[connection_id].last_activity = datetime.now(
+                    timezone.utc
+                ).isoformat()
 
     def _remove_connection(self, connection_id: str) -> None:
         """Remove a connection."""

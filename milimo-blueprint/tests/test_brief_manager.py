@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -16,7 +15,6 @@ Tests cover:
 import json
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -27,8 +25,6 @@ from orchestrator.content.content_init import (
 from orchestrator.content.brief_manager import (
     BriefManager,
     ContentBrief,
-    BriefDeadlineRisk,
-    BriefError,
     BriefValidationError,
     BriefAcknowledgmentError,
 )
@@ -350,7 +346,10 @@ class TestBriefManager:
 
         brief = manager.receive_brief(message)
 
-        published_urls = ["https://twitter.com/post/123", "https://linkedin.com/post/456"]
+        published_urls = [
+            "https://twitter.com/post/123",
+            "https://linkedin.com/post/456",
+        ]
         manager.complete_brief(brief.brief_id, published_urls)
 
         completed_path = fs.get_brief_path("completed", brief.brief_id)
@@ -409,7 +408,7 @@ class TestGetActiveBriefs:
                     "project_id": f"proj-{i}",
                     "client_id": f"client-{i}",
                     "brief_text": f"Brief {i}",
-                    "deadline": f"2026-04-0{i+1}T00:00:00Z",
+                    "deadline": f"2026-04-0{i + 1}T00:00:00Z",
                     "tone_requirements": "pro",
                     "platform_targets": ["twitter"],
                 }
@@ -493,7 +492,9 @@ class TestDeadlineRisks:
         """Brief within 4h is marked as critical."""
         fs, op_log, manager = self._create_test_env(tmp_path)
 
-        critical_deadline = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
+        critical_deadline = (
+            datetime.now(timezone.utc) + timedelta(hours=2)
+        ).isoformat()
         message = {
             "payload": {
                 "project_id": "proj-critical",

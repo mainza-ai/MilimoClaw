@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -46,7 +45,9 @@ class StripeClient:
         currency: str | None = None,
     ) -> None:
         self.api_key = api_key or os.environ.get("STRIPE_API_KEY", "")
-        self.webhook_secret = webhook_secret or os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+        self.webhook_secret = webhook_secret or os.environ.get(
+            "STRIPE_WEBHOOK_SECRET", ""
+        )
         self.currency = currency or os.environ.get("STRIPE_CURRENCY", "usd")
         self._cli_available: bool | None = None
 
@@ -102,8 +103,11 @@ class StripeClient:
             logger.error("Stripe CLI command failed: %s", e)
             return None
 
-    def _stripe_api(self, method: str, endpoint: str, data: dict | None = None) -> dict[str, Any] | None:
+    def _stripe_api(
+        self, method: str, endpoint: str, data: dict | None = None
+    ) -> dict[str, Any] | None:
         """Make a direct Stripe API call using curl (fallback when CLI unavailable)."""
+        import urllib.parse
         import urllib.request
         import urllib.error
 
@@ -116,9 +120,13 @@ class StripeClient:
 
         body = None
         if data:
-            body = "&".join(f"{k}={urllib.parse.quote(str(v))}" for k, v in data.items()).encode()
+            body = "&".join(
+                f"{k}={urllib.parse.quote(str(v))}" for k, v in data.items()
+            ).encode()
 
-        req = urllib.request.Request(url, data=body, headers=headers, method=method.upper())
+        req = urllib.request.Request(
+            url, data=body, headers=headers, method=method.upper()
+        )
 
         try:
             with urllib.request.urlopen(req, timeout=30) as response:
@@ -192,9 +200,15 @@ class StripeClient:
             }
             self._stripe_api("POST", "/invoiceitems", line_data)
             # Finalize invoice
-            return self._stripe_api("POST", f"/invoices/{result['id']}/finalize") or result
+            return (
+                self._stripe_api("POST", f"/invoices/{result['id']}/finalize") or result
+            )
 
-        return {"error": "Failed to create invoice", "customer_id": customer_id, "amount": amount}
+        return {
+            "error": "Failed to create invoice",
+            "customer_id": customer_id,
+            "amount": amount,
+        }
 
     def send_invoice(self, invoice_id: str) -> dict[str, Any]:
         """Send an invoice to the customer via email."""
@@ -393,7 +407,8 @@ class StripeClient:
 
         try:
             import stripe as stripe_lib
-            return stripe_lib.Webhook.construct_event(
+
+            return stripe_lib.Webhook.construct_event(  # type: ignore[return-value]
                 payload, sig_header, self.webhook_secret
             )
         except ImportError:
@@ -403,7 +418,9 @@ class StripeClient:
             logger.error("Webhook verification failed: %s", e)
             return None
 
-    def _verify_webhook_manual(self, payload: str, sig_header: str) -> dict[str, Any] | None:
+    def _verify_webhook_manual(
+        self, payload: str, sig_header: str
+    ) -> dict[str, Any] | None:
         """Manual webhook verification without the Stripe SDK."""
         import hmac
         import hashlib
@@ -455,7 +472,9 @@ class StripeClient:
 
     def get_balance(self) -> dict[str, Any]:
         """Get current Stripe account balance."""
-        return self._stripe_api("GET", "/balance") or {"error": "Failed to retrieve balance"}
+        return self._stripe_api("GET", "/balance") or {
+            "error": "Failed to retrieve balance"
+        }
 
     def list_charges(
         self,

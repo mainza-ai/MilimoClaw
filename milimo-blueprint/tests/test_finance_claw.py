@@ -1,10 +1,10 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """Tests for Finance Claw Main Entry Point."""
 
 import json
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -16,9 +16,9 @@ class MockInferenceClient:
     """Mock inference client."""
 
     def complete(self, prompt: str, data_type: str, max_tokens: int = 800) -> str:
-        return json.dumps([
-            {"description": "Work", "quantity": 1, "unit_price": 1000, "total": 1000}
-        ])
+        return json.dumps(
+            [{"description": "Work", "quantity": 1, "unit_price": 1000, "total": 1000}]
+        )
 
 
 class MockStripeClient:
@@ -31,7 +31,12 @@ class MockStripeClient:
         return {"id": invoice_id, "status": "open", "amount_paid": 0}
 
     def create_invoice(
-        self, customer_id: str, amount: float, currency: str, description: str, due_date: str
+        self,
+        customer_id: str,
+        amount: float,
+        currency: str,
+        description: str,
+        due_date: str,
     ) -> dict:
         self.calls.append({"method": "create"})
         return {"id": "st_test_123"}
@@ -56,14 +61,16 @@ class MockMeshGateway:
         message_id: str,
         timestamp: str,
     ) -> bool:
-        self.sent_messages.append({
-            "message_type": message_type,
-            "recipient_role": recipient_role,
-            "sender_role": sender_role,
-            "payload": payload,
-            "message_id": message_id,
-            "timestamp": timestamp,
-        })
+        self.sent_messages.append(
+            {
+                "message_type": message_type,
+                "recipient_role": recipient_role,
+                "sender_role": sender_role,
+                "payload": payload,
+                "message_id": message_id,
+                "timestamp": timestamp,
+            }
+        )
         return True
 
 
@@ -178,7 +185,9 @@ class TestFinanceClaw:
 
         finance_claw.handle_inbound(message)
 
-        pricing_responses = [m for m in gateway.sent_messages if m["message_type"] == "pricing_response"]
+        pricing_responses = [
+            m for m in gateway.sent_messages if m["message_type"] == "pricing_response"
+        ]
         assert len(pricing_responses) >= 1
 
         finance_claw.shutdown()
@@ -263,7 +272,7 @@ class TestFinanceClaw:
 
         finance_claw.handle_inbound(message)
 
-        log_path = base_path / "logs" / "operational.log"
+        base_path / "logs" / "operational.log"
 
         finance_claw.shutdown()
 

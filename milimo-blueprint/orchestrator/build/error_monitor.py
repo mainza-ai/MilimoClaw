@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """
 Build Claw error monitor.
 
@@ -14,9 +16,8 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from .build_init import BuildFilesystemInit, BuildOperationalLog, BuildLogEntry
@@ -111,28 +112,34 @@ class ErrorMonitor:
             if pattern:
                 # Auto-draft fix using known pattern
                 self._auto_draft_pattern_fix(pattern, group_errors)
-                results.append({
-                    "root_cause": root_cause,
-                    "status": "pattern_matched",
-                    "error_count": len(group_errors),
-                    "pattern_id": pattern.pattern_id,
-                })
+                results.append(
+                    {
+                        "root_cause": root_cause,
+                        "status": "pattern_matched",
+                        "error_count": len(group_errors),
+                        "pattern_id": pattern.pattern_id,
+                    }
+                )
             else:
                 # New pattern — save to active/ and queue REVIEW
                 self._save_new_pattern(root_cause, group_errors)
-                results.append({
-                    "root_cause": root_cause,
-                    "status": "new_pattern",
-                    "error_count": len(group_errors),
-                })
+                results.append(
+                    {
+                        "root_cause": root_cause,
+                        "status": "new_pattern",
+                        "error_count": len(group_errors),
+                    }
+                )
 
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="error_monitoring_pass",
-            entity_id="monitoring",
-            outcome="success",
-            details={"groups": len(results)},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="error_monitoring_pass",
+                entity_id="monitoring",
+                outcome="success",
+                details={"groups": len(results)},
+            )
+        )
         return results
 
     def run_error_check(self) -> list[dict[str, Any]]:
@@ -143,7 +150,9 @@ class ErrorMonitor:
     # Grouping
     # ------------------------------------------------------------------
 
-    def group_by_root_cause(self, errors: list[ErrorEvent]) -> dict[str, list[ErrorEvent]]:
+    def group_by_root_cause(
+        self, errors: list[ErrorEvent]
+    ) -> dict[str, list[ErrorEvent]]:
         groups: dict[str, list[ErrorEvent]] = {}
         for error in errors:
             root_cause = error.error_type
@@ -199,15 +208,19 @@ class ErrorMonitor:
             github_pr_url="",
         )
 
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="new_error_pattern",
-            entity_id=group_id,
-            outcome="queued",
-            details={"root_cause": root_cause, "count": len(errors)},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="new_error_pattern",
+                entity_id=group_id,
+                outcome="queued",
+                details={"root_cause": root_cause, "count": len(errors)},
+            )
+        )
 
-    def _auto_draft_pattern_fix(self, pattern: ErrorPattern, errors: list[ErrorEvent]) -> None:
+    def _auto_draft_pattern_fix(
+        self, pattern: ErrorPattern, errors: list[ErrorEvent]
+    ) -> None:
         """Auto-draft a fix using a known pattern."""
         pattern.times_applied += 1
 
@@ -215,16 +228,18 @@ class ErrorMonitor:
         pattern_path = self._fs.get_error_pattern_path(pattern.pattern_id)
         self._fs.atomic_write_json(pattern_path, pattern.to_dict())
 
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="pattern_fix_applied",
-            entity_id=pattern.pattern_id,
-            outcome="success",
-            details={
-                "root_cause": pattern.root_cause,
-                "times_applied": pattern.times_applied,
-            },
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="pattern_fix_applied",
+                entity_id=pattern.pattern_id,
+                outcome="success",
+                details={
+                    "root_cause": pattern.root_cause,
+                    "times_applied": pattern.times_applied,
+                },
+            )
+        )
 
     def promote_to_known_pattern(self, group_id: str, fix_template: str) -> None:
         """Promote an active error pattern to known patterns."""
@@ -245,10 +260,12 @@ class ErrorMonitor:
         self._fs.atomic_write_json(pattern_path, pattern.to_dict())
         active_path.unlink(missing_ok=True)
 
-        self._log.append(BuildLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            action_type="pattern_promoted",
-            entity_id=group_id,
-            outcome="success",
-            details={"root_cause": pattern.root_cause},
-        ))
+        self._log.append(
+            BuildLogEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                action_type="pattern_promoted",
+                entity_id=group_id,
+                outcome="success",
+                details={"root_cause": pattern.root_cause},
+            )
+        )

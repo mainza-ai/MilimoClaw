@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -31,8 +30,7 @@ class PricingNotConfirmedError(Exception):
 class MeshGateway(Protocol):
     """Protocol for the inter-claw mesh gateway."""
 
-    def send(self, message: dict[str, Any]) -> bool:
-        ...
+    def send(self, message: dict[str, Any]) -> bool: ...
 
 
 class OpsSignalDispatcher:
@@ -54,7 +52,9 @@ class OpsSignalDispatcher:
         self._gateway = gateway
         self._operational_log = operational_log
         self._squad_id = squad_id
-        self._pricing_confirmed_dir = pricing_confirmed_dir or Path("/sandbox/clients/pricing_confirmed")
+        self._pricing_confirmed_dir = pricing_confirmed_dir or Path(
+            "/sandbox/clients/pricing_confirmed"
+        )
 
     def _is_pricing_confirmed(self, project_id: str) -> bool:
         confirmation_file = self._pricing_confirmed_dir / f"{project_id}.json"
@@ -63,7 +63,11 @@ class OpsSignalDispatcher:
     def _confirm_pricing(self, project_id: str) -> None:
         self._pricing_confirmed_dir.mkdir(parents=True, exist_ok=True)
         confirmation_file = self._pricing_confirmed_dir / f"{project_id}.json"
-        confirmation_file.write_text('{"confirmed": true, "timestamp": "' + datetime.now(timezone.utc).isoformat() + '"}')
+        confirmation_file.write_text(
+            '{"confirmed": true, "timestamp": "'
+            + datetime.now(timezone.utc).isoformat()
+            + '"}'
+        )
 
     def send_project_brief(
         self,
@@ -258,9 +262,14 @@ class OpsSignalDispatcher:
                     OpsLogEntry(
                         timestamp=datetime.now(timezone.utc).isoformat(),
                         action_type=f"{message_type}_send_failed",
-                        entity_id=payload.get("project_id", payload.get("client_id", "unknown")),
+                        entity_id=payload.get(
+                            "project_id", payload.get("client_id", "unknown")
+                        ),
                         outcome="failed",
-                        details={"recipient_role": recipient_role, "error": "gateway returned false"},
+                        details={
+                            "recipient_role": recipient_role,
+                            "error": "gateway returned false",
+                        },
                     )
                 )
         except Exception as e:
@@ -274,7 +283,9 @@ class OpsSignalDispatcher:
                 OpsLogEntry(
                     timestamp=datetime.now(timezone.utc).isoformat(),
                     action_type=f"{message_type}_send_exception",
-                    entity_id=payload.get("project_id", payload.get("client_id", "unknown")),
+                    entity_id=payload.get(
+                        "project_id", payload.get("client_id", "unknown")
+                    ),
                     outcome="failed",
                     details={"recipient_role": recipient_role, "error": str(e)},
                 )
@@ -314,5 +325,8 @@ class OpsSignalDispatcher:
 
         logger.info(
             "Incident received: %s from %s (severity: %s) — %s",
-            alert_id, source, severity, title,
+            alert_id,
+            source,
+            severity,
+            title,
         )

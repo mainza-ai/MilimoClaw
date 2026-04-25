@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -16,8 +15,7 @@ import json
 import logging
 import statistics
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
+from datetime import datetime, timezone
 from typing import Any
 
 from .analytics_init import AnalyticsFilesystemInit
@@ -293,7 +291,9 @@ class ForwardProjector:
         recent_avg = sum(values[-4:]) / min(len(values), 4)
 
         if len(values) >= 4:
-            older_avg = sum(values[:-4]) / (len(values) - 4) if len(values) > 4 else recent_avg
+            older_avg = (
+                sum(values[:-4]) / (len(values) - 4) if len(values) > 4 else recent_avg
+            )
             trend = (recent_avg - older_avg) / max(older_avg, 1)
             trend = max(-0.2, min(0.2, trend))
             return recent_avg * (1 + trend)

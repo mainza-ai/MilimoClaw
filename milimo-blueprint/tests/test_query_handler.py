@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -6,11 +5,10 @@
 Unit tests for Query Handler.
 """
 
-from __future__ import annotations
-
 import json
 import shutil
 import tempfile
+from collections.abc import Iterator
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -27,7 +25,7 @@ from orchestrator.analytics.query_handler import (
 
 
 @pytest.fixture
-def temp_sandbox() -> Path:
+def temp_sandbox() -> Iterator[Path]:
     sandbox = Path(tempfile.mkdtemp(prefix="query_test_"))
     yield sandbox
     shutil.rmtree(sandbox, ignore_errors=True)
@@ -46,7 +44,9 @@ def operational_log(fs: AnalyticsFilesystemInit) -> AnalyticsOperationalLog:
 
 
 @pytest.fixture
-def query_handler(fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog) -> QueryHandler:
+def query_handler(
+    fs: AnalyticsFilesystemInit, operational_log: AnalyticsOperationalLog
+) -> QueryHandler:
     return QueryHandler(fs, operational_log)
 
 
@@ -63,7 +63,9 @@ def create_mock_performance_data(fs: AnalyticsFilesystemInit, days: int = 7) -> 
             "platform": "linkedin",
             "content_type": "article" if i % 2 == 0 else "carousel",
             "engagement_data": {"engagement_rate": 0.05 + (i * 0.01)},
-            "publish_time": (datetime.now(timezone.utc) - timedelta(days=i)).isoformat(),
+            "publish_time": (
+                datetime.now(timezone.utc) - timedelta(days=i)
+            ).isoformat(),
         }
         records.append(json.dumps(record))
     perf_file.write_text("\n".join(records) + "\n")
@@ -140,6 +142,7 @@ class TestQueryHandler:
         )
         assert response.data_quality in ["complete", "insufficient"]
         if response.data_quality == "complete":
+            assert response.data is not None
             assert "top_formats" in response.data
             assert len(response.data["top_formats"]) > 0
 
@@ -155,6 +158,7 @@ class TestQueryHandler:
             query_id="query-004",
         )
         if response.data_quality == "complete":
+            assert response.data is not None
             formats = response.data["top_formats"]
             for i in range(len(formats) - 1):
                 assert formats[i]["avg_engagement"] >= formats[i + 1]["avg_engagement"]
@@ -171,9 +175,7 @@ class TestQueryHandler:
         )
         assert response.data_quality == "insufficient"
 
-    def test_handle_unknown_query_type_returns_error(
-        self, query_handler: QueryHandler
-    ):
+    def test_handle_unknown_query_type_returns_error(self, query_handler: QueryHandler):
         message = {
             "message_id": "query-006",
             "message_type": "unknown_query_type",
@@ -184,7 +186,10 @@ class TestQueryHandler:
         assert response.data_quality == "error"
 
     def test_handle_logs_to_operational_log(
-        self, fs: AnalyticsFilesystemInit, query_handler: QueryHandler, operational_log: AnalyticsOperationalLog
+        self,
+        fs: AnalyticsFilesystemInit,
+        query_handler: QueryHandler,
+        operational_log: AnalyticsOperationalLog,
     ):
         message = {
             "message_id": "query-007",
@@ -201,9 +206,10 @@ class TestQueryHandler:
         self, fs: AnalyticsFilesystemInit, query_handler: QueryHandler
     ):
         import time
+
         create_mock_performance_data(fs, days=10)
         start = time.time()
-        response = query_handler.handle_content_performance_query(
+        query_handler.handle_content_performance_query(
             query="top_formats",
             lookback_days=7,
             platform=None,

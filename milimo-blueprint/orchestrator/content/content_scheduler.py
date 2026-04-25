@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -17,17 +16,15 @@ from __future__ import annotations
 import json
 import logging
 import threading
-import time
 from datetime import datetime, timezone, timedelta, time as time_type
-from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from .content_init import (
     ContentFilesystemInit,
     ContentOperationalLog,
     LogEntry,
 )
-from .content_generator import ContentGenerator, DraftContext
+from .content_generator import ContentGenerator
 from .brief_manager import BriefManager
 from .performance_monitor import PerformanceMonitor
 
@@ -154,25 +151,28 @@ class ContentScheduler:
         """
         logger.info("Starting morning planning")
 
-        self._log.append(LogEntry(
-            action_type="morning_planning_started",
-            entity_id=f"plan-{datetime.now(timezone.utc).date().isoformat()}",
-            outcome="success",
-            details={"time": datetime.now(timezone.utc).isoformat()},
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="morning_planning_started",
+                entity_id=f"plan-{datetime.now(timezone.utc).date().isoformat()}",
+                outcome="success",
+                details={"time": datetime.now(timezone.utc).isoformat()},
+            )
+        )
 
         active_briefs = []
         if self._brief_manager:
             active_briefs = self._brief_manager.get_active_briefs()
             logger.info("Found %d active briefs", len(active_briefs))
 
-        intel = self._read_analytics_intel()
+        self._read_analytics_intel()
 
         risks = []
         if self._generator:
             try:
                 # Use a dedicated event loop for async generation
                 import asyncio
+
                 try:
                     loop = asyncio.get_running_loop()
                     # Already in an async context — use create_task with error callback
@@ -196,15 +196,17 @@ class ContentScheduler:
             if risks:
                 logger.warning("%d briefs at deadline risk", len(risks))
 
-        self._log.append(LogEntry(
-            action_type="morning_planning_completed",
-            entity_id=f"plan-{datetime.now(timezone.utc).date().isoformat()}",
-            outcome="success",
-            details={
-                "active_briefs": len(active_briefs),
-                "risks": len(risks),
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="morning_planning_completed",
+                entity_id=f"plan-{datetime.now(timezone.utc).date().isoformat()}",
+                outcome="success",
+                details={
+                    "active_briefs": len(active_briefs),
+                    "risks": len(risks),
+                },
+            )
+        )
 
         logger.info("Morning planning completed")
 
@@ -215,12 +217,14 @@ class ContentScheduler:
             logger.info("Generated daily plan: %s", plan.plan_id)
         except Exception as e:
             logger.error("Daily plan generation failed: %s", e)
-            self._log.append(LogEntry(
-                action_type="daily_plan_failed",
-                entity_id=f"plan-{datetime.now(timezone.utc).date().isoformat()}",
-                outcome="failed",
-                details={"error": str(e)},
-            ))
+            self._log.append(
+                LogEntry(
+                    action_type="daily_plan_failed",
+                    entity_id=f"plan-{datetime.now(timezone.utc).date().isoformat()}",
+                    outcome="failed",
+                    details={"error": str(e)},
+                )
+            )
 
     def _send_weekly_analytics_query(self) -> None:
         """
@@ -244,15 +248,17 @@ class ContentScheduler:
         if self._mesh:
             self._mesh.send(query)
 
-        self._log.append(LogEntry(
-            action_type="analytics_query_sent",
-            entity_id=f"query-{datetime.now(timezone.utc).date().isoformat()}",
-            outcome="success",
-            details={
-                "query_type": "top_performing_formats",
-                "lookback_days": 7,
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="analytics_query_sent",
+                entity_id=f"query-{datetime.now(timezone.utc).date().isoformat()}",
+                outcome="success",
+                details={
+                    "query_type": "top_performing_formats",
+                    "lookback_days": 7,
+                },
+            )
+        )
 
         logger.info("Weekly analytics query sent")
 
@@ -275,12 +281,14 @@ class ContentScheduler:
 
         intel_path.write_text(json.dumps(intel_data, indent=2))
 
-        self._log.append(LogEntry(
-            action_type="intel_received",
-            entity_id="analytics-intel",
-            outcome="success",
-            details={"source": "analytics"},
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="intel_received",
+                entity_id="analytics-intel",
+                outcome="success",
+                details={"source": "analytics"},
+            )
+        )
 
         logger.info("Analytics intel received and stored")
 
@@ -306,18 +314,25 @@ class ContentScheduler:
             logger.warning("client_health_signal missing client_id")
             return
 
-        self._log.append(LogEntry(
-            action_type="client_health_signal_received",
-            entity_id=client_id,
-            outcome="success",
-            client_id=client_id,
-            details={
-                "health_score": health_score,
-                "recommended_action": recommended_action,
-            },
-        ))
+        self._log.append(
+            LogEntry(
+                action_type="client_health_signal_received",
+                entity_id=client_id,
+                outcome="success",
+                client_id=client_id,
+                details={
+                    "health_score": health_score,
+                    "recommended_action": recommended_action,
+                },
+            )
+        )
 
-        health_signal_path = self._fs.BASE / "intelligence" / "analytics-feed" / f"health_{client_id}.json"
+        health_signal_path = (
+            self._fs.BASE
+            / "intelligence"
+            / "analytics-feed"
+            / f"health_{client_id}.json"
+        )
         health_signal_path.parent.mkdir(parents=True, exist_ok=True)
 
         health_data = {
@@ -341,16 +356,18 @@ class ContentScheduler:
                 briefs = self._brief_manager.get_active_briefs()
                 for brief in briefs:
                     if brief.client_id == client_id:
-                        self._log.append(LogEntry(
-                            action_type="client_health_priority_adjustment",
-                            entity_id=brief.brief_id,
-                            outcome="success",
-                            client_id=client_id,
-                            details={
-                                "health_score": health_score,
-                                "brief_id": brief.brief_id,
-                            },
-                        ))
+                        self._log.append(
+                            LogEntry(
+                                action_type="client_health_priority_adjustment",
+                                entity_id=brief.brief_id,
+                                outcome="success",
+                                client_id=client_id,
+                                details={
+                                    "health_score": health_score,
+                                    "brief_id": brief.brief_id,
+                                },
+                            )
+                        )
 
         logger.info(
             "Client health signal processed for %s: score=%.2f",
@@ -368,7 +385,9 @@ class ContentScheduler:
 
         try:
             data = json.loads(intel_path.read_text())
-            logger.debug("Read analytics intel from %s", data.get("received_at", "unknown"))
+            logger.debug(
+                "Read analytics intel from %s", data.get("received_at", "unknown")
+            )
             return data
         except Exception as e:
             logger.warning("Failed to read analytics intel: %s", e)

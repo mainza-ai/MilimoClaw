@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -34,9 +33,8 @@ Usage:
 
 from __future__ import annotations
 
-import json
 import logging
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -44,7 +42,7 @@ from typing import Any
 import yaml
 
 from .operation_log import OperationLog
-from .pattern_detector import EvolutionPattern, PatternDetector
+from .pattern_detector import PatternDetector
 from .tool_builder import BuildResult, BuiltTool, ToolBuilder
 from .tool_proposal import (
     ToolProposal,

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -87,10 +86,13 @@ class BlueprintSnapshot:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> BlueprintSnapshot:
         meta_data = data.get("meta", {})
-        meta = BlueprintMeta(**{
-            k: v for k, v in meta_data.items()
-            if k in BlueprintMeta.__dataclass_fields__
-        })
+        meta = BlueprintMeta(
+            **{
+                k: v
+                for k, v in meta_data.items()
+                if k in BlueprintMeta.__dataclass_fields__
+            }
+        )
         return cls(
             meta=meta,
             claw_config=data.get("claw_config", {}),
@@ -172,11 +174,13 @@ class BlueprintManager:
 
         self._state["version"] = new_version
         self._state["version_history"] = self._state.get("version_history", [])
-        self._state["version_history"].append({
-            "version": new_version,
-            "reason": reason,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        self._state["version_history"].append(
+            {
+                "version": new_version,
+                "reason": reason,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         self._save_state()
 
         logger.info("Bumped version %s → %s (%s)", current, new_version, reason)
@@ -235,17 +239,20 @@ class BlueprintManager:
         Returns the path to the handoff file.
         """
         snapshot = self.export()
-        handoff_path = self._versions_dir / f"handoff_{self.claw_role}_v{snapshot.meta.version}.json"
-        
+        handoff_path = (
+            self._versions_dir
+            / f"handoff_{self.claw_role}_v{snapshot.meta.version}.json"
+        )
+
         bundle = {
             "type": "milimo-handoff",
             "snapshot": snapshot.to_dict(),
-            "exported_at": datetime.now(timezone.utc).isoformat()
+            "exported_at": datetime.now(timezone.utc).isoformat(),
         }
-        
+
         with handoff_path.open("w") as f:
             json.dump(bundle, f, indent=2, default=str)
-            
+
         logger.info(f"Generated handoff bundle at {handoff_path}")
         return str(handoff_path)
 
@@ -255,30 +262,30 @@ class BlueprintManager:
         if not path.exists():
             logger.error(f"Handoff file {handoff_path} not found.")
             return False
-            
+
         with path.open() as f:
             bundle = json.load(f)
-            
+
         if bundle.get("type") != "milimo-handoff":
             logger.error("Invalid handoff bundle format.")
             return False
-            
+
         snapshot = BlueprintSnapshot.from_dict(bundle.get("snapshot", {}))
-        
+
         # Verify integrity before accepting
         if not self.verify_integrity(snapshot):
             logger.error("Handoff bundle failed integrity verification. Rejected.")
             return False
-            
+
         # Import to state
         self._state["version"] = snapshot.meta.version
         self._state["provenance_chain"] = snapshot.integrity.get("provenance_chain", [])
-        
+
         # Save snapshot file locally so it exists in version history
         snapshot_file = self._versions_dir / f"v{snapshot.meta.version}.json"
         with snapshot_file.open("w") as f:
             json.dump(snapshot.to_dict(), f, indent=2, default=str)
-            
+
         self._save_state()
         logger.info(f"Successfully imported handoff blueprint v{snapshot.meta.version}")
         return True
@@ -318,7 +325,9 @@ class BlueprintManager:
         # Compare config
         config_changes = {}
         if snap_a.claw_config != snap_b.claw_config:
-            for key in set(list(snap_a.claw_config.keys()) + list(snap_b.claw_config.keys())):
+            for key in set(
+                list(snap_a.claw_config.keys()) + list(snap_b.claw_config.keys())
+            ):
                 val_a = snap_a.claw_config.get(key)
                 val_b = snap_b.claw_config.get(key)
                 if val_a != val_b:
@@ -344,11 +353,13 @@ class BlueprintManager:
         old_version = self.current_version()
         self._state["version"] = target_version
         self._state["version_history"] = self._state.get("version_history", [])
-        self._state["version_history"].append({
-            "version": target_version,
-            "reason": f"rollback from {old_version}: {reason}",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        self._state["version_history"].append(
+            {
+                "version": target_version,
+                "reason": f"rollback from {old_version}: {reason}",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         self._save_state()
 
         logger.info("Rolled back %s → %s (%s)", old_version, target_version, reason)
@@ -379,16 +390,16 @@ class BlueprintManager:
         """
         if not self.verify_integrity(snapshot):
             return False
-            
+
         chain = snapshot.integrity.get("provenance_chain", [])
         if not chain:
             return False
-            
+
         # The last element in the provenance chain should be this snapshot's digest
         expected_digest = snapshot.integrity.get("digest")
         if chain[-1] != expected_digest:
             return False
-            
+
         return True
 
     def list_versions(self) -> list[dict[str, Any]]:

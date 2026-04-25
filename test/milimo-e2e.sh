@@ -13,7 +13,10 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 pass() { echo -e "${GREEN}PASS${NC}: $1"; }
-fail() { echo -e "${RED}FAIL${NC}: $1"; exit 1; }
+fail() {
+  echo -e "${RED}FAIL${NC}: $1"
+  exit 1
+}
 info() { echo -e "${YELLOW}TEST${NC}: $1"; }
 
 # -------------------------------------------------------
@@ -25,18 +28,18 @@ openclaw --version && pass "OpenClaw CLI installed" || fail "OpenClaw CLI not fo
 info "2. Verify Milimo plugin can be installed"
 # -------------------------------------------------------
 openclaw plugins install /opt/milimo 2>&1 && pass "Plugin installed" || {
-    if [ -f /opt/milimo/dist/index.js ]; then
-        pass "Plugin built successfully (dist/index.js exists)"
-    else
-        fail "Plugin build artifacts missing"
-    fi
+  if [ -f /opt/milimo/dist/index.js ]; then
+    pass "Plugin built successfully (dist/index.js exists)"
+  else
+    fail "Plugin build artifacts missing"
+  fi
 }
 
 # -------------------------------------------------------
 info "3. Verify Milimo Templates and Blueprints Discovery"
 # -------------------------------------------------------
 # Run blueprint list and check for Category A templates
-openclaw milimo blueprint list > /tmp/blueprint-list.txt || fail "Failed to run blueprint list"
+openclaw milimo blueprint list >/tmp/blueprint-list.txt || fail "Failed to run blueprint list"
 grep -q "content-agency" /tmp/blueprint-list.txt && pass "Found content-agency template" || fail "Missing content-agency"
 grep -q "design-studio" /tmp/blueprint-list.txt && pass "Found design-studio template" || fail "Missing design-studio"
 grep -q "ai-micro-saas" /tmp/blueprint-list.txt && pass "Found ai-micro-saas template" || fail "Missing ai-micro-saas"

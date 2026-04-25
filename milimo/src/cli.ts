@@ -203,8 +203,8 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
     .description("Launch the War Room interactive operator dashboard")
     .option("-o, --operator <name>", "Override operator ID", "local-operator")
     .option("--list", "List pending messages without TUI (non-interactive)")
-    .action(async (opts: { operator: string; list?: boolean }) => {
-      await cliWarRoom({ operator: opts.operator, logger, pluginConfig, list: opts.list });
+    .action((opts: { operator: string; list?: boolean }) => {
+      cliWarRoom({ operator: opts.operator, logger, pluginConfig, list: opts.list });
     });
 
   // ── openclaw milimo health ────────────────────────────────────────
@@ -226,13 +226,13 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
         interval?: string;
         json?: boolean;
       }) => {
-        const { join } = await import("node:path");
-        const { homedir } = await import("node:os");
+        const path = await import("node:path");
+        const os = await import("node:os");
         const { existsSync } = await import("node:fs");
         const { readFile } = await import("node:fs/promises");
 
         const squadId = opts.squad || process.env.MILIMO_SQUAD || "default";
-        const healthPath = join(homedir(), ".milimo", "health", "health.json");
+        const healthPath = path.join(os.homedir(), ".milimo", "health", "health.json");
 
         if (!existsSync(healthPath)) {
           logger.info("No health data available. Run with --collect to gather data.");
@@ -428,7 +428,7 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
     .command("list")
     .description("List pending actions in the queue")
     .option("--json", "Output as JSON", false)
-    .action(async (opts: { json: boolean }) => {
+    .action((opts: { json: boolean }) => {
       const pending = listPendingActions();
 
       if (opts.json) {
