@@ -625,13 +625,20 @@ echo "Cleanup complete"
     ERRORS=0
 
     # Verify orchestrator files exist in primary location
-for claw in ops analytics content finance build assistant; do
+for claw in ops analytics content finance build; do
         f="/sandbox/milimo-blueprint/orchestrator/${claw}/${claw}_claw.py"
       if [ ! -f "$f" ]; then
         echo "MISSING: $f"
         ERRORS=$((ERRORS + 1))
       fi
     done
+# Assistant uses lucy.py, not assistant_claw.py
+f="/sandbox/milimo-blueprint/orchestrator/assistant/lucy.py"
+if [ ! -f "$f" ]; then
+ echo "MISSING: $f"
+ ERRORS=$((ERRORS + 1))
+fi
+
 
     # Verify mesh_config.yaml exists and has assistant types under message_types
     MC="/sandbox/milimo-blueprint/mesh_config.yaml"
@@ -656,13 +663,20 @@ for claw in ops analytics content finance build assistant; do
     # Verify blueprints copy is in sync
     BP="/sandbox/.milimo/blueprints/0.1.0"
     if [ -d "$BP/orchestrator" ]; then
-      for claw in ops analytics content finance build assistant; do
+      for claw in ops analytics content finance build; do
         f="$BP/orchestrator/${claw}/${claw}_claw.py"
         if [ ! -f "$f" ]; then
           echo "MISSING (blueprints copy): $f"
           ERRORS=$((ERRORS + 1))
         fi
       done
+# Assistant uses lucy.py, not assistant_claw.py
+f="$BP/orchestrator/assistant/lucy.py"
+if [ ! -f "$f" ]; then
+ echo "MISSING (blueprints copy): $f"
+ ERRORS=$((ERRORS + 1))
+fi
+
     fi
 
     if [ $ERRORS -eq 0 ]; then
@@ -851,7 +865,7 @@ PYEOF
     rm -rf /sandbox/.openclaw/workspace/memory/daily/
     rm -rf /sandbox/.openclaw/workspace/memory/channel/
 
-    cd /sandbox/milimo-blueprint && python3 orchestrator/assistant_setup.py 2>&1 || echo "Assistant setup skipped — run manually with: openclaw milimo assistant setup"
+    cd /sandbox/milimo-blueprint && HOME=/sandbox python3 orchestrator/assistant_setup.py 2>&1 || echo "Assistant setup skipped — run manually with: openclaw milimo assistant setup"
   '
 }
 
