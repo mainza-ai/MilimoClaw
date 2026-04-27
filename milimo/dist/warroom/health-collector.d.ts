@@ -22,7 +22,7 @@ export declare class HealthCollector {
     private intervalId;
     private running;
     constructor(options: HealthCollectorOptions);
-    collectAll(): Promise<ClawHealthMap>;
+    collectAll(): ClawHealthMap;
     startPolling(onUpdate: HealthUpdateHandler, onError?: HealthErrorHandler): () => void;
     stopPolling(): void;
     deriveStatus(health: ClawHealth): "active" | "idle" | "processing" | "error";

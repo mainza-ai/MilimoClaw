@@ -158,7 +158,7 @@ async function cliInit(opts) {
     try {
         await (0, assistant_js_1.assistantSetup)();
     }
-    catch (err) {
+    catch {
         logger.warn("Assistant setup skipped — run 'milimo assistant setup' manually.");
     }
     if (opts.solo) {

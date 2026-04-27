@@ -234,7 +234,7 @@ function slashRole(_api: OpenClawPluginApi): PluginCommandResult {
 
 function slashFinals(): PluginCommandResult {
   const home = process.env["HOME"] ?? process.env["USERPROFILE"] ?? "/tmp";
-  const finalsPath = join(home, ".milimo", "finals-mode.json");
+  const finalsPath = join(home, ".openclaw-data/milimo", "finals-mode.json");
 
   if (!existsSync(finalsPath)) {
     return {
@@ -372,7 +372,14 @@ function slashHealth(_api: OpenClawPluginApi): PluginCommandResult {
   const claws = state.meshMembers.length > 0 ? state.meshMembers : [state.clawRole];
 
   for (const claw of claws) {
-    const registryPath = join(home, ".milimo", "tools", state.squadName, claw, "registry.json");
+    const registryPath = join(
+      home,
+      ".openclaw-data/milimo",
+      "tools",
+      state.squadName,
+      claw,
+      "registry.json",
+    );
     let status = "○";
     let tools = 0;
 
@@ -405,7 +412,14 @@ function slashEvolution(_api: OpenClawPluginApi): PluginCommandResult {
   const claws = state.meshMembers.length > 0 ? state.meshMembers : [state.clawRole];
 
   for (const claw of claws) {
-    const registryPath = join(home, ".milimo", "tools", state.squadName, claw, "registry.json");
+    const registryPath = join(
+      home,
+      ".openclaw-data/milimo",
+      "tools",
+      state.squadName,
+      claw,
+      "registry.json",
+    );
 
     try {
       if (existsSync(registryPath)) {

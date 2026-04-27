@@ -251,7 +251,7 @@ export class GatewayClient {
   private sendFileMessage(message: GatewayMessage): void {
     const queueDir = join(
       process.env.HOME ?? "/tmp",
-      ".milimo",
+      ".openclaw-data/milimo",
       "mesh",
       "pending",
       this.squadId,

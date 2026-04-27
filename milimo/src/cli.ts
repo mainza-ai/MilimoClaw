@@ -232,7 +232,12 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
         const { readFile } = await import("node:fs/promises");
 
         const squadId = opts.squad || process.env.MILIMO_SQUAD || "default";
-        const healthPath = path.join(os.homedir(), ".milimo", "health", "health.json");
+        const healthPath = path.join(
+          os.homedir(),
+          ".openclaw-data/milimo",
+          "health",
+          "health.json",
+        );
 
         if (!existsSync(healthPath)) {
           logger.info("No health data available. Run with --collect to gather data.");

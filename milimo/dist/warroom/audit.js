@@ -1,4 +1,6 @@
 "use strict";
+// SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuditLogger = void 0;
 exports.createAuditLogger = createAuditLogger;
@@ -14,7 +16,7 @@ class AuditLogger {
     lastRotationCheck = null;
     constructor(squadId, rotationConfig) {
         const home = process.env.HOME || process.env.USERPROFILE || (0, os_1.homedir)() || "/tmp";
-        this.auditDir = (0, path_1.join)(home, ".milimo", "audit", squadId);
+        this.auditDir = (0, path_1.join)(home, ".openclaw-data/milimo", "audit", squadId);
         this.auditFile = (0, path_1.join)(this.auditDir, "warroom.log");
         this.rotationConfig = {
             retentionDays: rotationConfig?.retentionDays ?? DEFAULT_RETENTION_DAYS,

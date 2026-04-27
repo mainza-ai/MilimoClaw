@@ -27,80 +27,80 @@ class BridgeTools {
     /**
      * Get detailed status of a specific claw.
      */
-    async clawStatus(args) {
+    clawStatus(args) {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("claw_status", args, this.options);
     }
     /**
      * Send a typed message from the assistant to a specific claw via the mesh.
      * Use "assistant_query" for read-only questions and "assistant_task" for action requests.
      */
-    async sendToClaw(args) {
+    sendToClaw(args) {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("send_to_claw", args, this.options);
     }
     /**
      * Get live mesh topology, pending message counts, and delivery stats.
      */
-    async meshFlowState(args) {
+    meshFlowState(args) {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("mesh_flow_state", args ?? {}, this.options);
     }
     /**
      * List active client projects from the Ops claw sandbox.
      */
-    async opsActiveProjects() {
+    opsActiveProjects() {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("ops_active_projects", {}, this.options);
     }
     /**
      * List pending content drafts from the Content claw sandbox.
      */
-    async contentPendingDrafts() {
+    contentPendingDrafts() {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("content_pending_drafts", {}, this.options);
     }
     /**
      * List open PRs from the Build claw using the gh CLI.
      */
-    async buildOpenPrs() {
+    buildOpenPrs() {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("build_open_prs", {}, this.options);
     }
     /**
      * Summarize the latest intelligence report from the Analytics claw.
      */
-    async analyticsLatestReportSummary() {
+    analyticsLatestReportSummary() {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("analytics_latest_report_summary", {}, this.options);
     }
     /**
      * Trigger sprint plan generation by writing to the Build claw's sprint context.
      */
-    async generateSprintPlan(args) {
+    generateSprintPlan(args) {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("generate_sprint_plan", args ?? {}, this.options);
     }
     /**
      * Trigger opportunity scoring by writing to the Analytics claw's context.
      */
-    async runOpportunityScoring(args) {
+    runOpportunityScoring(args) {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("run_opportunity_scoring", args ?? {}, this.options);
     }
     /**
      * Generate a weekly report by aggregating data from all claws.
      */
-    async generateWeeklyReport(args) {
+    generateWeeklyReport(args) {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("generate_weekly_report", args ?? {}, this.options);
     }
     /**
      * Check deadlines across all claws.
      */
-    async checkAllDeadlines() {
+    checkAllDeadlines() {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("check_all_deadlines", {}, this.options);
     }
     /**
      * Run a dependency audit on the Build claw's repo.
      */
-    async runDependencyAudit() {
+    runDependencyAudit() {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("run_dependency_audit", {}, this.options);
     }
     /**
      * Discover what tools each claw currently has deployed.
      */
-    async discoverTools(args) {
+    discoverTools(args) {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("discover_tools", args ?? {}, this.options);
     }
     /**
@@ -113,7 +113,11 @@ class BridgeTools {
                     name: "claw_status",
                     description: "Get detailed status of a specific claw including health, tools, pending messages, and sandbox state.",
                     parameters: {
-                        role: { type: "string", description: "Claw role: content, ops, analytics, finance, build", required: true },
+                        role: {
+                            type: "string",
+                            description: "Claw role: content, ops, analytics, finance, build, assistant",
+                            required: true,
+                        },
                         squad_id: { type: "string", description: "Squad identifier", required: false },
                     },
                 },
@@ -122,7 +126,11 @@ class BridgeTools {
                     description: "Send a typed message from the assistant to a specific claw via the mesh. All messages require operator approval.",
                     parameters: {
                         role: { type: "string", description: "Target claw role", required: true },
-                        type: { type: "string", description: "Message type: assistant_query or assistant_task", required: true },
+                        type: {
+                            type: "string",
+                            description: "Message type: assistant_query or assistant_task",
+                            required: true,
+                        },
                         payload: { type: "object", description: "Message payload", required: true },
                         squad_id: { type: "string", description: "Squad identifier", required: false },
                     },
@@ -158,8 +166,16 @@ class BridgeTools {
                     name: "generate_sprint_plan",
                     description: "Trigger sprint plan generation by writing to the Build claw's sprint context.",
                     parameters: {
-                        instructions: { type: "string", description: "Instructions for the sprint plan", required: false },
-                        backlog_source: { type: "string", description: "Source for backlog items", required: false },
+                        instructions: {
+                            type: "string",
+                            description: "Instructions for the sprint plan",
+                            required: false,
+                        },
+                        backlog_source: {
+                            type: "string",
+                            description: "Source for backlog items",
+                            required: false,
+                        },
                     },
                 },
                 {
@@ -175,7 +191,11 @@ class BridgeTools {
                     description: "Generate a weekly report by aggregating data from all claws.",
                     parameters: {
                         squad_id: { type: "string", description: "Squad identifier", required: false },
-                        week_start: { type: "string", description: "Week start date (YYYY-MM-DD)", required: false },
+                        week_start: {
+                            type: "string",
+                            description: "Week start date (YYYY-MM-DD)",
+                            required: false,
+                        },
                     },
                 },
                 {

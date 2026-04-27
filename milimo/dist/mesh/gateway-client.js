@@ -96,7 +96,7 @@ class GatewayClient {
                 this.setupSocketHandlers();
                 resolve();
             };
-            const onError = (err) => {
+            const onError = (_err) => {
                 this.socket?.destroy();
                 this.socket = null;
                 if (this.retryCount < MAX_RETRIES) {
@@ -134,9 +134,8 @@ class GatewayClient {
                     this.handleIncomingMessage(message);
                 }
             }
-            catch (err) {
-                // Log parse errors for debugging but don't crash
-                console.warn("[GatewayClient] Failed to parse incoming message:", err);
+            catch (_err) {
+                console.warn("[GatewayClient] Failed to parse incoming message:", _err);
             }
         });
         this.socket.on("close", () => {
@@ -228,7 +227,7 @@ class GatewayClient {
         return Buffer.from((0, node_crypto_1.hkdfSync)("sha256", keyMaterial, salt, `milimo-mesh:${sender}:${recipient}`, 32));
     }
     sendFileMessage(message) {
-        const queueDir = (0, node_path_1.join)(process.env.HOME ?? "/tmp", ".milimo", "mesh", "pending", this.squadId, message.recipient_role);
+        const queueDir = (0, node_path_1.join)(process.env.HOME ?? "/tmp", ".openclaw-data/milimo", "mesh", "pending", this.squadId, message.recipient_role);
         (0, node_fs_1.mkdirSync)(queueDir, { recursive: true });
         const filePath = (0, node_path_1.join)(queueDir, `${message.id}.json`);
         (0, node_fs_1.writeFileSync)(filePath, JSON.stringify(message, null, 2));

@@ -127,7 +127,10 @@ function validateSquadName(name) {
         return { valid: false, error: "Squad name must be at most 50 characters" };
     }
     if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
-        return { valid: false, error: "Squad name can only contain letters, numbers, hyphens, and underscores" };
+        return {
+            valid: false,
+            error: "Squad name can only contain letters, numbers, hyphens, and underscores",
+        };
     }
     return { valid: true };
 }

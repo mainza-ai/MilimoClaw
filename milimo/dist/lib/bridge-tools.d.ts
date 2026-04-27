@@ -177,7 +177,7 @@ export declare class BridgeTools {
     clawStatus(args: {
         role: string;
         squad_id?: string;
-    }): Promise<BridgeResponse<ClawStatusResult>>;
+    }): BridgeResponse<ClawStatusResult>;
     /**
      * Send a typed message from the assistant to a specific claw via the mesh.
      * Use "assistant_query" for read-only questions and "assistant_task" for action requests.
@@ -187,64 +187,64 @@ export declare class BridgeTools {
         type: "assistant_query" | "assistant_task";
         payload: Record<string, unknown>;
         squad_id?: string;
-    }): Promise<BridgeResponse<SendToClawResult>>;
+    }): BridgeResponse<SendToClawResult>;
     /**
      * Get live mesh topology, pending message counts, and delivery stats.
      */
     meshFlowState(args?: {
         squad?: string;
-    }): Promise<BridgeResponse<MeshFlowStateResult>>;
+    }): BridgeResponse<MeshFlowStateResult>;
     /**
      * List active client projects from the Ops claw sandbox.
      */
-    opsActiveProjects(): Promise<BridgeResponse<OpsProjectsResult>>;
+    opsActiveProjects(): BridgeResponse<OpsProjectsResult>;
     /**
      * List pending content drafts from the Content claw sandbox.
      */
-    contentPendingDrafts(): Promise<BridgeResponse<ContentDraftsResult>>;
+    contentPendingDrafts(): BridgeResponse<ContentDraftsResult>;
     /**
      * List open PRs from the Build claw using the gh CLI.
      */
-    buildOpenPrs(): Promise<BridgeResponse<BuildPrsResult>>;
+    buildOpenPrs(): BridgeResponse<BuildPrsResult>;
     /**
      * Summarize the latest intelligence report from the Analytics claw.
      */
-    analyticsLatestReportSummary(): Promise<BridgeResponse<AnalyticsReportResult>>;
+    analyticsLatestReportSummary(): BridgeResponse<AnalyticsReportResult>;
     /**
      * Trigger sprint plan generation by writing to the Build claw's sprint context.
      */
     generateSprintPlan(args?: {
         instructions?: string;
         backlog_source?: string;
-    }): Promise<BridgeResponse<SprintPlanResult>>;
+    }): BridgeResponse<SprintPlanResult>;
     /**
      * Trigger opportunity scoring by writing to the Analytics claw's context.
      */
     runOpportunityScoring(args?: {
         criteria?: string[];
         scope?: string;
-    }): Promise<BridgeResponse<OpportunityScoringResult>>;
+    }): BridgeResponse<OpportunityScoringResult>;
     /**
      * Generate a weekly report by aggregating data from all claws.
      */
     generateWeeklyReport(args?: {
         squad_id?: string;
         week_start?: string;
-    }): Promise<BridgeResponse<WeeklyReportResult>>;
+    }): BridgeResponse<WeeklyReportResult>;
     /**
      * Check deadlines across all claws.
      */
-    checkAllDeadlines(): Promise<BridgeResponse<DeadlineCheckResult>>;
+    checkAllDeadlines(): BridgeResponse<DeadlineCheckResult>;
     /**
      * Run a dependency audit on the Build claw's repo.
      */
-    runDependencyAudit(): Promise<BridgeResponse<DependencyAuditResult>>;
+    runDependencyAudit(): BridgeResponse<DependencyAuditResult>;
     /**
      * Discover what tools each claw currently has deployed.
      */
     discoverTools(args?: {
         squad_id?: string;
-    }): Promise<BridgeResponse<DiscoverToolsResult>>;
+    }): BridgeResponse<DiscoverToolsResult>;
     /**
      * Get metadata for all available bridge tools (for assistant discovery).
      */

@@ -321,7 +321,7 @@ export function cliProvenanceKeygen(opts: KeygenOptions): Promise<void> {
 
   try {
     const home = process.env.HOME || process.env.USERPROFILE || "/tmp";
-    const keyDir = path.join(home, ".milimo", "keys");
+    const keyDir = path.join(home, ".openclaw-data/milimo", "keys");
     const keyFile = path.join(keyDir, `${opts.squad}.json`);
 
     if (fs.existsSync(keyFile) && !opts.force) {

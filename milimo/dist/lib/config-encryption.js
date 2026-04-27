@@ -43,7 +43,10 @@ function getMachineId() {
         }
     }
     if (currentPlatform === "darwin") {
-        const result = (0, node_child_process_1.spawnSync)("system_profiler", ["SPHardwareDataType"], { encoding: "utf-8", timeout: 5000 });
+        const result = (0, node_child_process_1.spawnSync)("system_profiler", ["SPHardwareDataType"], {
+            encoding: "utf-8",
+            timeout: 5000,
+        });
         if (result.status === 0) {
             const match = result.stdout.match(/Hardware UUID:\s*([A-Fa-f0-9-]+)/);
             if (match?.[1]) {
@@ -52,7 +55,10 @@ function getMachineId() {
         }
     }
     if (currentPlatform === "win32") {
-        const result = (0, node_child_process_1.spawnSync)("wmic", ["csproduct", "get", "UUID"], { encoding: "utf-8", timeout: 5000 });
+        const result = (0, node_child_process_1.spawnSync)("wmic", ["csproduct", "get", "UUID"], {
+            encoding: "utf-8",
+            timeout: 5000,
+        });
         if (result.status === 0) {
             const lines = result.stdout.split("\n").filter((l) => l.trim());
             if (lines.length > 1) {

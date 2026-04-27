@@ -41,7 +41,7 @@ interface FinalsModeState {
 
 function getFinalsModePath(): string {
   const home = process.env["HOME"] ?? process.env["USERPROFILE"] ?? "/tmp";
-  return path.join(home, ".milimo", "finals-mode.json");
+  return path.join(home, ".openclaw-data/milimo", "finals-mode.json");
 }
 
 function loadFinalsMode(): FinalsModeState | null {

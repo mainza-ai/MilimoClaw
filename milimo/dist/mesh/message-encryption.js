@@ -14,7 +14,6 @@ const node_crypto_1 = require("node:crypto");
 const ALGORITHM = "aes-256-gcm";
 const KEY_LENGTH = 32;
 const IV_LENGTH = 16;
-const AUTH_TAG_LENGTH = 16;
 const PBKDF2_ITERATIONS = 100000;
 const SALT_SEPARATOR = ":";
 class MessageEncryption {

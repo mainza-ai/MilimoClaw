@@ -82,7 +82,7 @@ function isNonInteractive(opts) {
 }
 function createMilimoDirectories() {
     const home = process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
-    const baseDir = path.join(home, ".milimo");
+    const baseDir = path.join(home, ".openclaw-data/milimo");
     const dirs = [
         baseDir,
         path.join(baseDir, "blueprints"),
@@ -100,6 +100,7 @@ function createMilimoDirectories() {
 async function cliOnboard(opts) {
     const { logger, pluginConfig } = opts;
     const nonInteractive = isNonInteractive(opts);
+    let nemoModelConfig = null;
     logger.info("");
     logger.info(" ╔═══════════════════════════════════════════════════════╗");
     logger.info(" ║ 🦀 MILIMO CLAW — Onboarding Wizard 🦀 ║");
@@ -115,17 +116,20 @@ async function cliOnboard(opts) {
         if (!nonInteractive) {
             const proceed = await (0, prompt_js_1.promptConfirm)("Continue anyway? (Inference will use defaults)", false);
             if (!proceed) {
-                return;
+                return Promise.resolve();
             }
         }
         else {
-            return;
+            logger.error("NemoClaw is not onboarded and cannot proceed in non-interactive mode.");
+            logger.error("Run 'openclaw nemoclaw onboard' first, then retry.");
+            process.exitCode = 1;
+            return Promise.resolve();
         }
     }
     else {
-        const nemoclawConfig = (0, config_js_1.loadNemoClawConfig)();
-        if (nemoclawConfig) {
-            logger.info(`Inference: ${nemoclawConfig.model} @ ${nemoclawConfig.endpointUrl}`);
+        nemoModelConfig = (0, config_js_1.loadNemoClawConfig)();
+        if (nemoModelConfig) {
+            logger.info(`Inference: ${nemoModelConfig.model} @ ${nemoModelConfig.endpointUrl}`);
             logger.info("");
         }
     }
@@ -139,7 +143,7 @@ async function cliOnboard(opts) {
             const reconfigure = await (0, prompt_js_1.promptConfirm)("Reconfigure?", false);
             if (!reconfigure) {
                 logger.info("Keeping existing configuration.");
-                return;
+                return Promise.resolve();
             }
         }
     }
@@ -151,7 +155,10 @@ async function cliOnboard(opts) {
     else {
         const builtInTemplates = (0, template_js_1.getBuiltInTemplates)();
         const discoveredTemplates = (0, template_js_1.discoverTemplates)(pluginConfig.blueprintDir);
-        const allTemplates = [...discoveredTemplates, ...builtInTemplates.filter((b) => !discoveredTemplates.some((d) => d.id === b.id))];
+        const allTemplates = [
+            ...discoveredTemplates,
+            ...builtInTemplates.filter((b) => !discoveredTemplates.some((d) => d.id === b.id)),
+        ];
         const templateOptions = allTemplates.map((t) => ({
             label: t.displayName,
             value: t.id,
@@ -208,7 +215,7 @@ async function cliOnboard(opts) {
         const validation = (0, validate_js_1.validateSquadName)(opts.squad);
         if (!validation.valid) {
             logger.error(`Invalid squad name: ${validation.error}`);
-            return;
+            return Promise.resolve();
         }
         squadName = opts.squad.trim();
     }
@@ -242,7 +249,7 @@ async function cliOnboard(opts) {
         if (opts.role) {
             if (!index_js_1.CLAW_ROLES.includes(opts.role)) {
                 logger.error(`Invalid role "${opts.role}". Must be one of: ${index_js_1.CLAW_ROLES.join(", ")}`);
-                return;
+                return Promise.resolve();
             }
             clawRole = opts.role;
         }
@@ -252,9 +259,7 @@ async function cliOnboard(opts) {
             logger.info("");
             // Only offer roles that are active in the selected template
             const templateActiveClaws = selectedTemplate?.clawsActive || (0, config_js_1.getActiveClawsForTemplate)(template);
-            const roleOptions = index_js_1.CLAW_ROLES
-                .filter((role) => templateActiveClaws.includes(role))
-                .map((role) => ({
+            const roleOptions = index_js_1.CLAW_ROLES.filter((role) => templateActiveClaws.includes(role)).map((role) => ({
                 label: role,
                 value: role,
                 hint: (0, template_js_1.getRoleDescription)(role),
@@ -277,7 +282,7 @@ async function cliOnboard(opts) {
         const validation = (0, validate_js_1.validateOperatorName)(opts.operator);
         if (!validation.valid) {
             logger.error(`Invalid operator name: ${validation.error}`);
-            return;
+            return Promise.resolve();
         }
         operatorName = opts.operator.trim();
     }
@@ -301,10 +306,10 @@ async function cliOnboard(opts) {
         logger.info("all your claws. Give it a name, a creature, and a vibe.");
         logger.info("");
         logger.info("Examples:");
-        logger.info('  Name: Nova · Creature: a hawk · Vibe: fast and precise · 🦅');
-        logger.info('  Name: Rex · Creature: a wolf · Vibe: direct and loyal · 🐺');
-        logger.info('  Name: Sage · Creature: an owl · Vibe: measured and wise · 🦉');
-        logger.info('  Name: Moyo · Creature: a claw · Vibe: sharp and unhurried · 🦀');
+        logger.info("  Name: Nova · Creature: a hawk · Vibe: fast and precise · 🦅");
+        logger.info("  Name: Rex · Creature: a wolf · Vibe: direct and loyal · 🐺");
+        logger.info("  Name: Sage · Creature: an owl · Vibe: measured and wise · 🦉");
+        logger.info("  Name: Moyo · Creature: a claw · Vibe: sharp and unhurried · 🦀");
         logger.info("");
         const nameInput = await (0, prompt_js_1.promptInput)("Assistant name", "Nova");
         const creatureInput = await (0, prompt_js_1.promptInput)("Creature (e.g. a claw, a hawk, an owl)", "a claw");
@@ -396,7 +401,7 @@ async function cliOnboard(opts) {
         const proceed = await (0, prompt_js_1.promptConfirm)("Apply this configuration?");
         if (!proceed) {
             logger.info("Onboarding cancelled.");
-            return;
+            return Promise.resolve();
         }
     }
     // Step 11: Apply Configuration
@@ -420,6 +425,9 @@ async function cliOnboard(opts) {
         blueprintVersion: "0.1.0",
         assistant,
         activeClaws,
+        ...(nemoModelConfig
+            ? { model: nemoModelConfig.model, endpointUrl: nemoModelConfig.endpointUrl }
+            : {}),
     };
     (0, config_js_1.saveOnboardConfig)(config);
     logger.info(" ✓ Saved configuration to ~/.milimo/config.json");
@@ -430,7 +438,7 @@ async function cliOnboard(opts) {
         try {
             const { execFileSync } = await import("child_process");
             const home = process.env.HOME ?? "/tmp";
-            const blueprintDir = path.join(home, ".milimo", "blueprints", "0.1.0");
+            const blueprintDir = path.join(home, ".openclaw-data/milimo", "blueprints", "0.1.0");
             const soloInitPath = path.join(blueprintDir, "orchestrator", "solo_init.py");
             if (fs.existsSync(soloInitPath)) {
                 const roleArg = solo ? "solo" : clawRole;
@@ -513,7 +521,7 @@ async function cliOnboard(opts) {
     logger.info("The milimo never stops. Work. Without working.");
     logger.info("");
 }
-async function cliOnboardStatus(logger) {
+function cliOnboardStatus(logger) {
     const config = (0, config_js_1.loadOnboardConfig)();
     if (!config) {
         logger.info("");
@@ -522,7 +530,7 @@ async function cliOnboardStatus(logger) {
         logger.info("Run the onboard command to set up:");
         logger.info("    milimo onboard");
         logger.info("");
-        return;
+        return Promise.resolve();
     }
     const assistant = config.assistant;
     const assistantLine = assistant
@@ -548,5 +556,6 @@ async function cliOnboardStatus(logger) {
     }
     logger.info("To reconfigure, run: milimo onboard");
     logger.info("");
+    return Promise.resolve();
 }
 //# sourceMappingURL=onboard.js.map

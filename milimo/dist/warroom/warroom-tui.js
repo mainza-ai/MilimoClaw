@@ -291,7 +291,8 @@ Press H to close this help.
                 content = lines.join("\n");
             }
             else {
-                content = "\n{bold}No digest available yet{/bold}\n\n{dim-fg}Morning brief at 07:00{/dim-fg}\n{dim-fg}Evening wrap at 20:00{/dim-fg}\n\nPress D to close.";
+                content =
+                    "\n{bold}No digest available yet{/bold}\n\n{dim-fg}Morning brief at 07:00{/dim-fg}\n{dim-fg}Evening wrap at 20:00{/dim-fg}\n\nPress D to close.";
             }
             this.digestOverlay = blessed.box({
                 top: "center",
@@ -346,15 +347,15 @@ Press H to close this help.
                 lines.push(`  {bold}${selector} ${modeIcon} {${modeColor}-fg}${evalResult.mode}{/${modeColor}-fg}{/bold} ${msg.sender_role.toUpperCase()} CLAW`);
                 if (msg.message_type === "tool_proposal") {
                     const toolName = msg.payload?.tool_name ?? "unknown";
-                    lines.push(`      Tool: ${toolName}`);
+                    lines.push(` Tool: ${JSON.stringify(toolName)}`);
                     if (msg.payload?.estimated_improvement) {
-                        lines.push(`      Expected: +${msg.payload.estimated_improvement}% uplift`);
+                        lines.push(` Expected: +${JSON.stringify(msg.payload.estimated_improvement)}% uplift`);
                     }
                 }
                 else if (msg.message_type === "deliverable") {
-                    lines.push(`      Type: ${msg.payload?.type ?? msg.message_type}`);
+                    lines.push(` Type: ${JSON.stringify(msg.payload?.type ?? msg.message_type)}`);
                     if (msg.payload?.amount) {
-                        lines.push(`      Amount: $${msg.payload.amount}`);
+                        lines.push(` Amount: $${JSON.stringify(msg.payload.amount)}`);
                     }
                 }
                 else {
@@ -379,7 +380,11 @@ Press H to close this help.
         const clawRoles = ["content", "ops", "analytics", "finance", "build", "assistant"];
         for (const role of clawRoles) {
             const health = this.getClawHealth(role);
-            const statusColor = health.status === "active" ? this.COLORS.teal : health.status === "error" ? this.COLORS.error : this.COLORS.dim;
+            const statusColor = health.status === "active"
+                ? this.COLORS.teal
+                : health.status === "error"
+                    ? this.COLORS.error
+                    : this.COLORS.dim;
             const statusIcon = health.status === "active" ? "●" : health.status === "error" ? "●" : "○";
             lines.push(` {${statusColor}-fg}${statusIcon}{/${statusColor}-fg} ${role.toUpperCase().padEnd(10)} ${health.tools} tools`);
         }
@@ -417,8 +422,8 @@ Press H to close this help.
         };
         try {
             const home = process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
-            const sandboxMesh = (0, node_path_1.join)("/sandbox", ".milimo");
-            const homeMesh = (0, node_path_1.join)(home, ".milimo");
+            const sandboxMesh = (0, node_path_1.join)("/sandbox", ".openclaw-data/milimo");
+            const homeMesh = (0, node_path_1.join)(home, ".openclaw-data/milimo");
             const meshRoot = (0, node_fs_1.existsSync)(sandboxMesh) ? sandboxMesh : homeMesh;
             const registryPath = (0, node_path_1.join)(meshRoot, "tools", this.squadId, role, "registry.json");
             if ((0, node_fs_1.existsSync)(registryPath)) {
@@ -470,7 +475,9 @@ Press H to close this help.
         }
     }
     updateBottomBar() {
-        const finalsText = this.finalsMode ? "{bold}{green-fg}ON{/green-fg}{/bold}" : "{red-fg}OFF{/red-fg}";
+        const finalsText = this.finalsMode
+            ? "{bold}{green-fg}ON{/green-fg}{/bold}"
+            : "{red-fg}OFF{/red-fg}";
         const digestIndicator = this.hasNewDigest ? "{cyan-fg}●{/cyan-fg} " : "";
         this.bottomBar.setContent(`{bold}[Q]{/bold}uit {bold}[R]{/bold}efresh {bold}[H]{/bold}elp {bold}[F]{/bold}inals Mode: ${finalsText} {bold}[D]{/bold}igest ${digestIndicator}`);
     }
@@ -534,8 +541,8 @@ Press H to close this help.
     fetchRevenueData() {
         try {
             const home = process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
-            const sandboxMesh = (0, node_path_1.join)("/sandbox", ".milimo");
-            const homeMesh = (0, node_path_1.join)(home, ".milimo");
+            const sandboxMesh = (0, node_path_1.join)("/sandbox", ".openclaw-data/milimo");
+            const homeMesh = (0, node_path_1.join)(home, ".openclaw-data/milimo");
             const meshRoot = (0, node_fs_1.existsSync)(sandboxMesh) ? sandboxMesh : homeMesh;
             const summaryPath = (0, node_path_1.join)(meshRoot, "finance", "revenue", "weekly_summary.json");
             if ((0, node_fs_1.existsSync)(summaryPath)) {
@@ -560,7 +567,7 @@ Press H to close this help.
                 this.revenueData = null;
             }
         }
-        catch (error) {
+        catch {
             this.revenueData = null;
         }
     }

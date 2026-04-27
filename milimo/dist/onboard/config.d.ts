@@ -19,6 +19,8 @@ export interface MilimoConfig {
     initializedAt: string;
     blueprintVersion: string;
     serverUrl?: string;
+    model?: string;
+    endpointUrl?: string;
     deep_work?: {
         active: boolean;
         activated_at: string;

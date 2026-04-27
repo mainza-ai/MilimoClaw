@@ -14,7 +14,7 @@ import { join } from "node:path";
 import type { ClawRole } from "../index.js";
 import { encryptConfig, decryptConfig } from "../lib/config-encryption.js";
 
-export const CONFIG_DIR = join(process.env.HOME ?? "/tmp", ".milimo");
+export const CONFIG_DIR = join(process.env.HOME ?? "/tmp", ".openclaw-data/milimo");
 const CONFIG_FILE = "config.json";
 const LEGACY_STATE_FILE = "state.json";
 

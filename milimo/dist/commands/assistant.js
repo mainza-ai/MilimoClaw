@@ -17,8 +17,19 @@ const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 const node_os_1 = require("node:os");
+function resolveAssistantScript() {
+    const candidates = [
+        (0, node_path_1.join)((0, node_os_1.homedir)(), ".openclaw-data/milimo", "blueprints", "0.1.0", "orchestrator", "assistant_setup.py"),
+        (0, node_path_1.join)(process.cwd(), "milimo-blueprint", "orchestrator", "assistant_setup.py"),
+    ];
+    for (const p of candidates) {
+        if ((0, node_fs_1.existsSync)(p))
+            return p;
+    }
+    return candidates[0];
+}
 function getAssistantConfig() {
-    const configPath = (0, node_path_1.join)((0, node_os_1.homedir)(), ".milimo", "config.json");
+    const configPath = (0, node_path_1.join)((0, node_os_1.homedir)(), ".openclaw-data/milimo", "config.json");
     try {
         const config = JSON.parse((0, node_fs_1.readFileSync)(configPath, "utf-8"));
         const assistant = config?.assistant;
@@ -33,7 +44,8 @@ function getAssistantConfig() {
 }
 async function assistantSetup() {
     console.log("Setting up squad assistant...\n");
-    const result = (0, node_child_process_1.spawn)("python3", ["milimo-blueprint/orchestrator/assistant_setup.py"], {
+    const scriptPath = resolveAssistantScript();
+    const result = (0, node_child_process_1.spawn)("python3", [scriptPath], {
         stdio: "inherit",
     });
     return new Promise((resolve, reject) => {
@@ -46,7 +58,8 @@ async function assistantSetup() {
     });
 }
 async function assistantVerify() {
-    const result = (0, node_child_process_1.spawn)("python3", ["milimo-blueprint/orchestrator/assistant_setup.py", "--verify"], {
+    const scriptPath = resolveAssistantScript();
+    const result = (0, node_child_process_1.spawn)("python3", [scriptPath, "--verify"], {
         stdio: "inherit",
     });
     return new Promise((resolve, reject) => {

@@ -475,8 +475,8 @@ Press H to close this help.
 
     try {
       const home = process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
-      const sandboxMesh = join("/sandbox", ".milimo");
-      const homeMesh = join(home, ".milimo");
+      const sandboxMesh = join("/sandbox", ".openclaw-data/milimo");
+      const homeMesh = join(home, ".openclaw-data/milimo");
       const meshRoot = existsSync(sandboxMesh) ? sandboxMesh : homeMesh;
       const registryPath = join(meshRoot, "tools", this.squadId, role, "registry.json");
       if (existsSync(registryPath)) {
@@ -607,8 +607,8 @@ Press H to close this help.
   private fetchRevenueData(): void {
     try {
       const home = process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
-      const sandboxMesh = join("/sandbox", ".milimo");
-      const homeMesh = join(home, ".milimo");
+      const sandboxMesh = join("/sandbox", ".openclaw-data/milimo");
+      const homeMesh = join(home, ".openclaw-data/milimo");
       const meshRoot = existsSync(sandboxMesh) ? sandboxMesh : homeMesh;
       const summaryPath = join(meshRoot, "finance", "revenue", "weekly_summary.json");
 

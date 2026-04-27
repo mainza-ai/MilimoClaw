@@ -51,7 +51,7 @@ export class AuditLogger {
 
   constructor(squadId: string, rotationConfig?: Partial<AuditRotationConfig>) {
     const home = process.env.HOME || process.env.USERPROFILE || homedir() || "/tmp";
-    this.auditDir = join(home, ".milimo", "audit", squadId);
+    this.auditDir = join(home, ".openclaw-data/milimo", "audit", squadId);
     this.auditFile = join(this.auditDir, "warroom.log");
     this.rotationConfig = {
       retentionDays: rotationConfig?.retentionDays ?? DEFAULT_RETENTION_DAYS,

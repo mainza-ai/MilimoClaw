@@ -1,10 +1,12 @@
 "use strict";
+// SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.cliWarRoom = cliWarRoom;
 const warroom_tui_js_1 = require("../warroom/warroom-tui.js");
 const approval_js_1 = require("../warroom/approval.js");
 const config_js_1 = require("../onboard/config.js");
-async function cliWarRoom(opts) {
+function cliWarRoom(opts) {
     const onboardConfig = (0, config_js_1.loadOnboardConfig)();
     const squadName = onboardConfig?.squadName ?? opts.pluginConfig.squadName;
     if (!squadName) {
@@ -33,7 +35,10 @@ function listWarRoomMessages(squadId, operatorId, tier) {
         console.log(`    Time: ${msg.timestamp}`);
         console.log(`    ID:   ${msg.message_id}`);
         if (msg.payload && Object.keys(msg.payload).length > 0) {
-            console.log(`    Payload: ${JSON.stringify(msg.payload, null, 4).split("\n").map(l => "      " + l).join("\n")}`);
+            console.log(`    Payload: ${JSON.stringify(msg.payload, null, 4)
+                .split("\n")
+                .map((l) => "      " + l)
+                .join("\n")}`);
         }
         console.log("");
     }

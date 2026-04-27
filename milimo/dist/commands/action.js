@@ -17,13 +17,13 @@ exports.listPendingActions = listPendingActions;
 const node_path_1 = require("node:path");
 const node_os_1 = require("node:os");
 const node_fs_1 = require("node:fs");
-async function cliActionApprove(options) {
-    const { logger, pluginConfig, actionId } = options;
+function cliActionApprove(options) {
+    const { logger, actionId } = options;
     const home = (0, node_os_1.homedir)();
-    const meshDir = (0, node_path_1.join)(home, ".milimo", "mesh");
+    const meshDir = (0, node_path_1.join)(home, ".openclaw-data/milimo", "mesh");
     const warRoomInbox = (0, node_path_1.join)(meshDir, "inbox", "war_room");
     const approvedDir = (0, node_path_1.join)(meshDir, "approved");
-    const logsDir = (0, node_path_1.join)(home, ".milimo", "logs");
+    const logsDir = (0, node_path_1.join)(home, ".openclaw-data/milimo", "logs");
     if (!(0, node_fs_1.existsSync)(warRoomInbox)) {
         logger.error("No pending actions found. War Room inbox does not exist.");
         process.exit(1);
@@ -47,27 +47,28 @@ async function cliActionApprove(options) {
             action_type: action.message_type,
         });
         logger.info(`✓ Action approved: ${actionId}`);
-        logger.info(`  Claw: ${action.sender_role.toUpperCase()}`);
-        logger.info(`  Type: ${action.message_type}`);
+        logger.info(` Claw: ${action.sender_role.toUpperCase()}`);
+        logger.info(` Type: ${action.message_type}`);
         if (action.message_type === "tool_proposal" && action.payload?.tool_name) {
-            logger.info(`  Tool: ${action.payload.tool_name}`);
+            logger.info(` Tool: ${action.payload.tool_name}`);
         }
         if (action.payload?.amount) {
-            logger.info(`  Amount: $${action.payload.amount}`);
+            logger.info(` Amount: $${action.payload.amount}`);
         }
     }
     catch (error) {
         logger.error(`Failed to approve action: ${error.message}`);
         process.exit(1);
     }
+    return Promise.resolve();
 }
-async function cliActionBlock(options) {
-    const { logger, pluginConfig, actionId, reason } = options;
+function cliActionBlock(options) {
+    const { logger, actionId, reason } = options;
     const home = (0, node_os_1.homedir)();
-    const meshDir = (0, node_path_1.join)(home, ".milimo", "mesh");
+    const meshDir = (0, node_path_1.join)(home, ".openclaw-data/milimo", "mesh");
     const warRoomInbox = (0, node_path_1.join)(meshDir, "inbox", "war_room");
     const rejectedDir = (0, node_path_1.join)(meshDir, "rejected");
-    const logsDir = (0, node_path_1.join)(home, ".milimo", "logs");
+    const logsDir = (0, node_path_1.join)(home, ".openclaw-data/milimo", "logs");
     if (!(0, node_fs_1.existsSync)(warRoomInbox)) {
         logger.error("No pending actions found. War Room inbox does not exist.");
         process.exit(1);
@@ -98,20 +99,21 @@ async function cliActionBlock(options) {
             reason: reason,
         });
         logger.info(`✗ Action blocked: ${actionId}`);
-        logger.info(`  Claw: ${action.sender_role.toUpperCase()}`);
-        logger.info(`  Type: ${action.message_type}`);
+        logger.info(` Claw: ${action.sender_role.toUpperCase()}`);
+        logger.info(` Type: ${action.message_type}`);
         if (reason) {
-            logger.info(`  Reason: ${reason}`);
+            logger.info(` Reason: ${reason}`);
         }
     }
     catch (error) {
         logger.error(`Failed to block action: ${error.message}`);
         process.exit(1);
     }
+    return Promise.resolve();
 }
 function listPendingActions() {
     const home = (0, node_os_1.homedir)();
-    const warRoomInbox = (0, node_path_1.join)(home, ".milimo", "mesh", "inbox", "war_room");
+    const warRoomInbox = (0, node_path_1.join)(home, ".openclaw-data/milimo", "mesh", "inbox", "war_room");
     if (!(0, node_fs_1.existsSync)(warRoomInbox)) {
         return [];
     }

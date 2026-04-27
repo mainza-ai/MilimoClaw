@@ -13,14 +13,14 @@ const node_path_1 = require("node:path");
 const node_os_1 = require("node:os");
 const node_fs_1 = require("node:fs");
 const node_zlib_1 = require("node:zlib");
-async function cliLogsSearch(options) {
+function cliLogsSearch(options) {
     const { logger, query, from, to, clawRole, decision, limit = 100, json, squad } = options;
     const squadId = squad || process.env.MILIMO_SQUAD || "default";
     const home = (0, node_os_1.homedir)();
-    const auditDir = (0, node_path_1.join)(home, ".milimo", "audit", squadId);
+    const auditDir = (0, node_path_1.join)(home, ".openclaw-data/milimo", "audit", squadId);
     if (!(0, node_fs_1.existsSync)(auditDir)) {
         logger.error(`No audit logs found for squad: ${squadId}`);
-        return;
+        return Promise.resolve();
     }
     const results = [];
     const fromDate = from ? new Date(from) : null;
@@ -69,6 +69,7 @@ async function cliLogsSearch(options) {
             }
         }
     }
+    return Promise.resolve();
 }
 function searchInFile(filePath, fromDate, toDate, query, clawRole, decision, limit, results, compressed) {
     try {
@@ -115,14 +116,14 @@ function searchInFile(filePath, fromDate, toDate, query, clawRole, decision, lim
         // Ignore errors reading file
     }
 }
-async function cliLogsList(options) {
+function cliLogsList(options) {
     const { logger, squad } = options;
     const squadId = squad || process.env.MILIMO_SQUAD || "default";
     const home = (0, node_os_1.homedir)();
-    const auditDir = (0, node_path_1.join)(home, ".milimo", "audit", squadId);
+    const auditDir = (0, node_path_1.join)(home, ".openclaw-data/milimo", "audit", squadId);
     if (!(0, node_fs_1.existsSync)(auditDir)) {
         logger.error(`No audit logs found for squad: ${squadId}`);
-        return;
+        return Promise.resolve();
     }
     try {
         const files = (0, node_fs_1.readdirSync)(auditDir)
@@ -131,7 +132,7 @@ async function cliLogsList(options) {
             .reverse();
         if (files.length === 0) {
             logger.info("No log files found.");
-            return;
+            return Promise.resolve();
         }
         logger.info(`Log files for squad ${squadId}:\n`);
         for (const file of files) {
@@ -145,5 +146,6 @@ async function cliLogsList(options) {
     catch (error) {
         logger.error(`Failed to list logs: ${error.message}`);
     }
+    return Promise.resolve();
 }
 //# sourceMappingURL=logs.js.map

@@ -58,7 +58,7 @@ function callPythonVerify(blueprintDir, code) {
     return result.stdout.trim();
 }
 // ---------------------------------------------------------------------------
-async function cliVerify(opts) {
+function cliVerify(opts) {
     const { logger, pluginConfig } = opts;
     const state = (0, init_js_1.loadMilimoState)();
     const blueprintDir = pluginConfig.blueprintDir;
@@ -71,13 +71,13 @@ async function cliVerify(opts) {
         logger.error("  ✗ No blueprint specified and no active squad.");
         logger.info("    Run with --blueprint <id> or activate a squad first.");
         logger.info("");
-        return;
+        return Promise.resolve();
     }
     const blueprintId = opts.blueprintId || (state ? `${state.squadName}-${state.clawRole}` : "");
     const version = opts.version || (state ? state.blueprintVersion : "latest");
     if (opts.chain) {
-        await verifyChain(opts, blueprintDir, blueprintId, logger);
-        return;
+        void verifyChain(opts, blueprintDir, blueprintId, logger);
+        return Promise.resolve();
     }
     logger.info(`  Blueprint: ${blueprintId}`);
     logger.info(`  Version: ${version}`);
@@ -101,30 +101,31 @@ else:
     verifier = ProvenanceVerifier(strict_mode=${opts.strict ? "True" : "False"})
     result = verifier.verify(attestation)
     result_dict = result.to_dict()
-    
+
     # Verify content if we have the blueprint
     content_result = verifier.verify_content(attestation, snapshot)
     result_dict['content_valid'] = content_result.valid
     result_dict['content_expected_hash'] = content_result.expected_hash[:16] + '...'
     result_dict['content_computed_hash'] = content_result.computed_hash[:16] + '...'
-    
+
     print(json.dumps(result_dict))
 `;
         const result = callPythonVerify(blueprintDir, code);
         const verifyResult = JSON.parse(result);
         if (opts.json) {
             logger.info(JSON.stringify(verifyResult, null, 2));
-            return;
+            return Promise.resolve();
         }
         renderVerificationResult(verifyResult, logger);
     }
     catch (err) {
-        logger.error(`  ✗ Verification failed: ${err.message}`);
+        logger.error(` ✗ Verification failed: ${err.message}`);
         logger.info("");
     }
+    return Promise.resolve();
 }
 // ---------------------------------------------------------------------------
-async function verifyChain(opts, blueprintDir, blueprintId, logger) {
+function verifyChain(opts, blueprintDir, blueprintId, logger) {
     logger.info("  Validating provenance chain...");
     logger.info("");
     try {
@@ -159,14 +160,15 @@ else:
         const chainResult = JSON.parse(result);
         if (opts.json) {
             logger.info(JSON.stringify(chainResult, null, 2));
-            return;
+            return Promise.resolve();
         }
         renderChainResult(chainResult, logger);
     }
     catch (err) {
-        logger.error(`  ✗ Chain validation failed: ${err.message}`);
+        logger.error(` ✗ Chain validation failed: ${err.message}`);
         logger.info("");
     }
+    return Promise.resolve();
 }
 // ---------------------------------------------------------------------------
 function renderVerificationResult(result, logger) {
@@ -245,7 +247,7 @@ function renderChainResult(result, logger) {
         logger.info("");
     }
 }
-async function cliProvenanceKeygen(opts) {
+function cliProvenanceKeygen(opts) {
     const { logger } = opts;
     logger.info("");
     logger.info("  ┌─────────────────────────────────────────────────────┐");
@@ -256,13 +258,13 @@ async function cliProvenanceKeygen(opts) {
     logger.info("");
     try {
         const home = process.env.HOME || process.env.USERPROFILE || "/tmp";
-        const keyDir = path.join(home, ".milimo", "keys");
+        const keyDir = path.join(home, ".openclaw-data/milimo", "keys");
         const keyFile = path.join(keyDir, `${opts.squad}.json`);
         if (fs.existsSync(keyFile) && !opts.force) {
             logger.error(`  ✗ Key file already exists: ${keyFile}`);
             logger.info("    Use --force to regenerate.");
             logger.info("");
-            return;
+            return Promise.resolve();
         }
         fs.mkdirSync(keyDir, { recursive: true });
         const code = `
@@ -280,7 +282,10 @@ print(json.dumps({
 }))
 `;
         const safeCode = `import sys; sys.path.insert(0, ${JSON.stringify(opts.pluginConfig.blueprintDir)}); ${code}`;
-        const result = (0, node_child_process_1.spawnSync)("python3", ["-c", safeCode], { cwd: opts.pluginConfig.blueprintDir, encoding: "utf-8" });
+        const result = (0, node_child_process_1.spawnSync)("python3", ["-c", safeCode], {
+            cwd: opts.pluginConfig.blueprintDir,
+            encoding: "utf-8",
+        });
         if (result.error)
             throw result.error;
         if (result.status !== 0)
@@ -295,8 +300,9 @@ print(json.dumps({
         logger.info("");
     }
     catch (err) {
-        logger.error(`  ✗ Key generation failed: ${err.message}`);
+        logger.error(` ✗ Key generation failed: ${err.message}`);
         logger.info("");
     }
+    return Promise.resolve();
 }
 //# sourceMappingURL=verify.js.map

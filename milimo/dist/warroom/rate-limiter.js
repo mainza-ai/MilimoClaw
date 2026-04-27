@@ -104,7 +104,7 @@ function getEffectiveTier(configPath) {
 }
 function loadConfig(configPath) {
     const home = process.env.HOME || process.env.USERPROFILE || "/tmp";
-    const configPathResolved = configPath || path.join(home, ".milimo", "config.json");
+    const configPathResolved = configPath || path.join(home, ".openclaw-data/milimo", "config.json");
     try {
         if (!fs.existsSync(configPathResolved)) {
             return null;
@@ -164,7 +164,7 @@ class RateLimiter extends node_events_1.EventEmitter {
         };
         // Setup state persistence
         const baseDir = stateDir || process.env.HOME || "/tmp";
-        this.statePath = path.join(baseDir, ".milimo", "rate-limits");
+        this.statePath = path.join(baseDir, ".openclaw-data/milimo", "rate-limits");
         this.loadState();
     }
     /**
@@ -173,7 +173,7 @@ class RateLimiter extends node_events_1.EventEmitter {
      */
     tryConsume() {
         this.refillIfNeeded();
-        const now = new Date();
+        new Date();
         // Pro tier has unlimited
         if (this.config.tier === Tier.PRO) {
             this.metrics.totalRequests++;
@@ -288,7 +288,8 @@ class RateLimiter extends node_events_1.EventEmitter {
         const lastBurstRefillDate = new Date(this.state.lastBurstRefill);
         const nextBurstReset = this.getBurstReset(lastBurstRefillDate);
         if (now >= nextBurstReset) {
-            this.state.burstTokens = this.config.burstLimit === Infinity ? Infinity : this.config.burstLimit;
+            this.state.burstTokens =
+                this.config.burstLimit === Infinity ? Infinity : this.config.burstLimit;
             this.state.lastBurstRefill = now.toISOString();
             this.emit("refill", { type: "burst", tokens: this.state.burstTokens });
         }
@@ -402,7 +403,6 @@ class RateLimitMetricsTracker {
         if (this.history.length === 0) {
             return 0;
         }
-        const latest = this.history[this.history.length - 1];
         const status = this.limiter.getStatus();
         if (status.dailyLimit === -1) {
             return 0; // Unlimited

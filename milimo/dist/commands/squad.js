@@ -53,7 +53,7 @@ const init_js_1 = require("./init.js");
 const python_bridge_js_1 = require("../lib/python-bridge.js");
 function getFinalsModePath() {
     const home = process.env["HOME"] ?? process.env["USERPROFILE"] ?? "/tmp";
-    return path.join(home, ".milimo", "finals-mode.json");
+    return path.join(home, ".openclaw-data/milimo", "finals-mode.json");
 }
 function loadFinalsMode() {
     const fp = getFinalsModePath();
@@ -88,13 +88,13 @@ function checkFinalsModeAutoResume(logger) {
         logger.info(" All claw policies restored to pre-finals configuration.");
     }
 }
-async function cliSquadStatus(opts) {
+function cliSquadStatus(opts) {
     const { logger } = opts;
     const state = (0, init_js_1.loadMilimoState)();
     if (!state) {
         logger.info("No Milimo Claw configuration found.");
         logger.info('Run "milimo init" to set up your claw.');
-        return;
+        return Promise.resolve();
     }
     const finalsMode = loadFinalsMode();
     const assistant = state.assistant;
@@ -117,7 +117,7 @@ async function cliSquadStatus(opts) {
             finalsMode: finalsMode?.active ?? false,
         };
         logger.info(JSON.stringify(output, null, 2));
-        return;
+        return Promise.resolve();
     }
     logger.info("");
     logger.info(" ┌─────────────────────────────────────────────────────┐");
@@ -150,27 +150,28 @@ async function cliSquadStatus(opts) {
         }
     }
     logger.info("");
+    return Promise.resolve();
 }
-async function cliSquadFinalsMode(opts) {
+function cliSquadFinalsMode(opts) {
     const { logger } = opts;
     const state = (0, init_js_1.loadMilimoState)();
     if (!state) {
         logger.error("No Milimo Claw configuration found. Run 'openclaw milimo init' first.");
-        return;
+        return Promise.resolve();
     }
     const existingFinalsMode = loadFinalsMode();
     if (existingFinalsMode?.active) {
         logger.warn("Finals Mode is already active.");
         logger.info(` Activated: ${existingFinalsMode.activatedAt}`);
         logger.info(` Duration: ${existingFinalsMode.duration}`);
-        logger.info(' To deactivate, run: openclaw milimo squad resume');
-        return;
+        logger.info(" To deactivate, run: openclaw milimo squad resume");
+        return Promise.resolve();
     }
     if (!opts.duration && !opts.resumeDate) {
         logger.error("At least one of --duration or --resume-date is required.");
         logger.info(" Usage: openclaw milimo squad finals-mode --duration 2weeks");
         logger.info(" Usage: openclaw milimo squad finals-mode --resume-date 2026-04-01");
-        return;
+        return Promise.resolve();
     }
     let resumeDate = opts.resumeDate ?? null;
     if (!resumeDate && opts.duration) {
@@ -183,18 +184,18 @@ async function cliSquadFinalsMode(opts) {
     }
     if (!resumeDate) {
         logger.error("Could not calculate resume date from duration.");
-        return;
+        return Promise.resolve();
     }
     const blueprintDir = getBlueprintDir();
     const response = (0, python_bridge_js_1.callPythonBridgeSafe)("activate_deep_work", { resume_date: resumeDate }, { blueprintDir });
     if (!response.success) {
         logger.error(`Failed to activate deep work mode: ${response.error}`);
-        return;
+        return Promise.resolve();
     }
     const data = response.data;
     if (!data) {
         logger.error("No data returned from deep work activation");
-        return;
+        return Promise.resolve();
     }
     const finalsModeState = {
         active: true,
@@ -242,24 +243,25 @@ async function cliSquadFinalsMode(opts) {
     logger.info("");
     logger.info(" To resume: openclaw milimo squad resume");
     logger.info("");
+    return Promise.resolve();
 }
-async function cliSquadResume(opts) {
+function cliSquadResume(opts) {
     const { logger } = opts;
     const state = (0, init_js_1.loadMilimoState)();
     if (!state) {
         logger.error("No Milimo Claw configuration found. Run 'openclaw milimo init' first.");
-        return;
+        return Promise.resolve();
     }
     const finalsMode = loadFinalsMode();
     if (!finalsMode?.active) {
         logger.info("Finals Mode is not active. Nothing to resume.");
-        return;
+        return Promise.resolve();
     }
     const blueprintDir = getBlueprintDir();
     const response = (0, python_bridge_js_1.callPythonBridgeSafe)("resume_deep_work", {}, { blueprintDir });
     if (!response.success) {
         logger.error(`Failed to resume from deep work mode: ${response.error}`);
-        return;
+        return Promise.resolve();
     }
     finalsMode.active = false;
     saveFinalsMode(finalsMode);
@@ -268,7 +270,7 @@ async function cliSquadResume(opts) {
         logger.info("");
         logger.info("Normal operations resumed.");
         logger.info("");
-        return;
+        return Promise.resolve();
     }
     logger.info("");
     logger.info(" ╔═══════════════════════════════════════════════════════╗");
@@ -296,6 +298,7 @@ async function cliSquadResume(opts) {
     logger.info("");
     logger.info(" Welcome back. Let's get it. 💪");
     logger.info("");
+    return Promise.resolve();
 }
 function parseDurationDays(duration) {
     const match = /^(\d+)\s*(day|days|week|weeks|month|months)$/i.exec(duration);

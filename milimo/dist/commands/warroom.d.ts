@@ -4,5 +4,5 @@ export declare function cliWarRoom(opts: {
     logger: PluginLogger;
     pluginConfig: MilimoConfig;
     list?: boolean;
-}): Promise<void>;
+}): void;
 //# sourceMappingURL=warroom.d.ts.map

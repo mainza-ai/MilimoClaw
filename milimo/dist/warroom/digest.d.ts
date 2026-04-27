@@ -57,8 +57,8 @@ export declare class DigestScheduler {
     private scheduleMorning;
     private scheduleEvening;
     private calculateDelay;
-    getMorningBrief(): Promise<DigestBrief | null>;
-    getEveningWrap(): Promise<DigestBrief | null>;
+    getMorningBrief(): DigestBrief | null;
+    getEveningWrap(): DigestBrief | null;
     renderBrief(brief: DigestBrief): string[];
     getNextMorningTime(): Date | null;
     getNextEveningTime(): Date | null;

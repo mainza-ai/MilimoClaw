@@ -57,6 +57,6 @@ declare class HealthDashboard extends EventEmitter {
 }
 declare function createHealthWidget(health: SquadHealth): string;
 declare function renderMetricGauge(value: number, max: number, label: string): string;
-export { HealthDashboard, createHealthWidget, renderMetricGauge, STATUS_ICONS, STATUS_COLORS, };
+export { HealthDashboard, createHealthWidget, renderMetricGauge, STATUS_ICONS, STATUS_COLORS };
 export type { SquadHealth, ClawHealth, HealthMetrics };
 //# sourceMappingURL=health-dashboard.d.ts.map

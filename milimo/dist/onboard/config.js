@@ -20,7 +20,7 @@ exports.getActiveClawsForTemplate = getActiveClawsForTemplate;
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 const config_encryption_js_1 = require("../lib/config-encryption.js");
-exports.CONFIG_DIR = (0, node_path_1.join)(process.env.HOME ?? "/tmp", ".milimo");
+exports.CONFIG_DIR = (0, node_path_1.join)(process.env.HOME ?? "/tmp", ".openclaw-data/milimo");
 const CONFIG_FILE = "config.json";
 const LEGACY_STATE_FILE = "state.json";
 const DEFAULT_CONFIG = {
@@ -57,16 +57,6 @@ function ensureConfigDir() {
     if (!(0, node_fs_1.existsSync)(exports.CONFIG_DIR)) {
         (0, node_fs_1.mkdirSync)(exports.CONFIG_DIR, { recursive: true });
     }
-}
-function validateConfig(data) {
-    if (typeof data !== "object" || data === null)
-        return false;
-    const cfg = data;
-    return (typeof cfg["squadName"] === "string" &&
-        typeof cfg["clawRole"] === "string" &&
-        typeof cfg["template"] === "string" &&
-        typeof cfg["solo"] === "boolean" &&
-        Array.isArray(cfg["meshMembers"]));
 }
 function loadLegacyState() {
     const statePath = getLegacyStatePath();
@@ -167,7 +157,16 @@ class ConfigManager {
     }
     static ensureDirectories() {
         ensureConfigDir();
-        const subdirs = ["blueprints", "audit", "mesh", "evolution", "tools", "attestations", "keys", "health"];
+        const subdirs = [
+            "blueprints",
+            "audit",
+            "mesh",
+            "evolution",
+            "tools",
+            "attestations",
+            "keys",
+            "health",
+        ];
         for (const subdir of subdirs) {
             const dir = (0, node_path_1.join)(exports.CONFIG_DIR, subdir);
             if (!(0, node_fs_1.existsSync)(dir)) {
@@ -218,10 +217,15 @@ function loadNemoClawConfig() {
             const raw = (0, node_fs_1.readFileSync)(openclawPath, "utf-8");
             const config = JSON.parse(raw);
             const primaryModel = config.agents?.defaults?.model?.primary;
-            const providerId = primaryModel?.split("/")[0];
+            const envModel = process.env.NEMOCLAW_MODEL || primaryModel;
+            const providerId = envModel?.split("/")[0];
             const baseUrl = providerId ? config.models?.providers?.[providerId]?.baseUrl : undefined;
-            if (primaryModel && baseUrl) {
-                return { model: primaryModel, endpointUrl: baseUrl };
+            if (envModel && baseUrl) {
+                return { model: envModel, endpointUrl: baseUrl };
+            }
+            if (envModel && !baseUrl) {
+                const defaultBase = process.env.NVIDIA_API_BASE ?? "https://integrate.api.nvidia.com/v1";
+                return { model: envModel, endpointUrl: defaultBase };
             }
         }
         catch {
@@ -243,6 +247,13 @@ exports.TEMPLATE_CLAW_MAP = {
     "campus-ai-tool": ["build", "content", "ops"],
 };
 function getActiveClawsForTemplate(templateName) {
-    return exports.TEMPLATE_CLAW_MAP[templateName] ?? ["content", "ops", "analytics", "finance", "build", "assistant"];
+    return (exports.TEMPLATE_CLAW_MAP[templateName] ?? [
+        "content",
+        "ops",
+        "analytics",
+        "finance",
+        "build",
+        "assistant",
+    ]);
 }
 //# sourceMappingURL=config.js.map

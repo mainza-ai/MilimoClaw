@@ -1,1 +1,1 @@
-{"version":3,"file":"config-legacy.d.ts","sourceRoot":"","sources":["../../src/onboard/config-legacy.ts"],"names":[],"mappings":"AASA,eAAO,MAAM,UAAU,QAA8C,CAAC;AAEtE,wBAAgB,UAAU,IAAI,MAAM,CAEnC"}
+{"version":3,"file":"config-legacy.d.ts","sourceRoot":"","sources":["../../src/onboard/config-legacy.ts"],"names":[],"mappings":"AASA,eAAO,MAAM,UAAU,QAA4D,CAAC;AAEpF,wBAAgB,UAAU,IAAI,MAAM,CAEnC"}

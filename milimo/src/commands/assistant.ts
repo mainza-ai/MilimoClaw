@@ -21,7 +21,14 @@ interface AssistantConfig {
 
 function resolveAssistantScript(): string {
   const candidates = [
-    join(homedir(), ".milimo", "blueprints", "0.1.0", "orchestrator", "assistant_setup.py"),
+    join(
+      homedir(),
+      ".openclaw-data/milimo",
+      "blueprints",
+      "0.1.0",
+      "orchestrator",
+      "assistant_setup.py",
+    ),
     join(process.cwd(), "milimo-blueprint", "orchestrator", "assistant_setup.py"),
   ];
   for (const p of candidates) {
@@ -31,7 +38,7 @@ function resolveAssistantScript(): string {
 }
 
 export function getAssistantConfig(): AssistantConfig | null {
-  const configPath = join(homedir(), ".milimo", "config.json");
+  const configPath = join(homedir(), ".openclaw-data/milimo", "config.json");
   try {
     const config = JSON.parse(readFileSync(configPath, "utf-8"));
     const assistant = config?.assistant;

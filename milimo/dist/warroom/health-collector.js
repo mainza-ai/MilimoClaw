@@ -21,7 +21,7 @@ class HealthCollector {
         this.bridgeOptions = { blueprintDir: options.blueprintDir };
         this.pollInterval = options.pollInterval ?? 3000;
     }
-    async collectAll() {
+    collectAll() {
         const response = (0, python_bridge_1.callPythonBridgeSafe)("collect_health", { squad_id: this.squadId }, this.bridgeOptions);
         if (!response.success || !response.data) {
             throw new Error(response.error ?? "Health collection failed");
@@ -33,21 +33,23 @@ class HealthCollector {
             return () => this.stopPolling();
         }
         this.running = true;
-        this.collectAll()
-            .then(onUpdate)
-            .catch((error) => {
+        try {
+            onUpdate(this.collectAll());
+        }
+        catch (error) {
             if (onError) {
                 onError(error);
             }
-        });
+        }
         this.intervalId = setInterval(() => {
-            this.collectAll()
-                .then(onUpdate)
-                .catch((error) => {
+            try {
+                onUpdate(this.collectAll());
+            }
+            catch (error) {
                 if (onError) {
                     onError(error);
                 }
-            });
+            }
         }, this.pollInterval);
         return () => this.stopPolling();
     }

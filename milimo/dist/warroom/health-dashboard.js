@@ -43,17 +43,18 @@ class HealthDashboard extends events_1.EventEmitter {
     constructor(squadId = "default") {
         super();
         this.squadId = squadId;
-        this.blueprintDir = process.env.MILIMO_BLUEPRINT_DIR || (0, path_1.join)((0, os_1.homedir)(), ".milimo", "blueprints", squadId);
-        this.healthPath = (0, path_1.join)((0, os_1.homedir)(), ".milimo", "health", "health.json");
+        this.blueprintDir =
+            process.env.MILIMO_BLUEPRINT_DIR || (0, path_1.join)((0, os_1.homedir)(), ".openclaw-data/milimo", "blueprints", squadId);
+        this.healthPath = (0, path_1.join)((0, os_1.homedir)(), ".openclaw-data/milimo", "health", "health.json");
     }
     start(intervalMs = 5000) {
         if (this.updateInterval) {
             return;
         }
         this.updateInterval = setInterval(() => {
-            this.update();
+            void this.update();
         }, intervalMs);
-        this.update();
+        void this.update();
     }
     stop() {
         if (this.updateInterval) {

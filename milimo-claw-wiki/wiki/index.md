@@ -130,6 +130,7 @@ Common issues and fixes.
 | [[issues-and-fixes]] | Comprehensive audit of past fixes | ✓ |
 | [[sandbox-sync]] | Sandbox synchronization issues | ✓ |
 | [[claw-silent-responses]] | Claws returning blank output | ✓ |
+| [[sandbox-security-audit-2026-04-25]] | Critical: install.sh violates NemoClaw sandbox security model | ✓ |
 
 ---
 

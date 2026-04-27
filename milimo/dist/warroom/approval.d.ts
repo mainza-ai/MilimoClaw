@@ -1,4 +1,4 @@
-export type ApprovalMode = 'AUTO' | 'REVIEW' | 'HOLD' | 'VETO';
+export type ApprovalMode = "AUTO" | "REVIEW" | "HOLD" | "VETO";
 export interface PendingMessage {
     message_id: string;
     sender_role: string;
@@ -30,7 +30,7 @@ export declare class ApprovalEngine {
         trigger?: string;
         description?: string;
     };
-    processDecision(message: PendingMessage, decision: 'APPROVED' | 'REJECTED' | 'DELEGATED', operatorId?: string, reason?: string): void;
+    processDecision(message: PendingMessage, decision: "APPROVED" | "REJECTED" | "DELEGATED", operatorId?: string, reason?: string): void;
     autoProcessEligible(): void;
     /**
      * Get rate limiter status for display in War Room.

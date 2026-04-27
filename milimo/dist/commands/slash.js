@@ -90,7 +90,7 @@ function slashStatus(api) {
     }
     return { text: lines.join("\n") };
 }
-function slashRole(api) {
+function slashRole(_api) {
     const state = (0, init_js_1.loadMilimoState)();
     if (!state) {
         return {
@@ -203,7 +203,7 @@ function slashRole(api) {
 }
 function slashFinals() {
     const home = process.env["HOME"] ?? process.env["USERPROFILE"] ?? "/tmp";
-    const finalsPath = (0, node_path_1.join)(home, ".milimo", "finals-mode.json");
+    const finalsPath = (0, node_path_1.join)(home, ".openclaw-data/milimo", "finals-mode.json");
     if (!(0, node_fs_1.existsSync)(finalsPath)) {
         return {
             text: [
@@ -245,7 +245,7 @@ function slashFinals() {
         return { text: "**📚 Finals Mode:** Unable to read state" };
     }
 }
-function slashApprove(actionId, api) {
+function slashApprove(actionId, _api) {
     if (!actionId) {
         return { text: "**❌ Error:** Usage: `/milimo approve <action_id>`" };
     }
@@ -277,7 +277,7 @@ function slashApprove(actionId, api) {
         return { text: `**❌ Error:** ${err.message}` };
     }
 }
-function slashVeto(actionId, api) {
+function slashVeto(actionId, _api) {
     if (!actionId) {
         return { text: "**❌ Error:** Usage: `/milimo veto <action_id>`" };
     }
@@ -309,7 +309,7 @@ function slashVeto(actionId, api) {
         return { text: `**❌ Error:** ${err.message}` };
     }
 }
-function slashHealth(api) {
+function slashHealth(_api) {
     const state = (0, init_js_1.loadMilimoState)();
     if (!state) {
         return { text: "**❌ Error:** Not initialized. Run `openclaw milimo init` first." };
@@ -318,7 +318,7 @@ function slashHealth(api) {
     const lines = ["**🦀 Claw Health Summary**", ""];
     const claws = state.meshMembers.length > 0 ? state.meshMembers : [state.clawRole];
     for (const claw of claws) {
-        const registryPath = (0, node_path_1.join)(home, ".milimo", "tools", state.squadName, claw, "registry.json");
+        const registryPath = (0, node_path_1.join)(home, ".openclaw-data/milimo", "tools", state.squadName, claw, "registry.json");
         let status = "○";
         let tools = 0;
         try {
@@ -331,12 +331,11 @@ function slashHealth(api) {
         catch {
             status = "⚠";
         }
-        const statusColor = status === "●" ? "active" : status === "⚠" ? "error" : "idle";
         lines.push(` ${status} **${claw.toUpperCase()}** — ${tools} tools`);
     }
     return { text: lines.join("\n") };
 }
-function slashEvolution(api) {
+function slashEvolution(_api) {
     const state = (0, init_js_1.loadMilimoState)();
     if (!state) {
         return { text: "**❌ Error:** Not initialized. Run `openclaw milimo init` first." };
@@ -345,7 +344,7 @@ function slashEvolution(api) {
     const lines = ["**🔧 Evolution Log**", ""];
     const claws = state.meshMembers.length > 0 ? state.meshMembers : [state.clawRole];
     for (const claw of claws) {
-        const registryPath = (0, node_path_1.join)(home, ".milimo", "tools", state.squadName, claw, "registry.json");
+        const registryPath = (0, node_path_1.join)(home, ".openclaw-data/milimo", "tools", state.squadName, claw, "registry.json");
         try {
             if ((0, node_fs_1.existsSync)(registryPath)) {
                 const data = JSON.parse((0, node_fs_1.readFileSync)(registryPath, "utf-8"));

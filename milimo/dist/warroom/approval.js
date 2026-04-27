@@ -1,4 +1,6 @@
 "use strict";
+// SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ApprovalEngine = void 0;
 const fs_1 = require("fs");
@@ -14,23 +16,23 @@ class ApprovalEngine {
     escalationRules = [];
     rateLimiter = null;
     tier = rate_limiter_1.Tier.FREE;
-    constructor(squadId, tier = 'free') {
-        const home = process.env.HOME || process.env.USERPROFILE || (0, os_1.homedir)() || '/tmp';
+    constructor(squadId, tier = "free") {
+        const home = process.env.HOME || process.env.USERPROFILE || (0, os_1.homedir)() || "/tmp";
         // Mesh data directory — supports both host and container environments
         // Container: /sandbox/.milimo/mesh/ (Path.home() in Python)
         // Host: ~/.milimo/mesh/
-        const sandboxMesh = (0, path_1.join)('/sandbox', '.milimo', 'mesh');
-        const homeMesh = (0, path_1.join)(home, '.milimo', 'mesh');
+        const sandboxMesh = (0, path_1.join)("/sandbox", ".openclaw-data/milimo", "mesh");
+        const homeMesh = (0, path_1.join)(home, ".openclaw-data/milimo", "mesh");
         this.meshDir = (0, fs_1.existsSync)(sandboxMesh) ? sandboxMesh : homeMesh;
-        this.warRoomInbox = (0, path_1.join)(this.meshDir, 'inbox', 'war_room');
+        this.warRoomInbox = (0, path_1.join)(this.meshDir, "inbox", "war_room");
         this.audit = new audit_1.AuditLogger(squadId);
         this.tier = (0, rate_limiter_1.getTierFromString)(tier);
         // Initialize rate limiter
         try {
-            this.rateLimiter = new rate_limiter_1.RateLimiter(this.tier, (0, path_1.join)(home, '.milimo'));
+            this.rateLimiter = new rate_limiter_1.RateLimiter(this.tier, (0, path_1.join)(home, ".openclaw-data/milimo"));
         }
-        catch (e) {
-            console.warn('Failed to initialize rate limiter:', e);
+        catch (_e) {
+            console.warn("Failed to initialize rate limiter:", _e);
         }
         this.loadEscalationRules();
     }
@@ -38,15 +40,15 @@ class ApprovalEngine {
         try {
             // Try multiple locations: host, container blueprint, container sandbox
             const candidates = [
-                (0, path_1.join)(process.cwd(), 'milimo-blueprint', 'mesh_config.yaml'),
-                (0, path_1.join)('/sandbox', '.milimo', 'blueprints', '0.1.0', 'mesh_config.yaml'),
-                (0, path_1.join)(process.cwd(), 'mesh_config.yaml'),
+                (0, path_1.join)(process.cwd(), "milimo-blueprint", "mesh_config.yaml"),
+                (0, path_1.join)("/sandbox", ".openclaw-data/milimo", "blueprints", "0.1.0", "mesh_config.yaml"),
+                (0, path_1.join)(process.cwd(), "mesh_config.yaml"),
             ];
-            const configPath = candidates.find(p => (0, fs_1.existsSync)(p));
+            const configPath = candidates.find((p) => (0, fs_1.existsSync)(p));
             if (!configPath) {
-                throw new Error('Config not found');
+                throw new Error("Config not found");
             }
-            const content = (0, fs_1.readFileSync)(configPath, 'utf8');
+            const content = (0, fs_1.readFileSync)(configPath, "utf8");
             const config = (0, yaml_1.parse)(content);
             if (config && config.escalation_rules) {
                 this.escalationRules = config.escalation_rules.map((rule) => ({
@@ -56,25 +58,29 @@ class ApprovalEngine {
                 }));
             }
         }
-        catch (e) {
-            console.warn('Failed to load escalation rules from mesh_config.yaml. Using defaults.');
+        catch {
+            console.warn("Failed to load escalation rules from mesh_config.yaml. Using defaults.");
             this.escalationRules = [
-                { trigger: 'invoice_over_500', action: 'VETO', description: 'Any invoice >$500 requires squad-wide approval' }
+                {
+                    trigger: "invoice_over_500",
+                    action: "VETO",
+                    description: "Any invoice >$500 requires squad-wide approval",
+                },
             ];
         }
     }
     getPendingMessages() {
         try {
-            const files = (0, fs_1.readdirSync)(this.warRoomInbox).filter(f => f.endsWith('.json'));
+            const files = (0, fs_1.readdirSync)(this.warRoomInbox).filter((f) => f.endsWith(".json"));
             const messages = [];
             for (const file of files) {
                 const filePath = (0, path_1.join)(this.warRoomInbox, file);
                 try {
-                    const content = (0, fs_1.readFileSync)(filePath, 'utf8');
+                    const content = (0, fs_1.readFileSync)(filePath, "utf8");
                     const msg = JSON.parse(content);
                     messages.push({
                         ...msg,
-                        file_path: filePath
+                        file_path: filePath,
                     });
                 }
                 catch (e) {
@@ -84,7 +90,7 @@ class ApprovalEngine {
             // Sort by timestamp (oldest first)
             return messages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
         }
-        catch (e) {
+        catch {
             // Directory might not exist yet if no messages received
             return [];
         }
@@ -92,38 +98,44 @@ class ApprovalEngine {
     evaluateAction(message) {
         // 1. Check escalation triggers based on payload heuristics
         // Example: invoice_over_500
-        if (message.message_type === 'deliverable' && message.payload && message.payload.type === 'invoice') {
+        if (message.message_type === "deliverable" &&
+            message.payload &&
+            message.payload.type === "invoice") {
             const amount = message.payload.amount || 0;
             if (amount > 500) {
-                const rule = this.escalationRules.find(r => r.trigger === 'invoice_over_500');
+                const rule = this.escalationRules.find((r) => r.trigger === "invoice_over_500");
                 if (rule) {
                     return { mode: rule.action, trigger: rule.trigger, description: rule.description };
                 }
             }
         }
         // Handle tool proposals based on evolution config
-        if (message.message_type === 'tool_proposal') {
+        if (message.message_type === "tool_proposal") {
             let requireApproval = false;
             try {
-                const configPath = (0, path_1.join)(process.cwd(), 'milimo-blueprint', 'evolution_config.yaml');
-                const content = (0, fs_1.readFileSync)(configPath, 'utf8');
+                const configPath = (0, path_1.join)(process.cwd(), "milimo-blueprint", "evolution_config.yaml");
+                const content = (0, fs_1.readFileSync)(configPath, "utf8");
                 const config = (0, yaml_1.parse)(content);
-                if (config && config.deployment && typeof config.deployment.require_proposal_approval === 'boolean') {
+                if (config &&
+                    config.deployment &&
+                    typeof config.deployment.require_proposal_approval === "boolean") {
                     requireApproval = config.deployment.require_proposal_approval;
                 }
             }
-            catch (e) {
+            catch {
                 // Default to false if config not found
             }
-            return requireApproval ? { mode: 'REVIEW', description: 'Tool proposal review' } : { mode: 'AUTO' };
+            return requireApproval
+                ? { mode: "REVIEW", description: "Tool proposal review" }
+                : { mode: "AUTO" };
         }
         // Default modes based on needs_approval flag from Contracts
         if (message.needs_approval) {
-            return { mode: 'REVIEW' };
+            return { mode: "REVIEW" };
         }
-        return { mode: 'AUTO' };
+        return { mode: "AUTO" };
     }
-    processDecision(message, decision, operatorId = 'system', reason) {
+    processDecision(message, decision, operatorId = "system", reason) {
         this.audit.logAction({
             messageId: message.message_id,
             clawRole: message.sender_role,
@@ -133,13 +145,13 @@ class ApprovalEngine {
             reason,
             details: {
                 message_type: message.message_type,
-                recipient: message.recipient_role
-            }
+                recipient: message.recipient_role,
+            },
         });
-        if (decision === 'APPROVED') {
+        if (decision === "APPROVED") {
             // Move from war_room inbox to actual recipient inbox
-            const targetInbox = (0, path_1.join)(this.meshDir, 'inbox', message.recipient_role);
-            const fileName = message.file_path.split('/').pop();
+            const targetInbox = (0, path_1.join)(this.meshDir, "inbox", message.recipient_role);
+            const fileName = message.file_path.split("/").pop();
             const targetPath = (0, path_1.join)(targetInbox, fileName);
             try {
                 (0, fs_1.renameSync)(message.file_path, targetPath);
@@ -148,10 +160,10 @@ class ApprovalEngine {
                 console.error(`Failed to route approved message ${message.message_id}:`, e);
             }
         }
-        else if (decision === 'REJECTED') {
+        else if (decision === "REJECTED") {
             // Move to rejected queue
-            const rejectedDir = (0, path_1.join)(this.meshDir, 'rejected');
-            const fileName = message.file_path.split('/').pop();
+            const rejectedDir = (0, path_1.join)(this.meshDir, "rejected");
+            const fileName = message.file_path.split("/").pop();
             const targetPath = (0, path_1.join)(rejectedDir, fileName);
             try {
                 (0, fs_1.renameSync)(message.file_path, targetPath);
@@ -160,7 +172,7 @@ class ApprovalEngine {
                 console.error(`Failed to move rejected message ${message.message_id}:`, e);
             }
         }
-        else if (decision === 'DELEGATED') {
+        else if (decision === "DELEGATED") {
             // Leave it in the queue, perhaps tag it somehow in future
             // For now, no file move is strictly needed for HOLD
         }
@@ -169,7 +181,7 @@ class ApprovalEngine {
         const pending = this.getPendingMessages();
         for (const msg of pending) {
             const evaluation = this.evaluateAction(msg);
-            if (evaluation.mode === 'AUTO') {
+            if (evaluation.mode === "AUTO") {
                 // Check rate limit before auto-approving
                 if (this.rateLimiter) {
                     const rateResult = this.rateLimiter.tryConsume();
@@ -178,10 +190,10 @@ class ApprovalEngine {
                         this.audit.logAction({
                             messageId: msg.message_id,
                             clawRole: msg.sender_role,
-                            actionType: 'RATE_LIMITED',
-                            decision: 'DELEGATED',
-                            operatorId: 'rate-limiter',
-                            reason: rateResult.reason || 'Daily auto-approval limit exceeded',
+                            actionType: "RATE_LIMITED",
+                            decision: "DELEGATED",
+                            operatorId: "rate-limiter",
+                            reason: rateResult.reason || "Daily auto-approval limit exceeded",
                             details: {
                                 remaining: rateResult.remaining,
                                 resetAt: rateResult.resetAt,
@@ -190,7 +202,7 @@ class ApprovalEngine {
                         continue; // Skip to next message, leave this for manual review
                     }
                 }
-                this.processDecision(msg, 'APPROVED', 'auto-engine', 'Auto-approved per policy');
+                this.processDecision(msg, "APPROVED", "auto-engine", "Auto-approved per policy");
             }
         }
     }
