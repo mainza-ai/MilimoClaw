@@ -129,7 +129,7 @@ function slashRole(_api: OpenClawPluginApi): PluginCommandResult {
     content: [
       "**🎨 Content Claw**",
       "",
-      "**Mount:** `/sandbox/content`",
+      "**Mount:** `~/.openclaw-data/milimo/claws/content`",
       "**Responsibility:** All creative output — posts, copy, campaigns, brand voice",
       "",
       "**Inference Routing:**",
@@ -145,7 +145,7 @@ function slashRole(_api: OpenClawPluginApi): PluginCommandResult {
     ops: [
       "**📋 Ops Claw**",
       "",
-      "**Mount:** `/sandbox/clients`",
+      "**Mount:** `~/.openclaw-data/milimo/claws/ops`",
       "**Responsibility:** Client lifecycle — intake, scoping, delivery, follow-up",
       "",
       "**Inference Routing:**",
@@ -161,7 +161,7 @@ function slashRole(_api: OpenClawPluginApi): PluginCommandResult {
     analytics: [
       "**📊 Analytics Claw**",
       "",
-      "**Mount:** `/sandbox/analytics`",
+      "**Mount:** `~/.openclaw-data/milimo/claws/analytics`",
       "**Responsibility:** Intelligence — performance, trends, opportunities",
       "",
       "**Inference Routing:**",
@@ -177,7 +177,7 @@ function slashRole(_api: OpenClawPluginApi): PluginCommandResult {
     finance: [
       "**💰 Finance Claw**",
       "",
-      "**Mount:** `/sandbox/finance`",
+      "**Mount:** `~/.openclaw-data/milimo/claws/finance`",
       "**Responsibility:** Financial ops — invoicing, pricing, margins",
       "",
       "**Inference Routing:**",
@@ -191,7 +191,7 @@ function slashRole(_api: OpenClawPluginApi): PluginCommandResult {
     build: [
       "**🔧 Build Claw** *(Tech Squads)*",
       "",
-      "**Mount:** `/sandbox/build`",
+      "**Mount:** `~/.openclaw-data/milimo/claws/build`",
       "**Responsibility:** Engineering — code, PRs, deploys, monitoring",
       "",
       "**Inference Routing:**",
@@ -208,7 +208,7 @@ function slashRole(_api: OpenClawPluginApi): PluginCommandResult {
     assistant: [
       "**👽 Assistant Claw**",
       "",
-      "**Mount:** `/sandbox/.milimo/assistant`",
+      "**Mount:** `/sandbox/.openclaw-data/milimo/claws/assistant`",
       "**Responsibility:** Cross-claw coordination, operator bridge (Telegram), research, scheduling",
       "",
       "**Inference Routing:**",

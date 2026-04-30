@@ -73,13 +73,14 @@ This creates a Docker image with:
 Before using MilimoClaw, each member must onboard NemoClaw for inference:
 
 ```bash
-openclaw nemoclaw onboard
+nemoclaw onboard
 ```
 
 This configures:
-- Inference endpoint (NVIDIA Build, NCP, or local)
+- Inference endpoint (NVIDIA Endpoints recommended)
 - API key authentication
 - Model selection
+- Telegram channel (if desired)
 
 ---
 
@@ -283,7 +284,7 @@ Once the mesh is live:
 
 | Issue | Solution |
 |---|---|
-| `milimo onboard` says "NemoClaw not onboarded" | Run `openclaw nemoclaw onboard` first |
+| `milimo onboard` says "NemoClaw not onboarded" | Run `nemoclaw onboard` first |
 | `milimo onboard` fails with "no template found" | Ensure `milimo-blueprint/templates/` is in the Docker image |
 | Mesh shows claw as "offline" | Check Docker container is running: `docker ps` |
 | War Room shows no pending actions | Normal for fresh installs — actions appear as claws operate |

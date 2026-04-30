@@ -2,6 +2,10 @@
 
 ---
 # ANALYTICS CLAW IMPLEMENTATION AUDIT
+
+> **NemoClaw Compliance Notice (2026-04-28)**
+>
+> This document has been updated to comply with NVIDIA NemoClaw v0.0.28 and OpenShell v0.0.26. Paths referencing `/sandbox/<role>/` or `/sandbox/analytics/reports/` have been migrated to `/sandbox/.openclaw-data/milimo/claws/<role>/` per NemoClaw's Landlock read-only `/sandbox/` enforcement. Credentials are stored in the OpenShell gateway store, not `~/.nemoclaw/credentials.json` (legacy). Network policies should use `protocol: rest` with `enforcement` and `access`/`rules` fields for L7 HTTP inspection. See [docs.nvidia.com/nemoclaw/latest/](https://docs.nvidia.com/nemoclaw/latest/) for authoritative documentation.
 ## Milimo Claw — Comprehensive Gap Analysis
 
 **Date:** 2026-03-21
@@ -263,7 +267,7 @@ The Analytics Claw is specified in detail but has **ZERO implementation**. No Py
 The spec emphasizes: "The weekly-intelligence.json file must be readable by ALL claws."
 
 **Required verification steps:**
-1. Content Claw can read `/sandbox/analytics/reports/weekly-intelligence.json`
+1. Content Claw can read `/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json`
 2. Ops Claw can read the same path
 3. Finance Claw can read the same path
 4. Build Claw can read the same path
@@ -317,7 +321,7 @@ While message types are defined in `contracts.py`, the Analytics Claw has no han
 - Runs daily at 06:00
 - Pull trend data from external endpoints
 - Score on: potential impact, squad readiness, timing
-- Update `/sandbox/analytics/reports/opportunity-scores.json`
+- Update `/sandbox/.openclaw-data/milimo/claws/analytics/reports/opportunity-scores.json`
 - High-confidence (>0.85): dispatch immediately to relevant claw
 
 **Status:** ❌ NOT IMPLEMENTED

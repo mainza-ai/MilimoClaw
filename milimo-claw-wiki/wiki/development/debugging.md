@@ -112,8 +112,14 @@ findmnt | grep sandbox
 # Verify Landlock rules
 cat /proc/self/landlock
 
-# Check seccomp filter
-cat /proc/self/status | grep Seccomp
+# Check process limits
+ulimit -a
+
+# Check capabilities
+capsh --print
+
+# Check Landlock rules
+cat /proc/self/landlock
 ```
 
 ---

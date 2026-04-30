@@ -14,6 +14,8 @@ import logging
 from pathlib import Path
 from typing import Any, Protocol
 
+from milimo_paths import claw_base
+
 logger = logging.getLogger("milimo.finance")
 
 from .finance_init import (
@@ -105,7 +107,7 @@ class FinanceClaw:
         self.inference_client = inference_client
         self.stripe_client = stripe_client
         self.gateway = gateway
-        self.base_path = base_path or Path("/sandbox/finance")
+        self.base_path = base_path or claw_base("finance")
 
         self._initialized = False
         self._components: dict[str, Any] = {}

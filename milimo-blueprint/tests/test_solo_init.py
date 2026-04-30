@@ -340,11 +340,13 @@ class TestHelperFunctions:
         paths = get_claw_paths(valid_config)
 
         assert len(paths) == 5
-        assert paths["content"] == Path("/sandbox/content")
-        assert paths["ops"] == Path("/sandbox/clients")
-        assert paths["analytics"] == Path("/sandbox/analytics")
-        assert paths["finance"] == Path("/sandbox/finance")
-        assert paths["build"] == Path("/sandbox/build")
+        assert paths["content"] == Path("/sandbox/.openclaw-data/milimo/claws/content")
+        assert paths["ops"] == Path("/sandbox/.openclaw-data/milimo/claws/ops")
+        assert paths["analytics"] == Path(
+            "/sandbox/.openclaw-data/milimo/claws/analytics"
+        )
+        assert paths["finance"] == Path("/sandbox/.openclaw-data/milimo/claws/finance")
+        assert paths["build"] == Path("/sandbox/.openclaw-data/milimo/claws/build")
 
     def test_get_claw_network_policy(self, valid_config: dict[str, Any]) -> None:
         """Test extracting network policy for a claw."""

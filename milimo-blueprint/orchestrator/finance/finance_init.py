@@ -16,7 +16,9 @@ import fcntl
 import json
 
 
-BASE = Path("/sandbox/finance")
+from milimo_paths import claw_base
+
+BASE = claw_base("finance")
 
 REQUIRED_DIRS = [
     "revenue/history",

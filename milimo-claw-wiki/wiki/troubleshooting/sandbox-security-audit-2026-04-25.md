@@ -9,7 +9,7 @@
 - NemoClaw documentation (architecture, sandbox-hardening, network-policies, best-practices)
 - NemoClaw sandbox policy (`openclaw-sandbox.yaml`)
 
-**Last updated**: 2026-04-25
+**Last updated**: 2026-04-28
 
 **Tags**: #troubleshooting #security #sandbox #critical
 
@@ -19,7 +19,7 @@
 
 MilimoClaw's `install.sh` script **directly manipulates the NemoClaw-managed sandbox**, bypassing the security model that NemoClaw provides. This has resulted in a **broken sandbox** where:
 
-1. `openclaw.json` is owned by `root:root` with mode `600`, unreadable by the `sandbox` user (uid 998)
+1. `openclaw.json` is owned by `root:root` with mode `600`, unreadable by the `sandbox` user (uid 999)
 2. The OpenClaw gateway cannot start because it cannot read its own config
 3. Multiple directories inside `/sandbox/` are owned by `root` instead of `sandbox`
 4. The Landlock filesystem policy is violated by files created outside the allowed writable paths
@@ -45,7 +45,7 @@ NemoClaw Sandbox Security Model:
 │  /sandbox/.nemoclaw/          → READ-WRITE      │
 │  /tmp/                        → READ-WRITE      │
 └─────────────────────────────────────────────────┘
-Process runs as: sandbox:sandbox (uid 998:gid 998)
+Process runs as: sandbox:sandbox (uid 999:gid 999)
 ```
 
 MilimoClaw's `install.sh` runs commands via `docker exec ... kubectl exec` which executes as **root** inside the sandbox, bypassing Landlock and filesystem protections. It then writes files, changes ownership, and modifies config files in paths that NemoClaw designates as **read-only and immutable**.
@@ -102,7 +102,7 @@ Files that should be owned by `sandbox:sandbox` but are owned by `root:root`:
 |------|-----------|
 | `/sandbox/.local/` (entire tree) | `install.sh` — gh CLI + milimo wrapper |
 | `/sandbox/.local/bin/gh` | `install.sh` line 461 |
-| `/sandbox/.local/bin/milimo` | `install.sh` line 474 |
+| ~~`/sandbox/.local/bin/milimo`~~ | **Removed** — `milimo` CLI is accessed via the orchestrator Python API, not a standalone binary |
 | `/sandbox/.local/lib/python3.11/` | `install.sh` line 438 |
 | `/sandbox/extensions/` | `install.sh` line 289 |
 | `/sandbox/.openclaw-data/extensions/milimo/` | `install.sh` line 314 |
@@ -141,13 +141,13 @@ The following MilimoClaw paths exist **outside** these writable zones:
 
 | Path | Violation |
 |------|-----------|
-| `/sandbox/.milimo/` | Not in Landlock read_write list |
-| `/sandbox/extensions/` | Not in Landlock read_write list |
-| `/sandbox/milimo-blueprint/` | Not in Landlock read_write list |
-| `/sandbox/content/`, `/sandbox/clients/`, etc. | Not in Landlock read_write list |
+| `/sandbox/.milimo/` | Migrated to `/sandbox/.openclaw-data/milimo/` which IS in the Landlock read_write list. Legacy `/sandbox/.milimo/` is now a symlink (backwards compat only). |
+| `/sandbox/extensions/` | Migrated to `/sandbox/.openclaw-data/milimo/extensions/` which IS writable under `.openclaw-data/`. Legacy `/sandbox/extensions/` is outside writable paths. |
+| `/sandbox/milimo-blueprint/` | Migrated to `/sandbox/.openclaw-data/milimo/blueprint/` which IS writable under `.openclaw-data/`. Legacy `/sandbox/milimo-blueprint/` is outside writable paths. |
+| `/sandbox/.openclaw-data/milimo/claws/content/`, `/sandbox/.openclaw-data/milimo/claws/ops/`, etc. | Correctly under `.openclaw-data/` — writable per Landlock policy |
 | `/sandbox/.local/` | Not in Landlock read_write list |
 
-> **Note**: These files were written via `kubectl exec` (as root), which bypasses Landlock. But the `sandbox` user (uid 998) running OpenClaw processes **cannot write** to these paths at runtime. This creates a read-only deployment that can't be updated without root access.
+> **Note**: These files were written via `kubectl exec` (as root), which bypasses Landlock. But the `sandbox` user (uid 999) running OpenClaw processes **cannot write** to these paths at runtime. This creates a read-only deployment that can't be updated without root access.
 
 ### MEDIUM — Backup File Accumulation
 
@@ -215,7 +215,7 @@ The installer has been successfully rewritten and tested on the fresh NemoClaw s
 
 1. **Plugin Registration:** Direct modification of `openclaw.json` was removed. The script now correctly registers the plugin using `openclaw plugins install /sandbox/.openclaw-data/extensions/milimo`.
 2. **Writable State:** All Milimo files (blueprints, extensions, templates, configs, mesh data) have been migrated to `/sandbox/.openclaw-data/milimo/` which is fully writable under the NemoClaw Landlock policy.
-3. **No Root Operations:** All `sandbox_exec` operations now run securely as the unprivileged `sandbox:sandbox` user (UID 998) instead of root, ensuring isolation.
+3. **No Root Operations:** All `sandbox_exec` operations now run securely as the unprivileged `sandbox:sandbox` user (UID 999) instead of root, ensuring isolation.
 4. **Secrets Management:** Environment variable injection (e.g. `NVIDIA_API_KEY`) into `.bashrc` and `.profile` was stripped out, as NemoClaw manages credentials out-of-band via inference routing on `https://inference.local/v1`.
 5. **Backwards Compatibility:** A harmless symlink from `/sandbox/.milimo` to `/sandbox/.openclaw-data/milimo` was implemented to ensure unmodified python scripts within the Milimo blueprint continue working seamlessly.
 

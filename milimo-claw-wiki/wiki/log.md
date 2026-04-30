@@ -2,7 +2,7 @@
 
 **Summary**: Append-only record of all wiki operations.
 
-**Last updated**: 2026-04-24
+**Last updated**: 2026-04-29
 
 **Tags**: #log #meta
 
@@ -501,6 +501,69 @@ Each entry follows this format:
 - Updated "NVIDIA Cloud Nemotron 120B" to "Cloud (NEMOCLAW_MODEL)" in solo-privacy.md, claw-schema.md
 
 **Notes**: Config keys (local_nim, local-nim) preserved unchanged — they are backend categories, not display labels
+
+---
+
+## 2026-04-29
+
+### 2026-04-29 — Inference Routing and Workspace Accuracy Fixes
+
+**Pages**: 5 pages modified, 1 new page
+**Source**: NemoClaw docs accuracy review — inference routing, workspace paths, TelegramBridge removal
+**Changes**:
+- Fixed `privacy-router.md` — Corrected inference.local proxy endpoint, OpenShell L7 credential substitution, NEMOCLAW_MODEL env var, model switching commands (openshell inference set / nemoclaw inference-switch), experimental providers (NEMOCLAW_EXPERIMENTAL=1), provider trust tiers, OpenShell cost guard reference, added NemoClaw compliance notice
+- Fixed `solo-privacy.md` — Corrected inference.local proxy endpoint, removed OPENAI_API_KEY for local inference (provider-specific tokens), NEMOCLAW_MODEL determines model, OpenShell cost controls reference, added NemoClaw compliance notice
+- Fixed `network-egress.md` — Removed NVIDIA NIM endpoints from Assistant Egress (inference.local is internal-only, handled by OpenShell gateway, not an external egress endpoint)
+- Fixed `sandbox-sync.md` — Added workspace path references (/sandbox/.openclaw/workspace/), multi-agent workspace-name/ subdirectories, persistence across restarts but not rebuilds, rebuild = new container data loss, added NemoClaw compliance notice
+- Fixed `assistant-lucy.md` — Removed TelegramBridge class and all telegram_poll_loop/process_telegram_message references, replaced with OpenShell channel messaging (Telegram, Discord, Slack), replaced NVIDIA NIM with inference.local in network access, updated startup to use OpenShell channels instead of Telegram bridge
+- Created `architecture/workspace-files.md` — Workspace file persistence model: location, multi-agent layout, persistence model (survives restart, lost on rebuild), Landlock writable exception, use cases, backup guidance
+- Updated `index.md` — Added workspace-files to Architecture section, updated Architecture page count to 11, fixed Assistant module reference (removed TelegramBridge)
+
+**Notes**:
+- All inference routing pages now correctly describe inference.local as the sandbox-internal proxy endpoint
+- No API keys in sandbox environment is now documented across privacy-router, solo-privacy
+- TelegramBridge fully removed from assistant-lucy and index — messaging uses OpenShell channels
+- Workspace persistence model now documented as a first-class architecture page
+
+### 2026-04-29 — Official command audit corrections
+
+**Pages changed**: workspace-files.md, development-scripts.md, best-practices.md, sandbox-hardening.md, sandbox-isolation.md, solo-init.md, index.md
+
+**Fixes**:
+- `nemoclaw snapshot create/list/restore` — re-annotated as official NemoClaw v0.0.29 commands (previously incorrectly marked as "MilimoClaw-specific")
+- `nemoclaw debug` — confirmed official; `milimo debug` correctly documented as wrapper
+- `/sandbox` writability — corrected across all wiki pages: `/sandbox` is writable at the container mount level (per official best-practices.html + architecture.html); `/sandbox/.openclaw/` is the only read-only exception (root-owned, immutable, SHA256-verified)
+- Removed "Landlock-read-only" claim for `/sandbox` root — Landlock adds best-effort restrictions on 5.13+ kernels but is not the sole enforcement mechanism
+- `/sandbox/.openclaw/workspace/` writability — now correctly attributed to symlink into `.openclaw-data/` (official mechanism), not "MilimoClaw convention"
+
+### 2026-04-29 — Fourth wiki correction pass (prerequisites + posture profiles + seccomp)
+
+**Pages changed**: install.sh, installation-scripts.md, best-practices.md, policy-overview.md, inference-client.md
+
+**Fixes**:
+- Node.js version — corrected from `>=20` to `>=22.16` per official NemoClaw v0.0.29 prerequisites.html (install.sh check logic + wiki)
+- Posture profiles — previously conflated with policy tiers; wiki now distinguishes the two: **Policy tiers** (from `nemoclaw onboard`) = Restricted/Balanced/Open; **Posture profiles** (operational guidance from best-practices.html) = Locked-Down (Default)/Development/Integration Testing
+- Seccomp conflation — removed "as part of the seccomp filter setup" from `PR_SET_NO_NEW_PRIVS` description in both best-practices.md and policy-overview.md; `prctl()` is a separate call, NemoClaw does NOT add its own seccomp BPF filters
+- `/sandbox/` (root) removed from Read-Only Paths table in policy-overview.md — `/sandbox` is writable at container mount level; only `.openclaw/` is read-only
+- inference-client.md — added official default model reference (`nvidia/nemotron-3-super-120b-a12b` via NVIDIA Endpoints, `integrate.api.nvidia.com/v1`, routed through `inference.local`)
+- installation-scripts.md — directory structure updated to reflect actual `.openclaw-data/milimo/claws/<role>` mount paths with full tree
+
+### 2026-04-29 — Fifth wiki correction pass (Dockerfile install mode + filesystem two-level model + full docs re-check)
+
+**Pages changed**: installation-scripts.md, best-practices.md, policy-overview.md, index.md
+
+**Official docs re-verified**: prerequisites.html, best-practices.html, sandbox-hardening.html, install-openclaw-plugins.html, commands.html, architecture.html, network-policies.html, credential-storage.html, workspace-files.html, inference-options.html
+
+**Fixes**:
+- installation-scripts.md — rewritten to document two install modes: Dockerfile (default, official `nemoclaw onboard --from` path) and Runtime deploy (`--runtime-deploy` flag). Added macOS tar xattr handling section, credential storage guidance per official docs, Dockerfile pattern explanation with `ARG SANDBOX_BASE`, `openclaw doctor --fix`, `WORKDIR /opt/nemoclaw`
+- best-practices.md — Writable Paths section updated with two-level model table (mount vs Landlock vs DAC) reflecting both best-practices.html (mount rw) and sandbox-hardening.html (Landlock ro) semantics
+- best-practices.md — Policy Tiers vs Posture Profiles section added: distinguishes tiers (Restricted/Balanced/Open from `nemoclaw onboard`) from profiles (Locked-Down/Development/Integration Testing from best-practices.html)
+- best-practices.md — Common Mistakes table updated with "Disabling device auth for remote deployments" and "Adding inference provider hosts to network policy" per official docs
+- best-practices.md — Known Limitations added: `openclaw agent --local` bypass, direct filesystem writes bypass scanner, base64/hex-encoded secrets not detected
+- best-practices.md — Gateway Authentication Controls section added (device auth, insecure auth derivation, auto-pair allowlist, CLI secret redaction, memory secret scanner)
+- best-practices.md — Auth Profile Permissions and Image Digest Pinning sections added
+- policy-overview.md — Read-Only Paths table updated with `/sandbox` as read-only via Landlock + Level column
+- policy-overview.md — Seccomp Filters section wording clarified: OpenShell applies seccomp internally; NemoClaw does NOT add its own BPF filters
 
 ---
 

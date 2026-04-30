@@ -21,7 +21,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
-BASE = Path("/sandbox/build")
+from milimo_paths import claw_base
+
+BASE = claw_base("build")
 
 REQUIRED_DIRS = [
     "repo",

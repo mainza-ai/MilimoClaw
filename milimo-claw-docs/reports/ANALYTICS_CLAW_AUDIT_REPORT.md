@@ -2,6 +2,10 @@
 
 ---
 # ANALYTICS CLAW IMPLEMENTATION AUDIT REPORT
+
+> **NemoClaw Compliance Notice (2026-04-28)**
+>
+> This document has been updated to comply with NVIDIA NemoClaw v0.0.28 and OpenShell v0.0.26. Paths referencing `/sandbox/<role>/` or `/sandbox/analytics/reports/` have been migrated to `/sandbox/.openclaw-data/milimo/claws/<role>/` per NemoClaw's Landlock read-only `/sandbox/` enforcement. Credentials are stored in the OpenShell gateway store, not `~/.nemoclaw/credentials.json` (legacy). Network policies should use `protocol: rest` with `enforcement` and `access`/`rules` fields for L7 HTTP inspection. See [docs.nvidia.com/nemoclaw/latest/](https://docs.nvidia.com/nemoclaw/latest/) for authoritative documentation.
 ## Date: 2026-03-21
 ## Status: ✅ COMPLETE - 199/199 TESTS PASSING (100%)
 
@@ -10,7 +14,7 @@
 ## PROGRESS UPDATE
 
 ### All Fixes Applied:
-1. ✅ **Sandbox policies fixed** — Added `/sandbox/analytics/reports` read-only mount to Ops, Build, Finance claws
+1. ✅ **Sandbox policies fixed** — Added `/sandbox/.openclaw-data/milimo/claws/analytics/reports` read-only mount to Ops, Build, Finance claws
 2. ✅ **Added `_determine_target_claw` method** to AnomalyDetector
 3. ✅ **Added `operational_log` parameter** to BaselineManager constructor
 4. ✅ **Timeout enforcement implemented** in QueryHandler with `_with_timeout()` method

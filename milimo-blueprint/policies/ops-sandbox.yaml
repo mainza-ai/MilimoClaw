@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Ops Claw Sandbox Policy
-# Mount: /sandbox/clients (read-write) — the squad's most sensitive data store.
-# No cross-claw read access except Finance (billing context via inter-claw msg).
+# Mount: /sandbox/.openclaw-data/milimo/claws/ops (read-write)
+# No cross-claw read access except Analytics weekly reports.
 
 version: 1
 
@@ -17,9 +17,9 @@ filesystem_policy:
   - /app
   - /etc
   - /var/log
-  - /sandbox/analytics/reports # Cross-mount: Analytics weekly reports
+  - /sandbox/.openclaw-data/milimo/claws/analytics/reports
   read_write:
-  - /sandbox/clients # Primary mount — client records
+  - /sandbox/.openclaw-data/milimo/claws/ops
   - /tmp
   - /dev/null
 
@@ -45,7 +45,6 @@ network_policies:
     binaries:
       - { path: /usr/local/bin/openclaw }
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── Email APIs ──────────────────────────────────────────────────────
   sendgrid:
@@ -61,7 +60,6 @@ network_policies:
           - allow: { method: GET, path: "/v3/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   gmail_api:
     name: gmail_api
@@ -75,7 +73,6 @@ network_policies:
           - allow: { method: "*", path: "/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   outlook:
     name: outlook
@@ -90,7 +87,6 @@ network_policies:
           - allow: { method: "*", path: "/v1.0/me/sendMail" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── Scheduling & PM ─────────────────────────────────────────────────
   calendly:
@@ -105,7 +101,6 @@ network_policies:
           - allow: { method: "*", path: "/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   notion_api:
     name: notion_api
@@ -119,7 +114,6 @@ network_policies:
           - allow: { method: "*", path: "/v1/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── Messaging (Telegram — inherited from base) ─────────────────────
   telegram:
@@ -135,4 +129,3 @@ network_policies:
           - allow: { method: POST, path: "/bot*/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }

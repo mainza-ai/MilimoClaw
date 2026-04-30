@@ -22,7 +22,7 @@ icon: "📋"
 
 # ── Filesystem ─────────────────────────────────────────────────────────
 filesystem_mount:
-  primary: "/sandbox/clients"
+  primary: "/sandbox/.openclaw-data/milimo/claws/ops"
   mode: read_write
   contents:
     - full client records

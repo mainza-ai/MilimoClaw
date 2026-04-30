@@ -45,20 +45,20 @@ The default policy is defined in `milimo-blueprint/privacy_policy.yaml`. Squads 
 
 ### Filesystem Isolation (Landlock)
 
-Each claw's filesystem access is restricted by Landlock LSM — a Linux kernel security module:
+Each claw's filesystem access is restricted by Landlock LSM — a Linux kernel security module. **All claws share a single NemoClaw sandbox**; per-claw isolation is enforced by path conventions and Landlock writable-path rules, not separate sandbox instances:
 
 | Claw | Read-Write | Read-Only |
 |---|---|---|
-| Content | `/sandbox/content`, `/tmp` | `/sandbox/analytics/reports` |
-| Ops | `/sandbox/clients`, `/tmp` | System libraries only |
-| Analytics | `/sandbox/analytics`, `/tmp` | System libraries only |
-| Finance | `/sandbox/finance`, `/tmp` | System libraries only |
-| Build | `/sandbox/build`, `/tmp` | System libraries only |
-| Assistant | `/sandbox/assistant`, `/tmp` | System libraries only |
+| Content | `/sandbox/.openclaw-data/milimo/claws/content/`, `/tmp` | `/sandbox/.openclaw-data/milimo/claws/analytics/reports/` |
+| Ops | `/sandbox/.openclaw-data/milimo/claws/ops/`, `/tmp` | System libraries only |
+| Analytics | `/sandbox/.openclaw-data/milimo/claws/analytics/`, `/tmp` | System libraries only |
+| Finance | `/sandbox/.openclaw-data/milimo/claws/finance/`, `/tmp` | System libraries only |
+| Build | `/sandbox/.openclaw-data/milimo/claws/build/`, `/tmp` | System libraries only |
+| Assistant | `/sandbox/.openclaw-data/milimo/claws/assistant/`, `/tmp` | System libraries only |
 
 **Key guarantees:**
-- The Content Claw **cannot** read `/sandbox/clients` (Ops data)
-- The Finance Claw **cannot** read `/sandbox/build` (source code)
+- The Content Claw **cannot** read `/sandbox/.openclaw-data/milimo/claws/ops/` (Ops data)
+- The Finance Claw **cannot** read `/sandbox/.openclaw-data/milimo/claws/build/` (source code)
 - No claw can access another claw's primary mount
 - These restrictions are **kernel-level** — no instruction can bypass them
 
@@ -72,7 +72,7 @@ Each sandbox runs with a seccomp BPF profile that:
 
 ### Network Isolation
 
-Each claw has its own network egress policy — a whitelist of external APIs it can reach:
+Each claw has its own network egress policy — a whitelist of external APIs it can reach. **In practice, all claws share the same NemoClaw sandbox with a single set of egress policies** (applied via `nemoclaw <name> policy-add <preset>`). Per-claw egress rules are aspirational and enforced by Milimo's Python orchestrator at the application level:
 
 | Claw | Allowed Endpoints |
 |---|---|

@@ -2,7 +2,7 @@
 
 **Summary**: Master table of contents for the MilimoClaw knowledge base.
 
-**Last updated**: 2026-04-23
+**Last updated**: 2026-04-29
 
 **Tags**: #index #navigation
 
@@ -12,7 +12,7 @@
 
 | Section | Description | Pages |
 |---------|-------------|-------|
-| [[#Architecture]] | System design and isolation model | 10 |
+| [[#Architecture]] | System design and isolation model | 11 |
 | [[#Claws]] | Individual claw documentation | 6 |
 | [[#Coordination]] | Message contracts and War Room | 5 |
 | [[#Evolution]] | Self-evolution system | 8 |
@@ -23,7 +23,7 @@
 | [[#Solo]] | Solo system modules | 6 |
 | [[#Templates]] | Squad templates | 8 |
 | [[#Patterns]] | Cross-cutting implementation patterns | 1 |
-| [[#Security]] | Provenance and attestation modules | 3 |
+| [[#Security]] | Sandbox security, credentials, hardening, OpenClaw controls | 7 |
 | [[#Operations]] | Health, metrics, and monitoring modules | 4 |
 | [[#Scripts]] | Installation and service scripts | 3 |
 
@@ -36,14 +36,16 @@ System architecture and design documentation.
 | Page | Description | Status |
 |------|-------------|--------|
 | [[system-overview]] | Eight-layer architecture overview | ✓ |
-| [[sandbox-isolation]] | Landlock, seccomp, and filesystem isolation | ✓ |
+| [[sandbox-isolation]] | Landlock, process limits, capability drop, and filesystem isolation | ✓ |
 | [[inter-claw-communication]] | Typed message contracts and routing | ✓ |
 | [[mesh-coordinator]] | Inter-sandbox gateway and policies | ✓ |
 | [[mesh-coordinator-modules]] | Mesh implementation details | ✓ |
 | [[privacy-router]] | Inference routing and data sensitivity | ✓ |
+| [[workspace-files]] | Workspace file persistence and rebuild behavior | ✓ |
 | [[tool-generation]] | Core evolution system (tools, proposals, registry) | ✓ |
 | [[claw-launcher]] | Claw startup and process supervision | ✓ |
 | [[assistant-system]] | Conversational assistant configuration | ✓ |
+| [[workspace-files]] | Agent workspace persistence and semantics | ✓ |
 
 ---
 
@@ -74,7 +76,7 @@ Detailed documentation for each code module:
 
 **[[build-claw|Build]]**: build-init • issue-manager • code-generator • pr-manager • deploy-manager • error-monitor
 
-**[[assistant-lucy|Assistant]]**: lucy.py (TelegramBridge • PendingQuery • LucyAssistant)
+**[[assistant-lucy|Assistant]]**: lucy.py (PendingQuery • LucyAssistant)
 
 ---
 
@@ -215,13 +217,17 @@ Cross-cutting implementation patterns used across claws.
 
 ## Security
 
-Provenance, attestation, and cryptographic modules.
+Sandbox security controls, credential management, image hardening, and OpenClaw application-layer security.
 
 | Page | Description | Status |
 |------|-------------|--------|
 | [[provenance-signing]] | Ed25519 blueprint signing and verification | ✓ |
 | [[chain-validator]] | Provenance chain validation | ✓ |
 | [[attestation-generator]] | Performance attestation generation | ✓ |
+| [[best-practices]] | Four protection layers, network/filesystem/process/inference controls | ✓ |
+| [[credential-storage]] | OpenShell gateway credential storage, no-disk-persistence | ✓ |
+| [[openclaw-controls]] | OpenClaw application-layer security beyond NemoClaw's scope | ✓ |
+| [[sandbox-hardening]] | Sandbox image hardening, capability drops, filesystem policy | ✓ |
 
 ---
 
@@ -244,7 +250,7 @@ Installation and service management scripts.
 
 | Page | Description | Status |
 |------|-------------|--------|
-| [[installation-scripts]] | One-command installer | ✓ |
+| [[installation-scripts]] | One-command installer (Dockerfile mode + runtime-deploy mode) | ✓ |
 | [[service-scripts]] | Service management scripts | ✓ |
 | [[development-scripts]] | Debug and coverage scripts | ✓ |
 
@@ -255,7 +261,7 @@ Installation and service management scripts.
 | Metric | Value |
 |--------|-------|
 | Total pages | 150+ |
-| Architecture pages | 10 |
+| Architecture pages | 11 |
 | Claw pages | 6 |
 | Module pages | 75+ |
 | Coordination pages | 5 |
@@ -267,7 +273,7 @@ Installation and service management scripts.
 | Solo pages | 6 |
 | Template pages | 8 |
 | Pattern pages | 1 |
-| Security pages | 3 |
+| Security pages | 7 |
 | Operations pages | 4 |
 | Script pages | 3 |
 | TUI pages | 1 |
@@ -285,6 +291,8 @@ See [[log]] for complete operation history.
 
 | Date | Change | Pages Affected |
 |------|--------|----------------|
+| 2026-04-29 | Fifth wiki correction pass: Dockerfile install mode, filesystem two-level model, posture profiles vs policy tiers, Common Mistakes, Known Limitations, Gateway Auth Controls | installation-scripts.md, best-practices.md, policy-overview.md, index.md |
+| 2026-04-29 | Fourth wiki correction pass: Node.js >=22.16, posture profile naming, seccomp conflation, inference-client default model | install.sh, installation-scripts.md, best-practices.md, policy-overview.md, inference-client.md |
 | 2026-04-17 | Evolution module pages (tool-generator, evolution-integration, sandbox-runner, marketplace-manager) | 4 new pages |
 | 2026-04-15 | Wiki audit and broken link fixes | 10 new pages | |
 | 2026-04-15 | Phase 4: Scripts section | 2 new pages |

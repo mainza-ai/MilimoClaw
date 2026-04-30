@@ -106,6 +106,10 @@ class NvidiaInferenceClient:
         max_retries: int = 3,
         timeout: int = 120,
     ) -> None:
+        _sandbox_mode = bool(os.environ.get("NEMOCLAW_MODEL"))
+        _proxy_host = os.environ.get("NEMOCLAW_PROXY_HOST", "10.200.0.1")
+        _proxy_port = os.environ.get("NEMOCLAW_PROXY_PORT", "3128")
+
         self.api_key = api_key or os.environ.get("NVIDIA_API_KEY", "")
         self.api_base = (api_base or DEFAULT_API_BASE).rstrip("/")
         self.fallback_chain = fallback_chain or DEFAULT_FALLBACK_CHAIN
@@ -114,8 +118,21 @@ class NvidiaInferenceClient:
 
         self._usage_history: list[InferenceUsage] = []
         self._total_cost_usd: float = 0.0
+        self._sandbox_mode = _sandbox_mode
+        self._proxies = None
 
-        if not self.api_key:
+        if _sandbox_mode:
+            inference_base = os.environ.get("NEMOCLAW_INFERENCE_BASE_URL", "")
+            if inference_base:
+                self.api_base = inference_base.rstrip("/")
+            if not self.api_key:
+                self.api_key = "unused"
+            proxy_url = f"http://{_proxy_host}:{_proxy_port}"
+            self._proxies = {"http": proxy_url, "https": proxy_url}
+            logger.info(
+                "NvidiaInferenceClient: sandbox mode — using proxy %s", proxy_url
+            )
+        elif not self.api_key:
             logger.warning("NVIDIA_API_KEY not set — inference calls will fail")
 
     # ------------------------------------------------------------------
@@ -253,7 +270,7 @@ class NvidiaInferenceClient:
         system_prompt: str | None = None,
     ) -> dict[str, Any]:
         """Make a single API call to the specified model."""
-        if not self.api_key:
+        if not self.api_key and not self._sandbox_mode:
             raise RuntimeError("NVIDIA_API_KEY is not configured")
 
         messages: list[dict[str, str]] = []
@@ -280,6 +297,8 @@ class NvidiaInferenceClient:
             headers=headers,
             json=payload,
             timeout=self.timeout,
+            proxies=self._proxies,
+            verify=not self._sandbox_mode,
         )
         response.raise_for_status()
         return response.json()

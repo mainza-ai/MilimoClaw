@@ -82,7 +82,7 @@ Every Sunday at 02:00 (before Evolution Cycle).
 ## Shared Access
 
 This file is readable by ALL claws:
-`/sandbox/analytics/reports/weekly-intelligence.json`
+`/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json`
 
 ## Dependencies
 

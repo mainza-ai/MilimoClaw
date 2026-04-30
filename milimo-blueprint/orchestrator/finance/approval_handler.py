@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Literal
 import json
 
+from milimo_paths import claw_base
+
 from .finance_init import FinanceOperationalLog, FinanceLogEntry
 from .invoice_manager import Invoice, InvoiceManager
 
@@ -50,8 +52,8 @@ class FinanceApprovalHandler:
     ):
         self.invoice_manager = invoice_manager
         self.operational_log = operational_log
-        self.decisions_path = decisions_path or Path(
-            "/sandbox/finance/logs/decisions.log"
+        self.decisions_path = (
+            decisions_path or claw_base("finance") / "logs/decisions.log"
         )
 
     def queue_invoice_review(self, invoice: Invoice) -> str:

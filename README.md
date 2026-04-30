@@ -20,7 +20,7 @@
 ### Prerequisites
 
 - **macOS** (Apple Silicon) or **Linux** with Docker
-- **Node.js** 22+
+- **Node.js** 22.16+
 - **Python 3.11+**
 - **NVIDIA API Key** — get one at [build.nvidia.com](https://build.nvidia.com/)
 - **GitHub Personal Access Token** (for Build Claw) — [github.com/settings/tokens](https://github.com/settings/tokens)
@@ -38,8 +38,11 @@ cd MilimoClaw
 cp .env.example .env
 # Edit .env and add your API keys (NVIDIA_API_KEY, GITHUB_TOKEN, GITHUB_REPO, etc.)
 
-# 3. Install Milimo Claw
+# 3. Install Milimo Claw (Dockerfile mode — bakes plugin into custom sandbox image)
 ./install.sh --solo --operator-name "your-name" --squad-name "your-squad" --non-interactive
+
+# Alternative: runtime-deploy mode (inject into a running sandbox without rebuilding)
+# ./install.sh --solo --operator-name "your-name" --squad-name "your-squad" --runtime-deploy
 
 # 4. Connect NemoClaw assistant
 nemoclaw my-assistant connect
@@ -47,17 +50,13 @@ nemoclaw my-assistant connect
 # 5. Open the chat UI (approve device if prompted)
 openclaw tui
 # If needed: openclaw devices approve --latest
-
-# 6. (Optional) Start with Telegram bot
-export TELEGRAM_BOT_TOKEN=your-token
-nemoclaw start
 ```
 
-That's it. Your five autonomous claws (Content, Ops, Analytics, Finance, Build) are now running.
+That's it. Your six autonomous claws (Content, Ops, Analytics, Finance, Build, Assistant) are now running.
 
 ---
 
-## The Five Claws
+## The Six Claws
 
 | Claw | Role | Mount |
 |------|------|-------|
@@ -66,6 +65,7 @@ That's it. Your five autonomous claws (Content, Ops, Analytics, Finance, Build) 
 | 📊 **Analytics** | Intelligence, reports | `/sandbox/analytics` |
 | 💰 **Finance** | Invoicing, pricing | `/sandbox/finance` |
 | 🔧 **Build** | Code, PRs, deploys | `/sandbox/build` |
+| 🤖 **Assistant** | Coordination, mesh dispatch | `/sandbox/assistant` |
 
 Each claw has its own sandbox, network policy, and self-evolution cycle. Claws communicate through typed inter-sandbox messages — not shared files.
 
@@ -96,21 +96,21 @@ openclaw milimo blueprint publish
 
 ## Architecture
 
-Milimo Claw runs on top of the NemoClaw stack, inheriting its security sandbox (OpenShell + Landlock + seccomp) while adding multi-agent coordination:
+Milimo Claw runs on top of the NemoClaw stack, inheriting its security sandbox (OpenShell + Landlock + seccomp + capability drops) while adding multi-agent coordination:
 
 - **Each claw = isolated sandbox** with kernel-level filesystem and network isolation
 - **Privacy router** — sensitive data (finance, source code, client contacts) never leaves the device
 - **Self-evolving** — claws build and deploy new tools weekly through a backtested evolution pipeline
 - **Blueprint versioning** — every claw's state is a versioned, forkable artifact
+- **Assistant claw (Lucy)** — coordinates all claws via mesh dispatch, accessible through TUI or Telegram
 
 ### Two Deployment Models
 
 | Model | Description | When to Use |
 |-------|-------------|-------------|
-| **NemoClaw Sandbox** | Claws run inside `my-assistant` sandbox, accessible to Lucy via mesh | **Recommended** — Default setup |
+| **Dockerfile (default)** | `install.sh` generates a Dockerfile and runs `nemoclaw onboard --from` to bake the plugin into a custom sandbox image | **Recommended** — official NemoClaw plugin path |
+| **Runtime Deploy** | `install.sh --runtime-deploy` injects files into a running sandbox via `docker cp` + `kubectl cp` | Quick updates without rebuilding |
 | **Docker Compose** | Each claw runs in its own container (`docker-compose up`) | Alternative for isolated deployments |
-
-**Important:** The `MilimoClaw` Docker container and the `my-assistant` NemoClaw sandbox are **completely separate environments**. Lucy runs in the sandbox and can only communicate with claws running there. The standalone Docker container is not needed for normal operation.
 
 For full technical details, see [milimo-claw-docs/ARCHITECTURE.md](milimo-claw-docs/ARCHITECTURE.md).
 
@@ -127,6 +127,15 @@ For full technical details, see [milimo-claw-docs/ARCHITECTURE.md](milimo-claw-d
 | [Project Description](milimo-claw-docs/MILIMO_CLAW_PROJECT_DESCRIPTION.md) | Full product spec |
 | [Sandbox File Sharing](milimo-claw-docs/guides/SANDBOX_FILE_SHARING.md) | How to share files with claws |
 | [Contributing](milimo-claw-docs/guides/CONTRIBUTING.md) | Dev guidelines |
+
+### Wiki
+
+| Section | Description |
+|---------|-------------|
+| [Security Best Practices](milimo-claw-wiki/wiki/security/best-practices.md) | Policy tiers, posture profiles, hardening |
+| [Sandbox Hardening](milimo-claw-wiki/wiki/security/sandbox-hardening.md) | Landlock, seccomp, capability drops |
+| [Credential Storage](milimo-claw-wiki/wiki/security/credential-storage.md) | Gateway store, env vars, rotation |
+| [OpenClaw Controls](milimo-claw-wiki/wiki/security/openclaw-controls.md) | Device auth, secret redaction, memory scanner |
 
 ---
 

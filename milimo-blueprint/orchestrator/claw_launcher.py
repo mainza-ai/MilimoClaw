@@ -41,16 +41,17 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any, Callable
 
+from milimo_paths import MILIMO_DIR, claw_base
+
 logger = logging.getLogger("milimo.claw_launcher")
 
-# Ensure blueprint is on sys.path so claw imports work in daemon mode
-BLUEPRINT_PATH = Path("/sandbox/.milimo/blueprints/0.1.0")
+BLUEPRINT_PATH = MILIMO_DIR / "blueprints" / "0.1.0"
 if BLUEPRINT_PATH.exists() and str(BLUEPRINT_PATH) not in sys.path:
     sys.path.insert(0, str(BLUEPRINT_PATH))
 
 ALL_ROLES = ["content", "ops", "analytics", "finance", "build", "assistant"]
 SQUAD_ID = os.environ.get("SQUAD_ID", "zulu")
-MESH_DIR = Path.home() / ".milimo" / "mesh"
+MESH_DIR = MILIMO_DIR / "mesh"
 HEARTBEAT_DIR = MESH_DIR / "heartbeats"
 INBOX_DIR = MESH_DIR / "inbox"
 OUTBOX_DIR = MESH_DIR / "outbox"
@@ -224,7 +225,13 @@ def validate_environment(role: str | None = None) -> dict[str, Any]:
     if not os.environ.get("NVIDIA_API_KEY") and not os.environ.get(
         "BUILD_CLAW_NVIDIA_API_KEY"
     ):
-        results["warnings"].append("No NVIDIA API key - inference will fail")
+        sandbox_mode = bool(os.environ.get("NEMOCLAW_MODEL"))
+        if sandbox_mode:
+            results["warnings"].append(
+                "NVIDIA_API_KEY not set — using sandbox proxy (inference routed through gateway)"
+            )
+        else:
+            results["warnings"].append("No NVIDIA API key - inference will fail")
 
     return results
 
@@ -1008,7 +1015,14 @@ class ClawLauncher:
             api_base=os.environ.get("NVIDIA_API_BASE"),
         )
 
-        github_client = GitHubClient(repo=os.environ.get("GITHUB_REPO"))
+        try:
+            github_client = GitHubClient(repo=os.environ.get("GITHUB_REPO"))
+        except RuntimeError as exc:
+            logger.warning(
+                "ClawLauncher: GitHubClient unavailable (%s) — build running without GitHub",
+                exc,
+            )
+            github_client = None
 
         # Initialize real Vercel client if token available
         vercel_client = None
@@ -1064,15 +1078,86 @@ class ClawLauncher:
         if vercel_client is None:
 
             class _StubVercelClient:
-                pass
+                def health_check(self):
+                    return False
+
+                def trigger_deployment(self, *a, **kw):
+                    return {"id": None, "status": "skipped", "url": None}
+
+                def get_deployment_status(self, *a, **kw):
+                    return "skipped"
+
+                def get_deployment_url(self, *a, **kw):
+                    return ""
+
+                def wait_for_deployment(self, *a, **kw):
+                    return "skipped"
+
+                def rollback(self, *a, **kw):
+                    return {}
+
+                def list_deployments(self, *a, **kw):
+                    return []
 
             vercel_client = _StubVercelClient()
             logger.debug("ClawLauncher: using stub VercelClient")
 
+        if github_client is None:
+
+            class _StubGitHubClient:
+                def get_open_issues(self, limit=50):
+                    return []
+
+                def create_issue(self, *a, **kw):
+                    return None
+
+                def create_branch(self, *a, **kw):
+                    return False
+
+                def commit_file(self, *a, **kw):
+                    return False
+
+                def create_pull_request(self, *a, **kw):
+                    return (None, None)
+
+                def merge_pull_request(self, *a, **kw):
+                    return False
+
+                def list_prs(self, *a, **kw):
+                    return []
+
+            github_client = _StubGitHubClient()
+            logger.debug("ClawLauncher: using stub GitHubClient")
+
         if sentry_client is None:
 
             class _StubSentryClient:
-                pass
+                def health_check(self):
+                    return False
+
+                def get_recent_errors(self, *a, **kw):
+                    return []
+
+                def list_events(self, *a, **kw):
+                    return []
+
+                def get_event(self, *a, **kw):
+                    return {}
+
+                def create_release(self, *a, **kw):
+                    return {}
+
+                def upload_sourcemap(self, *a, **kw):
+                    return {}
+
+                def deploy_release(self, *a, **kw):
+                    return {}
+
+                def list_projects(self, *a, **kw):
+                    return []
+
+                def get_release_stats(self, *a, **kw):
+                    return {}
 
             sentry_client = _StubSentryClient()
             logger.debug("ClawLauncher: using stub SentryClient")
@@ -1128,7 +1213,7 @@ class ClawLauncher:
                     squad_id=SQUAD_ID,
                     inference_client=inference,
                     mesh_sender=mesh_sender,
-                    base_path=Path("/sandbox/content"),
+                    base_path=claw_base("content"),
                 )
                 claw.startup()
                 poller._message_handler = claw.handle_inbound
@@ -1149,7 +1234,7 @@ class ClawLauncher:
                     squad_id=SQUAD_ID,
                     inference_client=inference,
                     mesh_gateway=mesh_gateway,
-                    base_path=Path("/sandbox/ops"),
+                    base_path=claw_base("ops"),
                 )
                 claw.startup()
                 poller._message_handler = claw.handle_inbound
@@ -1170,7 +1255,7 @@ class ClawLauncher:
                     squad_id=SQUAD_ID,
                     inference_client=inference,
                     mesh_sender=mesh_sender,
-                    base_path=Path("/sandbox/analytics"),
+                    base_path=claw_base("analytics"),
                 )
                 claw.startup()
                 poller._message_handler = claw.handle_inbound
@@ -1198,50 +1283,26 @@ class ClawLauncher:
                     inference_client=inference,
                     stripe_client=stripe,
                     gateway=self._mesh_gateway,
-                    base_path=Path("/sandbox/finance"),
+                    base_path=claw_base("finance"),
                 )
                 claw.startup()
                 poller._message_handler = claw.handle_inbound
                 logger.info("ClawLauncher: FinanceClaw using shared RealMeshGateway")
 
             elif role == "assistant":
-                from orchestrator.assistant.lucy import LucyAssistant, TelegramBridge
-
-                telegram_bridge = None
-                tg_token = os.environ.get("TELEGRAM_BOT_TOKEN")
-                tg_chat_id = os.environ.get("TELEGRAM_ID")
-                if tg_token and tg_chat_id:
-                    telegram_bridge = TelegramBridge(
-                        bot_token=tg_token,
-                        chat_id=tg_chat_id,
-                    )
-                    logger.info("ClawLauncher: TelegramBridge configured for assistant")
-                else:
-                    logger.warning(
-                        "ClawLauncher: TELEGRAM_BOT_TOKEN/TELEGRAM_ID not set"
-                        " — assistant running without Telegram"
-                    )
+                from orchestrator.assistant.lucy import LucyAssistant
 
                 claw = LucyAssistant(
                     squad_id=SQUAD_ID,
                     mesh_gateway=self._mesh_gateway,
-                    telegram_bridge=telegram_bridge,
-                    base_path=Path("/sandbox/.milimo/assistant"),
+                    base_path=claw_base("assistant"),
                 )
                 claw.startup()
                 poller._message_handler = claw.handle_inbound
-                logger.info("ClawLauncher: LucyAssistant using shared RealMeshGateway")
-
-                if telegram_bridge:
-                    import threading
-
-                    tg_thread = threading.Thread(
-                        target=claw.telegram_poll_loop, daemon=True
-                    )
-                    tg_thread.start()
-                    logger.info(
-                        "ClawLauncher: Telegram poll loop started for assistant"
-                    )
+                logger.info(
+                    "ClawLauncher: LucyAssistant using shared RealMeshGateway"
+                    " (Telegram handled by OpenShell channel messaging)"
+                )
 
         except ImportError as e:
             logger.warning(
@@ -1380,12 +1441,25 @@ def main() -> None:
     # Validate environment before starting (only check current role's vars)
     env_result = validate_environment(role=args.role)
     if not env_result["valid"]:
-        print("\n❌ Missing required environment variables:")
-        for item in env_result["missing_required"]:
-            print(f"   - {item['role']}: {item['var']}")
-        print("\nSet missing variables or use --validate-only for full report.")
-        write_alert("env_missing", "Missing required environment variables", env_result)
-        sys.exit(1)
+        missing = env_result["missing_required"]
+        # In sandbox mode, some vars are optional (proxy-injected or mocked)
+        sandbox_mode = os.environ.get("NEMOCLAW_MODEL") is not None
+        _SKIP_VARS = {"NVIDIA_API_KEY", "GITHUB_REPO", "STRIPE_SECRET_KEY"}
+        if sandbox_mode:
+            missing = [m for m in missing if m["var"] not in _SKIP_VARS]
+        if missing:
+            print("\n❌ Missing required environment variables:")
+            for item in missing:
+                print(f" - {item['role']}: {item['var']}")
+            print("\nSet missing variables or use --validate-only for full report.")
+            write_alert(
+                "env_missing", "Missing required environment variables", env_result
+            )
+            sys.exit(1)
+        if sandbox_mode:
+            logger.warning(
+                "Some env vars not set (running in sandbox mode with defaults)"
+            )
 
     # Warn about missing optional vars
     if env_result["missing_optional"]:

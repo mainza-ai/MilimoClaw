@@ -40,8 +40,8 @@ layer where every message between claws is typed, logged, and validated.
 │ MILIMO CLAW MESH │
 │ │
 │ CONTENT CLAW OPS CLAW ANALYTICS CLAW FINANCE CLAW │
-│ /sandbox/ /sandbox/ /sandbox/ /sandbox/ │
-│ content clients analytics finance │
+│ /sandbox/.openclaw-data/ /sandbox/.openclaw-data/ /sandbox/.openclaw-data/ /sandbox/.openclaw-data/ │
+│ milimo/claws/content milimo/claws/ops milimo/claws/analytics milimo/claws/finance │
 │ OpenShell GW ── OpenShell GW── OpenShell GW ── OpenShell GW │
 │ │ │ │ │ │
 │ └───────────────┴───────────────┴───────────────┘ │
@@ -49,13 +49,20 @@ layer where every message between claws is typed, logged, and validated.
 │ (typed contracts · logged · policy-enforced) │
 │ │
 │ BUILD CLAW (tech squads) ASSISTANT CLAW (operator bridge) │
-│ /sandbox/build /sandbox/.milimo/assistant │
+│ /sandbox/.openclaw-data/ /sandbox/.openclaw-data/ │
+│ milimo/claws/build milimo/claws/assistant │
 │ OpenShell GW ──────────────────────────┘ │
 │ │ ════════════════════════════════════════════════════════════════ │
 │ WAR ROOM (TUI) │
 │ Every pending action · every claw · one view │
 └──────────────────────────────────────────────────────────────────────┘
 ```
+
+**NemoClaw Sandbox Filesystem Policy (per docs.nvidia.com/nemoclaw/latest/):**
+- `/sandbox/` root is **read-only** per NemoClaw Landlock policy — claws cannot write here
+- Writable claw data lives under `/sandbox/.openclaw-data/milimo/claws/<role>/`
+- Other writable paths: `/sandbox/.openclaw-data/`, `/sandbox/.nemoclaw/`, `/tmp/`
+- Provider credentials are stored in the **OpenShell gateway store** (not `~/.nemoclaw/credentials.json`, which is legacy)
 
 **Plugin namespace:** `openclaw milimo`
 **Blueprint location:** `milimo-blueprint/`
@@ -71,7 +78,7 @@ layer where every message between claws is typed, logged, and validated.
 **Role:** Creative department. Generates all content autonomously.
 
 **Sandbox:** `content-claw`
-**Filesystem mount:** `/sandbox/content`
+**Filesystem mount:** `/sandbox/.openclaw-data/milimo/claws/content`
 **Blueprint:** `milimo-blueprint/roles/content-claw.yaml`
 **Policy:** `milimo-blueprint/policies/content-sandbox.yaml`
 **Orchestrator:** `milimo-blueprint/orchestrator/content/`
@@ -85,7 +92,7 @@ layer where every message between claws is typed, logged, and validated.
 - Sends `brief_acknowledged` within 5 minutes of every project brief received
 
 **What it cannot do:**
-- Read `/sandbox/clients`, `/sandbox/finance`, `/sandbox/build`, or `/sandbox/.milimo/assistant`
+- Read `/sandbox/.openclaw-data/milimo/claws/ops`, `/sandbox/.openclaw-data/milimo/claws/finance`, `/sandbox/.openclaw-data/milimo/claws/build`, or `/sandbox/.openclaw-data/milimo/claws/assistant`
 - Publish anything without operator REVIEW approval in the War Room
 - Make inference calls that bypass the privacy router
 
@@ -128,7 +135,7 @@ Client voice adapter → Trend injector
 **Role:** Account manager and project manager. Owns the full client lifecycle.
 
 **Sandbox:** `ops-claw`
-**Filesystem mount:** `/sandbox/clients`
+**Filesystem mount:** `/sandbox/.openclaw-data/milimo/claws/ops`
 **Blueprint:** `milimo-blueprint/roles/ops-claw.yaml`
 **Policy:** `milimo-blueprint/policies/ops-sandbox.yaml`
 **Orchestrator:** `milimo-blueprint/orchestrator/ops/`
@@ -142,7 +149,7 @@ Client voice adapter → Trend injector
 - Always queries Finance Claw for pricing before sending any proposal
 
 **What it cannot do:**
-- Read `/sandbox/finance`, `/sandbox/content`, `/sandbox/build`, or `/sandbox/.milimo/assistant`
+- Read `/sandbox/.openclaw-data/milimo/claws/finance`, `/sandbox/.openclaw-data/milimo/claws/content`, `/sandbox/.openclaw-data/milimo/claws/build`, or `/sandbox/.openclaw-data/milimo/claws/assistant`
 - Send any client-facing message without operator REVIEW approval
 - Send a `project_brief` before receiving a `pricing_response` from Finance Claw
 - Generate or send invoices — Finance Claw only
@@ -199,7 +206,7 @@ Relationship health scorer v2
 **Role:** Intelligence layer. Observes everything, acts on nothing.
 
 **Sandbox:** `analytics-claw`
-**Filesystem mount:** `/sandbox/analytics`
+**Filesystem mount:** `/sandbox/.openclaw-data/milimo/claws/analytics`
 **Blueprint:** `milimo-blueprint/roles/analytics-claw.yaml`
 **Policy:** `milimo-blueprint/policies/analytics-sandbox.yaml`
 **Orchestrator:** `milimo-blueprint/orchestrator/analytics/`
@@ -214,13 +221,13 @@ Relationship health scorer v2
 
 **What it cannot do:**
 - Write to any external platform — read-only network access only
-- Read `/sandbox/clients`, `/sandbox/finance`, `/sandbox/build`, or `/sandbox/.milimo/assistant` raw records
+- Read `/sandbox/.openclaw-data/milimo/claws/ops`, `/sandbox/.openclaw-data/milimo/claws/finance`, `/sandbox/.openclaw-data/milimo/claws/build`, or `/sandbox/.openclaw-data/milimo/claws/assistant` raw records
 - Queue HOLD actions in the War Room — it observes, never blocks
 - Perform any write operation to external APIs
 
 **Primary output — shared filesystem (CRITICAL):**
 ```
-/sandbox/analytics/reports/weekly-intelligence.json
+/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json
 ```
 This is the only file in the entire mesh that all six claws can read
 directly without a message contract. It must be configured as a
@@ -274,7 +281,7 @@ Retention correlator → Competitor signal tracker → Forward projection engine
 **Role:** Financial nervous system. Tracks every dollar, protects every margin.
 
 **Sandbox:** `finance-claw`
-**Filesystem mount:** `/sandbox/finance`
+**Filesystem mount:** `/sandbox/.openclaw-data/milimo/claws/finance`
 **Blueprint:** `milimo-blueprint/roles/finance-claw.yaml`
 **Policy:** `milimo-blueprint/policies/finance-sandbox.yaml`
 **Orchestrator:** `milimo-blueprint/orchestrator/finance/`
@@ -290,7 +297,7 @@ Retention correlator → Competitor signal tracker → Forward projection engine
 
 **What it cannot do:**
 - Communicate with clients directly — ever
-- Read `/sandbox/clients`, `/sandbox/content`, `/sandbox/build`, or `/sandbox/.milimo/assistant`
+- Read `/sandbox/.openclaw-data/milimo/claws/ops`, `/sandbox/.openclaw-data/milimo/claws/content`, `/sandbox/.openclaw-data/milimo/claws/build`, or `/sandbox/.openclaw-data/milimo/claws/assistant`
 - Initiate financial transfers — payment status checks only
 - Send any invoice without two-stage operator approval (see below)
 - Include line items, client names, or invoice IDs in `revenue_summary` — totals only
@@ -351,7 +358,7 @@ Margin tracker v2 → Tax category classifier v2 → Rate optimization advisor v
 **Role:** Engineering department. Ships code autonomously.
 
 **Sandbox:** `build-claw`
-**Filesystem mount:** `/sandbox/build`
+**Filesystem mount:** `/sandbox/.openclaw-data/milimo/claws/build`
 **Blueprint:** `milimo-blueprint/roles/build-claw.yaml`
 **Policy:** `milimo-blueprint/policies/build-sandbox.yaml`
 **Orchestrator:** `milimo-blueprint/orchestrator/build/`
@@ -371,7 +378,7 @@ Margin tracker v2 → Tax category classifier v2 → Rate optimization advisor v
 - Merge any PR without operator HOLD clearance
 - Deploy to production without operator HOLD clearance (separate from PR HOLD)
 - Share source code or API keys with any other claw via inter-sandbox message
-- Read `/sandbox/clients`, `/sandbox/finance`, `/sandbox/content`, or `/sandbox/.milimo/assistant`
+- Read `/sandbox/.openclaw-data/milimo/claws/ops`, `/sandbox/.openclaw-data/milimo/claws/finance`, `/sandbox/.openclaw-data/milimo/claws/content`, or `/sandbox/.openclaw-data/milimo/claws/assistant`
 
 **Two separate two-stage approval flows:**
 ```
@@ -440,7 +447,7 @@ Error pattern classifier v2 → Churn signal correlator → Auto-roadmap drafter
 **Role:** Operator bridge and cross-claw coordinator. Lucy.
 
 **Sandbox:** `assistant-claw`
-**Filesystem mount:** `/sandbox/.milimo/assistant`
+**Filesystem mount:** `/sandbox/.openclaw-data/milimo/claws/assistant`
 **Blueprint:** `milimo-blueprint/roles/assistant-claw.yaml`
 **Policy:** `milimo-blueprint/policies/assistant-sandbox.yaml`
 **Orchestrator:** `milimo-blueprint/orchestrator/assistant/`
@@ -454,7 +461,7 @@ Error pattern classifier v2 → Churn signal correlator → Auto-roadmap drafter
 - Maintains conversation context with the operator across sessions
 
 **What it cannot do:**
-- Read `/sandbox/content`, `/sandbox/clients`, `/sandbox/analytics`, `/sandbox/finance`, or `/sandbox/build`
+- Read `/sandbox/.openclaw-data/milimo/claws/content`, `/sandbox/.openclaw-data/milimo/claws/ops`, `/sandbox/.openclaw-data/milimo/claws/analytics`, `/sandbox/.openclaw-data/milimo/claws/finance`, or `/sandbox/.openclaw-data/milimo/claws/build`
 - Send any client-facing message — operator communication only
 - Execute financial transactions, merge PRs, or publish content
 - Modify any other claw's filesystem or configuration
@@ -590,7 +597,7 @@ typed messages.
 
 **One exception — the Analytics Claw's shared read export:**
 ```
-/sandbox/analytics/reports/weekly-intelligence.json
+/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json
 ```
 This file must be configured as a read-only mount in **all six** claw
 sandbox policies. Verify with Phase A isolation tests before anything else.

@@ -21,7 +21,9 @@ from typing import Any, Literal
 
 logger = logging.getLogger("milimo.analytics_init")
 
-BASE = Path("/sandbox/analytics")
+from milimo_paths import claw_base
+
+BASE = claw_base("analytics")
 
 REQUIRED_DIRS = [
     "reports/weekly-intelligence-archive",

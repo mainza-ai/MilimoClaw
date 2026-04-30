@@ -161,7 +161,7 @@ Check `.env` for required tokens:
 
 ## Available Tools
 The following CLI tools are available in the sandbox:
-- **milimo** (`/sandbox/.local/bin/milimo`) — Bridge to all claw operations. Use `milimo --command <name> --args '{"key": "value"}'` to invoke.
+- **milimo** (`python3 /sandbox/.openclaw-data/milimo/orchestrator/bridge_cli.py`) — Bridge to all claw operations. Use `python3 /sandbox/.openclaw-data/milimo/orchestrator/bridge_cli.py --command <name> --args '{"key": "value"}'` to invoke.
 - **gh** (`/sandbox/.local/bin/gh`) — GitHub CLI for PR management, issue tracking, repo operations.
 - **Python 3** — All claws and the bridge are Python-based. Key packages: `pyyaml`, `requests`, `stripe`, `httpx`, `sentry-sdk`.
 
@@ -247,12 +247,7 @@ You have access to ALL of these commands via the bridge. Do NOT ask the operator
 
 **How to invoke commands:**
 ```bash
-milimo --command <name> --args '{"key": "value"}'
-```
-
-Or via Python bridge directly:
-```python
-python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/bridge_cli.py --command <name> --args '{"key": "value"}'
+python3 /sandbox/.openclaw-data/milimo/orchestrator/bridge_cli.py --command <name> --args '{"key": "value"}'
 ```
 
 **Important:** When asked to start a claw or check claw status, use these commands directly. Do NOT ask the operator to do it manually.
@@ -260,14 +255,14 @@ python3 /sandbox/.milimo/blueprints/0.1.0/orchestrator/bridge_cli.py --command <
 ## Sandbox Filesystem
 Your working directories:
 - `/sandbox/milimo-blueprint/orchestrator/` — Blueprint source code (50+ Python modules)
-- `/sandbox/.milimo/blueprints/0.1.0/orchestrator/` — Active blueprint copy (same content)
-- `/sandbox/.milimo/config.json` — Squad configuration
-- `/sandbox/.milimo/mesh/` — Mesh state, heartbeats, inbox/outbox
-- `/sandbox/clients/` — Ops Claw workspace (clients, projects, calendar, queue)
-- `/sandbox/content/` — Content Claw workspace (drafts, queue)
-- `/sandbox/analytics/` — Analytics Claw workspace (reports, metrics)
-- `/sandbox/finance/` — Finance Claw workspace (invoices, revenue, expenses)
-- `/sandbox/build/` — Build Claw workspace (prs, deployments, tasks, repo)
+- `/sandbox/.openclaw-data/milimo/blueprints/0.1.0/orchestrator/` — Active blueprint copy (same content)
+- `/sandbox/.openclaw-data/milimo/config.json` — Squad configuration
+- `/sandbox/.openclaw-data/milimo/mesh/` — Mesh state, heartbeats, inbox/outbox
+- `/sandbox/.openclaw-data/milimo/claws/ops/` — Ops Claw workspace (clients, projects, calendar, queue)
+- `/sandbox/.openclaw-data/milimo/claws/content/` — Content Claw workspace (drafts, queue)
+- `/sandbox/.openclaw-data/milimo/claws/analytics/` — Analytics Claw workspace (reports, metrics)
+- `/sandbox/.openclaw-data/milimo/claws/finance/` — Finance Claw workspace (invoices, revenue, expenses)
+- `/sandbox/.openclaw-data/milimo/claws/build/` — Build Claw workspace (prs, deployments, tasks, repo)
 
 ---
 *The milimo never stops. Work. Without working.*

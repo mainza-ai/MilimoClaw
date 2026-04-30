@@ -24,7 +24,7 @@ $ openshell inference set --provider nvidia-nim --model nvidia/nemotron-3-super-
 ```
 
 This requires the `NVIDIA_API_KEY` environment variable.
-The `nemoclaw onboard` command stores this key in `~/.nemoclaw/credentials.json` on first run.
+The `nemoclaw onboard` command registers this key with the OpenShell gateway on first run. `~/.nemoclaw/credentials.json` is a legacy file from earlier releases; it is auto-migrated to the gateway and deleted on first `nemoclaw onboard` after upgrading.
 
 ## Step 2: Verify the Active Model
 

@@ -63,7 +63,7 @@ const createMockMessage = (overrides: Partial<PendingMessage> = {}): PendingMess
   squad_id: "test-squad",
   timestamp: new Date().toISOString(),
   needs_approval: false,
-  file_path: "/home/test/.milimo/mesh/inbox/war_room/msg-001.json",
+  file_path: "/home/test/.openclaw-data/milimo/mesh/inbox/war_room/msg-001.json",
   ...overrides,
 });
 

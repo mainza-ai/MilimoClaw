@@ -1,13 +1,13 @@
 # Milimo Claw — Architecture Guide
 
 > Technical deep-dive into the multi-sandbox mesh architecture.
-> **Last Updated:** 2026-04-04
+> **Last Updated:** 2026-04-28
 
 ---
 
 ## System Overview
 
-Milimo Claw is a distributed multi-agent system where each agent (claw) runs in its own isolated NemoClaw sandbox. The system has eight architectural layers:
+Milimo Claw is a distributed multi-agent system where all claws run inside a single NemoClaw sandbox. Per-claw isolation is enforced by Landlock filesystem paths, application-level egress policies, and the Python orchestrator. The system has nine architectural layers:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -41,9 +41,13 @@ Milimo Claw is a distributed multi-agent system where each agent (claw) runs in 
 │ Role Configs · Sandbox Policies · Templates · Schema           │
 │ Regions Config · Rate Limits · Performance Attestations        │
 ├─────────────────────────────────────────────────────────────────┤
-│ RUNTIME LAYER                                                   │
-│ NemoClaw · OpenShell · Docker · Landlock · seccomp             │
-│ Relay Server · WebSocket Gateway                               │
+│ MESSAGING LAYER (OpenShell-managed, not Milimo) │
+│ Telegram · Discord · Slack — Channel Messaging │
+│ OpenShell Gateway → Agent delivery (no direct API polling) │
+├─────────────────────────────────────────────────────────────────┤
+│ RUNTIME LAYER │
+│ NemoClaw · OpenShell · Docker · Landlock · seccomp │
+│ Relay Server · WebSocket Gateway │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -51,11 +55,11 @@ Milimo Claw is a distributed multi-agent system where each agent (claw) runs in 
 
 ## Sandbox Isolation Model
 
-Each claw runs inside a NemoClaw sandbox with kernel-level isolation:
+Each claw runs inside a shared NemoClaw sandbox with kernel-level isolation enforced per-path:
 
 | Isolation Layer | Mechanism | What It Protects |
 |---|---|---|
-| **Filesystem** | Landlock LSM | Each claw can only access its own `/sandbox/<role>` mount |
+| **Filesystem** | Landlock LSM | Each claw can only access its own `/sandbox/.openclaw-data/milimo/claws/<role>` mount |
 | **Network** | OpenShell netns + egress policy | Per-claw API allowlists — Finance can't reach social APIs |
 | **Process** | seccomp BPF | Blocks privilege escalation, restricts dangerous syscalls |
 | **Inference** | Privacy router intercept | Sensitive data routed to local NIM, never to cloud |
@@ -64,24 +68,81 @@ Each claw runs inside a NemoClaw sandbox with kernel-level isolation:
 ### Filesystem Mounts
 
 ```
-/sandbox/
-├── content/      # Content Claw — brand assets, drafts, style guides
-├── clients/      # Ops Claw — client records, project histories
-├── analytics/    # Analytics Claw — performance data, reports
-│   └── reports/  # Read-only cross-mount for Content Claw
-├── finance/ # Finance Claw — invoices, revenue, pricing
-├── build/ # Build Claw — codebase, secrets, deploy configs
-│   ├── repo/ # Codebase (GitHub mount)
-│   ├── context/ # Sprint plans, error patterns, cost tracking
-│   ├── prs/ # PR state tracking (drafted/approved/merged)
-│   ├── deployments/ # Deploy state (pending/history)
-│   ├── docs/ # Changelog, API docs, devlog
-│   ├── memory/ # Filesystem memory pattern (Clawhip)
-│   └── logs/ # Operational, PR, deploy, cost alerts
-└── assistant/ # Assistant Claw — sessions, context, logs
+/sandbox/.openclaw-data/milimo/
+├── blueprints/0.1.0/orchestrator/ # Blueprint code (migrated from .milimo/)
+├── claws/
+│   ├── content/ # Content Claw — brand assets, drafts, style guides
+│   ├── ops/ # Ops Claw — client records, project histories
+│   ├── analytics/ # Analytics Claw — performance data, reports
+│   │   └── reports/ # Read-only cross-mount for Content Claw
+│   ├── finance/ # Finance Claw — invoices, revenue, pricing
+│   ├── build/ # Build Claw — codebase, secrets, deploy configs
+│   │   ├── repo/ # Codebase (GitHub mount)
+│   │   ├── context/ # Sprint plans, error patterns, cost tracking
+│   │   ├── prs/ # PR state tracking (drafted/approved/merged)
+│   │   ├── deployments/ # Deploy state (pending/history)
+│   │   ├── docs/ # Changelog, API docs, devlog
+│   │   ├── memory/ # Filesystem memory pattern (Clawhip)
+│   │   └── logs/ # Operational, PR, deploy, cost alerts
+│   └── assistant/ # Assistant Claw — sessions, context, logs
+├── mesh/ # Mesh coordination (heartbeats, logs, topology)
+└── config/ # Squad configuration
 ```
 
 Each claw has **read-write** access only to its own mount. Cross-mounts are explicitly declared and **read-only**.
+
+### Sandbox Writable Paths
+
+Under NemoClaw's Landlock policy, only specific paths are writable inside the sandbox:
+
+| Path | Writable | Purpose |
+|---|---|---|
+| `/sandbox/.openclaw-data/` | **Yes** | Primary writable area — claw data, blueprints, mesh state |
+| `/sandbox/.nemoclaw/` | **Yes** | NemoClaw internal state |
+| `/tmp` | **Yes** | Temporary files |
+| `/sandbox/.openclaw/workspace/` | **Yes** | Agent workspace files |
+| `/sandbox/` root | **No** | Read-only — system layout |
+| `/sandbox/.openclaw/` | **No** | Read-only — OpenClaw runtime |
+
+This is why claw data directories migrated from `/sandbox/<role>` to `/sandbox/.openclaw-data/milimo/claws/<role>`. The old `/sandbox/` root is read-only under Landlock; `.openclaw-data/` is the designated writable subtree.
+
+The `.milimo` directory is now a symlink to `.openclaw-data/milimo/`, so blueprints moved from `/sandbox/.milimo/blueprints/` to `/sandbox/.openclaw-data/milimo/blueprints/`.
+
+### Centralized Path Resolution
+
+All Python modules use `milimo_paths.py` for sandbox-aware path resolution:
+
+```python
+from milimo_paths import claw_base, MILIMO_DIR, CLAWS_DIR
+
+base = claw_base("content")
+# Returns /sandbox/.openclaw-data/milimo/claws/content in sandbox
+# Falls back to /sandbox/content outside sandbox
+```
+
+This replaces all hardcoded `/sandbox/<role>` references and ensures claws work in both sandbox and non-sandbox environments.
+
+### Sandbox Mode Env Validation
+
+When `NEMOCLAW_MODEL` env var is present (indicating sandbox proxy), the following environment variables are treated as **non-fatal warnings** instead of fatal errors:
+
+- `NVIDIA_API_KEY` — injected by sandbox proxy at `10.200.0.1:3128`
+- `GITHUB_REPO` — injected by sandbox proxy
+- `STRIPE_SECRET_KEY` — injected by sandbox proxy
+
+Outside sandbox mode, these remain fatal if missing.
+
+### Stub Client Fallback
+
+The claw launcher creates **stub clients** when real services are unavailable (missing CLI tools, no auth tokens):
+
+| Stub Client | Replaces | Behavior |
+|---|---|---|
+| `GitHubClient` | Real GitHub API | Returns empty results, logs warnings |
+| `VercelClient` | Real Vercel API | Returns empty results, logs warnings |
+| `SentryClient` | Real Sentry API | Returns empty results, logs warnings |
+
+Claws degrade gracefully instead of crashing when external services are unavailable.
 
 ---
 
@@ -338,6 +399,27 @@ Rate limit status is visible in the War Room via `getRateLimitStatus()`.
 
 ---
 
+## Messaging Layer (OpenShell-Managed)
+
+Telegram, Discord, and Slack messaging are **not** part of the Milimo Claw codebase. They are fully managed by OpenShell's channel messaging subsystem:
+
+```
+┌──────────────┐     ┌──────────────────────┐     ┌──────────────┐
+│ Telegram     │────▶│ OpenShell Gateway     │────▶│ OpenClaw     │
+│ (your bot)   │    │ (channel messaging)   │    │ (sandbox)    │
+└──────────────┘     └──────────────────────┘     └──────────────┘
+```
+
+- **No direct API polling** — The sandbox never calls `api.telegram.org` directly. OpenShell intercepts messaging platform APIs and delivers messages to the agent through its channel messaging subsystem.
+- **No TelegramBridge class** — Lucy (Assistant Claw) does not contain a `TelegramBridge`. All Telegram integration was removed from `lucy.py` and `claw_launcher.py` to eliminate 409 Conflict errors caused by dual consumers.
+- **Credential injection** — Bot tokens are registered as OpenShell providers during `nemoclaw onboard`. The sandbox receives placeholder credentials; the L7 proxy injects real credentials at egress.
+- **Channel config is build-time** — `NEMOCLAW_MESSAGING_CHANNELS_B64` and `NEMOCLAW_MESSAGING_ALLOWED_IDS_B64` are baked into the sandbox image during `nemoclaw onboard`. Changes require `nemoclaw onboard` again.
+- **Pause/resume** — `nemoclaw <name> channels stop/start telegram` pauses/resumes without rebuild. `nemoclaw tunnel start` only starts cloudflared for the dashboard URL — it does **not** affect Telegram.
+
+See `troubleshooting/TELEGRAM_SETUP.md` for full setup instructions.
+
+---
+
 ## Component Map
 
 | Component | Language | Location | Purpose |
@@ -366,6 +448,7 @@ Rate limit status is visible in the War Room via `getRateLimitStatus()`.
 | **Analytics Claw** | Python | `milimo-blueprint/orchestrator/analytics/` | 12 modules — intelligence layer |
 | **Finance Claw** | Python | `milimo-blueprint/orchestrator/finance/` | 12 modules — financial operations |
 | **Assistant Claw** | Python | `milimo-blueprint/orchestrator/assistant/` | Conversational interface — operator ↔ claws |
+| Path resolver | Python | `milimo-blueprint/orchestrator/milimo_paths.py` | Centralized sandbox-aware path resolution (MILIMO_DIR, CLAWS_DIR, claw_base()) |
 
 ---
 

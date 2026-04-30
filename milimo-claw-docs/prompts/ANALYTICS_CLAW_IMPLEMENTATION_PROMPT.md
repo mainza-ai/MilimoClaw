@@ -2,6 +2,8 @@
 
 ---
 # MILIMO CLAW — ANALYTICS CLAW IMPLEMENTATION PROMPT
+
+> **NemoClaw Compliance Notice (2026-04-28)** — Paths migrated to `/sandbox/.openclaw-data/milimo/claws/<role>/`; credentials in OpenShell gateway store; network policies use `protocol: rest` with `enforcement`/`access`/`rules`. See [docs.nvidia.com/nemoclaw/latest/](https://docs.nvidia.com/nemoclaw/latest/).
 # ─────────────────────────────────────────────────────────────────────────────
 # Attach this prompt alongside:
 #   1. ANALYTICS_CLAW_IMPLEMENTATION_AUDIT.md  (the gap analysis)
@@ -49,7 +51,7 @@ or moves money. It only observes and informs.
     (this is a copy of the shared report — see filesystem note below)
 
 **Shared filesystem mount — the most critical dependency:**
-  `/sandbox/analytics/reports/weekly-intelligence.json`
+  `/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json`
   must be readable by ALL six claws. This is configured in each claw's
   sandbox policy. Verify the mount exists in analytics-sandbox.yaml
   before writing any generation code. If it is missing, add it.
@@ -681,8 +683,8 @@ class ReportGenerator:
     mark affected sections with data_quality="internal_only"
     """
 
-    REPORT_PATH = Path("/sandbox/analytics/reports/weekly-intelligence.json")
-    ARCHIVE_DIR = Path("/sandbox/analytics/reports/weekly-intelligence-archive")
+    REPORT_PATH = Path("/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json")
+    ARCHIVE_DIR = Path("/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence-archive")
 
     def generate(self) -> WeeklyReport: ...
     # Full generation sequence:
@@ -1180,7 +1182,7 @@ class AnalyticsClaw:
 **BEFORE ANY OTHER INTEGRATION WORK:**
 
 Check `analytics-sandbox.yaml` for the shared mount configuration.
-The file at `/sandbox/analytics/reports/weekly-intelligence.json` must
+The file at `/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json` must
 be readable by all other claws.
 
 Add or verify this entry exists in analytics-sandbox.yaml:
@@ -1188,7 +1190,7 @@ Add or verify this entry exists in analytics-sandbox.yaml:
 filesystem:
   primary: "/sandbox/analytics"
   shared_exports:
-    - path: "/sandbox/analytics/reports/weekly-intelligence.json"
+    - path: "/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json"
       readable_by: ["content", "ops", "finance", "build"]
       writable_by: []   # analytics only writes this — others read only
 ```

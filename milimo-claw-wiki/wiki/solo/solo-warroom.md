@@ -4,7 +4,7 @@
 
 **Sources**: `milimo-blueprint/orchestrator/solo_warroom.py`
 
-**Last updated**: 2026-04-23
+**Last updated**: 2026-04-28
 
 **Tags**: #solo #warroom #queue #approval
 
@@ -66,7 +66,7 @@ class WarRoomAction:
 
 ## Revenue Summary Widget
 
-Reads from `/sandbox/finance/revenue/weekly_summary.json`:
+Reads from `/sandbox/.openclaw-data/milimo/claws/finance/revenue/weekly_summary.json`:
 - `week_revenue` — Current week total
 - `week_over_week_pct` — WoW change percentage
 - `invoices_paid` — Paid invoice count

@@ -30,14 +30,17 @@ from __future__ import annotations
 import fcntl
 import json
 import logging
-import os
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
+from milimo_paths import claw_base
+
 logger = logging.getLogger("milimo.content_init")
+
+BASE = claw_base("content")
 
 
 # ---------------------------------------------------------------------------
@@ -132,13 +135,12 @@ class LogEntry:
 
 class ContentFilesystemInit:
     """
+
     Creates and validates the full /sandbox/content/ filesystem structure.
 
     Called during onboarding and on every claw startup to ensure
     required directories and files exist.
     """
-
-    BASE = Path("/sandbox/content")
 
     REQUIRED_DIRS = [
         "brand/style-guides",
@@ -185,18 +187,9 @@ class ContentFilesystemInit:
         if base_path:
             self.BASE = base_path
         else:
-            # Check for fallback to user directory
-            home = os.environ.get("HOME", os.environ.get("USERPROFILE", "/tmp"))
-            sandbox_base = Path(home) / ".milimo" / "sandboxes"
+            from milimo_paths import claw_base as _claw_base
 
-            if squad_id:
-                self.BASE = sandbox_base / squad_id / "content"
-            else:
-                # Try /sandbox/content first, fall back to user directory
-                if Path("/sandbox/content").exists() or os.access("/sandbox", os.W_OK):
-                    self.BASE = Path("/sandbox/content")
-                else:
-                    self.BASE = sandbox_base / "default" / "content"
+            self.BASE = _claw_base("content")
 
         self.BASE.mkdir(parents=True, exist_ok=True)
 

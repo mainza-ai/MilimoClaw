@@ -90,8 +90,8 @@ chmod +x /tmp/milimo-wrapper
 
 # Upload to sandbox
 openshell sandbox upload my-assistant \
-  /tmp/milimo-wrapper \
-  /sandbox/.local/bin/milimo
+/tmp/milimo-wrapper \
+/sandbox/.openclaw-data/milimo/orchestrator/bridge_cli.py
 ```
 
 Add to PATH in shell profiles:
@@ -106,7 +106,7 @@ echo 'export PATH=$HOME/.local/bin:$PATH' | \
 
 ### Verify
 ```bash
-openshell sandbox download my-assistant /sandbox/.local/bin/milimo /tmp/verify_milimo
+openshell sandbox download my-assistant /sandbox/.openclaw-data/milimo/orchestrator/bridge_cli.py /tmp/verify_milimo
 head -3 /tmp/verify_milimo
 # Should show the Python wrapper script
 ```
@@ -249,12 +249,12 @@ openshell sandbox upload my-assistant /tmp/fix_venv.sh /tmp/fix_venv.sh
 
 ---
 
-## Issue 6: Missing /sandbox/clients Directory
+## Issue 6: Missing /sandbox/.openclaw-data/milimo/claws/ops Directory
 
 ### Symptoms
 - Ops claw reports "sandbox not initialized"
-- `/sandbox/clients/` doesn't exist
-- Ops primary mount path from blueprint is `/sandbox/clients`
+- `/sandbox/.openclaw-data/milimo/claws/ops/` doesn't exist
+- Ops primary mount path from blueprint is `/sandbox/.openclaw-data/milimo/claws/ops`
 
 ### Root Cause
 The `install.sh` script now creates sandbox directories, but existing sandboxes may not have been initialized with the correct directory structure.
@@ -268,8 +268,8 @@ mkdir -p /tmp/clients_init/{clients/{active,archived},projects/{active,completed
 
 # Upload to sandbox
 openshell sandbox upload my-assistant \
-  /tmp/clients_init/ \
-  /sandbox/clients/
+/tmp/clients_init/ \
+/sandbox/.openclaw-data/milimo/claws/ops/
 ```
 
 ---
@@ -303,12 +303,15 @@ When deploying changes to an existing sandbox, run through this checklist:
 |---|------|---------|
 | 1 | Upload corrected `bridge_cli.py` | `openshell sandbox upload my-assistant <local>/bridge_cli.py /sandbox/milimo-blueprint/orchestrator/bridge_cli.py` |
 | 2 | Upload full blueprint to `.milimo/blueprints/0.1.0/` | `openshell sandbox upload my-assistant <local>/orchestrator/ /sandbox/.milimo/blueprints/0.1.0/orchestrator/` |
-| 3 | Upload `milimo` CLI wrapper | `openshell sandbox upload my-assistant /tmp/milimo-wrapper /sandbox/.local/bin/milimo` |
+| 3 | Upload `milimo` CLI wrapper | `openshell sandbox upload my-assistant /tmp/milimo-wrapper /sandbox/.openclaw-data/milimo/orchestrator/bridge_cli.py` |
 | 4 | Upload `gh` CLI (correct arch) | `openshell sandbox upload my-assistant /tmp/gh /sandbox/.local/bin/gh` |
 | 5 | Upload Python packages | Upload each package to `/sandbox/.local/lib/python3.11/site-packages/` |
-| 6 | Create `/sandbox/clients/` | Upload directory structure |
+| 6 | Create `/sandbox/.openclaw-data/milimo/claws/ops/` | Upload directory structure |
 | 7 | Fix `.venv` | Upload and run `fix_venv.sh` inside sandbox |
 | 8 | Verify all uploads | Download back and check line counts/checksums |
+| 9 | Clear `__pycache__` after file updates | `docker exec openshell-cluster-nemoclaw kubectl exec my-assistant -n openshell -- find /sandbox/.openclaw-data/milimo/blueprints/0.1.0/orchestrator -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null` |
+| 10 | Install `requests` package | `docker exec openshell-cluster-nemoclaw kubectl exec my-assistant -n openshell -- pip install --break-system-packages requests` |
+| 11 | Verify claw paths are under `.openclaw-data/milimo/claws/` | `docker exec openshell-cluster-nemoclaw kubectl exec my-assistant -n openshell -- ls /sandbox/.openclaw-data/milimo/claws/` |
 
 ---
 
@@ -344,25 +347,30 @@ As of 2026-04-06, `install.sh` includes these provisioning steps that were previ
 | 6c | Copy blueprint to `/sandbox/.milimo/blueprints/0.1.0/` |
 | 6d | Install Python dependencies (pyyaml, requests, stripe, httpx, sentry-sdk) |
 | 6e | Install `gh` CLI with auto-detected architecture (ARM64/AMD64) |
-| 6f | Create `milimo` CLI wrapper and add to PATH |
+| 6f | Create `milimo` CLI wrapper (`python3 /sandbox/.openclaw-data/milimo/orchestrator/bridge_cli.py`) and add to PATH |
 | 6g | Recreate `.venv` with sandbox Python |
 
 Fresh installs will get all of these automatically. Existing sandboxes need manual sync using the commands above.
 
 ---
 
-## Issue 7: Claws Don't Start (Missing Environment Variables)
+## Issue 7: Claws Don't Start (Missing Environment Variables / Path Migration)
 
 ### Symptoms
 - `launcher_status` shows claws as "stopped"
 - Build claw specifically shows "missing NVIDIA_API_KEY & GITHUB_REPO"
 - Launcher logs show `No module named 'requests'` for all claws
+- Launcher logs show `[Errno 13] Permission denied: '/sandbox/.openclaw-data/milimo/claws/build'` or similar
 - All claws run in "stub mode" instead of full mode
 
 ### Root Cause
 The sandbox's shell environment does NOT inherit from the host. The `install.sh` script deploys files but the launcher runs in a fresh process without the API keys from `.env`.
 
 Additionally, Python packages installed via `pip3 install --target` are not in Python's default search path.
+
+**Primary fix (as of 2026-04-28):** Claw data directories have been migrated from `/sandbox/<role>/` to `/sandbox/.openclaw-data/milimo/claws/<role>/` because NemoClaw's Landlock LSM policy marks `/sandbox/` root as read-only. See Issue 9 for full details.
+
+Additionally, the `NEMOCLAW_MODEL` environment variable now triggers sandbox mode, which treats missing API keys as warnings rather than hard errors — so claws can start even without all keys configured.
 
 ### Fix
 `install.sh` now includes three new provisioning steps (6h, 6i, 6j):
@@ -410,7 +418,7 @@ docker exec openshell-cluster-nemoclaw kubectl exec -n openshell my-assistant --
 docker exec openshell-cluster-nemoclaw kubectl exec -n openshell my-assistant -- python3 -c "import requests; print('OK')"
 
 # Check launcher status
-docker exec openshell-cluster-nemoclaw kubectl exec -n openshell my-assistant -- bash -c 'source /sandbox/.bashrc; /sandbox/.local/bin/milimo --command launcher_status'
+docker exec openshell-cluster-nemoclaw kubectl exec -n openshell my-assistant -- bash -c 'source /sandbox/.bashrc; python3 /sandbox/.openclaw-data/milimo/orchestrator/bridge_cli.py --command launcher_status'
 ```
 
 ---
@@ -447,6 +455,111 @@ For all claws to function properly, ensure your `.env` contains:
 
 ---
 
+## Issue 9: Claws Fail with Permission Denied on /sandbox/<role>
+
+### Symptoms
+- Launcher logs show `[Errno 13] Permission denied: '/sandbox/.openclaw-data/milimo/claws/build'` or `/sandbox/.openclaw-data/milimo/claws/content`, `/sandbox/.openclaw-data/milimo/claws/ops`
+- All claws show "stopped" in health endpoint
+- `openclaw tui` freezes when trying to interact with claws
+
+### Root Cause
+NemoClaw's Landlock LSM policy marks `/sandbox/` root as **read-only**. Only specific subdirectories are writable:
+- `/sandbox/.openclaw-data/` — writable (primary data area)
+- `/sandbox/.nemoclaw/` — writable (NemoClaw state)
+- `/tmp/` — writable
+- `/sandbox/.openclaw/workspace/` — writable
+
+The claw data directories (`/sandbox/.openclaw-data/milimo/claws/content/`, `/sandbox/.openclaw-data/milimo/claws/build/`, etc.) sit under `/sandbox/.openclaw-data/` which IS writable. The old paths (`/sandbox/content/`, `/sandbox/build/`, etc.) that sat directly under `/sandbox/` were NOT writable because `/sandbox/` root is read-only. When claws tried `mkdir -p` on those old paths, they got EACCES.
+
+### Fix
+All claw data directories have been migrated to `/sandbox/.openclaw-data/milimo/claws/<role>/`:
+
+- `/sandbox/content/` → `/sandbox/.openclaw-data/milimo/claws/content/`
+- `/sandbox/clients/` → `/sandbox/.openclaw-data/milimo/claws/ops/` (also renamed from "clients" to "ops")
+- `/sandbox/analytics/` → `/sandbox/.openclaw-data/milimo/claws/analytics/`
+- `/sandbox/finance/` → `/sandbox/.openclaw-data/milimo/claws/finance/`
+- `/sandbox/build/` → `/sandbox/.openclaw-data/milimo/claws/build/`
+- `/sandbox/assistant/` → `/sandbox/.openclaw-data/milimo/claws/assistant/`
+
+The centralized `milimo_paths.py` module handles this automatically. All Python modules now use `claw_base(role)` instead of hardcoded paths.
+
+### Manual Fix (if sandbox has old code)
+```bash
+# 1. Deploy updated milimo_paths.py
+docker exec openshell-cluster-nemoclaw kubectl cp milimo_paths.py my-assistant:/sandbox/.openclaw-data/milimo/blueprints/0.1.0/orchestrator/milimo_paths.py -n openshell
+docker exec openshell-cluster-nemoclaw kubectl exec my-assistant -n openshell -- chmod 644 /sandbox/.openclaw-data/milimo/blueprints/0.1.0/orchestrator/milimo_paths.py
+
+# 2. Deploy updated claw init files (content_init.py, ops_init.py, analytics_init.py, finance_init.py, build_init.py)
+
+# 3. Clear stale bytecode
+docker exec openshell-cluster-nemoclaw kubectl exec my-assistant -n openshell -- find /sandbox/.openclaw-data/milimo/blueprints/0.1.0/orchestrator -type d -name __pycache__ -exec rm -rf {} +
+
+# 4. Kill old launcher and restart
+docker exec openshell-cluster-nemoclaw kubectl exec my-assistant -n openshell -- kill $(cat /root/.openclaw-data/milimo/mesh/launcher.pid 2>/dev/null)
+docker exec openshell-cluster-nemoclaw kubectl exec my-assistant -n openshell -- rm -f /root/.openclaw-data/milimo/mesh/launcher.pid
+docker exec openshell-cluster-nemoclaw kubectl exec my-assistant -n openshell -- sh -c 'cd /sandbox/.openclaw-data/milimo/blueprints/0.1.0/orchestrator && PYTHONPATH=/sandbox/.openclaw-data/milimo/blueprints/0.1.0 nohup python3 claw_launcher.py --all --daemon > /tmp/launcher.log 2>&1 &'
+```
+
+### Verification
+```bash
+# Check health endpoint
+docker exec openshell-cluster-nemoclaw kubectl exec my-assistant -n openshell -- curl -s http://localhost:8081/health
+
+# Check claw directories
+docker exec openshell-cluster-nemoclaw kubectl exec my-assistant -n openshell -- ls /sandbox/.openclaw-data/milimo/claws/
+
+# Check heartbeat files
+docker exec openshell-cluster-nemoclaw kubectl exec my-assistant -n openshell -- ls /root/.openclaw-data/milimo/mesh/heartbeats/
+```
+
+---
+
+## Issue 10: Updated Python Files Not Taking Effect (Stale Bytecode)
+
+### Symptoms
+- Deployed updated `.py` files to sandbox but claws still show old errors
+- Launcher logs show errors from old code (e.g., `Permission denied: '/sandbox/.openclaw-data/milimo/claws/build'` even after path fix)
+- `py_compile` on the source file succeeds but runtime behavior doesn't match
+
+### Root Cause
+Python caches compiled bytecode in `__pycache__/` directories as `.pyc` files. When you update a `.py` file, Python may still load the cached `.pyc` if the modification time check doesn't trigger recompilation (can happen with `kubectl cp` which may not update mtime correctly, or when copying as a different user).
+
+### Fix
+Clear all `__pycache__` directories in the blueprint after deploying changes:
+
+```bash
+docker exec openshell-cluster-nemoclaw kubectl exec my-assistant -n openshell -- \
+  find /sandbox/.openclaw-data/milimo/blueprints/0.1.0/orchestrator -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null
+```
+
+Then restart the launcher.
+
+**Important:** Always clear `__pycache__` after deploying updated Python files to the sandbox.
+
+---
+
+## Issue 11: Build Claw Fails with "No module named 'requests'"
+
+### Symptoms
+- Launcher log: `ClawLauncher: exception starting build: No module named 'requests'`
+- All other claws run in "stub mode": `could not import X claw: No module named 'requests' (running in stub mode)`
+- Build claw shows "stopped" while others show "running"
+
+### Root Cause
+The `requests` library is required by multiple claw modules (Vercel client, Sentry client, GitHub client, etc.). The sandbox Python installation does not include it by default.
+
+### Fix
+Install `requests` in the sandbox:
+
+```bash
+docker exec openshell-cluster-nemoclaw kubectl exec my-assistant -n openshell -- \
+  pip install --break-system-packages requests
+```
+
+For `install.sh`, ensure Step 6d includes `requests` in the pip install command.
+
+---
+
 ## Key Lessons Learned
 
 1. **Two environments, not one** — The Docker container and NemoClaw sandbox are completely separate. Fixes must be applied to the sandbox where the assistant runs.
@@ -458,4 +571,7 @@ For all claws to function properly, ensure your `.env` contains:
 7. **install.sh is the source of truth** — All provisioning steps should be in `install.sh` so fresh installs get everything automatically.
 8. **Env vars must be explicitly injected** — The sandbox doesn't inherit host env vars. Use `install.sh` Step 6h to inject them into shell profiles.
 9. **Python needs .pth files** — Packages installed to non-standard locations need a `.pth` file for discovery.
-10. **PATH must include /sandbox/.local/bin** — Tools installed via `install.sh` go to `/sandbox/.local/bin/`, not `/root/.local/bin/`.
+10. **PATH must include /sandbox/.local/bin** — Tools installed via `install.sh` go to `/sandbox/.local/bin/`, not `/root/.local/bin/`. The milimo CLI is now invoked as `python3 /sandbox/.openclaw-data/milimo/orchestrator/bridge_cli.py`.
+11. **Claw data goes to `.openclaw-data/milimo/claws/`** — `/sandbox/<role>` is read-only under Landlock. All claw data is now under `/sandbox/.openclaw-data/milimo/claws/<role>/`. Use `claw_base(role)` from `milimo_paths.py`.
+12. **Always clear `__pycache__`** after deploying updated Python files — stale bytecode causes mysterious old-code behavior.
+13. **`requests` is a required dependency** — all claws need it; install in sandbox with `pip install --break-system-packages requests`.

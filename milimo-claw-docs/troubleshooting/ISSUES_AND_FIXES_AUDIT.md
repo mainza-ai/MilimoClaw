@@ -1,5 +1,9 @@
 # MilimoClaw Issues and Fixes Audit Document
 
+> **NemoClaw Compliance Notice (2026-04-28)**
+>
+> This document has been updated to comply with NVIDIA NemoClaw v0.0.28 and OpenShell v0.0.26. Paths referencing `/sandbox/<role>/` or `/sandbox/analytics/reports/` have been migrated to `/sandbox/.openclaw-data/milimo/claws/<role>/` per NemoClaw's Landlock read-only `/sandbox/` enforcement. Credentials are stored in the OpenShell gateway store, not `~/.nemoclaw/credentials.json` (legacy). Network policies should use `protocol: rest` with `enforcement` and `access`/`rules` fields for L7 HTTP inspection. See [docs.nvidia.com/nemoclaw/latest/](https://docs.nvidia.com/nemoclaw/latest/) for authoritative documentation.
+
 **Date:** April 11, 2026 (created) · April 14, 2026 (updated)
 **Purpose:** Comprehensive record of issues discovered and fixes implemented for external audit
 
@@ -200,7 +204,7 @@ The assistant-sandbox.yaml policy only allowed specific binaries for GitHub API 
 - `/usr/bin/git`
 - `/sandbox/.local/bin/gh`
 - `/usr/bin/python3`
-- `/sandbox/.local/bin/milimo`
+- `/sandbox/.openclaw-data/milimo/orchestrator/bridge_cli.py`
 
 The Node.js binary (`/usr/local/bin/node`) was not in this list.
 
@@ -214,7 +218,7 @@ binaries:
   - { path: /sandbox/.local/bin/gh }
   - { path: /usr/local/bin/node }
   - { path: /usr/bin/python3 }
-  - { path: /sandbox/.local/bin/milimo }
+  - { path: /sandbox/.openclaw-data/milimo/orchestrator/bridge_cli.py }
 ```
 
 ### Files Modified
@@ -232,7 +236,7 @@ Claws reported permission denied errors when trying to write to operational.log 
 ### Evidence
 
 ```
-2026-04-11 16:56:02,333 [ERROR] milimo.claw_launcher: ClawLauncher: error starting content claw: [Errno 13] Permission denied: '/sandbox/content/logs/operational.log'
+2026-04-11 16:56:02,333 [ERROR] milimo.claw_launcher: ClawLauncher: error starting content claw: [Errno 13] Permission denied: '/sandbox/.openclaw-data/milimo/claws/content/logs/operational.log'
 ```
 
 ### Root Cause
@@ -242,8 +246,8 @@ Log files were owned by `root` instead of `sandbox` user, likely created during 
 ### Fix Applied
 
 ```bash
-chown -R sandbox:sandbox /sandbox/*/logs
-chmod -R 755 /sandbox/*/logs
+chown -R sandbox:sandbox /sandbox/.openclaw-data/milimo/claws/*/logs
+chmod -R 755 /sandbox/.openclaw-data/milimo/claws/*/logs
 ```
 
 ### Files Modified

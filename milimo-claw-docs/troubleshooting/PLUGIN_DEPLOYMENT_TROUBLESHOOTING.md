@@ -289,7 +289,7 @@ The initial fix installed the plugin to `/root/.openclaw/extensions/milimo/` and
 
 Additionally, `openclaw plugins install --link` fails inside the sandbox because `/sandbox/.openclaw/extensions` is a symlink to `/sandbox/.openclaw-data/extensions`, and OpenClaw requires a real directory (not a symlink) as the extensions base.
 
-**Solution:** Install plugin to `/sandbox/extensions/milimo/` (writable, not a symlink, not world-writable) with `sandbox:sandbox` ownership, and register it in `/sandbox/.openclaw/openclaw.json`.
+**Solution:** Install plugin to `/sandbox/.openclaw-data/milimo/extensions/` (writable under `.openclaw-data`, not a symlink, not world-writable) with `sandbox:sandbox` ownership, and register it in `/sandbox/.openclaw/openclaw.json`.
 
 ### 4. Solo Template Onboard Dropped to Mesh Mode (Quaternary Cause)
 

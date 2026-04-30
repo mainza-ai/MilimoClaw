@@ -41,11 +41,13 @@ Every claw role blueprint must define:
 
 ## Inference Backends
 
-| ID | Name | Use Case |
-|----|------|----------|
-| `cloud` | Cloud (NEMOCLAW_MODEL) | Max quality, client-facing |
-| `local-nim` | Local NIM (NEMOCLAW_MODEL) on RTX | Private data stays on device |
-| `local-vllm` | Local vLLM | Tightest isolation, lightweight |
+| ID | Name | Use Case | NemoClaw Official |
+|----|------|----------|-------------------|
+| `cloud` | Cloud (NEMOCLAW_MODEL) | Max quality, client-facing | Yes (NVIDIA Endpoints, OpenAI, Anthropic, Gemini) |
+| `local-nim` | Local NIM (NEMOCLAW_MODEL) on RTX | Private data stays on device | Experimental (`NEMOCLAW_EXPERIMENTAL=1` required) |
+| `local-vllm` | Local vLLM | Tightest isolation, lightweight | Experimental (`NEMOCLAW_EXPERIMENTAL=1` required) |
+
+> **Note:** `local-nim` and `local-vllm` are experimental in official NemoClaw v0.0.29 and require `NEMOCLAW_EXPERIMENTAL=1`. The `nvidia-nim` provider name is used in official docs for the local NIM integration. MilimoClaw's `local-nim`/`local-vllm` naming is a convenience alias.
 
 ## Approval Modes
 

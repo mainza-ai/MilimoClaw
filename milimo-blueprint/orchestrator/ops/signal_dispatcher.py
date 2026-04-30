@@ -18,6 +18,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
 
+from milimo_paths import claw_base
+
 from .ops_init import OpsOperationalLog, OpsLogEntry
 
 logger = logging.getLogger("milimo.ops")
@@ -52,8 +54,8 @@ class OpsSignalDispatcher:
         self._gateway = gateway
         self._operational_log = operational_log
         self._squad_id = squad_id
-        self._pricing_confirmed_dir = pricing_confirmed_dir or Path(
-            "/sandbox/clients/pricing_confirmed"
+        self._pricing_confirmed_dir = (
+            pricing_confirmed_dir or claw_base("ops") / "pricing_confirmed"
         )
 
     def _is_pricing_confirmed(self, project_id: str) -> bool:

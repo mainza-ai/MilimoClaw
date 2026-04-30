@@ -101,7 +101,17 @@ class CommsManager:
         self._comms_log = comms_log
         self._dispatcher = dispatcher
         self._scope_monitor = scope_monitor
-        self._config_path = config_path or Path.home() / ".milimo" / "config.json"
+        self._config_path = config_path or next(
+            (
+                p
+                for p in [
+                    Path.home() / ".openclaw-data" / "milimo" / "config.json",
+                    Path.home() / ".milimo" / "config.json",
+                ]
+                if p.exists()
+            ),
+            Path.home() / ".openclaw-data" / "milimo" / "config.json",
+        )
 
     def handle_inbound(
         self,

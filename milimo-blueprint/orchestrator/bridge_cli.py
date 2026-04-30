@@ -26,6 +26,7 @@ import sys
 from pathlib import Path
 from typing import Any
 from datetime import datetime, timedelta, timezone
+from milimo_paths import claw_base
 
 # Configure logging to stderr only
 logging.basicConfig(
@@ -556,7 +557,13 @@ def handle_collect_health(args: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError(f"Collect health error: {e}") from e
 
 
-MILIMO_CONFIG_PATH = Path.home() / ".milimo" / "config.json"
+_MILIMO_CONFIG_CANDIDATES = [
+    Path.home() / ".openclaw-data" / "milimo" / "config.json",
+    Path.home() / ".milimo" / "config.json",
+]
+MILIMO_CONFIG_PATH = next(
+    (p for p in _MILIMO_CONFIG_CANDIDATES if p.exists()), _MILIMO_CONFIG_CANDIDATES[0]
+)
 
 
 def handle_squad_config(args: dict[str, Any]) -> dict[str, Any]:
@@ -920,7 +927,7 @@ def handle_claw_status(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_ops_active_projects(args: dict[str, Any]) -> dict[str, Any]:
     """List active client projects from the Ops claw sandbox."""
-    sandbox = Path("/sandbox/clients")
+    sandbox = claw_base("ops")
     result: dict[str, Any] = {"projects": [], "sandbox_exists": sandbox.exists()}
 
     if not sandbox.exists():
@@ -966,7 +973,7 @@ def handle_ops_active_projects(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_content_pending_drafts(args: dict[str, Any]) -> dict[str, Any]:
     """List pending content drafts from the Content claw sandbox."""
-    sandbox = Path("/sandbox/content")
+    sandbox = claw_base("content")
     result: dict[str, Any] = {"drafts": [], "sandbox_exists": sandbox.exists()}
 
     if not sandbox.exists():
@@ -1058,7 +1065,7 @@ def handle_build_open_prs(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_analytics_latest_report_summary(args: dict[str, Any]) -> dict[str, Any]:
     """Summarize the latest intelligence report from the Analytics claw."""
-    reports_dir = Path("/sandbox/analytics/reports")
+    reports_dir = claw_base("analytics") / "reports"
     result: dict[str, Any] = {
         "report": None,
         "reports_found": [],
@@ -1107,7 +1114,7 @@ def handle_generate_sprint_plan(args: dict[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {"status": "pending", "plan_path": ""}
 
     # Ensure build sandbox exists
-    build_base = Path("/sandbox/build")
+    build_base = claw_base("build")
     if not build_base.exists():
         init_result = BuildFilesystemInit().initialize()
         result["sandbox_init"] = {
@@ -1143,7 +1150,7 @@ def handle_generate_sprint_plan(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_run_opportunity_scoring(args: dict[str, Any]) -> dict[str, Any]:
     """Trigger opportunity scoring by writing to the Analytics claw's context."""
-    sandbox = Path("/sandbox/analytics")
+    sandbox = claw_base("analytics")
     result: dict[str, Any] = {"status": "pending", "request_path": ""}
 
     if not sandbox.exists():
@@ -1220,7 +1227,7 @@ def handle_generate_weekly_report(args: dict[str, Any]) -> dict[str, Any]:
         report["claws"][role] = claw_info
 
     # Write report to analytics reports directory
-    reports_dir = Path("/sandbox/analytics/reports")
+    reports_dir = claw_base("analytics") / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
     report_file = reports_dir / f"weekly-report-{report['week_start']}.json"
     report_file.write_text(json.dumps(report, indent=2))
@@ -1238,7 +1245,7 @@ def handle_check_all_deadlines(args: dict[str, Any]) -> dict[str, Any]:
     now = datetime.now(timezone.utc)
 
     # Check Build claw sprint deadlines
-    sprint_plan = Path("/sandbox/build/context/sprint/current-plan.json")
+    sprint_plan = claw_base("build") / "context/sprint/current-plan.json"
     if sprint_plan.exists():
         try:
             data = json.loads(sprint_plan.read_text())
@@ -1257,7 +1264,7 @@ def handle_check_all_deadlines(args: dict[str, Any]) -> dict[str, Any]:
             pass
 
     # Check Content claw draft deadlines
-    content_data = Path("/sandbox/content/data")
+    content_data = claw_base("content") / "data"
     if content_data.exists():
         for draft_file in content_data.glob("*.json"):
             try:
@@ -1278,7 +1285,7 @@ def handle_check_all_deadlines(args: dict[str, Any]) -> dict[str, Any]:
                 pass
 
     # Check Ops claw project deadlines
-    ops_data = Path("/sandbox/clients")
+    ops_data = claw_base("ops")
     if ops_data.exists():
         for project_file in ops_data.glob("*.json"):
             try:
@@ -1314,7 +1321,7 @@ def handle_run_dependency_audit(args: dict[str, Any]) -> dict[str, Any]:
 
     result: dict[str, Any] = {"status": "pending", "audit_path": ""}
 
-    repo_path = Path("/sandbox/build/repo")
+    repo_path = claw_base("build") / "repo"
     if not repo_path.exists():
         result["note"] = "Build repo not found. Clone a repo first."
         return result
@@ -1382,7 +1389,7 @@ def handle_run_dependency_audit(args: dict[str, Any]) -> dict[str, Any]:
     result["audited_at"] = datetime.now(timezone.utc).isoformat()
 
     # Write audit result
-    audit_dir = Path("/sandbox/build/context/audit")
+    audit_dir = claw_base("build") / "context/audit"
     audit_dir.mkdir(parents=True, exist_ok=True)
     audit_file = (
         audit_dir
@@ -1524,7 +1531,7 @@ def handle_start_claw(args: dict[str, Any]) -> dict[str, Any]:
 
     mesh_dir = Path.home() / ".milimo" / "mesh"
     launcher_pid_file = mesh_dir / "launcher.pid"
-    blueprint_path = Path("/sandbox/.milimo/blueprints/0.1.0")
+    blueprint_path = Path("/sandbox/.openclaw-data/milimo/blueprints/0.1.0")
 
     if not launcher_pid_file.exists():
         raise RuntimeError("Launcher not running. Start the launcher first.")

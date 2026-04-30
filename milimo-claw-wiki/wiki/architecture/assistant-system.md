@@ -4,7 +4,7 @@
 
 **Sources**: `milimo-blueprint/orchestrator/assistant_setup.py`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-29
 
 **Tags**: #architecture #assistant
 
@@ -45,7 +45,7 @@ Defines which claws are active per squad template:
 
 | Template | Active Claws |
 |----------|--------------|
-| `solo-founder` | content, ops, analytics, finance, build |
+| `solo-founder` | content, ops, analytics, finance, build, assistant |
 | `content-agency` | content, ops, analytics |
 | `design-studio` | content, ops, finance |
 | `event-promotion` | content, ops, analytics |
@@ -87,7 +87,7 @@ Substitutes placeholders in template:
 {{operator_name}} → Mainza
 {{squad_name}} → quantum-squad
 {{template_name}} → solo-founder
-{{active_claws}} → content, ops, analytics, finance, build
+{{active_claws}} → content, ops, analytics, finance, build, assistant
 ```
 
 ### 3. Install Files
@@ -217,7 +217,7 @@ agent:
 squad:
   name: quantum-squad
   template: solo-founder
-  active_claws: [content, ops, analytics, finance, build]
+  active_claws: [content, ops, analytics, finance, build, assistant]
   operator: Mainza
 ```
 

@@ -4,19 +4,34 @@
 """
 Lucy — Assistant Runtime Coordinator
 
-The conversational layer that bridges the operator (via Telegram) to the
-Milimo Claw squad. Lucy:
+The conversational layer that bridges the operator to the Milimo Claw squad.
+Telegram (and other messaging platforms) are handled entirely by OpenShell's
+managed channel messaging — NemoClaw configures channels during `nemoclaw
+onboard`, and OpenShell delivers inbound messages to the agent and relays
+outbound responses back to the platform. Lucy does NOT poll Telegram directly.
 
-1. Receives Telegram messages from the operator
+Lucy:
+
+1. Receives operator messages via OpenShell channel delivery (not direct polling)
 2. Routes queries/tasks to the appropriate claw via the mesh
 3. Collects assistant_response messages from all claws
-4. Relays consolidated responses back to Telegram
+4. Returns consolidated responses to the operator (OpenShell relays to Telegram)
 
 Lifecycle:
 - Polls inbox at ~/.milimo/mesh/inbox/assistant/ for claw responses
-- Listens for Telegram messages via long-polling
 - Sends outbound messages via RealMeshGateway
 - Emits heartbeats like any other claw
+
+Per NemoClaw architecture (docs.nvidia.com/nemoclaw/latest/reference/architecture.html):
+  MSGAPI ["Messaging Platforms"] → CHMSG ["Channel messaging (OpenShell-managed)"] → AGENT
+Tokens are registered as OpenShell providers during `nemoclaw onboard`; the L7 proxy
+injects real credentials at egress. The sandbox never sees raw tokens.
+
+Per Telegram setup guide (docs.nvidia.com/nemoclaw/latest/deployment/set-up-telegram-bridge.html):
+  Channel messaging (Telegram, Discord, Slack) is configured during `nemoclaw onboard`
+  and runs through OpenShell-managed constructs. `nemoclaw tunnel start` only starts
+  cloudflared — it does NOT start Telegram. Use `nemoclaw <name> channels stop/start`
+  to pause/resume messaging bridges.
 """
 
 from __future__ import annotations
@@ -29,78 +44,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import requests
+from milimo_paths import claw_base
 
 logger = logging.getLogger("milimo.assistant")
 
 ALL_CLAW_ROLES = ["content", "ops", "analytics", "finance", "build", "assistant"]
-TELEGRAM_API_BASE = "https://api.telegram.org"
 RESPONSE_TIMEOUT_SECONDS = 60
-
-
-class TelegramBridge:
-    """Telegram Bot API client for sending/receiving messages."""
-
-    def __init__(
-        self,
-        bot_token: str,
-        chat_id: str,
-        api_base: str = TELEGRAM_API_BASE,
-    ) -> None:
-        self._token = bot_token
-        self._chat_id = chat_id
-        self._api_base = api_base
-        self._last_update_id = 0
-
-    @property
-    def base_url(self) -> str:
-        return f"{self._api_base}/bot{self._token}"
-
-    def send_message(self, text: str, chat_id: str | None = None) -> dict:
-        """Send a text message to Telegram."""
-        url = f"{self.base_url}/sendMessage"
-        payload = {
-            "chat_id": chat_id or self._chat_id,
-            "text": text,
-            "parse_mode": "Markdown",
-        }
-        try:
-            resp = requests.post(url, json=payload, timeout=10)
-            resp.raise_for_status()
-            return resp.json()
-        except Exception as e:
-            logger.error("TelegramBridge: send failed: %s", e)
-            return {"ok": False, "error": str(e)}
-
-    def get_updates(self, timeout: int = 30) -> list[dict]:
-        """Long-poll for new Telegram messages."""
-        url = f"{self.base_url}/getUpdates"
-        params = {
-            "offset": self._last_update_id + 1,
-            "timeout": timeout,
-            "allowed_updates": ["message"],
-        }
-        try:
-            resp = requests.post(url, json=params, timeout=timeout + 5)
-            resp.raise_for_status()
-            data = resp.json()
-            updates = data.get("result", [])
-            if updates:
-                self._last_update_id = updates[-1]["update_id"]
-            return updates
-        except Exception as e:
-            logger.error("TelegramBridge: get_updates failed: %s", e)
-            return []
-
-    def health_check(self) -> bool:
-        """Verify the bot token is valid."""
-        url = f"{self.base_url}/getMe"
-        try:
-            resp = requests.get(url, timeout=5)
-            resp.raise_for_status()
-            return resp.json().get("ok", False)
-        except Exception:
-            return False
 
 
 class PendingQuery:
@@ -110,13 +59,11 @@ class PendingQuery:
         self,
         query_id: str,
         original_text: str,
-        telegram_chat_id: str,
         target_roles: list[str],
         created_at: float | None = None,
     ) -> None:
         self.query_id = query_id
         self.original_text = original_text
-        self.telegram_chat_id = telegram_chat_id
         self.target_roles = target_roles
         self.created_at = created_at or time.time()
         self.responses: dict[str, dict] = {}
@@ -138,25 +85,25 @@ class LucyAssistant:
     """
     Lucy — the conversational assistant coordinating the Milimo Claw squad.
 
-    Bridges operator messages (Telegram) to claw queries/tasks via the mesh,
-    collects responses, and relays consolidated answers back to Telegram.
+    Bridges operator messages (delivered by OpenShell channel messaging) to claw
+    queries/tasks via the mesh, collects responses, and returns consolidated
+    answers. Telegram/Discord/Slack are fully managed by OpenShell — Lucy never
+    polls messaging APIs directly.
     """
 
     def __init__(
         self,
         squad_id: str,
         mesh_gateway: Any,
-        telegram_bridge: TelegramBridge | None = None,
         inbox_dir: Path | None = None,
         base_path: Path | None = None,
     ) -> None:
         self._squad_id = squad_id
         self._mesh_gateway = mesh_gateway
-        self._telegram = telegram_bridge
         self._inbox_dir = (
             inbox_dir or Path.home() / ".milimo" / "mesh" / "inbox" / "assistant"
         )
-        self._base_path = base_path or Path("/sandbox/.milimo/assistant")
+        self._base_path = base_path or claw_base("assistant")
 
         self._pending: dict[str, PendingQuery] = {}
         self._running = False
@@ -166,7 +113,7 @@ class LucyAssistant:
         self._base_path.mkdir(parents=True, exist_ok=True)
 
     def startup(self) -> None:
-        """Initialize Lucy and start background threads."""
+        """Initialize Lucy."""
         if self._started:
             logger.warning("LucyAssistant already started")
             return
@@ -175,13 +122,6 @@ class LucyAssistant:
 
         self._running = True
         self._started = True
-
-        if self._telegram:
-            tg_ok = self._telegram.health_check()
-            if tg_ok:
-                logger.info("LucyAssistant: Telegram bot connected")
-            else:
-                logger.warning("LucyAssistant: Telegram bot health check failed")
 
         logger.info("LucyAssistant: started successfully")
 
@@ -200,7 +140,7 @@ class LucyAssistant:
 
         Processes assistant_response messages from claws, collecting them
         into pending queries. When all target claws respond (or timeout),
-        consolidates and sends to Telegram.
+        consolidates the results.
 
         Returns:
             Dict with handler result including status and any relevant data.
@@ -225,11 +165,11 @@ class LucyAssistant:
                     pending.add_response(sender_role, response_data)
 
                     if pending.is_complete:
-                        self._relay_to_telegram(pending)
                         pending.responded = True
+                        result["consolidated"] = self._consolidate(pending)
                     elif pending.is_expired:
-                        self._relay_to_telegram(pending)
                         pending.responded = True
+                        result["consolidated"] = self._consolidate(pending)
 
                 result["query_id"] = query_id
                 result["sender"] = sender_role
@@ -250,14 +190,12 @@ class LucyAssistant:
         self,
         query_text: str,
         target_roles: list[str] | None = None,
-        telegram_chat_id: str | None = None,
     ) -> str:
         """Dispatch an assistant_query to one or more claws.
 
         Args:
             query_text: The operator's query text
             target_roles: Which claws to query (default: all)
-            telegram_chat_id: Chat ID to relay the response to
 
         Returns:
             query_id for tracking the pending query
@@ -269,7 +207,6 @@ class LucyAssistant:
         pending = PendingQuery(
             query_id=query_id,
             original_text=query_text,
-            telegram_chat_id=telegram_chat_id or "",
             target_roles=roles,
         )
         self._pending[query_id] = pending
@@ -294,7 +231,6 @@ class LucyAssistant:
         task_description: str,
         target_role: str,
         deadline: str = "",
-        telegram_chat_id: str | None = None,
     ) -> str:
         """Dispatch an assistant_task to a specific claw.
 
@@ -302,7 +238,6 @@ class LucyAssistant:
             task_description: The task to assign
             target_role: Which claw to assign the task to
             deadline: ISO deadline string
-            telegram_chat_id: Chat ID to relay the response to
 
         Returns:
             message_id for tracking
@@ -313,7 +248,6 @@ class LucyAssistant:
         pending = PendingQuery(
             query_id=message_id,
             original_text=task_description,
-            telegram_chat_id=telegram_chat_id or "",
             target_roles=[target_role],
         )
         self._pending[message_id] = pending
@@ -337,35 +271,24 @@ class LucyAssistant:
         logger.info("LucyAssistant: dispatched task %s to %s", message_id, target_role)
         return message_id
 
-    def _relay_to_telegram(self, pending: PendingQuery) -> None:
-        """Consolidate claw responses and relay to Telegram."""
-        if not self._telegram:
-            logger.debug("LucyAssistant: no Telegram bridge, skipping relay")
-            return
-
-        if not pending.telegram_chat_id:
-            logger.debug("LucyAssistant: no chat_id for query %s", pending.query_id)
-            return
-
-        lines = [f"*Query:* {pending.original_text}\n"]
+    def _consolidate(self, pending: PendingQuery) -> dict:
+        """Consolidate claw responses into a single result dict."""
+        consolidated: dict[str, Any] = {
+            "query_id": pending.query_id,
+            "original_text": pending.original_text,
+            "responses": {},
+            "missing": [],
+        }
 
         for role, response in pending.responses.items():
             data = response.get("response", response)
-            summary = self._summarize_response(role, data)
-            lines.append(f"*{role.title()} Claw:* {summary}")
+            consolidated["responses"][role] = self._summarize_response(role, data)
 
         missing = set(pending.target_roles) - set(pending.responses.keys())
         if missing:
-            lines.append(f"_No response from: {', '.join(missing)}_")
+            consolidated["missing"] = sorted(missing)
 
-        text = "\n".join(lines)
-        self._telegram.send_message(text, chat_id=pending.telegram_chat_id)
-
-        logger.info(
-            "LucyAssistant: relayed %d responses to Telegram for query %s",
-            len(pending.responses),
-            pending.query_id,
-        )
+        return consolidated
 
     def _summarize_response(self, role: str, data: dict) -> str:
         """Create a brief human-readable summary of a claw response."""
@@ -386,13 +309,16 @@ class LucyAssistant:
 
         return f"{', '.join(parts)}"
 
-    def process_telegram_message(self, text: str, chat_id: str) -> str:
-        """Parse an incoming Telegram message and dispatch accordingly.
+    def process_operator_message(self, text: str) -> str:
+        """Parse an incoming operator message and dispatch accordingly.
 
         Supports:
         - Direct queries: "status" -> dispatches assistant_query to all claws
         - Targeted queries: "@content how's the draft?" -> queries content claw
         - Task assignments: "@finance generate invoice for X" -> dispatches task
+
+        Operator messages are delivered by OpenShell channel messaging (Telegram,
+        Discord, Slack) — Lucy never polls messaging APIs directly.
 
         Returns:
             query_id or message_id
@@ -402,23 +328,21 @@ class LucyAssistant:
             return ""
 
         if text.startswith("@"):
-            return self._handle_targeted_message(text, chat_id)
+            return self._handle_targeted_message(text)
 
         if text.lower() in ("status", "squad status", "report"):
             return self.dispatch_query(
                 "squad status report",
                 target_roles=ALL_CLAW_ROLES,
-                telegram_chat_id=chat_id,
             )
 
         return self.dispatch_query(
             text,
             target_roles=ALL_CLAW_ROLES,
-            telegram_chat_id=chat_id,
         )
 
-    def _handle_targeted_message(self, text: str, chat_id: str) -> str:
-        """Handle @role prefixed messages from Telegram."""
+    def _handle_targeted_message(self, text: str) -> str:
+        """Handle @role prefixed messages from the operator."""
         parts = text[1:].split(None, 1)
         if len(parts) < 2:
             role = parts[0].lower() if parts else ""
@@ -426,7 +350,6 @@ class LucyAssistant:
                 return self.dispatch_query(
                     "status",
                     target_roles=[role],
-                    telegram_chat_id=chat_id,
                 )
             return ""
 
@@ -434,12 +357,7 @@ class LucyAssistant:
         message = parts[1].strip()
 
         if role not in ALL_CLAW_ROLES:
-            logger.warning("LucyAssistant: unknown role '%s' in Telegram message", role)
-            if self._telegram:
-                self._telegram.send_message(
-                    f"Unknown claw: {role}. Available: {', '.join(ALL_CLAW_ROLES)}",
-                    chat_id=chat_id,
-                )
+            logger.warning("LucyAssistant: unknown role '%s' in operator message", role)
             return ""
 
         task_keywords = [
@@ -456,13 +374,11 @@ class LucyAssistant:
             return self.dispatch_task(
                 task_description=message,
                 target_role=role,
-                telegram_chat_id=chat_id,
             )
 
         return self.dispatch_query(
             message,
             target_roles=[role],
-            telegram_chat_id=chat_id,
         )
 
     def cleanup_expired(self) -> int:
@@ -471,7 +387,6 @@ class LucyAssistant:
         for qid, pending in self._pending.items():
             if pending.is_expired and not pending.responded:
                 expired.append(qid)
-                self._relay_to_telegram(pending)
                 pending.responded = True
 
         for qid in expired:
@@ -480,31 +395,3 @@ class LucyAssistant:
         if expired:
             logger.info("LucyAssistant: cleaned %d expired queries", len(expired))
         return len(expired)
-
-    def telegram_poll_loop(self) -> None:
-        """Long-running loop that polls Telegram for new messages."""
-        if not self._telegram:
-            logger.warning("LucyAssistant: no Telegram bridge, poll loop not started")
-            return
-
-        logger.info("LucyAssistant: starting Telegram poll loop")
-        while self._running:
-            try:
-                updates = self._telegram.get_updates(timeout=30)
-                for update in updates:
-                    message = update.get("message", {})
-                    chat_id = str(message.get("chat", {}).get("id", ""))
-                    text = message.get("text", "")
-
-                    if not text or not chat_id:
-                        continue
-
-                    logger.info(
-                        "LucyAssistant: received Telegram message: %s",
-                        text[:100],
-                    )
-                    self.process_telegram_message(text, chat_id)
-
-            except Exception as e:
-                logger.error("LucyAssistant: Telegram poll error: %s", e)
-                time.sleep(5)

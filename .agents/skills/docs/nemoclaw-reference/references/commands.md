@@ -24,7 +24,7 @@ Use this command for new installs and for recreating a sandbox after changes to 
 $ nemoclaw onboard
 ```
 
-The first run prompts for your NVIDIA API key and saves it to `~/.nemoclaw/credentials.json`.
+The first run prompts for your NVIDIA API key and registers it with the OpenShell gateway. `~/.nemoclaw/credentials.json` is a legacy file from earlier releases; on first `nemoclaw onboard` after upgrading, NemoClaw auto-migrates credentials from that file to the gateway and securely deletes it.
 
 The wizard prompts for a sandbox name.
 Names must follow RFC 1123 subdomain rules: lowercase alphanumeric characters and hyphens only, and must start and end with an alphanumeric character.
@@ -114,22 +114,40 @@ $ openshell term
 
 For a remote Brev instance, SSH to the instance and run `openshell term` there, or use a port-forward to the gateway.
 
-### `nemoclaw start`
+### `nemoclaw tunnel start`
 
-Start auxiliary services, such as the Telegram bridge and cloudflared tunnel.
+Start optional host auxiliary services. This is the cloudflared tunnel when `cloudflared` is installed (for a public URL to the dashboard). Channel messaging (Telegram, Discord, Slack) is not started here; it is configured during `nemoclaw onboard` and runs through OpenShell-managed constructs.
 
 ```console
-$ nemoclaw start
+$ nemoclaw tunnel start
 ```
 
-Requires `TELEGRAM_BOT_TOKEN` for the Telegram bridge.
+`nemoclaw start` remains as a deprecated alias that prints a warning and delegates to `tunnel start`.
 
-### `nemoclaw stop`
+### `nemoclaw tunnel stop`
 
-Stop all auxiliary services.
+Stop host auxiliary services started by `nemoclaw tunnel start` (for example cloudflared). This does not affect messaging channels running inside the sandbox; use `nemoclaw <name> channels stop <channel>` to pause a specific bridge without destroying the sandbox.
 
 ```console
-$ nemoclaw stop
+$ nemoclaw tunnel stop
+```
+
+`nemoclaw stop` remains as a deprecated alias that prints a warning and delegates to `tunnel stop`.
+
+### `nemoclaw <name> channels stop <channel>`
+
+Pause a single messaging bridge (`telegram`, `discord`, or `slack`) without clearing its credentials. The channel is marked disabled in the per-sandbox registry, and the sandbox is rebuilt so the onboard step skips registering the bridge with the gateway. Credentials stay in the OpenShell gateway store (env vars take precedence), so a later `channels start` brings the bridge back without re-entering tokens. `~/.nemoclaw/credentials.json` is a legacy file that is auto-migrated and deleted on first `nemoclaw onboard` after upgrading.
+
+```console
+$ nemoclaw my-assistant channels stop telegram
+```
+
+### `nemoclaw <name> channels start <channel>`
+
+Re-enable a channel previously paused with `channels stop`. The channel is removed from the disabled list, the sandbox is rebuilt, and the bridge registers with the gateway again using the stored credentials.
+
+```console
+$ nemoclaw my-assistant channels start telegram
 ```
 
 ### `nemoclaw status`
@@ -141,6 +159,8 @@ $ nemoclaw status
 ```
 
 ### `nemoclaw setup-spark`
+
+> **Warning:** The `nemoclaw setup-spark` command is deprecated. Use the standard installer and run `nemoclaw onboard` instead.
 
 Set up NemoClaw on DGX Spark.
 This command applies cgroup v2 and Docker fixes required for Ubuntu 24.04.

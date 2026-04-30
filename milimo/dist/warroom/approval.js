@@ -19,8 +19,8 @@ class ApprovalEngine {
     constructor(squadId, tier = "free") {
         const home = process.env.HOME || process.env.USERPROFILE || (0, os_1.homedir)() || "/tmp";
         // Mesh data directory — supports both host and container environments
-        // Container: /sandbox/.milimo/mesh/ (Path.home() in Python)
-        // Host: ~/.milimo/mesh/
+        // Container: /sandbox/.openclaw-data/milimo/mesh/ (Path.home() in Python)
+        // Host: ~/.openclaw-data/milimo/mesh/
         const sandboxMesh = (0, path_1.join)("/sandbox", ".openclaw-data/milimo", "mesh");
         const homeMesh = (0, path_1.join)(home, ".openclaw-data/milimo", "mesh");
         this.meshDir = (0, fs_1.existsSync)(sandboxMesh) ? sandboxMesh : homeMesh;
@@ -41,6 +41,7 @@ class ApprovalEngine {
             // Try multiple locations: host, container blueprint, container sandbox
             const candidates = [
                 (0, path_1.join)(process.cwd(), "milimo-blueprint", "mesh_config.yaml"),
+                (0, path_1.join)("/sandbox", ".openclaw-data/milimo", "milimo-blueprint", "mesh_config.yaml"),
                 (0, path_1.join)("/sandbox", ".openclaw-data/milimo", "blueprints", "0.1.0", "mesh_config.yaml"),
                 (0, path_1.join)(process.cwd(), "mesh_config.yaml"),
             ];

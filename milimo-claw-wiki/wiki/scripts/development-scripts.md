@@ -6,7 +6,7 @@
 - `scripts/debug.sh`
 - `scripts/check-coverage-ratchet.sh`
 
-**Last updated**: 2026-04-15
+**Last updated**: 2026-04-29
 
 **Tags**: #scripts #development #debugging
 
@@ -37,9 +37,13 @@ Diagnostic collection for bug reports.
 # Save to tarball
 ./scripts/debug.sh --output /tmp/diag.tar.gz
 
-# Via CLI
+# Via official NemoClaw CLI
 nemoclaw debug
-nemoclaw debug --quick --output /tmp/diag.tar.gz
+nemoclaw debug --quick --sandbox my-squad --output /tmp/diag.tar.gz
+
+# Via MilimoClaw CLI wrapper (aliases nemoclaw debug)
+milimo debug
+milimo debug --quick --output /tmp/diag.tar.gz
 ```
 
 ### Collected Data

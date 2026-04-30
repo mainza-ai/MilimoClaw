@@ -2,9 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Finance Claw Sandbox Policy
-# Mount: /sandbox/finance (read-write) — tightest isolation in the squad.
-# Egress: Payment processors (read-only + invoice gen), accounting APIs.
-# ⚠️ NO CLOUD INFERENCE ENDPOINTS — enforced at policy level.
+# Mount: /sandbox/.openclaw-data/milimo/claws/finance (read-write)
 
 version: 1
 
@@ -18,13 +16,11 @@ filesystem_policy:
   - /app
   - /etc
   - /var/log
-  - /sandbox/analytics/reports # Cross-mount: Analytics weekly reports
+  - /sandbox/.openclaw-data/milimo/claws/analytics/reports
   read_write:
-  - /sandbox/finance # Primary mount — financial records
+  - /sandbox/.openclaw-data/milimo/claws/finance
   - /tmp
   - /dev/null
-  # NOTE: /sandbox/finance is the most restricted store.
-  # No other claw has ANY filesystem access to this directory.
 
 landlock:
   compatibility: best_effort
@@ -49,7 +45,6 @@ network_policies:
       - allow: { method: POST, path: "/v1/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── LOCAL Inference (production target) ─────────────────────────────
   # ⚠️ PRODUCTION TARGET: Switch to nim_local only for Finance Claw.
@@ -67,7 +62,6 @@ network_policies:
           - allow: { method: "*", path: "/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── Payment Processors (restricted) ─────────────────────────────────
   stripe_api:
@@ -89,7 +83,6 @@ network_policies:
           - allow: { method: POST, path: "/v1/invoices/*/send" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   paypal_api:
     name: paypal_api
@@ -108,7 +101,6 @@ network_policies:
           - allow: { method: POST, path: "/v2/invoicing/invoices/*/send" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── Accounting ──────────────────────────────────────────────────────
   quickbooks_api:
@@ -125,7 +117,6 @@ network_policies:
           - allow: { method: POST, path: "/**/expense" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   wave_api:
     name: wave_api
@@ -139,4 +130,3 @@ network_policies:
           - allow: { method: POST, path: "/graphql/public" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }

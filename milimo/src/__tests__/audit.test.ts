@@ -56,9 +56,12 @@ describe("AuditLogger", () => {
 
       new AuditLogger(squadId);
 
-      expect(mockMkdirSync).toHaveBeenCalledWith(expect.stringContaining(".milimo/audit"), {
-        recursive: true,
-      });
+      expect(mockMkdirSync).toHaveBeenCalledWith(
+        expect.stringContaining(".openclaw-data/milimo/audit"),
+        {
+          recursive: true,
+        },
+      );
     });
 
     it("skips directory creation if exists", () => {

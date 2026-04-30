@@ -24,27 +24,27 @@ icon: "👽"
 
 # ── Filesystem ─────────────────────────────────────────────────────────
 filesystem_mount:
-  primary: "/sandbox/.milimo/assistant"
+  primary: "/sandbox/.openclaw-data/milimo/claws/assistant"
   mode: read_write
   contents:
   - assistant coordination state
   - pending query tracking
   - response aggregation cache
   - Telegram bridge session data
-  cross_mounts:
-  - path: "/sandbox/analytics/reports"
+cross_mounts:
+  - path: "/sandbox/.openclaw-data/milimo/claws/analytics/reports"
     mode: read_only
     description: "Weekly intelligence reports from Analytics Claw"
-  - path: "/sandbox/content"
+  - path: "/sandbox/.openclaw-data/milimo/claws/content"
     mode: read_only
     description: "Read-only access to content drafts for operator queries"
-  - path: "/sandbox/clients"
+  - path: "/sandbox/.openclaw-data/milimo/claws/ops"
     mode: read_only
     description: "Read-only access to client records for operator queries"
-  - path: "/sandbox/finance"
+  - path: "/sandbox/.openclaw-data/milimo/claws/finance"
     mode: read_only
     description: "Read-only access to revenue summaries (totals only)"
-  - path: "/sandbox/build"
+  - path: "/sandbox/.openclaw-data/milimo/claws/build"
     mode: read_only
     description: "Read-only access to build status and deploy history"
 

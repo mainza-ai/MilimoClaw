@@ -20,16 +20,19 @@ interface AssistantConfig {
 }
 
 function resolveAssistantScript(): string {
+  const home = homedir();
   const candidates = [
     join(
-      homedir(),
+      home,
       ".openclaw-data/milimo",
       "blueprints",
       "0.1.0",
       "orchestrator",
       "assistant_setup.py",
     ),
+    join(home, ".openclaw-data/milimo", "milimo-blueprint", "orchestrator", "assistant_setup.py"),
     join(process.cwd(), "milimo-blueprint", "orchestrator", "assistant_setup.py"),
+    "/opt/milimo-blueprint/orchestrator/assistant_setup.py",
   ];
   for (const p of candidates) {
     if (existsSync(p)) return p;

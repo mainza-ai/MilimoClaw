@@ -1,12 +1,12 @@
 # System Overview
 
-**Summary**: Eight-layer architecture of MilimoClaw multi-agent system.
+**Summary**: Nine-layer architecture of MilimoClaw multi-agent system.
 
 **Sources**:
 - `raw/ARCHITECTURE.md`
 - `raw/AGENTS.md`
 
-**Last updated**: 2026-04-23
+**Last updated**: 2026-04-29
 
 **Tags**: #architecture #overview
 
@@ -14,43 +14,46 @@
 
 ## Architecture Layers
 
-MilimoClaw has eight architectural layers, each with specific responsibilities:
+MilimoClaw has nine architectural layers, each with specific responsibilities:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ OPERATOR LAYER                                                  │
-│ War Room TUI · Approval Engine · Audit Trail · Rate Limiter   │
-│ Health Dashboard · Push Notifications                          │
+│ OPERATOR LAYER │
+│ War Room TUI · Approval Engine · Audit Trail · Rate Limiter │
+│ Health Dashboard · Push Notifications │
 ├─────────────────────────────────────────────────────────────────┤
-│ PAYMENT LAYER                                                   │
-│ Stripe Connect · Fee Calculator · Payouts · Invoices          │
-│ Webhooks · Connected Accounts                                   │
+│ PAYMENT LAYER │
+│ Stripe Connect · Fee Calculator · Payouts · Invoices │
+│ Webhooks · Connected Accounts │
 ├─────────────────────────────────────────────────────────────────┤
-│ PROVENANCE LAYER                                                │
-│ Ed25519 Signer · Signature Verifier · Chain Validator         │
-│ Attestation Generator · Performance Badges                      │
+│ PROVENANCE LAYER │
+│ Ed25519 Signer · Signature Verifier · Chain Validator │
+│ Attestation Generator · Performance Badges │
 ├─────────────────────────────────────────────────────────────────┤
-│ COORDINATION LAYER                                              │
-│ Mesh Coordinator · Gateway Adapter · Typed Contracts           │
-│ Region Detector · Latency Monitor · Failover Manager          │
-│ Event Normalization (Clawhip pattern)                          │
+│ COORDINATION LAYER │
+│ Mesh Coordinator · Gateway Adapter · Typed Contracts │
+│ Region Detector · Latency Monitor · Failover Manager │
+│ Event Normalization (Clawhip pattern) │
 ├─────────────────────────────────────────────────────────────────┤
-│ EVOLUTION LAYER                                                 │
+│ EVOLUTION LAYER │
 │ Tool Generator · Tool Validator · Tool Sandbox · Pattern Detect│
-│ Health Collector · Alert Generation                            │
+│ Health Collector · Alert Generation │
 ├─────────────────────────────────────────────────────────────────┤
-│ INTELLIGENCE LAYER                                              │
-│ Privacy Router · Sensitivity Classifier · Inference Routing   │
-│ Category-Based Model Selection (OmO pattern)                   │
-│ Inference Fallback Chain (OmO pattern)                         │
+│ INTELLIGENCE LAYER │
+│ Privacy Router · Sensitivity Classifier · Inference Routing │
+│ Category-Based Model Selection (OmO pattern) │
 ├─────────────────────────────────────────────────────────────────┤
-│ BLUEPRINT LAYER                                                 │
-│ Role Configs · Sandbox Policies · Templates · Schema           │
-│ Regions Config · Rate Limits · Performance Attestations        │
+│ BLUEPRINT LAYER │
+│ Role Configs · Sandbox Policies · Templates · Schema │
+│ Regions Config · Rate Limits · Performance Attestations │
 ├─────────────────────────────────────────────────────────────────┤
-│ RUNTIME LAYER                                                   │
-│ NemoClaw · OpenShell · Docker · Landlock · seccomp            │
-│ Relay Server · WebSocket Gateway                               │
+│ MESSAGING LAYER (OpenShell-managed, not Milimo) │
+│ Telegram · Discord · Slack — Channel Messaging │
+│ OpenShell Gateway → Agent delivery (no direct API polling) │
+├─────────────────────────────────────────────────────────────────┤
+│ RUNTIME LAYER │
+│ NemoClaw · OpenShell · Docker · Landlock · no-new-privileges │
+│ cap-drop · ulimit · Relay Server · WebSocket Gateway │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -114,7 +117,7 @@ AI inference and data routing.
 
 - **Privacy Router**: Routes based on sensitivity
 - **Sensitivity Classifier**: Labels data types
-- **Inference Routing**: Cloud vs local NIM (NEMOCLAW_MODEL)
+- **Inference Routing**: Cloud vs local NIM (`NEMOCLAW_MODEL`, `NEMOCLAW_MODEL_OVERRIDE`, `NEMOCLAW_INFERENCE_API_OVERRIDE`, `NEMOCLAW_PREFERRED_API`)
 - **Model Selection**: Category-based model choice
 
 ### 7. Blueprint Layer
@@ -126,7 +129,15 @@ Configuration and policy management.
 - **Templates**: Squad templates
 - **Schema**: Data schemas
 
-### 8. Runtime Layer
+### 8. Messaging Layer (OpenShell-Managed)
+
+External messaging integration — not part of the Milimo codebase.
+
+- **Channel Messaging**: Telegram, Discord, Slack via OpenShell gateway
+- **No Direct API Polling**: Sandbox never calls `api.telegram.org` directly
+- **Credential Injection**: Bot tokens registered as OpenShell providers; L7 proxy injects real credentials
+
+### 9. Runtime Layer
 
 Execution environment.
 
@@ -134,14 +145,16 @@ Execution environment.
 - **OpenShell**: Inter-sandbox communication
 - **Docker**: Container runtime
 - **Landlock**: Filesystem isolation
-- **seccomp**: Syscall filtering
+- **no-new-privileges + cap-drop + capsh**: Privilege escalation prevention, capability restriction, and entrypoint-level drops (NemoClaw)
+- **ulimit**: Process count limits (NemoClaw)
+- **seccomp**: Syscall filtering (OpenShell-provided)
 
 
 ## Assistant (Lucy)
 
 The [[assistant-lucy]] is the conversational interface that bridges users to all claws. While not a dedicated layer, Lucy operates across the Operator and Coordination layers:
 
-- **User Interface**: Natural language interaction via Telegram
+- **User Interface**: Natural language interaction via channel messaging (Telegram, Discord, Slack — OpenShell-managed)
 - **Message Routing**: Dispatches `assistant_query` and `assistant_task` to appropriate claws
 - **Silent Responses**: Returns diagnostic output when claws return empty results
 - **Runtime Coordination**: Implemented in `assistant/lucy.py` as `LucyAssistant` class

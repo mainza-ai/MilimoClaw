@@ -152,7 +152,7 @@ export async function cliInit(opts: InitOptions): Promise<void> {
 
   ConfigManager.save(config);
 
-  logger.info(" ✓ State directory created (~/.milimo/)");
+  logger.info(" ✓ State directory created (~/.openclaw-data/milimo/)");
   logger.info(" ✓ Blueprint directories initialized");
   logger.info(" ✓ Claw configuration saved");
   logger.info("");

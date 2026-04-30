@@ -469,8 +469,8 @@ When documenting messages:
 
 | Path | Purpose | Access |
 |------|---------|--------|
-| /sandbox/content/drafts/ | Draft content | Read-write |
-| /sandbox/analytics/reports/ | Intelligence reports | Read-only |
+| /sandbox/.openclaw-data/milimo/claws/content/drafts/ | Draft content | Read-write |
+| /sandbox/.openclaw-data/milimo/claws/analytics/reports/ | Intelligence reports | Read-only |
 ```
 
 ---

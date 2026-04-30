@@ -6,11 +6,13 @@
 - `raw/AGENTS.md`
 - `milimo-blueprint/orchestrator/`
 
-**Last updated**: 2026-04-15
+**Last updated**: 2026-04-29
 
 **Tags**: #troubleshooting #sandbox #sync
 
 ---
+
+> **NemoClaw Compliance Notice:** Workspace files live at `/sandbox/.openclaw/workspace/`. In multi-agent setups, each agent gets a `workspace-name/` subdirectory. Files persist across sandbox restarts (same container) but **NOT** across `nemoclaw rebuild` (new container = all non-persisted data lost). Workspace is not backed up by `nemoclaw backup` — use explicit file copies if needed. See [[workspace-files]] for full details.
 
 ## Overview
 
@@ -19,6 +21,7 @@ Sandbox sync issues occur when:
 - Shared resources are locked
 - File permissions prevent read/write
 - Network partitions delay message delivery
+- Workspace files are lost after a sandbox rebuild
 
 ---
 
@@ -164,9 +167,44 @@ def wait_for_sync(file_path, timeout=30):
 
 ---
 
+## Workspace Persistence and Rebuilds
+
+### Files Lost After Rebuild
+
+**Symptom**: Agent state, conversation context, or task artifacts disappear after `nemoclaw rebuild`.
+
+**Cause**: Workspace files at `/sandbox/.openclaw/workspace/` persist across sandbox restarts (same container) but are **NOT** preserved across `nemoclaw rebuild` by default. A rebuild creates a new container; all non-persisted data is lost unless explicitly backed up.
+
+> **Note:** `nemoclaw rebuild` does automatically back up the workspace to `~/.nemoclaw/rebuild-backups/<name>/` before destroying the old sandbox and restores it after creating the new one. However, this backup-restore is best-effort — always verify critical files after a rebuild.
+
+**Fix**:
+```bash
+# Before rebuild: copy workspace files to a persistent location
+cp -r /sandbox/.openclaw/workspace/ ~/workspace-backup/
+
+# After rebuild: restore
+cp -r ~/workspace-backup/ /sandbox/.openclaw/workspace/
+```
+
+### Multi-Agent Workspace Paths
+
+**Symptom**: Agent writes to wrong workspace directory.
+
+**Cause**: In multi-agent setups, each agent gets a `workspace-name/` subdirectory under `/sandbox/.openclaw/workspace/`.
+
+**Fix**:
+```bash
+# Verify correct workspace path for each agent
+ls /sandbox/.openclaw/workspace/
+# Expected: workspace-name/ per agent
+```
+
+---
+
 ## Related Pages
 
 - [[sandbox-isolation]] — Sandbox architecture
+- [[workspace-files]] — Workspace file persistence model
 - [[common-issues]] — Other common problems
 - [[issues-and-fixes]] — Comprehensive fix history
 - [[mesh-coordinator]] — Message routing

@@ -2,26 +2,24 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Analytics Claw Sandbox Policy
-# Mount: /sandbox/analytics (read-write)
-# Egress: Platform analytics APIs (read-only), market research feeds.
-# No write access to any external platform.
+# Mount: /sandbox/.openclaw-data/milimo/claws/analytics (read-write)
 
 version: 1
 
 filesystem_policy:
   include_workdir: true
   read_only:
-    - /usr
-    - /lib
-    - /proc
-    - /dev/urandom
-    - /app
-    - /etc
-    - /var/log
+  - /usr
+  - /lib
+  - /proc
+  - /dev/urandom
+  - /app
+  - /etc
+  - /var/log
   read_write:
-    - /sandbox/analytics           # Primary mount
-    - /tmp
-    - /dev/null
+  - /sandbox/.openclaw-data/milimo/claws/analytics
+  - /tmp
+  - /dev/null
 
 landlock:
   compatibility: best_effort
@@ -45,7 +43,6 @@ network_policies:
     binaries:
       - { path: /usr/local/bin/openclaw }
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── Platform Analytics (READ-ONLY) ──────────────────────────────────
   google_analytics:
@@ -61,7 +58,6 @@ network_policies:
           - allow: { method: POST, path: "/v1beta/**:runReport" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   meta_insights:
     name: meta_insights
@@ -76,7 +72,6 @@ network_policies:
           - allow: { method: GET, path: "/**/analytics" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   twitter_analytics:
     name: twitter_analytics
@@ -91,7 +86,6 @@ network_policies:
           - allow: { method: GET, path: "/2/users/**/tweets" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── Market Research ─────────────────────────────────────────────────
   google_trends:
@@ -106,7 +100,6 @@ network_policies:
           - allow: { method: GET, path: "/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   semrush_api:
     name: semrush_api
@@ -120,4 +113,3 @@ network_policies:
           - allow: { method: GET, path: "/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }

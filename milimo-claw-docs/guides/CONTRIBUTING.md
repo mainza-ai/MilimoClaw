@@ -1,6 +1,6 @@
-# Contributing to NVIDIA NemoClaw
+# Contributing to MilimoClaw
 
-Thank you for your interest in contributing to NVIDIA NemoClaw. This guide covers how to set up your development environment, run tests, and submit changes.
+Thank you for your interest in contributing to MilimoClaw. This guide covers how to set up your development environment, run tests, and submit changes.
 
 ## Before You Open an Issue
 
@@ -28,20 +28,20 @@ Install the root dependencies and build the TypeScript plugin:
 npm install
 
 # Install and build the TypeScript plugin
-cd nemoclaw && npm install && npm run build && cd ..
+cd milimo && npm install && npm run build && cd ..
 
 # Install Python deps for the blueprint
-cd nemoclaw-blueprint && uv sync && cd ..
+cd milimo-blueprint && uv sync && cd ..
 ```
 
 ## Building
 
-The TypeScript plugin lives in `nemoclaw/` and compiles with `tsc`:
+The TypeScript plugin lives in `milimo/` and compiles with `tsc`:
 
 ```bash
-cd nemoclaw
-npm run build        # one-time compile
-npm run dev          # watch mode
+cd milimo
+npm run build # one-time compile
+npm run dev # watch mode
 ```
 
 ## Main Tasks
@@ -54,7 +54,7 @@ These are the primary `make` and `npm` targets for day-to-day development:
 | `make lint` | Same as `make check` |
 | `make format` | Auto-format TypeScript and Python source |
 | `npm test` | Run root-level tests (`test/*.test.js`) |
-| `cd nemoclaw && npm test` | Run plugin unit tests (Vitest) |
+| `cd milimo && npm test` | Run plugin unit tests (Vitest) |
 | `make docs` | Build documentation (Sphinx/MyST) |
 | `make docs-live` | Serve docs locally with auto-rebuild |
 | `npx prek run --all-files` | Run all hooks from `.pre-commit-config.yaml` — see below |
@@ -79,12 +79,12 @@ The repository is organized as follows.
 
 | Path | Purpose |
 |------|---------|
-| `nemoclaw/` | TypeScript plugin (Commander CLI, OpenClaw extension) |
-| `nemoclaw-blueprint/` | Python blueprint for sandbox orchestration |
-| `bin/` | CLI entry point (`nemoclaw.js`) |
+| `milimo/` | TypeScript plugin (Commander CLI, OpenClaw extension) |
+| `milimo-blueprint/` | Python blueprint for sandbox orchestration |
+| `bin/` | CLI entry point (`milimo.js`) |
 | `scripts/` | Install helpers and automation scripts |
 | `test/` | Root-level integration tests |
-| `docs/` | User-facing documentation (Sphinx/MyST) |
+| `docs/` | User-facing documentation |
 
 ## Documentation
 
@@ -110,7 +110,7 @@ The `docs/` directory is the source of truth for user-facing documentation. The 
 After changing any page in `docs/`, regenerate the skills. Run the canonical command from the repo root:
 
 ```bash
-python scripts/docs-to-skills.py docs/ .agents/skills/docs/ --prefix nemoclaw
+python scripts/docs-to-skills.py docs/ .agents/skills/docs/ --prefix milimo
 ```
 
 Always use this exact output path and prefix so skill names and locations stay consistent across the project.
@@ -192,7 +192,7 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/). 
 **Examples:**
 
 ```
-feat(cli): add --profile flag to nemoclaw onboard
+feat(cli): add --profile flag to milimo onboard
 fix(blueprint): handle missing API key gracefully
 docs: update quickstart for new install wizard
 chore(deps): bump commander to 13.2

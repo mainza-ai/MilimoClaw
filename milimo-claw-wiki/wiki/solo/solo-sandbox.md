@@ -4,7 +4,7 @@
 
 **Sources**: `milimo-blueprint/orchestrator/solo_sandbox.py`
 
-**Last updated**: 2026-04-23
+**Last updated**: 2026-04-28
 
 **Tags**: #solo #sandbox #policy #isolation
 
@@ -45,9 +45,9 @@ Generated policy files (`{claw}-claw.yaml`):
 metadata:
   claw: content
   version: 1.0.0
-  schema: nemoClaw-sandbox-policy-v1
+  schema: milimo-sandbox-policy-v1
 filesystem:
-  mount: /sandbox/content
+  mount: /sandbox/.openclaw-data/milimo/claws/content
   permissions: rw
   isolation: landlock
 network:
@@ -61,8 +61,8 @@ operator_policy:
   approval_mode: REVIEW
   war_room_access: true
 security:
-  seccomp: strict
-  capabilities: [CAP_NET_BIND_SERVICE]
+  no_new_privileges: true
+  capabilities: drop_all
 ```
 
 ## Inference Routes per Claw
@@ -80,7 +80,7 @@ security:
 
 Creates standard subdirectories for each claw:
 ```
-/sandbox/{claw}/
+/sandbox/.openclaw-data/milimo/claws/{claw}/
 ├── tools/
 ├── data/
 └── logs/

@@ -27,11 +27,11 @@ VALID_CONFIG: dict[str, Any] = {
         "claws_active": ["content", "ops", "analytics", "finance", "build"],
     },
     "filesystem": {
-        "content": "/sandbox/content",
-        "ops": "/sandbox/clients",
-        "analytics": "/sandbox/analytics",
-        "finance": "/sandbox/finance",
-        "build": "/sandbox/build",
+        "content": "/sandbox/.openclaw-data/milimo/claws/content",
+        "ops": "/sandbox/.openclaw-data/milimo/claws/ops",
+        "analytics": "/sandbox/.openclaw-data/milimo/claws/analytics",
+        "finance": "/sandbox/.openclaw-data/milimo/claws/finance",
+        "build": "/sandbox/.openclaw-data/milimo/claws/build",
     },
     "network_egress": {
         "content": {"approved": ["api.twitter.com", "api.instagram.com"]},
@@ -107,7 +107,10 @@ class TestInitSoloSandbox:
         with policy_file.open("r") as f:
             policy = yaml.safe_load(f)
 
-        assert policy["filesystem"]["mount"] == "/sandbox/content"
+        assert (
+            policy["filesystem"]["mount"]
+            == "/sandbox/.openclaw-data/milimo/claws/content"
+        )
 
     def test_policy_has_network_egress(self, tmp_path: Path) -> None:
         """Test that policy has network egress configuration."""
@@ -243,7 +246,7 @@ class TestWriteSandboxPolicy:
         """Test that valid YAML is written."""
         policy = SandboxPolicy(
             claw="content",
-            mount="/sandbox/content",
+            mount="/sandbox/.openclaw-data/milimo/claws/content",
             network_egress=["api.twitter.com"],
             inference_routes={"client_facing_drafts": "cloud"},
             approval_mode="REVIEW",
@@ -263,7 +266,7 @@ class TestWriteSandboxPolicy:
         """Test that all required sections are included."""
         policy = SandboxPolicy(
             claw="content",
-            mount="/sandbox/content",
+            mount="/sandbox/.openclaw-data/milimo/claws/content",
             network_egress=["api.twitter.com"],
             inference_routes={},
             approval_mode="AUTO",
@@ -286,7 +289,7 @@ class TestWriteSandboxPolicy:
         """Test that metadata section is correct."""
         policy = SandboxPolicy(
             claw="ops",
-            mount="/sandbox/clients",
+            mount="/sandbox/.openclaw-data/milimo/claws/ops",
             network_egress=[],
             inference_routes={},
             approval_mode="REVIEW",

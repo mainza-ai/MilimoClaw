@@ -1,12 +1,12 @@
 # Sandbox Isolation
 
-**Summary**: Kernel-level isolation for each claw using Landlock, seccomp, and filesystem mounts.
+**Summary**: Kernel-level isolation for each claw using Landlock, process limits, capability dropping, and filesystem mounts within a shared NemoClaw sandbox.
 
 **Sources**:
 - `raw/ARCHITECTURE.md`
 - `raw/AGENTS.md`
 
-**Last updated**: 2026-04-23
+**Last updated**: 2026-04-29
 
 **Tags**: #architecture #sandbox #isolation #security
 
@@ -14,15 +14,15 @@
 
 ## Overview
 
-Each claw runs inside a NemoClaw sandbox with **kernel-level isolation**. This ensures that even if a claw is compromised, it cannot access data or resources belonging to other claws.
+Each claw runs inside a **shared** NemoClaw sandbox with **kernel-level isolation** enforced per-path. All claws share the same sandbox instance; per-claw data isolation is enforced by Landlock writable-path rules and the Python orchestrator's path conventions. Even if a claw is compromised, it cannot access data belonging to other claws at the Landlock level.
 
 ## Isolation Layers
 
 | Layer | Mechanism | What It Protects |
 |-------|-----------|------------------|
-| **Filesystem** | Landlock LSM | Each claw can only access its own `/sandbox/<role>` mount |
+| **Filesystem** | Landlock LSM | Each claw can only access its own `/sandbox/.openclaw-data/milimo/claws/<role>` mount |
 | **Network** | OpenShell netns + egress policy | Per-claw API allowlists — Finance can't reach social APIs |
-| **Process** | seccomp BPF | Blocks privilege escalation, restricts dangerous syscalls |
+| **Process** | ulimit + cap-drop + capsh + no-new-privileges | `ulimit -u 512` limits processes, `--cap-drop=ALL` + entrypoint `capsh` drops 8 capabilities, 5 retained for `gosu` (`CHOWN`, `SETUID`, `SETGID`, `FOWNER`, `KILL`), `no-new-privileges` prevents escalation, non-root sandbox user (UID 999), PATH hardening |
 | **Inference** | Privacy router intercept | Sensitive data routed to local NIM (NEMOCLAW_MODEL), never to cloud |
 | **Communication** | Typed contract validation | Inter-claw messages validated against policy before delivery |
 
@@ -30,6 +30,24 @@ Each claw runs inside a NemoClaw sandbox with **kernel-level isolation**. This e
 
 ### Mount Structure
 
+> **Note:** All claws share a single NemoClaw sandbox. Per-claw isolation is enforced by path conventions and the Python orchestrator, not separate sandbox instances. `/sandbox` is writable at the container mount level; the only read-only exception is `/sandbox/.openclaw/` (root-owned, immutable). Writable claw data is under `/sandbox/.openclaw-data/milimo/claws/`.
+
+```
+/sandbox/.openclaw-data/milimo/claws/
+├── content/ # Content Claw — brand assets, drafts, style guides
+├── ops/ # Ops Claw — client records, project histories
+├── analytics/ # Analytics Claw — performance data, reports
+│ └── reports/ # Read-only cross-mount for all claws
+├── finance/ # Finance Claw — invoices, revenue, pricing
+├── build/ # Build Claw — codebase, secrets, deploy configs
+│ ├── repo/ # Codebase (GitHub mount)
+│ ├── context/ # Sprint plans, error patterns, cost tracking
+│ ├── prs/ # PR state tracking
+│ ├── deployments/ # Deploy state
+│ ├── docs/ # Changelog, API docs, devlog
+│ ├── memory/ # Filesystem memory pattern
+│ └── logs/ # Operational logs
+└── assistant/ # Assistant Claw — sessions, context, logs
 ```
 /sandbox/
 ├── content/           # Content Claw — brand assets, drafts, style guides
@@ -59,7 +77,7 @@ Each claw has:
 One exception exists — Analytics Claw's shared read export:
 
 ```
-/sandbox/analytics/reports/weekly-intelligence.json
+/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json
 ```
 
 This file must be configured as a read-only mount in **all six** claw sandbox policies. It's the only file in the entire mesh that all claws can read directly without a message contract.
@@ -77,7 +95,9 @@ Each claw has a specific API allowlist defined in its sandbox policy:
 | Analytics | Read-only platform analytics, Google Trends |
 | Finance | Stripe, payment gateways |
 | Build | GitHub, Vercel, Sentry |
-| [[assistant-lucy\|Assistant]] | NVIDIA NIM, GitHub, Vercel, Sentry, Stripe (read-only), Telegram Bot API |
+| [[assistant-lucy\|Assistant]] | Inference proxy (`inference.local`), GitHub, Vercel, Sentry, Stripe (read-only) |
+
+> **Note:** The sandbox never calls `api.telegram.org` directly. Telegram is managed by OpenShell's channel messaging subsystem — the L7 proxy intercepts and delivers messages to the agent.
 
 ### Network Policy Files
 
@@ -88,23 +108,29 @@ Policy files define allowed network access:
 network_policies:
   twitter_api:
     endpoints:
-      - host: api.twitter.com
-        port: 443
+    - host: api.twitter.com
+      port: 443
+      protocol: rest
+      enforcement: enforce
+      access: read-write
     binaries:
-      - /usr/bin/python3
-      - /sandbox/.local/bin/milimo
+    - { path: /usr/bin/python3 }
 ```
 
 ## Process Isolation
 
-### seccomp BPF
+### NemoClaw Process Controls
 
-Filters dangerous system calls:
+NemoClaw enforces process isolation through multiple mechanisms (seccomp filtering is provided by OpenShell internally, not configured by NemoClaw):
 
-- Blocks `execve` for unauthorized binaries
-- Restricts `socket` to allowed network operations
-- Prevents `ptrace` and debug attempts
-- Limits `mount` and `umount`
+- **`ulimit -u 512`** — Limits max processes per user, preventing fork bombs
+- **`--cap-drop=ALL`** — Drops all Linux capabilities at the container runtime level
+- **Entrypoint `capsh` drops** — The entrypoint additionally drops: `cap_net_raw`, `cap_dac_override`, `cap_sys_chroot`, `cap_fsetid`, `cap_setfcap`, `cap_mknod`, `cap_audit_write`, `cap_net_bind_service`
+- **Retained capabilities** — 5 capabilities kept for `gosu` user switching: `cap_chown`, `cap_setuid`, `cap_setgid`, `cap_fowner`, `cap_kill`
+- **`no-new-privileges`** — Prevents privilege escalation via setuid/setgid binaries (`PR_SET_NO_NEW_PRIVS` via `prctl()`)
+- **Non-root sandbox user** — All processes run as `sandbox:sandbox` (UID 999), never root
+- **PATH hardening** — Restricted PATH prevents executing arbitrary binaries
+- **OpenShell seccomp** — OpenShell applies seccomp filters internally for `PR_SET_NO_NEW_PRIVS`; this is not a NemoClaw-configured layer
 
 ### Process Tree
 
@@ -139,11 +165,11 @@ Location: `milimo-blueprint/policies/`
 version: 1
 filesystem_policy:
   read_only:
-    - /usr
-    - /lib
-    - /sandbox/analytics/reports  # Cross-mount
+  - /usr
+  - /lib
+  - /sandbox/.openclaw-data/milimo/claws/analytics/reports # Cross-mount
   read_write:
-    - /sandbox/content
+  - /sandbox/.openclaw-data/milimo/claws/content
 
 landlock:
   compatibility: best_effort
@@ -155,10 +181,13 @@ process:
 network_policies:
   twitter_api:
     endpoints:
-      - host: api.twitter.com
-        port: 443
+    - host: api.twitter.com
+      port: 443
+      protocol: rest
+      enforcement: enforce
+      access: read-write
     binaries:
-      - /usr/bin/python3
+    - { path: /usr/bin/python3 }
 ```
 
 ## Verification
@@ -175,7 +204,7 @@ Tests verify:
 - Each claw cannot read other claws' mounts
 - Cross-mounts are read-only
 - Network egress is restricted to allowed APIs
-- Process isolation is enforced
+- Process limits and capability drops are enforced
 
 ## Related Pages
 

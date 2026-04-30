@@ -1,5 +1,9 @@
 # Lucy — Empowerment Report
 
+> **NemoClaw Compliance Notice (2026-04-28)**
+>
+> This document has been updated to comply with NVIDIA NemoClaw v0.0.28 and OpenShell v0.0.26. Paths referencing `/sandbox/<role>/` or `/sandbox/analytics/reports/` have been migrated to `/sandbox/.openclaw-data/milimo/claws/<role>/` per NemoClaw's Landlock read-only `/sandbox/` enforcement. Credentials are stored in the OpenShell gateway store, not `~/.nemoclaw/credentials.json` (legacy). Network policies should use `protocol: rest` with `enforcement` and `access`/`rules` fields for L7 HTTP inspection. See [docs.nvidia.com/nemoclaw/latest/](https://docs.nvidia.com/nemoclaw/latest/) for authoritative documentation.
+
 > **Goal:** Grant Lucy (the assistant) full capabilities as the primary point of contact and orchestrator of the Milimo Claw system.
 >
 > **Date:** 2026-04-04
@@ -185,7 +189,7 @@ Implement the missing bridge commands that the system prompt already documents:
 | `ops_active_projects` | List active client projects | Read from `/sandbox/clients/` |
 | `content_pending_drafts` | List pending content drafts | Read from `/sandbox/content/` |
 | `build_open_prs` | List open PRs | Query GitHub via `gh pr list` |
-| `analytics_latest_report_summary` | Summarize latest intelligence | Read from `/sandbox/analytics/reports/` |
+| `analytics_latest_report_summary` | Summarize latest intelligence | Read from `/sandbox/.openclaw-data/milimo/claws/analytics/reports/` |
 | `generate_sprint_plan` | Trigger sprint plan generation | Call build claw's sprint planner |
 | `run_opportunity_scoring` | Run opportunity scoring | Call analytics claw's scorer |
 | `generate_weekly_report` | Generate weekly report | Aggregate from all claws |

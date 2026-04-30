@@ -26,7 +26,7 @@ icon: "🔨"
 
 # ── Filesystem ─────────────────────────────────────────────────────────
 filesystem_mount:
-  primary: "/sandbox/build"
+  primary: "/sandbox/.openclaw-data/milimo/claws/build"
   mode: read_write
   contents:
     - squad codebase (via approved GitHub repository mount)

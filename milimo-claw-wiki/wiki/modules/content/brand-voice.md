@@ -4,7 +4,7 @@
 
 **Sources**: `milimo-blueprint/orchestrator/content/brand_voice.py`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-28
 
 **Tags**: #module #content-claw
 
@@ -50,7 +50,7 @@ class BrandVoiceManager:
 ## Voice Profile Storage
 
 ```
-/sandbox/content/brand/
+/sandbox/.openclaw-data/milimo/claws/content/brand/
 ├── style-guides/      # brand voice docs
 ├── assets/            # approved images, logos
 └── voice-profiles/    # per-client voice adapters

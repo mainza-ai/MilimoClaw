@@ -107,7 +107,7 @@ describe("assistant commands", () => {
 
       expect(mockedSpawn).toHaveBeenCalledWith(
         "python3",
-        ["/home/test/.milimo/blueprints/0.1.0/orchestrator/assistant_setup.py"],
+        ["/home/test/.openclaw-data/milimo/blueprints/0.1.0/orchestrator/assistant_setup.py"],
         { stdio: "inherit" },
       );
     });
@@ -141,7 +141,10 @@ describe("assistant commands", () => {
 
       expect(mockedSpawn).toHaveBeenCalledWith(
         "python3",
-        ["/home/test/.milimo/blueprints/0.1.0/orchestrator/assistant_setup.py", "--verify"],
+        [
+          "/home/test/.openclaw-data/milimo/blueprints/0.1.0/orchestrator/assistant_setup.py",
+          "--verify",
+        ],
         { stdio: "inherit" },
       );
     });

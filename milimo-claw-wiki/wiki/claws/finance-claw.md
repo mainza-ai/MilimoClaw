@@ -6,7 +6,7 @@
 - `raw/FINANCE_CLAW_SPEC.md`
 - `milimo-blueprint/roles/finance-claw.yaml`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-28
 
 **Tags**: #claw #finance
 
@@ -18,12 +18,12 @@ The Finance Claw is the **financial nervous system** of MilimoClaw. It tracks ev
 
 ## Sandbox
 
-**Mount**: `/sandbox/finance`
+**Mount**: `/sandbox/.openclaw-data/milimo/claws/finance`
 
 | Path | Purpose | Access |
 |------|---------|--------|
-| `/sandbox/finance/` | Invoices, revenue, pricing | Read-write |
-| `/sandbox/analytics/reports/` | Intelligence reports | Read-only |
+| `/sandbox/.openclaw-data/milimo/claws/finance/` | Invoices, revenue, pricing | Read-write |
+| `/sandbox/.openclaw-data/milimo/claws/analytics/reports/` | Intelligence reports | Read-only |
 
 ## What It Does
 
@@ -38,7 +38,7 @@ The Finance Claw is the **financial nervous system** of MilimoClaw. It tracks ev
 ## What It Cannot Do
 
 - Communicate with clients directly — ever
-- Read `/sandbox/clients`, `/sandbox/content`, or `/sandbox/build`
+- Read `/sandbox/.openclaw-data/milimo/claws/ops`, `/sandbox/.openclaw-data/milimo/claws/content`, or `/sandbox/.openclaw-data/milimo/claws/build`
 - Initiate financial transfers — payment status checks only
 - Send any invoice without two-stage operator approval
 - Include line items, client names, or invoice IDs in `revenue_summary` — totals only

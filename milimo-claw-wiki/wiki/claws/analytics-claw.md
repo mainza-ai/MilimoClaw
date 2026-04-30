@@ -6,7 +6,7 @@
 - `raw/ANALYTICS_CLAW_SPEC.md`
 - `milimo-blueprint/roles/analytics-claw.yaml`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-28
 
 **Tags**: #claw #analytics
 
@@ -18,14 +18,14 @@ The Analytics Claw is the **intelligence layer** of MilimoClaw. It observes ever
 
 ## Sandbox
 
-**Mount**: `/sandbox/analytics`
+**Mount**: `/sandbox/.openclaw-data/milimo/claws/analytics`
 
 | Path | Purpose | Access |
 |------|---------|--------|
-| `/sandbox/analytics/` | Performance data, reports | Read-write |
-| `/sandbox/analytics/reports/` | Weekly intelligence report | Read-write (shared) |
-| `/sandbox/clients/` | Client data | **NO ACCESS** |
-| `/sandbox/finance/` | Financial data | **NO ACCESS** |
+| `/sandbox/.openclaw-data/milimo/claws/analytics/` | Performance data, reports | Read-write |
+| `/sandbox/.openclaw-data/milimo/claws/analytics/reports/` | Weekly intelligence report | Read-write (shared) |
+| `/sandbox/.openclaw-data/milimo/claws/ops/` | Client data | **NO ACCESS** |
+| `/sandbox/.openclaw-data/milimo/claws/finance/` | Financial data | **NO ACCESS** |
 
 ## What It Does
 
@@ -39,7 +39,7 @@ The Analytics Claw is the **intelligence layer** of MilimoClaw. It observes ever
 ## What It Cannot Do
 
 - Write to any external platform — read-only network access only
-- Read `/sandbox/clients`, `/sandbox/finance`, or `/sandbox/build` raw records
+- Read `/sandbox/.openclaw-data/milimo/claws/ops`, `/sandbox/.openclaw-data/milimo/claws/finance`, or `/sandbox/.openclaw-data/milimo/claws/build` raw records
 - Queue HOLD actions in the War Room — it observes, never blocks
 - Perform any write operation to external APIs
 
@@ -48,7 +48,7 @@ The Analytics Claw is the **intelligence layer** of MilimoClaw. It observes ever
 **CRITICAL**: The weekly intelligence report is the only file all claws can read directly:
 
 ```
-/sandbox/analytics/reports/weekly-intelligence.json
+/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json
 ```
 
 This file must be configured as a read-only mount in **every** claw's sandbox policy file. If any claw cannot read this file, the intelligence layer is silently broken.

@@ -2,6 +2,8 @@
 
 ---
 # MILIMO CLAW — SOLO TEMPLATE V2 AUDIT REMEDIATION PROMPT
+
+> **NemoClaw Compliance Notice (2026-04-28)** — Paths migrated to `/sandbox/.openclaw-data/milimo/claws/<role>/`; credentials in OpenShell gateway store; network policies use `protocol: rest` with `enforcement`/`access`/`rules`. See [docs.nvidia.com/nemoclaw/latest/](https://docs.nvidia.com/nemoclaw/latest/).
 # ─────────────────────────────────────────────────────────────────────────────
 # Attach this prompt alongside:
 #   1. SOLO_TEMPLATE_SPEC_V2_AUDIT.md          (the gap analysis)
@@ -70,7 +72,7 @@ Log data_type on every inference call. Mandatory.
 
 **Audit finding (Section 3, HIGH):**
 Only `content-sandbox.yaml` has the shared read mount for
-`/sandbox/analytics/reports`. The other five claws are missing it.
+`/sandbox/.openclaw-data/milimo/claws/analytics/reports`. The other five claws are missing it.
 The Analytics Claw's `weekly-intelligence.json` must be readable by
 ALL claws. Without this, the intelligence layer is silently broken.
 
@@ -88,7 +90,7 @@ filesystem:
   # ... existing entries unchanged ...
   read_only:
     # ... existing read_only entries unchanged ...
-    - path: "/sandbox/analytics/reports/weekly-intelligence.json"
+    - path: "/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json"
       label: "analytics_shared_read"
       purpose: "Weekly intelligence report — read by all claws"
 ```
@@ -100,7 +102,7 @@ Print the updated `filesystem` section of each modified file.
 
 **Verification:** After adding the mount entries, confirm that all six
 sandbox policy files now contain a reference to
-`/sandbox/analytics/reports/weekly-intelligence.json`. Run a grep
+`/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json`. Run a grep
 across all six policy files and show the output.
 
 ---
@@ -292,7 +294,7 @@ FALLBACK_ROOTS = {
     for role in SANDBOX_ROOTS
 }
 
-SHARED_REPORT_PATH = Path("/sandbox/analytics/reports/weekly-intelligence.json")
+SHARED_REPORT_PATH = Path("/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json")
 SHARED_REPORT_FALLBACK = (
     Path.home() / ".milimo" / "sandboxes" / "analytics" /
     "reports" / "weekly-intelligence.json"
@@ -434,7 +436,7 @@ def _read_report_as_claw(claw_role: str, report_path: Path) -> dict:
 
 def test_a3_content_claw_can_read_report(written_report):
     """
-    Content Claw can read /sandbox/analytics/reports/weekly-intelligence.json.
+    Content Claw can read /sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json.
     Fails if content-sandbox.yaml missing the shared_read mount entry.
     """
     content = _read_report_as_claw("content", written_report)
@@ -442,7 +444,7 @@ def test_a3_content_claw_can_read_report(written_report):
 
 def test_a4_ops_claw_can_read_report(written_report):
     """
-    Ops Claw can read /sandbox/analytics/reports/weekly-intelligence.json.
+    Ops Claw can read /sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json.
     Fails if ops-sandbox.yaml missing the shared_read mount entry.
     """
     content = _read_report_as_claw("ops", written_report)
@@ -450,7 +452,7 @@ def test_a4_ops_claw_can_read_report(written_report):
 
 def test_a5_finance_claw_can_read_report(written_report):
     """
-    Finance Claw can read /sandbox/analytics/reports/weekly-intelligence.json.
+    Finance Claw can read /sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json.
     Fails if finance-sandbox.yaml missing the shared_read mount entry.
     """
     content = _read_report_as_claw("finance", written_report)
@@ -458,7 +460,7 @@ def test_a5_finance_claw_can_read_report(written_report):
 
 def test_a6_build_claw_can_read_report(written_report):
     """
-    Build Claw can read /sandbox/analytics/reports/weekly-intelligence.json.
+    Build Claw can read /sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json.
     Fails if build-sandbox.yaml missing the shared_read mount entry.
     """
     content = _read_report_as_claw("build", written_report)

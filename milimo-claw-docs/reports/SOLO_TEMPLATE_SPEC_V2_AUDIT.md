@@ -3,6 +3,10 @@
 ---
 # MILIMO_CLAW_SOLO_TEMPLATE_SPEC_V2.md — Code Audit Report
 
+> **NemoClaw Compliance Notice (2026-04-28)**
+>
+> This document has been updated to comply with NVIDIA NemoClaw v0.0.28 and OpenShell v0.0.26. Paths referencing `/sandbox/<role>/` or `/sandbox/analytics/reports/` have been migrated to `/sandbox/.openclaw-data/milimo/claws/<role>/` per NemoClaw's Landlock read-only `/sandbox/` enforcement. Credentials are stored in the OpenShell gateway store, not `~/.nemoclaw/credentials.json` (legacy). Network policies should use `protocol: rest` with `enforcement` and `access`/`rules` fields for L7 HTTP inspection. See [docs.nvidia.com/nemoclaw/latest/](https://docs.nvidia.com/nemoclaw/latest/) for authoritative documentation.
+
 **Audit Date:** 2026-03-22
 **Auditor:** AI Assistant
 **Spec Version:** v2 (742 lines)
@@ -58,7 +62,7 @@ This audit compares the current code implementation against `MILIMO_CLAW_SOLO_TE
 > **Phase A — Verify Isolation and Shared Mount (before anything else)**
 >
 > A1. Confirm all six sandbox filesystem mounts exist and are isolated
-> A2. Write a test file to `/sandbox/analytics/reports/weekly-intelligence.json`
+> A2. Write a test file to `/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json`
 > A3. Confirm Content Claw can read the file from its sandbox
 > A4. Confirm Ops Claw can read the file from its sandbox
 > A5. Confirm Finance Claw can read the file from its sandbox
@@ -85,7 +89,7 @@ This audit compares the current code implementation against `MILIMO_CLAW_SOLO_TE
 
 The sandbox policy files exist in `/policies/`:
 
-- `content-sandbox.yaml` — Line 23: `read_only: /sandbox/analytics/reports`
+- `content-sandbox.yaml` — Line 23: `read_only: /sandbox/.openclaw-data/milimo/claws/analytics/reports`
 - `analytics-sandbox.yaml` — Line 22: `read_write: /sandbox/analytics`
 - `build-sandbox.yaml` — Defines `/sandbox/build` mount
 - `finance-sandbox.yaml` — Defines `/sandbox/finance` mount
@@ -274,7 +278,7 @@ ANALYTICS_WAIT_SECONDS = 300  # 5 minutes
 
 ### Spec Requirement
 
-> **The one shared-read file:** `/sandbox/analytics/reports/weekly-intelligence.json`
+> **The one shared-read file:** `/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json`
 >
 > This is the only file in the entire mesh that all six claws can read directly without a message contract. It is written by the Analytics Claw every Sunday and mounted as read-only in every other claw's sandbox policy.
 >
@@ -295,13 +299,13 @@ ANALYTICS_WAIT_SECONDS = 300  # 5 minutes
 **solo-founder.yaml line 95-96:**
 ```yaml
 shared_read:
-  - /sandbox/analytics/reports/weekly-intelligence.json
+  - /sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json
 ```
 
 **content-sandbox.yaml line 23:**
 ```yaml
 read_only:
-  - /sandbox/analytics/reports  # Cross-mount: Analytics weekly reports
+  - /sandbox/.openclaw-data/milimo/claws/analytics/reports  # Cross-mount: Analytics weekly reports
 ```
 
 ### Gaps
@@ -314,7 +318,7 @@ read_only:
 Update all sandbox policies to include:
 ```yaml
 read_only:
-  - /sandbox/analytics/reports/weekly-intelligence.json
+  - /sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json
 ```
 
 ---

@@ -4,7 +4,7 @@
 
 **Sources**: `milimo-blueprint/orchestrator/solo_init.py`
 
-**Last updated**: 2026-04-23
+**Last updated**: 2026-04-28
 
 **Tags**: #solo #init #template #validation
 
@@ -27,9 +27,8 @@ else:
 
 ### Permission Check
 
-- If `/sandbox` exists and is writable → System sandbox
-- If `/sandbox` doesn't exist and parent writable → Can create system sandbox
-- Otherwise → Fall back to user sandbox
+- If `/sandbox` exists and `/sandbox/.openclaw-data/` is writable → System sandbox (note: `/sandbox` is writable at the container mount level; `/sandbox/.openclaw/` is the only read-only exception)
+- If `/sandbox/.openclaw-data/` doesn't exist or isn't writable → Fall back to user sandbox
 
 ## Required Fields
 

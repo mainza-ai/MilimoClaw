@@ -2,6 +2,8 @@
 
 ---
 # MILIMO CLAW — MASTER CODEBASE AUDIT AND COMPLETION PROMPT
+
+> **NemoClaw Compliance Notice (2026-04-28)** — Paths migrated to `/sandbox/.openclaw-data/milimo/claws/<role>/`; credentials in OpenShell gateway store; network policies use `protocol: rest` with `enforcement`/`access`/`rules`. See [docs.nvidia.com/nemoclaw/latest/](https://docs.nvidia.com/nemoclaw/latest/).
 # ─────────────────────────────────────────────────────────────────────────────
 # Give this prompt to any AI coding assistant to perform a systematic audit
 # of the Milimo Claw codebase, identify all gaps against the spec documents
@@ -193,7 +195,7 @@ Open each of the five sandbox policy files:
   - `milimo-blueprint/policies/build-sandbox.yaml`
 
 Every file except analytics-sandbox.yaml must contain a read-only mount
-for `/sandbox/analytics/reports/weekly-intelligence.json`. This is the
+for `/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json`. This is the
 most critical configuration item in the system. If any claw is missing
 this mount, its intelligence feed is silently broken.
 

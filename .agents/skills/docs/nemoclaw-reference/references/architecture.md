@@ -68,7 +68,7 @@ container image. Inside the sandbox:
 - OpenClaw runs with the NemoClaw plugin pre-installed.
 - Inference calls are routed through OpenShell to the configured provider.
 - Network egress is restricted by the baseline policy in `openclaw-sandbox.yaml`.
-- Filesystem access is confined to `/sandbox` and `/tmp` for read-write access, with system paths read-only.
+- Filesystem access: `/sandbox` is read-only (Landlock). Writable paths are `/sandbox/.openclaw-data`, `/sandbox/.nemoclaw`, and `/tmp`. System paths are read-only.
 
 ## Inference Routing
 

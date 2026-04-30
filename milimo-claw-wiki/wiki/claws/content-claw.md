@@ -6,7 +6,7 @@
 - `raw/CONTENT_CLAW_SPEC.md`
 - `milimo-blueprint/roles/content-claw.yaml`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-28
 
 **Tags**: #claw #content
 
@@ -18,13 +18,13 @@ The Content Claw is the **creative department** of MilimoClaw. It generates all 
 
 ## Sandbox
 
-**Mount**: `/sandbox/content`
+**Mount**: `/sandbox/.openclaw-data/milimo/claws/content`
 
 | Path | Purpose | Access |
 |------|---------|--------|
-| `/sandbox/content/drafts/` | Draft content | Read-write |
-| `/sandbox/content/brand/` | Brand assets, style guides | Read-write |
-| `/sandbox/analytics/reports/` | Intelligence reports | Read-only |
+| `/sandbox/.openclaw-data/milimo/claws/content/drafts/` | Draft content | Read-write |
+| `/sandbox/.openclaw-data/milimo/claws/content/brand/` | Brand assets, style guides | Read-write |
+| `/sandbox/.openclaw-data/milimo/claws/analytics/reports/` | Intelligence reports | Read-only |
 
 ## What It Does
 
@@ -37,7 +37,7 @@ The Content Claw is the **creative department** of MilimoClaw. It generates all 
 
 ## What It Cannot Do
 
-- Read `/sandbox/clients`, `/sandbox/finance`, or `/sandbox/build`
+- Read `/sandbox/.openclaw-data/milimo/claws/ops`, `/sandbox/.openclaw-data/milimo/claws/finance`, or `/sandbox/.openclaw-data/milimo/claws/build`
 - Publish anything without operator REVIEW approval in the War Room
 - Make inference calls that bypass the privacy router
 

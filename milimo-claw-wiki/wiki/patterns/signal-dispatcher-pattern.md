@@ -4,7 +4,7 @@
 
 **Sources**: `milimo-blueprint/orchestrator/*/signal_dispatcher.py`, `milimo-blueprint/orchestrator/assistant/lucy.py`
 
-**Last updated**: 2026-04-23
+**Last updated**: 2026-04-28
 
 **Tags**: #patterns #signal-dispatcher #communication #mesh
 
@@ -75,7 +75,7 @@ def send_project_brief(...):
         )
 ```
 
-Confirmation tracked in `/sandbox/clients/pricing_confirmed/{project_id}.json`
+Confirmation tracked in `/sandbox/.openclaw-data/milimo/claws/ops/pricing_confirmed/{project_id}.json`
 
 ## Error Handling
 

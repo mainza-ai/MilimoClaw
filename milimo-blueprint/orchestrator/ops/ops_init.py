@@ -21,7 +21,9 @@ from typing import Any, Literal
 
 logger = logging.getLogger("milimo.ops")
 
-BASE = Path("/sandbox/clients")
+from milimo_paths import claw_base
+
+BASE = claw_base("ops")
 
 REQUIRED_DIRS = [
     "active",

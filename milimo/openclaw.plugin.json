@@ -13,8 +13,8 @@
       },
       "clawRole": {
         "type": "string",
-        "description": "Role of this claw instance (content, ops, analytics, finance, build)",
-        "enum": ["content", "ops", "analytics", "finance", "build", ""],
+"description": "Role of this claw instance (solo, content, ops, analytics, finance, build, assistant)",
+      "enum": ["solo", "content", "ops", "analytics", "finance", "build", "assistant", ""],
         "default": ""
       },
       "meshSecret": {

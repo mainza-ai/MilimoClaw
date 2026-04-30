@@ -18,9 +18,12 @@ const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 const node_os_1 = require("node:os");
 function resolveAssistantScript() {
+    const home = (0, node_os_1.homedir)();
     const candidates = [
-        (0, node_path_1.join)((0, node_os_1.homedir)(), ".openclaw-data/milimo", "blueprints", "0.1.0", "orchestrator", "assistant_setup.py"),
+        (0, node_path_1.join)(home, ".openclaw-data/milimo", "blueprints", "0.1.0", "orchestrator", "assistant_setup.py"),
+        (0, node_path_1.join)(home, ".openclaw-data/milimo", "milimo-blueprint", "orchestrator", "assistant_setup.py"),
         (0, node_path_1.join)(process.cwd(), "milimo-blueprint", "orchestrator", "assistant_setup.py"),
+        "/opt/milimo-blueprint/orchestrator/assistant_setup.py",
     ];
     for (const p of candidates) {
         if ((0, node_fs_1.existsSync)(p))

@@ -6,7 +6,7 @@
 - `raw/BUILD_CLAW_SPEC.md`
 - `milimo-blueprint/roles/build-claw.yaml`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-28
 
 **Tags**: #claw #build
 
@@ -18,18 +18,18 @@ The Build Claw is the **engineering department** of MilimoClaw. It ships code au
 
 ## Sandbox
 
-**Mount**: `/sandbox/build`
+**Mount**: `/sandbox/.openclaw-data/milimo/claws/build`
 
 | Path | Purpose | Access |
 |------|---------|--------|
-| `/sandbox/build/repo/` | Codebase (GitHub mount) | Read-write |
-| `/sandbox/build/context/` | Sprint plans, error patterns | Read-write |
-| `/sandbox/build/prs/` | PR state tracking | Read-write |
-| `/sandbox/build/deployments/` | Deploy state | Read-write |
-| `/sandbox/build/docs/` | Changelog, API docs | Read-write |
-| `/sandbox/build/memory/` | Filesystem memory | Read-write |
-| `/sandbox/build/logs/` | Operational logs | Read-write |
-| `/sandbox/analytics/reports/` | Intelligence reports | Read-only |
+| `/sandbox/.openclaw-data/milimo/claws/build/repo/` | Codebase (GitHub mount) | Read-write |
+| `/sandbox/.openclaw-data/milimo/claws/build/context/` | Sprint plans, error patterns | Read-write |
+| `/sandbox/.openclaw-data/milimo/claws/build/prs/` | PR state tracking | Read-write |
+| `/sandbox/.openclaw-data/milimo/claws/build/deployments/` | Deploy state | Read-write |
+| `/sandbox/.openclaw-data/milimo/claws/build/docs/` | Changelog, API docs | Read-write |
+| `/sandbox/.openclaw-data/milimo/claws/build/memory/` | Filesystem memory | Read-write |
+| `/sandbox/.openclaw-data/milimo/claws/build/logs/` | Operational logs | Read-write |
+| `/sandbox/.openclaw-data/milimo/claws/analytics/reports/` | Intelligence reports | Read-only |
 
 ## What It Does
 
@@ -48,7 +48,7 @@ The Build Claw is the **engineering department** of MilimoClaw. It ships code au
 - Merge any PR without operator HOLD clearance
 - Deploy to production without operator HOLD clearance (separate from PR HOLD)
 - Share source code or API keys with any other claw via inter-sandbox message
-- Read `/sandbox/clients`, `/sandbox/finance`, or `/sandbox/content`
+- Read `/sandbox/.openclaw-data/milimo/claws/ops`, `/sandbox/.openclaw-data/milimo/claws/finance`, or `/sandbox/.openclaw-data/milimo/claws/content`
 
 ## Two-Stage Approval Flows
 

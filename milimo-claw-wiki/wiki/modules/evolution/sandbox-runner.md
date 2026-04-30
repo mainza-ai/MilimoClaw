@@ -136,7 +136,7 @@ Where:
 - [[tool-generator]] — LLM-based tool code generation
 - [[tool-builder]] — Tool building and backtesting workflow
 - [[evolution-integration]] — Evolution scheduler
-- [[sandbox-isolation]] — Landlock/seccomp filesystem isolation
+- [[sandbox-isolation]] — Landlock/process-limits/capability-drop filesystem isolation
 
 ## See Also
 

@@ -149,9 +149,10 @@ print("Plugin registered")
 PYEOF
 
 # 6. Fix all directory ownership
-chown -R sandbox:sandbox /sandbox/.milimo 2>/dev/null || true
-mkdir -p /sandbox/.milimo/blueprints
-chown -R sandbox:sandbox /sandbox/.milimo
+# Note: /sandbox/.milimo is a symlink to /sandbox/.openclaw-data/milimo/
+chown -R sandbox:sandbox /sandbox/.openclaw-data/milimo/blueprints 2>/dev/null || true
+mkdir -p /sandbox/.openclaw-data/milimo/blueprints
+chown -R sandbox:sandbox /sandbox/.openclaw-data/milimo
 chown -R sandbox:sandbox /sandbox/.openclaw/agents/main
 chmod -R 775 /sandbox/.openclaw/agents/main
 chown -R sandbox:sandbox /sandbox/.openclaw/workspace
@@ -267,26 +268,29 @@ openclaw tui
 
 ## Phase 6: Telegram Setup (Host-Side)
 
-> **Critical:** Telegram is managed by NemoClaw on the HOST, not inside the sandbox.
+> **Critical:** Telegram is managed by OpenShell's channel messaging subsystem, NOT by `nemoclaw start/stop`. Those commands only control the cloudflared tunnel for the dashboard URL.
 
 ```bash
-# 1. Set the bot token as an environment variable on your HOST
-export TELEGRAM_BOT_TOKEN="your-bot-token-here"
+# 1. Telegram is configured during nemoclaw onboard
+# The wizard registers your bot token as an OpenShell provider
+# Channel config (NEMOCLAW_MESSAGING_CHANNELS_B64) is baked into the sandbox image
 
-# 2. (Optional) Restrict to your Telegram account only
-export ALLOWED_CHAT_IDS="your_telegram_chat_id"
+# 2. To verify Telegram is running:
+nemoclaw my-assistant status
 
-# 3. Start auxiliary services (launches Telegram bridge)
-nemoclaw start
+# 3. To pause/resume Telegram without rebuild:
+nemoclaw my-assistant channels stop telegram
+nemoclaw my-assistant channels start telegram
 
-# 4. Verify the bridge is running
-nemoclaw status
+# 4. (Optional) Start the cloudflared tunnel for dashboard access:
+nemoclaw tunnel start
+# Note: This does NOT affect Telegram — it only provides a dashboard URL
 
 # 5. Open Telegram, find your bot, and send a message
-# The bridge forwards messages between your bot and the agent
+# OpenShell intercepts and delivers to the agent via channel messaging
 
-# 6. To stop the bridge
-nemoclaw stop
+# 6. To restrict DMs to specific users, set allowed IDs during nemoclaw onboard
+# This is stored as NEMOCLAW_MESSAGING_ALLOWED_IDS_B64 in the sandbox image
 ```
 
 **Getting your Telegram Chat ID:**
@@ -319,7 +323,7 @@ curl -s --max-time 10 https://inference.local/v1/models
 ```bash
 # From host terminal
 docker exec openshell-cluster-nemoclaw kubectl exec -n openshell my-assistant -- bash -c '
-chown -R 999:999 /sandbox/.milimo
+chown -R 999:999 /sandbox/.openclaw-data/milimo
 chown -R 999:999 /sandbox/.openclaw
 chown -R 999:999 /sandbox/.openclaw/agents/main
 chown -R 999:999 /sandbox/.openclaw/workspace
@@ -348,9 +352,10 @@ python3 orchestrator/assistant_setup.py
 
 ```bash
 # Inside sandbox - ensure template is at the right path
+# Note: /sandbox/.milimo is a symlink to /sandbox/.openclaw-data/milimo/
 cp /sandbox/milimo-blueprint/orchestrator/templates/assistant_system_prompt.md \
-   /sandbox/.milimo/MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md
-chown sandbox:sandbox /sandbox/.milimo/MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md
+/sandbox/.openclaw-data/milimo/MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md
+chown sandbox:sandbox /sandbox/.openclaw-data/milimo/MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md
 ```
 
 ### Assistant Setup Fails (FileNotFoundError)
@@ -378,9 +383,10 @@ print("Template search path added")
 PYEOF
 
 # Also copy template to expected locations
+# Note: /sandbox/.milimo is a symlink to /sandbox/.openclaw-data/milimo/
 cp /sandbox/milimo-blueprint/orchestrator/templates/assistant_system_prompt.md \
-   /sandbox/.milimo/MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md
-chown sandbox:sandbox /sandbox/.milimo/MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md
+/sandbox/.openclaw-data/milimo/MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md
+chown sandbox:sandbox /sandbox/.openclaw-data/milimo/MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md
 
 # Re-run assistant setup
 cd /sandbox/milimo-blueprint
@@ -393,8 +399,8 @@ python3 orchestrator/assistant_setup.py
 
 ```
 /sandbox/
-├── .milimo/
-│   ├── config.json              # Flat schema: squadName, operatorName, template, solo, activeClaws
+├── .openclaw-data/milimo/    # Primary writable area (symlinked from /sandbox/.milimo)
+│ ├── config.json # Flat schema: squadName, operatorName, template, solo, activeClaws
 │   ├── blueprints/              # Installed blueprint packages
 │   ├── templates/               # Assistant prompt templates
 │   └── MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md  # Copy for find_template()
@@ -440,9 +446,10 @@ python3 orchestrator/assistant_setup.py
 | `nemoclaw my-assistant connect` | Connect to sandbox |
 | `nemoclaw my-assistant status` | Check sandbox status |
 | `nemoclaw my-assistant logs --follow` | Follow sandbox logs |
-| `nemoclaw start` | Start auxiliary services (Telegram bridge) |
-| `nemoclaw stop` | Stop auxiliary services |
-| `export TELEGRAM_BOT_TOKEN="..."` | Set Telegram bot token |
+| `nemoclaw tunnel start` | Start cloudflared tunnel (dashboard URL only, NOT Telegram) |
+| `nemoclaw tunnel stop` | Stop cloudflared tunnel |
+| `nemoclaw my-assistant channels start telegram` | Resume Telegram channel |
+| `nemoclaw my-assistant channels stop telegram` | Pause Telegram channel |
 
 ### Inside Sandbox
 
@@ -474,7 +481,7 @@ python3 orchestrator/assistant_setup.py
 
 1. **NemoClaw is the host** — MilimoClaw runs inside the NemoClaw sandbox, never on the host directly
 2. **API key stays on host** — The sandbox uses `inference.local` which is proxied by OpenShell; credentials never enter the sandbox
-3. **Telegram is host-side** — The Telegram bridge runs via `nemoclaw start` on the host, not inside the sandbox
+3. **Telegram is OpenShell-managed** — Bot tokens are registered as OpenShell providers during `nemoclaw onboard`; the L7 proxy injects real credentials at egress. Use `nemoclaw <name> channels stop/start telegram` to pause/resume.
 4. **Two OpenClaw users** — The sandbox has both `root` and `sandbox` (uid 999) users. Plugins must be installed for the sandbox user at `/sandbox/.openclaw-data/extensions/`
 5. **Solo template = all 6 claws** — No role selection. All claws (Content, Ops, Analytics, Finance, Build, Assistant) are active simultaneously
 6. **Assistant is NOT a claw** — It's the conversational bridge between the operator and the autonomous claws

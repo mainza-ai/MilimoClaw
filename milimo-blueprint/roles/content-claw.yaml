@@ -22,17 +22,17 @@ icon: "🎨"
 
 # ── Filesystem ─────────────────────────────────────────────────────────
 filesystem_mount:
-  primary: "/sandbox/content"
+  primary: "/sandbox/.openclaw-data/milimo/claws/content"
   mode: read_write
   contents:
-    - approved brand assets
-    - style guides
-    - past approved posts
-    - client creative briefs (fed from Ops via inter-claw message)
-  cross_mounts:
-    - path: "/sandbox/analytics/reports"
-      mode: read_only
-      description: "Weekly intelligence reports from Analytics Claw"
+  - approved brand assets
+  - style guides
+  - past approved posts
+  - client creative briefs (fed from Ops via inter-claw message)
+cross_mounts:
+  - path: "/sandbox/.openclaw-data/milimo/claws/analytics/reports"
+    mode: read_only
+    description: "Weekly intelligence reports from Analytics Claw"
 
 # ── Network Egress ─────────────────────────────────────────────────────
 egress_policy: content-sandbox

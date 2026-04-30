@@ -4,7 +4,7 @@
 
 **Sources**: `milimo-blueprint/orchestrator/finance/pricing_engine.py`
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-28
 
 **Tags**: #module #finance-claw
 
@@ -50,7 +50,7 @@ class PricingEngine:
 ## Pricing Query Flow
 
 1. **Receive** `pricing_query` from Ops Claw
-2. **Load** pricing rules from `/sandbox/finance/pricing/rules.json`
+2. **Load** pricing rules from `/sandbox/.openclaw-data/milimo/claws/finance/pricing/rules.json`
 3. **Run** scope cost estimation
 4. **Check** historical estimates vs actuals
 5. **Respond** within 10 minutes
@@ -65,7 +65,7 @@ Scope estimation routes to **Local NIM (NEMOCLAW_MODEL)**:
 
 ## Pricing Rules
 
-Stored in `/sandbox/finance/pricing/rules.json`:
+Stored in `/sandbox/.openclaw-data/milimo/claws/finance/pricing/rules.json`:
 - Floor rates
 - Ceiling rates
 - Scope weights

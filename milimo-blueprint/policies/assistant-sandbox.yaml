@@ -11,24 +11,24 @@ version: 1
 filesystem_policy:
   include_workdir: true
   read_only:
-    - /usr
-    - /lib
-    - /proc
-    - /dev/urandom
-    - /app
-    - /etc
-    - /var/log
-    - /sandbox/analytics/reports    # Cross-mount: Analytics weekly reports
-    - /sandbox/clients              # Cross-mount: Ops client data (read-only for assistant)
-    - /sandbox/content/drafts       # Cross-mount: Content drafts (read-only for review)
-    - /sandbox/finance/revenue      # Cross-mount: Finance revenue data
-    - /sandbox/build/prs            # Cross-mount: Build PR data
+  - /usr
+  - /lib
+  - /proc
+  - /dev/urandom
+  - /app
+  - /etc
+  - /var/log
+  - /sandbox/.openclaw-data/milimo/claws/analytics/reports
+  - /sandbox/.openclaw-data/milimo/claws/ops
+  - /sandbox/.openclaw-data/milimo/claws/content/drafts
+  - /sandbox/.openclaw-data/milimo/claws/finance/revenue
+  - /sandbox/.openclaw-data/milimo/claws/build/prs
   read_write:
-    - /sandbox/.milimo              # Milimo config and mesh state
-    - /sandbox/.openclaw            # OpenClaw agent state
-    - /sandbox/.local               # Installed tools and packages
-    - /tmp
-    - /dev/null
+  - /sandbox/.openclaw-data/milimo
+  - /sandbox/.openclaw
+  - /sandbox/.local
+  - /tmp
+  - /dev/null
 
 landlock:
   compatibility: best_effort
@@ -53,7 +53,6 @@ network_policies:
       - { path: /usr/local/bin/openclaw }
       - { path: /usr/bin/python3 }
       - { path: /usr/bin/python3.11 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── GitHub API ───────────────────────────────────────────────────────
   github_api:
@@ -80,7 +79,6 @@ network_policies:
     - { path: /sandbox/.local/bin/gh }
     - { path: /usr/local/bin/node }
     - { path: /usr/bin/python3 }
-    - { path: /sandbox/.local/bin/milimo }
 
   # ── Deployment: Vercel ───────────────────────────────────────────────
   vercel_api:
@@ -95,7 +93,6 @@ network_policies:
           - allow: { method: "*", path: "/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── Error Monitoring: Sentry ─────────────────────────────────────────
   sentry_api:
@@ -110,7 +107,6 @@ network_policies:
           - allow: { method: "*", path: "/api/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── Payments: Stripe ─────────────────────────────────────────────────
   stripe_api:
@@ -125,7 +121,6 @@ network_policies:
           - allow: { method: "*", path: "/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── Messaging: Telegram Bot API ──────────────────────────────────────
   telegram_api:
@@ -142,7 +137,6 @@ network_policies:
     binaries:
       - { path: /usr/bin/python3 }
       - { path: /usr/bin/python3.11 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── Package Registries ───────────────────────────────────────────────
   npm_registry:

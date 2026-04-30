@@ -5,7 +5,7 @@
 **Sources**:
 - `milimo-blueprint/orchestrator/inference_client.py`
 
-**Last updated**: 2026-04-24
+**Last updated**: 2026-04-29
 
 **Tags**: #module #inference #ai #nvidia
 
@@ -14,6 +14,8 @@
 ## Overview
 
 InferenceClient wraps the NVIDIA NIM API (OpenAI-compatible) for all inference needs. Implements fallback chain and category-based model/temperature selection.
+
+**Official default model** (NemoClaw v0.0.29): `nvidia/nemotron-3-super-120b-a12b` via NVIDIA Endpoints at `integrate.api.nvidia.com/v1`, routed through `inference.local` proxy inside the sandbox.
 
 ---
 
@@ -33,8 +35,8 @@ class NvidiaInferenceClient:
 ```
 
 **Environment Variables**:
-- `NVIDIA_API_KEY` — API key for NVIDIA NIM
-- `NVIDIA_API_BASE` — Base URL (default: https://integrate.api.nvidia.com/v1)
+- `NVIDIA_API_KEY` — API key for NVIDIA NIM (official NemoClaw env var)
+- `NVIDIA_API_BASE` — Base URL override (MilimoClaw extension; official NemoClaw routes via `inference.local` proxy and `NEMOCLAW_INFERENCE_API_OVERRIDE` for cross-provider switching)
 - `NEMOCLAW_MODEL` — Primary inference model (set during `nemoclaw onboard`, required)
 - `INFERENCE_FALLBACK` — Comma-separated fallback models
 
@@ -44,8 +46,10 @@ class NvidiaInferenceClient:
 
 Default fallback order (model from `NEMOCLAW_MODEL` env var, set during `nemoclaw onboard`):
 1. `NEMOCLAW_MODEL`
-2. `meta/llama-3.3-70b-instruct`
-3. `mistralai/mixtral-8x22b-instruct-v0.1`
+2. `meta/llama-3.3-70b-instruct` — MilimoClaw addition (not in official NemoClaw model catalog)
+3. `mistralai/mixtral-8x22b-instruct-v0.1` — MilimoClaw addition (not in official NemoClaw model catalog)
+
+> **Note:** The official NemoClaw v0.0.29 model catalog includes only `nvidia/`-prefixed NVIDIA Endpoint models, plus OpenAI, Anthropic, and Google Gemini providers. The `meta/` and `mistralai/` fallbacks are MilimoClaw extensions that require the corresponding models to be available on the configured inference endpoint.
 
 On failure, automatically tries next model in chain.
 

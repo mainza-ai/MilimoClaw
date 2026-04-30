@@ -41,10 +41,22 @@ _TEMPLATE_CANDIDATES = [
     Path(__file__).resolve().parent.parent
     / "docs"
     / "MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md",
-    # 3. Home-relative (sandbox deployment)
+    # 3. Home-relative (sandbox deployment — .openclaw-data is the writable path)
+    Path.home()
+    / ".openclaw-data"
+    / "milimo"
+    / "MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md",
     Path.home() / ".milimo" / "MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md",
 ]
-MILIMO_CONFIG_PATH = Path.home() / ".milimo" / "config.json"
+
+_MILIMO_CONFIG_CANDIDATES = [
+    Path.home() / ".openclaw-data" / "milimo" / "config.json",
+    Path.home() / ".milimo" / "config.json",
+]
+
+MILIMO_CONFIG_PATH = next(
+    (p for p in _MILIMO_CONFIG_CANDIDATES if p.exists()), _MILIMO_CONFIG_CANDIDATES[0]
+)
 # Use home-relative path so it works for both root and sandbox users
 OPENCLAW_AGENTS_DIR = Path.home() / ".openclaw" / "agents" / "main"
 SYSTEM_PROMPT_DEST = OPENCLAW_AGENTS_DIR / "system.md"

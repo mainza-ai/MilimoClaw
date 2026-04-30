@@ -15,7 +15,8 @@ import type { Command } from "commander";
 import { registerCliCommands } from "./cli.js";
 import { handleSlashCommand } from "./commands/slash.js";
 import { checkFinalsModeAutoResume } from "./commands/squad.js";
-import { loadOnboardConfig } from "./onboard/config.js";
+import { loadOnboardConfig, type MilimoOnboardConfig } from "./onboard/config.js";
+import { formatRoleDisplay } from "./commands/onboard.js";
 
 // ---------------------------------------------------------------------------
 // OpenClaw Plugin SDK compatible types (mirrors openclaw/plugin-sdk)
@@ -151,6 +152,8 @@ function isValidClawRole(value: string): value is ClawRole | "" {
 // Plugin entry point
 // ---------------------------------------------------------------------------
 
+let _bannerDisplayed = false;
+
 export default function register(api: OpenClawPluginApi): void {
   // 1. Register /milimo slash command (chat interface)
   api.registerCommand({
@@ -175,25 +178,31 @@ export default function register(api: OpenClawPluginApi): void {
   // 4. Auto-resume check for Finals mode
   checkFinalsModeAutoResume(api.logger);
 
-  // 5. Display registration banner with onboarding status
-  const roleDisplay = onboardConfig?.clawRole || config.clawRole || "not assigned";
-  const squadDisplay = onboardConfig?.squadName || config.squadName || "not configured";
-  const templateDisplay = onboardConfig?.template || "not selected";
+  // 5. Display registration banner with onboarding status (once per process)
+  if (!_bannerDisplayed) {
+    _bannerDisplayed = true;
+    const roleDisplay =
+      formatRoleDisplay(
+        (onboardConfig ?? { clawRole: config.clawRole, activeClaws: [] }) as MilimoOnboardConfig,
+      ) || "not assigned";
+    const squadDisplay = onboardConfig?.squadName || config.squadName || "not configured";
+    const templateDisplay = onboardConfig?.template || "not selected";
 
-  api.logger.info("");
-  api.logger.info(" ┌─────────────────────────────────────────────────────┐");
-  api.logger.info(" │ Milimo Claw registered │");
-  api.logger.info(" │ │");
-  api.logger.info(` │ Squad: ${squadDisplay.padEnd(40)}│`);
-  api.logger.info(` │ Role: ${roleDisplay.padEnd(40)}│`);
-  api.logger.info(` │ Template: ${templateDisplay.padEnd(38)}│`);
-  api.logger.info(" │ Commands: openclaw milimo <command> │");
-  api.logger.info(" │ Chat: /milimo <command> │");
-  api.logger.info(" └─────────────────────────────────────────────────────┘");
-  api.logger.info("");
-
-  if (!onboardConfig) {
-    api.logger.info(" ⚠ Not onboarded. Run: openclaw milimo onboard");
     api.logger.info("");
+    api.logger.info(" ┌─────────────────────────────────────────────────────┐");
+    api.logger.info(" │ Milimo Claw registered │");
+    api.logger.info(" │ │");
+    api.logger.info(` │ Squad: ${squadDisplay.padEnd(40)}│`);
+    api.logger.info(` │ Role: ${roleDisplay.padEnd(40)}│`);
+    api.logger.info(` │ Template: ${templateDisplay.padEnd(38)}│`);
+    api.logger.info(" │ Commands: openclaw milimo <command> │");
+    api.logger.info(" │ Chat: /milimo <command> │");
+    api.logger.info(" └─────────────────────────────────────────────────────┘");
+    api.logger.info("");
+
+    if (!onboardConfig) {
+      api.logger.info(" ⚠ Not onboarded. Run: openclaw milimo onboard");
+      api.logger.info("");
+    }
   }
 }

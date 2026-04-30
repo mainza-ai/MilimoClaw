@@ -2,7 +2,7 @@
 
 **Summary**: Template for documenting a MilimoClaw agent.
 
-**Last updated**: 2026-04-14
+**Last updated**: 2026-04-28
 
 **Tags**: #template #claw
 
@@ -32,7 +32,7 @@ Describe the claw's primary function and responsibilities.
 
 | Path | Purpose | Access |
 |------|---------|--------|
-| `/sandbox/{{mount}}/` | Primary workspace | Read-write |
+| `/sandbox/.openclaw-data/milimo/claws/{{mount}}/` | Primary workspace (must be under `.openclaw-data/` for writability — `/sandbox/` is read-only per NemoClaw Landlock) | Read-write |
 
 ## What It Does
 

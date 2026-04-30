@@ -24,19 +24,21 @@ pytestmark = pytest.mark.phase_a
 
 
 SANDBOX_ROOTS = {
-    "content": Path("/sandbox/content"),
-    "clients": Path("/sandbox/clients"),
-    "analytics": Path("/sandbox/analytics"),
-    "finance": Path("/sandbox/finance"),
-    "build": Path("/sandbox/build"),
-    "assistant": Path("/sandbox/.milimo/assistant"),
+    "content": Path("/sandbox/.openclaw-data/milimo/claws/content"),
+    "ops": Path("/sandbox/.openclaw-data/milimo/claws/ops"),
+    "analytics": Path("/sandbox/.openclaw-data/milimo/claws/analytics"),
+    "finance": Path("/sandbox/.openclaw-data/milimo/claws/finance"),
+    "build": Path("/sandbox/.openclaw-data/milimo/claws/build"),
+    "assistant": Path("/sandbox/.openclaw-data/milimo/claws/assistant"),
 }
 
 FALLBACK_ROOTS = {
     role: Path.home() / ".milimo" / "sandboxes" / role for role in SANDBOX_ROOTS
 }
 
-SHARED_REPORT_PATH = Path("/sandbox/analytics/reports/weekly-intelligence.json")
+SHARED_REPORT_PATH = Path(
+    "/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json"
+)
 SHARED_REPORT_FALLBACK = (
     Path.home()
     / ".milimo"
@@ -214,7 +216,8 @@ def _read_report_as_claw(claw_role: str, report_path: Path) -> dict:
 
     if not declared:
         declared = any(
-            "/sandbox/analytics/reports" in str(mount) for mount in read_only_mounts
+            "/sandbox/.openclaw-data/milimo/claws/analytics/reports" in str(mount)
+            for mount in read_only_mounts
         )
 
     assert declared, (
@@ -305,7 +308,8 @@ def test_a7_content_cannot_read_clients_sandbox():
     Cross-sandbox isolation must be enforced.
     """
     _assert_cross_sandbox_read_blocked(
-        reading_claw="content", blocked_path=Path("/sandbox/clients")
+        reading_claw="content",
+        blocked_path=Path("/sandbox/.openclaw-data/milimo/claws/ops"),
     )
 
 
@@ -315,7 +319,8 @@ def test_a8_finance_cannot_read_build_sandbox():
     Cross-sandbox isolation must be enforced.
     """
     _assert_cross_sandbox_read_blocked(
-        reading_claw="finance", blocked_path=Path("/sandbox/build")
+        reading_claw="finance",
+        blocked_path=Path("/sandbox/.openclaw-data/milimo/claws/build"),
     )
 
 
@@ -324,37 +329,51 @@ def test_a8_finance_cannot_read_build_sandbox():
 
 def test_isolation_ops_cannot_read_finance():
     """Ops Claw cannot read Finance sandbox."""
-    _assert_cross_sandbox_read_blocked("ops", Path("/sandbox/finance"))
+    _assert_cross_sandbox_read_blocked(
+        "ops", Path("/sandbox/.openclaw-data/milimo/claws/finance")
+    )
 
 
 def test_isolation_ops_cannot_read_build():
     """Ops Claw cannot read Build sandbox."""
-    _assert_cross_sandbox_read_blocked("ops", Path("/sandbox/build"))
+    _assert_cross_sandbox_read_blocked(
+        "ops", Path("/sandbox/.openclaw-data/milimo/claws/build")
+    )
 
 
 def test_isolation_build_cannot_read_finance():
     """Build Claw cannot read Finance sandbox."""
-    _assert_cross_sandbox_read_blocked("build", Path("/sandbox/finance"))
+    _assert_cross_sandbox_read_blocked(
+        "build", Path("/sandbox/.openclaw-data/milimo/claws/finance")
+    )
 
 
 def test_isolation_build_cannot_read_clients():
     """Build Claw cannot read Ops (clients) sandbox."""
-    _assert_cross_sandbox_read_blocked("build", Path("/sandbox/clients"))
+    _assert_cross_sandbox_read_blocked(
+        "build", Path("/sandbox/.openclaw-data/milimo/claws/ops")
+    )
 
 
 def test_isolation_finance_cannot_read_clients():
     """Finance Claw cannot read Ops (clients) sandbox."""
-    _assert_cross_sandbox_read_blocked("finance", Path("/sandbox/clients"))
+    _assert_cross_sandbox_read_blocked(
+        "finance", Path("/sandbox/.openclaw-data/milimo/claws/ops")
+    )
 
 
 def test_isolation_content_cannot_read_finance():
     """Content Claw cannot read Finance sandbox."""
-    _assert_cross_sandbox_read_blocked("content", Path("/sandbox/finance"))
+    _assert_cross_sandbox_read_blocked(
+        "content", Path("/sandbox/.openclaw-data/milimo/claws/finance")
+    )
 
 
 def test_isolation_content_cannot_read_build():
     """Content Claw cannot read Build sandbox."""
-    _assert_cross_sandbox_read_blocked("content", Path("/sandbox/build"))
+    _assert_cross_sandbox_read_blocked(
+        "content", Path("/sandbox/.openclaw-data/milimo/claws/build")
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -390,4 +409,4 @@ class TestSandboxPolicyHelpers:
         all_mounts = _get_all_accessible_mounts(policy)
 
         mount_strs = [str(m) for m in all_mounts]
-        assert "/sandbox/content" in mount_strs
+        assert "/sandbox/.openclaw-data/milimo/claws/content" in mount_strs

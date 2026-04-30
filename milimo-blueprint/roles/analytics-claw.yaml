@@ -22,7 +22,7 @@ icon: "📊"
 
 # ── Filesystem ─────────────────────────────────────────────────────────
 filesystem_mount:
-  primary: "/sandbox/analytics"
+  primary: "/sandbox/.openclaw-data/milimo/claws/analytics"
   mode: read_write
   contents:
     - aggregated performance data

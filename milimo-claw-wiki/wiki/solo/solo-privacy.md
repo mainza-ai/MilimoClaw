@@ -4,11 +4,13 @@
 
 **Sources**: `milimo-blueprint/orchestrator/solo_privacy.py`
 
-**Last updated**: 2026-04-23
+**Last updated**: 2026-04-29
 
 **Tags**: #solo #privacy #routing #cost-guard
 
 ---
+
+> **NemoClaw Compliance Notice:** Inference routing in the NemoClaw sandbox works via `https://inference.local/v1` — the agent talks to this proxy endpoint inside the sandbox, and the OpenShell gateway intercepts on the host and forwards to the actual provider. No API keys are present in the sandbox environment; the gateway handles credential substitution at egress. The `NEMOCLAW_MODEL` env var determines which model is used. Local inference (Ollama/vLLM) uses provider-specific tokens, NOT `OPENAI_API_KEY`. **Same-provider** model switches use `openshell inference set`; **cross-provider** switches require `NEMOCLAW_MODEL_OVERRIDE` + `NEMOCLAW_INFERENCE_API_OVERRIDE` + `nemoclaw onboard --resume --recreate-sandbox`.
 
 ## Purpose
 
@@ -35,7 +37,7 @@ Attempting to override locked routes raises `PrivacyPolicyViolationError`.
 
 ## Cost Guard
 
-Manages daily cloud token budget:
+Manages daily cloud token budget. OpenShell provides inference cost controls at the gateway level; this cost guard is the application-level complement:
 
 | Parameter | Default |
 |-----------|---------|
@@ -66,8 +68,8 @@ def check_budget() -> (allowed, is_alert):
 
 | Value | Meaning |
 |-------|---------|
-| `CLOUD` | Cloud (NEMOCLAW_MODEL) |
-| `LOCAL` | Local NIM (NEMOCLAW_MODEL) on RTX |
+| `CLOUD` | Cloud via inference.local proxy (`NEMOCLAW_MODEL` determines model) |
+| `LOCAL` | Local NIM (Ollama/vLLM via inference.local, provider-specific tokens, NOT `OPENAI_API_KEY`) |
 | `VLLM` | Local vLLM |
 
 ## Main Functions

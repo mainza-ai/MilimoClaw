@@ -430,7 +430,7 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
 
   // Create directories
   createMilimoDirectories();
-  logger.info(" ✓ Created ~/.milimo/ directory structure");
+  logger.info(" ✓ Created ~/.openclaw-data/milimo/ directory structure");
 
   // Save configuration
   const config: MilimoOnboardConfig = {
@@ -453,7 +453,7 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
   };
 
   saveOnboardConfig(config);
-  logger.info(" ✓ Saved configuration to ~/.milimo/config.json");
+  logger.info(" ✓ Saved configuration to ~/.openclaw-data/milimo/config.json");
 
   // Step 11a: Sandbox auto-creation (unless --no-sandbox)
   if (!opts.noSandbox) {
@@ -462,7 +462,14 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
     try {
       const { execFileSync } = await import("child_process");
       const home = process.env.HOME ?? "/tmp";
-      const blueprintDir = path.join(home, ".openclaw-data/milimo", "blueprints", "0.1.0");
+      const candidates = [
+        path.join(home, ".openclaw-data/milimo", "blueprints", "0.1.0"),
+        path.join(home, ".openclaw-data/milimo", "milimo-blueprint"),
+        "/opt/milimo-blueprint",
+      ];
+      const blueprintDir =
+        candidates.find((d) => fs.existsSync(path.join(d, "orchestrator", "solo_init.py"))) ??
+        candidates[0];
       const soloInitPath = path.join(blueprintDir, "orchestrator", "solo_init.py");
 
       if (fs.existsSync(soloInitPath)) {

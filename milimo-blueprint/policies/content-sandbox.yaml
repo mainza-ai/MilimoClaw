@@ -5,26 +5,26 @@
 # Extends the base OpenClaw sandbox policy with Content-specific
 # filesystem and network constraints.
 #
-# Mount: /sandbox/content (read-write)
-# Cross: /sandbox/analytics/reports (read-only)
+# Mount: /sandbox/.openclaw-data/milimo/claws/content (read-write)
+# Cross: /sandbox/.openclaw-data/milimo/claws/analytics/reports (read-only)
 
 version: 1
 
 filesystem_policy:
   include_workdir: true
   read_only:
-    - /usr
-    - /lib
-    - /proc
-    - /dev/urandom
-    - /app
-    - /etc
-    - /var/log
-    - /sandbox/analytics/reports   # Cross-mount: Analytics weekly reports
+  - /usr
+  - /lib
+  - /proc
+  - /dev/urandom
+  - /app
+  - /etc
+  - /var/log
+  - /sandbox/.openclaw-data/milimo/claws/analytics/reports
   read_write:
-    - /sandbox/content             # Primary mount
-    - /tmp
-    - /dev/null
+  - /sandbox/.openclaw-data/milimo/claws/content
+  - /tmp
+  - /dev/null
 
 landlock:
   compatibility: best_effort
@@ -48,7 +48,6 @@ network_policies:
     binaries:
       - { path: /usr/local/bin/openclaw }
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── Social Publishing APIs ──────────────────────────────────────────
   instagram_api:
@@ -65,7 +64,6 @@ network_policies:
           - allow: { method: GET, path: "/**/insights" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   twitter_api:
     name: twitter_api
@@ -80,7 +78,6 @@ network_policies:
           - allow: { method: GET, path: "/2/tweets/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   linkedin_api:
     name: linkedin_api
@@ -95,7 +92,6 @@ network_policies:
           - allow: { method: GET, path: "/v2/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   tiktok_api:
     name: tiktok_api
@@ -109,7 +105,6 @@ network_policies:
           - allow: { method: POST, path: "/v2/post/publish/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── Stock Assets & SEO ──────────────────────────────────────────────
   unsplash_api:
@@ -124,7 +119,6 @@ network_policies:
           - allow: { method: GET, path: "/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   pexels_api:
     name: pexels_api
@@ -138,7 +132,6 @@ network_policies:
           - allow: { method: GET, path: "/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── Facebook Publishing API ────────────────────────────────────────
   facebook_api:
@@ -155,7 +148,6 @@ network_policies:
           - allow: { method: GET, path: "/**/insights" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── Trend & Research APIs (read-only) ───────────────────────────────
   google_trends_api:
@@ -170,7 +162,6 @@ network_policies:
           - allow: { method: GET, path: "/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   buzzsumo_api:
     name: buzzsumo_api
@@ -184,7 +175,6 @@ network_policies:
           - allow: { method: GET, path: "/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── Optional: Buffer Scheduling API ─────────────────────────────────
   # Uncomment to enable Buffer integration for scheduled publishing

@@ -70,8 +70,8 @@ def _make_policy():
     """Return a sample sandbox policy for testing."""
     return {
         "filesystem_policy": {
-            "read_write": ["/sandbox/content", "/tmp"],
-            "read_only": ["/sandbox/analytics/reports"],
+            "read_write": ["/sandbox/.openclaw-data/milimo/claws/content", "/tmp"],
+            "read_only": ["/sandbox/.openclaw-data/milimo/claws/analytics/reports"],
         },
         "network_policies": {
             "social_api": {
@@ -317,7 +317,9 @@ class TestToolProposal(unittest.TestCase):
                 confidence=0.8,
             ),
             metric_target="approval_rate",
-            data_sources_required=["/sandbox/content/styles"],
+            data_sources_required=[
+                "/sandbox/.openclaw-data/milimo/claws/content/styles"
+            ],
         )
         valid, reason = validate_permissions(proposal, _make_policy())
         self.assertTrue(valid)
@@ -333,7 +335,9 @@ class TestToolProposal(unittest.TestCase):
                 confidence=0.8,
             ),
             metric_target="x",
-            data_sources_required=["/sandbox/finance/invoices"],
+            data_sources_required=[
+                "/sandbox/.openclaw-data/milimo/claws/finance/invoices"
+            ],
         )
         valid, reason = validate_permissions(proposal, _make_policy())
         self.assertFalse(valid)

@@ -23,7 +23,7 @@ icon: "💰"
 
 # ── Filesystem ─────────────────────────────────────────────────────────
 filesystem_mount:
-  primary: "/sandbox/finance"
+  primary: "/sandbox/.openclaw-data/milimo/claws/finance"
   mode: read_write
   contents:
     - revenue records

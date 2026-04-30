@@ -6,15 +6,19 @@
 - `milimo-blueprint/orchestrator/privacy_router.py`
 - `raw/AGENTS.md`
 
-**Last updated**: 2026-04-23
+**Last updated**: 2026-04-29
 
 **Tags**: #architecture #privacy #inference #routing
 
 ---
 
+> **NemoClaw Compliance Notice:** This page describes MilimoClaw's application-level privacy routing layer. The underlying inference transport is handled entirely by OpenShell. The sandbox never sees real API keys; credentials are substituted at egress by the OpenShell L7 proxy.
+
 ## Overview
 
-The Privacy Router intercepts **every inference call** in MilimoClaw. It determines whether the data is sensitive and routes accordingly — sensitive data to local NIM (NEMOCLAW_MODEL), non-sensitive to cloud APIs.
+The Privacy Router intercepts **every inference call** in MilimoClaw. It determines whether the data is sensitive and routes accordingly — sensitive data stays local, non-sensitive goes to cloud APIs.
+
+> **Important:** In the NemoClaw sandbox, the agent talks to `https://inference.local/v1` inside the sandbox. The OpenShell gateway intercepts this on the host and forwards to the actual provider. The sandbox **never** sees the real API key — OpenShell's L7 proxy substitutes credentials at egress. Local inference (Ollama/vLLM) uses provider-specific tokens, **not** `OPENAI_API_KEY`. The `NEMOCLAW_MODEL` env var determines which model is used; switching models uses `openshell inference set --provider nvidia-nim --model <model>` (or the alias `nemoclaw <name> inference-switch`). Experimental providers require `NEMOCLAW_EXPERIMENTAL=1`. Provider trust tiers (official, community, experimental) govern which providers are available without the experimental flag.
 
 ## Purpose
 
@@ -47,7 +51,7 @@ The Privacy Router intercepts **every inference call** in MilimoClaw. It determi
 │         ▼                                                      │
 │  ┌──────────────┐                                             │
 │ │ Local NIM │ │
-│ │ (NEMOCLAW_MODEL) │ │
+│ │ (on-device) │ │
 │  └──────────────┘                                             │
 └────────────────────────────────────────────────────────────────┘
 ```
@@ -126,12 +130,12 @@ def route_inference_dev(data_type: str) -> str:
 
 ## Production Routing
 
-In production, the privacy router enforces local NIM (NEMOCLAW_MODEL) for sensitive data:
+In production, the privacy router enforces local NIM for sensitive data:
 
 ```python
 def route_inference_prod(data_type: str) -> str:
     if data_type in SENSITIVE_TYPES:
-        logger.info(f"Routing sensitive data to local NIM (NEMOCLAW_MODEL): {data_type}")
+        logger.info(f"Routing sensitive data to local NIM: {data_type}")
         return "local_nim"
     return "cloud_api"
 ```
@@ -141,14 +145,55 @@ def route_inference_prod(data_type: str) -> str:
 ### Environment Variables
 
 ```bash
-# Development mode
-MILIMO_DEV_MODE=true  # All inference to cloud
+# Model selection (determines which model the sandbox proxy uses)
+NEMOCLAW_MODEL=nvidia/nemotron-3-super-120b-a12b
 
-# Production mode
-MILIMO_DEV_MODE=false # Sensitive data to local NIM (NEMOCLAW_MODEL)
-NVIDIA_API_KEY=nvapi-xxx # Cloud API key
-LOCAL_NIM_ENDPOINT=http://localhost:8000 # Local NIM (NEMOCLAW_MODEL)
+# Preferred API protocol (new in v0.0.29)
+NEMOCLAW_PREFERRED_API=openai-responses
+
+# Cross-provider switching (requires sandbox recreation)
+NEMOCLAW_MODEL_OVERRIDE=openai/gpt-5.4
+NEMOCLAW_INFERENCE_API_OVERRIDE=openai-completions
+
+# Experimental providers (required to use community/experimental providers)
+NEMOCLAW_EXPERIMENTAL=1
+
+# Inference endpoint inside the sandbox (agent-facing, not the real provider)
+# The agent calls https://inference.local/v1
+# OpenShell gateway intercepts and routes to the real provider
+
+# Real API keys are NEVER in the sandbox environment.
+# They are stored in the OpenShell gateway and substituted at egress.
+# For local inference (Ollama/vLLM), provider-specific tokens are used — NOT OPENAI_API_KEY.
 ```
+
+### Switching Models
+
+**Same provider** — no sandbox restart needed:
+
+```bash
+openshell inference set --provider nvidia-nim --model nvidia/nemotron-3-super-120b-a12b
+# Or via nemoclaw alias:
+nemoclaw <name> inference-switch --model nvidia/nemotron-3-super-120b-a12b
+```
+
+**Cross-provider switch** (e.g., NVIDIA → OpenAI) — requires sandbox recreation:
+
+```bash
+NEMOCLAW_MODEL_OVERRIDE=openai/gpt-5.4 \
+NEMOCLAW_INFERENCE_API_OVERRIDE=openai-completions \
+nemoclaw onboard --resume --recreate-sandbox
+```
+
+Valid `NEMOCLAW_INFERENCE_API_OVERRIDE` values: `openai-completions`, `anthropic-messages`.
+
+### Provider Trust Tiers
+
+| Tier | Providers | Behavior |
+|------|-----------|----------|
+| **Tested** | NVIDIA Endpoints, OpenAI, Anthropic, Google Gemini | Fully supported, tested during onboarding |
+| **Compatible** | Other OpenAI-compatible, Other Anthropic-compatible | User-supplied base URL and model |
+| **Local** | Ollama, NVIDIA NIM, vLLM | Self-hosted; NIM and vLLM require `NEMOCLAW_EXPERIMENTAL=1` |
 
 ### Privacy Policy File
 
@@ -178,8 +223,8 @@ routing:
   sensitive: local_nim
   non_sensitive: cloud_api
 
-fallback:
-- cloud_api # Fallback if local NIM (NEMOCLAW_MODEL) unavailable
+  fallback:
+  - cloud_api # Fallback if local NIM unavailable
 ```
 
 ## Auditing
@@ -209,11 +254,11 @@ Weekly reports include:
 
 ## Error Handling
 
-### Local NIM (NEMOCLAW_MODEL) Unavailable
+### Local NIM Unavailable
 
 ```python
 def handle_nim_unavailable(prompt, data_type):
-    """Fallback when local NIM (NEMOCLAW_MODEL) is down."""
+    """Fallback when local NIM is down."""
     if data_type in SENSITIVE_TYPES:
         # Block rather than send to cloud
         raise PrivacyError(f"Cannot route sensitive data to cloud: {data_type}")
@@ -224,23 +269,24 @@ def handle_nim_unavailable(prompt, data_type):
 
 ### Cost Guard
 
-Daily cloud token budget with fallback:
+Daily cloud token budget with fallback. OpenShell provides inference cost controls at the gateway level; the privacy router's cost guard is an application-level complement:
 
 ```python
 DAILY_TOKEN_BUDGET = 50000
-FALLBACK_STRATEGY = "lighter_prompt"  # Reduce tokens by 50%
+FALLBACK_STRATEGY = "lighter_prompt" # Reduce tokens by 50%
 
 def check_budget():
-    if daily_tokens_used > DAILY_TOKEN_BUDGET * 0.8:
-        alert("Approaching token budget limit")
-    if daily_tokens_used > DAILY_TOKEN_BUDGET:
-        return FALLBACK_STRATEGY
-    return "normal"
+if daily_tokens_used > DAILY_TOKEN_BUDGET * 0.8:
+alert("Approaching token budget limit")
+if daily_tokens_used > DAILY_TOKEN_BUDGET:
+return FALLBACK_STRATEGY
+return "normal"
 ```
 
 ## Related Pages
 
 - [[sandbox-isolation]] — Overall isolation model
+- [[workspace-files]] — Workspace persistence and rebuild behavior
 - [[content-claw]] — Content Claw sensitive types
 - [[finance-claw]] — Finance Claw (all sensitive)
 - [[build-claw]] — Build Claw sensitive types

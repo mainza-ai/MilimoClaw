@@ -5,7 +5,7 @@
 **Sources**:
 - `milimo-claw-docs/troubleshooting/ISSUES_AND_FIXES_AUDIT.md`
 
-**Last updated**: 2026-04-23
+**Last updated**: 2026-04-29
 
 **Tags**: #troubleshooting #audit #fixes
 
@@ -123,10 +123,16 @@ NET:OPEN DENIED /usr/local/bin/node -> api.github.com:443
 
 ### Fix
 
-Added Node.js to `assistant-sandbox.yaml`:
+Added Node.js to `assistant-sandbox.yaml` (endpoint must have `protocol: rest`):
 ```yaml
+endpoints:
+- host: api.github.com
+  port: 443
+  protocol: rest
+  enforcement: enforce
+  access: read-write
 binaries:
-  - { path: /usr/local/bin/node }
+- { path: /usr/local/bin/node }
 ```
 
 ---
@@ -140,8 +146,8 @@ Claws reported permission denied on operational.log files.
 ### Fix
 
 ```bash
-chown -R sandbox:sandbox /sandbox/*/logs
-chmod -R 755 /sandbox/*/logs
+chown -R sandbox:sandbox /sandbox/.openclaw-data/milimo/claws/*/logs/
+chmod -R 755 /sandbox/.openclaw-data/milimo/claws/*/logs/
 ```
 
 ---

@@ -7,7 +7,7 @@
 - `milimo-blueprint/orchestrator/templates/assistant_system_prompt.md`
 - `milimo-blueprint/policies/assistant-sandbox.yaml`
 
-**Last updated**: 2026-04-23
+**Last updated**: 2026-04-28
 
 **Tags**: #claw #assistant #lucy
 
@@ -23,13 +23,13 @@ Lucy is the **conversational assistant** that serves as the primary user interfa
 
 | Path | Purpose | Access |
 |------|---------|--------|
-| `/sandbox/.openclaw/` | Assistant state and configuration | Read-write |
-| `/sandbox/.milimo/` | Mesh communication | Read-write |
-| `/sandbox/clients/` | Client data (read-only) | Read-only |
-| `/sandbox/content/drafts/` | Content drafts (read-only) | Read-only |
-| `/sandbox/finance/revenue/` | Revenue data | Read-only |
-| `/sandbox/build/prs/` | PR data | Read-only |
-| `/sandbox/analytics/reports/` | Intelligence reports | Read-only |
+| `/sandbox/.openclaw/` | Gateway config (immutable, root-owned, integrity-verified) | Read-only |
+| `/sandbox/.openclaw-data/milimo/` | Agent state, workspace, plugins, mesh communication | Read-write |
+| `/sandbox/.openclaw-data/milimo/claws/ops/` | Client data (read-only) | Read-only |
+| `/sandbox/.openclaw-data/milimo/claws/content/drafts/` | Content drafts (read-only) | Read-only |
+| `/sandbox/.openclaw-data/milimo/claws/finance/revenue/` | Revenue data | Read-only |
+| `/sandbox/.openclaw-data/milimo/claws/build/prs/` | PR data | Read-only |
+| `/sandbox/.openclaw-data/milimo/claws/analytics/reports/` | Intelligence reports | Read-only |
 
 ## What It Does
 
@@ -92,12 +92,13 @@ Lucy has broader network access than other claws:
 
 | API | Purpose |
 |-----|---------|
-| NVIDIA NIM | Inference for conversation |
-| Telegram Bot API | User messaging interface |
+| Inference (inference.local) | Inference for conversation (routed via OpenShell gateway) |
 | GitHub API | Repository and PR information |
 | Vercel API | Deployment status |
 | Sentry API | Error tracking |
 | Stripe API | Payment status (read-only) |
+
+Messaging to the operator uses OpenShell channel messaging (Telegram, Discord, Slack), not direct API calls.
 
 ## Implementation
 
@@ -109,21 +110,19 @@ The `LucyAssistant` class in `milimo-blueprint/orchestrator/assistant/lucy.py` i
 
 | Class | Purpose |
 |-------|---------|
-| `TelegramBridge` | Polls Telegram Bot API for user messages, sends responses |
 | `PendingQuery` | Tracks dispatched queries awaiting claw responses (with TTL) |
-| `LucyAssistant` | Main coordinator: startup, shutdown, dispatch, telegram integration |
+| `LucyAssistant` | Main coordinator: startup, shutdown, dispatch, channel integration |
 
 **Key Methods**:
 
 | Method | Purpose |
 |--------|---------|
-| `startup()` | Initialize Telegram bridge, connect to mesh |
+| `startup()` | Initialize OpenShell channel messaging, connect to mesh |
 | `shutdown()` | Graceful cleanup of all resources |
 | `handle_inbound(message)` | Route incoming mesh messages to handlers |
 | `dispatch_query(target, query)` | Send assistant_query to a specific claw |
 | `dispatch_task(target, task)` | Send assistant_task to a specific claw |
-| `process_telegram_message(text)` | Parse user input and route to appropriate claw |
-| `telegram_poll_loop()` | Background loop polling Telegram for new messages |
+| `process_channel_message(text)` | Parse user input from OpenShell channel and route to appropriate claw |
 | `cleanup_expired()` | Remove expired pending queries past TTL |
 
 **Silent Response Handling**: When a claw returns an empty or None response, Lucy returns a diagnostic dict with `status`, `role`, and `message_type` fields instead of propagating silence.

@@ -2,9 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Build Claw Sandbox Policy
-# Mount: /sandbox/build (read-write) — squad's codebase, secrets,
-# test suites, and deployment configs.
-# No access to social, financial, or client communication channels.
+# Mount: /sandbox/.openclaw-data/milimo/claws/build (read-write)
 
 version: 1
 
@@ -18,9 +16,9 @@ filesystem_policy:
   - /app
   - /etc
   - /var/log
-  - /sandbox/analytics/reports # Cross-mount: Analytics weekly reports
+  - /sandbox/.openclaw-data/milimo/claws/analytics/reports
   read_write:
-  - /sandbox/build # Primary mount — codebase & configs
+  - /sandbox/.openclaw-data/milimo/claws/build
   - /tmp
   - /dev/null
 
@@ -47,7 +45,6 @@ network_policies:
       - { path: /usr/local/bin/openclaw }
       - { path: /usr/bin/python3 }
       - { path: /usr/bin/python3.11 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── GitHub ──────────────────────────────────────────────────────────
   github_api:
@@ -73,7 +70,6 @@ network_policies:
       - { path: /usr/bin/git }
       - { path: /sandbox/.local/bin/gh }
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── Deployment: Vercel ──────────────────────────────────────────────
   vercel_api:
@@ -88,7 +84,6 @@ network_policies:
           - allow: { method: "*", path: "/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── Deployment: Railway ─────────────────────────────────────────────
   railway_api:
@@ -103,7 +98,6 @@ network_policies:
           - allow: { method: "*", path: "/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }
 
   # ── Package Registries ──────────────────────────────────────────────
   npm_registry:
@@ -146,4 +140,3 @@ network_policies:
           - allow: { method: "*", path: "/api/**" }
     binaries:
       - { path: /usr/bin/python3 }
-      - { path: /sandbox/.local/bin/milimo }

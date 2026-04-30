@@ -5,7 +5,7 @@
 **Sources**:
 - `milimo-claw-docs/troubleshooting/ISSUES_AND_FIXES_AUDIT.md`
 
-**Last updated**: 2026-04-23
+**Last updated**: 2026-04-29
 
 **Tags**: #troubleshooting #issues #fixes
 
@@ -23,7 +23,7 @@
 ```yaml
 filesystem_policy:
   read_only:
-    - /sandbox/analytics/reports
+    - /sandbox/.openclaw-data/milimo/claws/analytics/reports
 ```
 
 Run: `pytest -m phase_a`
@@ -191,10 +191,16 @@ NET:OPEN DENIED /usr/local/bin/node -> api.github.com:443
 
 **Cause**: Node.js not in allowed binaries.
 
-**Fix**: Add to `assistant-sandbox.yaml`:
+**Fix**: Add to `assistant-sandbox.yaml` (with `protocol: rest` on the endpoint):
 ```yaml
+endpoints:
+- host: api.github.com
+  port: 443
+  protocol: rest
+  enforcement: enforce
+  access: read-write
 binaries:
-  - { path: /usr/local/bin/node }
+- { path: /usr/local/bin/node }
 ```
 
 ---

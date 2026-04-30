@@ -28,6 +28,7 @@ import logging
 from pathlib import Path
 from typing import Any, Callable
 
+from milimo_paths import claw_base
 from ..privacy_router import PrivacyRouter
 from ..tool_registry import ToolRegistry
 from .content_init import (
@@ -68,7 +69,7 @@ class ContentClaw:
         self._squad_id = squad_id
         self._inference_client = inference_client
         self._mesh_sender = mesh_sender
-        self._base_path = base_path or Path("/sandbox/content")
+        self._base_path = base_path or claw_base("content")
         self._privacy_router = privacy_router
         self._tool_registry = tool_registry
         self._war_room = war_room

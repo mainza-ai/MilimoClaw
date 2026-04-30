@@ -1,4 +1,27 @@
 # MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md
+
+> **NemoClaw Compliance Notice (2026-04-28)**
+>
+> This spec has been updated to comply with NVIDIA NemoClaw v0.0.28 and OpenShell v0.0.26 as documented at [docs.nvidia.com/nemoclaw/latest/](https://docs.nvidia.com/nemoclaw/latest/) and [docs.nvidia.com/openshell/latest/](https://docs.nvidia.com/openshell/latest/).
+>
+> **Key changes applied:**
+>
+> - **Filesystem paths migrated** from `/sandbox/<role>/` to `/sandbox/.openclaw-data/milimo/claws/<role>/` — NemoClaw's Landlock LSM makes `/sandbox/` root read-only; only `/sandbox/.openclaw-data/`, `/sandbox/.nemoclaw/`, and `/tmp/` are writable (see [Sandbox Hardening](https://docs.nvidia.com/nemoclaw/latest/deployment/sandbox-hardening.html)).
+> - **Shared analytics report path** updated from `/sandbox/analytics/reports/` to `/sandbox/.openclaw-data/milimo/claws/analytics/reports/` — same Landlock compliance reason.
+> - **`/sandbox/.openclaw/`** is read-only — contains immutable gateway config (auth tokens, CORS); agents cannot modify it.
+> - **`/sandbox/.openclaw/workspace/`** is the canonical workspace files location (SOUL.md, USER.md, AGENTS.md, MEMORY.md, etc.) — persisted via symlink into `.openclaw-data/`.
+> - **`/sandbox/.local/bin/milimo` does NOT exist** — was referenced in old policy YAMLs; Milimo bridge CLI is at `python3 /sandbox/.openclaw-data/milimo/orchestrator/bridge_cli.py`.
+> - **Credentials** are stored in the OpenShell gateway store only — NOT in `~/.nemoclaw/credentials.json` (which is legacy, auto-migrated and deleted on `nemoclaw onboard`). See [Credential Storage](https://docs.nvidia.com/nemoclaw/latest/security/credential-storage.html).
+> - **Network policy** uses `protocol: rest` with `enforcement` and `access`/`rules`/`deny_rules` for L7 HTTP inspection — see [OpenShell Policy Schema](https://docs.nvidia.com/openshell/latest/reference/policy-schema.html).
+> - **GitHub is NOT in the baseline policy** — it's a preset only, applied via `nemoclaw <name> policy-add github` or during onboarding tier selection.
+> - **`include_workdir: false`** in filesystem_policy — NemoClaw default; `/sandbox/` root is read-only.
+> - **Policy tiers**: Restricted / Balanced (default) / Open — determine which presets are included at onboarding.
+> - **`openshell policy set` REPLACES** the live policy (does NOT merge) — use `nemoclaw <name> policy-add` for non-destructive merging.
+> - **Sandbox process** runs as `sandbox:sandbox` (UID 999), not root — `run_as_user: root` is rejected by OpenShell.
+> - **`/sandbox/.openclaw/openclaw.json`** is read-only at runtime — `openclaw channels remove` cannot modify it from inside the sandbox; use `nemoclaw <name> channels remove` from the host.
+>
+> If this spec conflicts with the official NemoClaw/OpenShell docs, the official docs win. See the [Ground Truth Hierarchy](../../.agents/AGENTS.md) for resolution rules.
+
 # ─────────────────────────────────────────────────────────────────────────────
 # This is the TEMPLATE. It is never loaded directly into the NemoClaw runtime.
 # It contains placeholder variables that are rendered at setup time by
@@ -86,7 +109,7 @@ weekly intelligence report every Sunday at 02:00. Runs continuous
 anomaly detection. Identifies opportunities. Answers queries within
 2 minutes. The squad's intelligence layer — observes everything, acts
 on nothing directly.
-**Primary output:** `/sandbox/analytics/reports/weekly-intelligence.json`
+**Primary output:** `/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json`
 This file feeds every other claw's weekly planning.
 
 ### 💰 FINANCE CLAW
@@ -193,7 +216,7 @@ bridge: build_open_prs()
 
 ### Read the weekly intelligence report
 ```
-bridge: read_file("/sandbox/analytics/reports/weekly-intelligence.json")
+bridge: read_file("/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json")
 ```
 
 ### Send messages to claws (operator-directed only)
