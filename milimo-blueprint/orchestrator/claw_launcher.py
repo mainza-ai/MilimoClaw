@@ -802,7 +802,12 @@ class ClawComponents:
         self._alive = True
 
     def is_alive(self) -> bool:
-        return self._alive and self.heartbeat.is_alive and self.poller.is_alive
+        return (
+            self.claw is not None
+            and self._alive
+            and self.heartbeat.is_alive
+            and self.poller.is_alive
+        )
 
     def stop(self) -> None:
         self._alive = False
@@ -868,7 +873,7 @@ class ClawLauncher:
                 else:
                     claw, heartbeat, poller = self._start_generic_claw(role)
 
-                if claw or heartbeat:
+                if claw is not None and heartbeat is not None:
                     components = ClawComponents(role, claw, heartbeat, poller)
                     self._components[role] = components
                     self._supervisor.clear(role)

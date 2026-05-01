@@ -851,10 +851,14 @@ def handle_claw_status(args: dict[str, Any]) -> dict[str, Any]:
 
     result: dict[str, Any] = {"role": claw_role}
 
-    health_file = milimo_paths.health_dir(squad_id) / f"{claw_role}.json"
+    health_file = milimo_paths.health_dir(squad_id) / "health.json"
     if health_file.exists():
         try:
-            result["health"] = json.loads(health_file.read_text())
+            data = json.loads(health_file.read_text())
+            claw_health = data.get("claws", {}).get(claw_role, {})
+            result["health"] = (
+                claw_health if claw_health else {"status": "no_health_data"}
+            )
         except (json.JSONDecodeError, OSError):
             result["health"] = {
                 "status": "unknown",
@@ -899,7 +903,7 @@ def handle_claw_status(args: dict[str, Any]) -> dict[str, Any]:
         result["pending_messages"] = []
 
     # Read sandbox status (check if sandbox directory exists)
-    sandbox_path = Path(f"/sandbox/{claw_role}")
+    sandbox_path = milimo_paths.CLAWS_DIR / claw_role
     result["sandbox_exists"] = sandbox_path.exists()
     if sandbox_path.exists():
         try:
@@ -1667,6 +1671,73 @@ def handle_restart_all_claws(args: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def handle_start_launcher(args: dict[str, Any]) -> dict[str, Any]:
+    """Start the claw launcher as a background daemon.
+
+    Returns:
+        Dict with launcher PID and startup status
+    """
+    import os
+    import subprocess
+    import time
+
+    _mesh_dir = milimo_paths.mesh_dir()
+    launcher_pid_file = _mesh_dir / "launcher.pid"
+
+    if launcher_pid_file.exists():
+        try:
+            pid = int(launcher_pid_file.read_text().strip())
+            os.kill(pid, 0)
+            return {
+                "status": "already_running",
+                "launcher_pid": pid,
+                "message": f"Launcher already running (PID {pid})",
+            }
+        except ProcessLookupError:
+            launcher_pid_file.unlink(missing_ok=True)
+
+    blueprint_path = milimo_paths.blueprints_dir("0.1.0")
+    launcher_script = blueprint_path / "orchestrator" / "claw_launcher.py"
+
+    if not launcher_script.exists():
+        raise RuntimeError(f"Launcher script not found: {launcher_script}")
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(blueprint_path)
+
+    subprocess.Popen(
+        [
+            "python3",
+            str(launcher_script),
+            "--all",
+            "--daemon",
+        ],
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    for _ in range(15):
+        time.sleep(1)
+        if launcher_pid_file.exists():
+            try:
+                pid = int(launcher_pid_file.read_text().strip())
+                os.kill(pid, 0)
+                return {
+                    "status": "started",
+                    "launcher_pid": pid,
+                    "message": f"Launcher started successfully (PID {pid})",
+                }
+            except (ValueError, ProcessLookupError):
+                pass
+
+    return {
+        "status": "pending",
+        "launcher_pid": None,
+        "message": "Launcher start initiated, waiting for PID file",
+    }
+
+
 def handle_claw_logs(args: dict[str, Any]) -> dict[str, Any]:
     """Get recent log lines for a specific claw.
 
@@ -1747,7 +1818,9 @@ def handle_launcher_status(args: dict[str, Any]) -> dict[str, Any]:
             try:
                 hb = json.loads(hb_file.read_text())
                 timestamp = hb.get("timestamp", "")
-                if timestamp:
+                if not timestamp:
+                    status["claws"][role] = {"status": "unknown"}
+                else:
                     hb_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
                     age = (datetime.now(timezone.utc) - hb_time).total_seconds()
                     status["claws"][role] = {
@@ -1758,8 +1831,8 @@ def handle_launcher_status(args: dict[str, Any]) -> dict[str, Any]:
                     }
             except Exception:
                 status["claws"][role] = {"status": "unknown"}
-            else:
-                status["claws"][role] = {"status": "stopped"}
+        else:
+            status["claws"][role] = {"status": "stopped"}
 
     return status
 
@@ -1804,6 +1877,7 @@ COMMAND_HANDLERS: dict[str, Any] = {
     "stop_claw": handle_stop_claw,
     "restart_claw": handle_restart_claw,
     "restart_all_claws": handle_restart_all_claws,
+    "start_launcher": handle_start_launcher,
     "claw_logs": handle_claw_logs,
     "launcher_status": handle_launcher_status,
 }

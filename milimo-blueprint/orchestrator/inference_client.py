@@ -17,20 +17,19 @@ Environment variables:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import time
+import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
-
-import requests
 
 logger = logging.getLogger("milimo.inference_client")
 
 _NEMOCLAW_MODEL = os.environ.get("NEMOCLAW_MODEL", "nvidia/nemotron-3-super-120b-a12b")
 
-# Default fallback chain (matches build_init.py)
 DEFAULT_FALLBACK_CHAIN = [
     _NEMOCLAW_MODEL,
     "meta/llama-3.3-70b-instruct",
@@ -41,7 +40,6 @@ DEFAULT_API_BASE = os.environ.get(
     "NVIDIA_API_BASE", "https://integrate.api.nvidia.com/v1"
 )
 
-# Category-based model routing defaults (model set from NEMOCLAW_MODEL env var)
 CATEGORY_MODELS: dict[str, dict[str, Any]] = {
     "source_code_generation": {"model": _NEMOCLAW_MODEL, "temperature": 0.1},
     "code_review": {"model": _NEMOCLAW_MODEL, "temperature": 0.1},
@@ -119,7 +117,6 @@ class NvidiaInferenceClient:
         self._usage_history: list[InferenceUsage] = []
         self._total_cost_usd: float = 0.0
         self._sandbox_mode = _sandbox_mode
-        self._proxies = None
 
         if _sandbox_mode:
             inference_base = os.environ.get("NEMOCLAW_INFERENCE_BASE_URL", "")
@@ -128,16 +125,13 @@ class NvidiaInferenceClient:
             if not self.api_key:
                 self.api_key = "unused"
             proxy_url = f"http://{_proxy_host}:{_proxy_port}"
-            self._proxies = {"http": proxy_url, "https": proxy_url}
+            os.environ["HTTP_PROXY"] = proxy_url
+            os.environ["HTTPS_PROXY"] = proxy_url
             logger.info(
                 "NvidiaInferenceClient: sandbox mode — using proxy %s", proxy_url
             )
         elif not self.api_key:
             logger.warning("NVIDIA_API_KEY not set — inference calls will fail")
-
-    # ------------------------------------------------------------------
-    # Primary inference interface (matches what code_generator.py expects)
-    # ------------------------------------------------------------------
 
     def complete(
         self,
@@ -147,22 +141,6 @@ class NvidiaInferenceClient:
         max_tokens: int = 4096,
         system_prompt: str | None = None,
     ) -> str:
-        """
-        Send a completion request with automatic fallback chain retry.
-
-        Args:
-            prompt: The user prompt / instruction.
-            data_type: Category for model routing (e.g., "source_code_generation").
-            temperature: Override temperature (category default used if None).
-            max_tokens: Maximum tokens to generate.
-            system_prompt: Optional system prompt.
-
-        Returns:
-            The generated text content.
-
-        Raises:
-            RuntimeError: If all models in the fallback chain fail.
-        """
         category = CATEGORY_MODELS.get(data_type, CATEGORY_MODELS["general"])
         _model = category["model"]
         temp = temperature if temperature is not None else category["temperature"]
@@ -218,16 +196,12 @@ class NvidiaInferenceClient:
                     last_error,
                 )
                 if attempt_idx < len(self.fallback_chain) - 1:
-                    time.sleep(2**attempt_idx)  # Exponential backoff
+                    time.sleep(2**attempt_idx)
 
         raise RuntimeError(
             f"All {len(self.fallback_chain)} models in fallback chain failed. "
             f"Last error: {last_error}"
         )
-
-    # ------------------------------------------------------------------
-    # Usage tracking
-    # ------------------------------------------------------------------
 
     def get_usage(self) -> dict[str, Any]:
         """Return aggregate usage statistics."""
@@ -248,7 +222,7 @@ class NvidiaInferenceClient:
                     "cost_usd": u.estimated_cost_usd,
                     "timestamp": u.timestamp,
                 }
-                for u in self._usage_history[-50:]  # Last 50 calls
+                for u in self._usage_history[-50:]
             ],
         }
 
@@ -256,10 +230,6 @@ class NvidiaInferenceClient:
         """Reset usage counters."""
         self._usage_history.clear()
         self._total_cost_usd = 0.0
-
-    # ------------------------------------------------------------------
-    # Internal: API call
-    # ------------------------------------------------------------------
 
     def _call_model(
         self,
@@ -269,7 +239,7 @@ class NvidiaInferenceClient:
         max_tokens: int,
         system_prompt: str | None = None,
     ) -> dict[str, Any]:
-        """Make a single API call to the specified model."""
+        """Make a single API call to the specified model using stdlib urllib."""
         if not self.api_key and not self._sandbox_mode:
             raise RuntimeError("NVIDIA_API_KEY is not configured")
 
@@ -291,17 +261,19 @@ class NvidiaInferenceClient:
         }
 
         url = f"{self.api_base}/chat/completions"
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
 
-        response = requests.post(
-            url,
-            headers=headers,
-            json=payload,
-            timeout=self.timeout,
-            proxies=self._proxies,
-            verify=not self._sandbox_mode,
-        )
-        response.raise_for_status()
-        return response.json()
+        ctx = None
+        if self._sandbox_mode:
+            import ssl
+
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+
+        with urllib.request.urlopen(req, timeout=self.timeout, context=ctx) as response:
+            return json.loads(response.read())
 
     @staticmethod
     def _estimate_cost(total_tokens: int) -> float:
