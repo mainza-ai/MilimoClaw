@@ -20,8 +20,8 @@ const node_os_1 = require("node:os");
 function resolveAssistantScript() {
     const home = (0, node_os_1.homedir)();
     const candidates = [
-        (0, node_path_1.join)(home, ".openclaw-data/milimo", "blueprints", "0.1.0", "orchestrator", "assistant_setup.py"),
-        (0, node_path_1.join)(home, ".openclaw-data/milimo", "milimo-blueprint", "orchestrator", "assistant_setup.py"),
+        (0, node_path_1.join)(home, ".openclaw/milimo", "blueprints", "0.1.0", "orchestrator", "assistant_setup.py"),
+        (0, node_path_1.join)(home, ".openclaw/milimo", "milimo-blueprint", "orchestrator", "assistant_setup.py"),
         (0, node_path_1.join)(process.cwd(), "milimo-blueprint", "orchestrator", "assistant_setup.py"),
         "/opt/milimo-blueprint/orchestrator/assistant_setup.py",
     ];
@@ -32,7 +32,7 @@ function resolveAssistantScript() {
     return candidates[0];
 }
 function getAssistantConfig() {
-    const configPath = (0, node_path_1.join)((0, node_os_1.homedir)(), ".openclaw-data/milimo", "config.json");
+    const configPath = (0, node_path_1.join)((0, node_os_1.homedir)(), ".openclaw/milimo", "config.json");
     try {
         const config = JSON.parse((0, node_fs_1.readFileSync)(configPath, "utf-8"));
         const assistant = config?.assistant;
@@ -48,8 +48,11 @@ function getAssistantConfig() {
 async function assistantSetup() {
     console.log("Setting up squad assistant...\n");
     const scriptPath = resolveAssistantScript();
-    const result = (0, node_child_process_1.spawn)("python3", [scriptPath], {
+    const blueprintDir = (0, node_path_1.dirname)((0, node_path_1.dirname)(scriptPath));
+    const result = (0, node_child_process_1.spawn)("python3", ["-m", "orchestrator.assistant_setup"], {
+        cwd: blueprintDir,
         stdio: "inherit",
+        env: { ...process.env, PYTHONPATH: blueprintDir },
     });
     return new Promise((resolve, reject) => {
         result.on("close", (code) => {

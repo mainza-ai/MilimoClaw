@@ -51,10 +51,10 @@ export function cliActionApprove(options: ActionCliOptions & { actionId: string 
   const { logger, actionId } = options;
 
   const home = homedir();
-  const meshDir = join(home, ".openclaw-data/milimo", "mesh");
+  const meshDir = join(home, ".openclaw/milimo", "mesh");
   const warRoomInbox = join(meshDir, "inbox", "war_room");
   const approvedDir = join(meshDir, "approved");
-  const logsDir = join(home, ".openclaw-data/milimo", "logs");
+  const logsDir = join(home, ".openclaw/milimo", "logs");
 
   if (!existsSync(warRoomInbox)) {
     logger.error("No pending actions found. War Room inbox does not exist.");
@@ -110,10 +110,10 @@ export function cliActionBlock(
   const { logger, actionId, reason } = options;
 
   const home = homedir();
-  const meshDir = join(home, ".openclaw-data/milimo", "mesh");
+  const meshDir = join(home, ".openclaw/milimo", "mesh");
   const warRoomInbox = join(meshDir, "inbox", "war_room");
   const rejectedDir = join(meshDir, "rejected");
-  const logsDir = join(home, ".openclaw-data/milimo", "logs");
+  const logsDir = join(home, ".openclaw/milimo", "logs");
 
   if (!existsSync(warRoomInbox)) {
     logger.error("No pending actions found. War Room inbox does not exist.");
@@ -169,7 +169,7 @@ export function cliActionBlock(
 
 export function listPendingActions(): PendingAction[] {
   const home = homedir();
-  const warRoomInbox = join(home, ".openclaw-data/milimo", "mesh", "inbox", "war_room");
+  const warRoomInbox = join(home, ".openclaw/milimo", "mesh", "inbox", "war_room");
 
   if (!existsSync(warRoomInbox)) {
     return [];

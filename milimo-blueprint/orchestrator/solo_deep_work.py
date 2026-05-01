@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+from .milimo_paths import state_dir as milimo_state_dir
+
 import yaml
 
 logger = logging.getLogger("milimo.solo_deep_work")
@@ -131,7 +133,7 @@ def activate_deep_work_mode(
         policy_dir = Path(__file__).parent.parent / "policies"
 
     if state_file is None:
-        state_dir = Path.home() / ".milimo" / "state"
+        state_dir = milimo_state_dir()
         state_dir.mkdir(parents=True, exist_ok=True)
         state_file = state_dir / "deep_work.json"
 
@@ -216,7 +218,7 @@ def deactivate_deep_work_mode(
         Summary of what was restored
     """
     if state_file is None:
-        state_dir = Path.home() / ".milimo" / "state"
+        state_dir = milimo_state_dir()
         state_file = state_dir / "deep_work.json"
 
     if policy_dir is None:
@@ -417,7 +419,7 @@ def get_deep_work_status(state_file: Optional[Path] = None) -> dict[str, Any]:
         Status information
     """
     if state_file is None:
-        state_dir = Path.home() / ".milimo" / "state"
+        state_dir = milimo_state_dir()
         state_file = state_dir / "deep_work.json"
 
     state = _load_state(state_file)

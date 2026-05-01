@@ -39,10 +39,10 @@ export class ApprovalEngine {
   constructor(squadId: string, tier: string = "free") {
     const home = process.env.HOME || process.env.USERPROFILE || homedir() || "/tmp";
     // Mesh data directory — supports both host and container environments
-    // Container: /sandbox/.openclaw-data/milimo/mesh/ (Path.home() in Python)
-    // Host: ~/.openclaw-data/milimo/mesh/
-    const sandboxMesh = join("/sandbox", ".openclaw-data/milimo", "mesh");
-    const homeMesh = join(home, ".openclaw-data/milimo", "mesh");
+    // Container: /sandbox/.openclaw/milimo/mesh/ (Path.home() in Python)
+    // Host: ~/.openclaw/milimo/mesh/
+    const sandboxMesh = join("/sandbox", ".openclaw/milimo", "mesh");
+    const homeMesh = join(home, ".openclaw/milimo", "mesh");
     this.meshDir = existsSync(sandboxMesh) ? sandboxMesh : homeMesh;
     this.warRoomInbox = join(this.meshDir, "inbox", "war_room");
     this.audit = new AuditLogger(squadId);
@@ -50,7 +50,7 @@ export class ApprovalEngine {
 
     // Initialize rate limiter
     try {
-      this.rateLimiter = new RateLimiter(this.tier, join(home, ".openclaw-data/milimo"));
+      this.rateLimiter = new RateLimiter(this.tier, join(home, ".openclaw/milimo"));
     } catch (_e) {
       console.warn("Failed to initialize rate limiter:", _e);
     }
@@ -63,8 +63,8 @@ export class ApprovalEngine {
       // Try multiple locations: host, container blueprint, container sandbox
       const candidates = [
         join(process.cwd(), "milimo-blueprint", "mesh_config.yaml"),
-        join("/sandbox", ".openclaw-data/milimo", "milimo-blueprint", "mesh_config.yaml"),
-        join("/sandbox", ".openclaw-data/milimo", "blueprints", "0.1.0", "mesh_config.yaml"),
+        join("/sandbox", ".openclaw/milimo", "milimo-blueprint", "mesh_config.yaml"),
+        join("/sandbox", ".openclaw/milimo", "blueprints", "0.1.0", "mesh_config.yaml"),
         join(process.cwd(), "mesh_config.yaml"),
       ];
       const configPath = candidates.find((p) => existsSync(p));

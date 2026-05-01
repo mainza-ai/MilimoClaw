@@ -20,10 +20,10 @@ const node_fs_1 = require("node:fs");
 function cliActionApprove(options) {
     const { logger, actionId } = options;
     const home = (0, node_os_1.homedir)();
-    const meshDir = (0, node_path_1.join)(home, ".openclaw-data/milimo", "mesh");
+    const meshDir = (0, node_path_1.join)(home, ".openclaw/milimo", "mesh");
     const warRoomInbox = (0, node_path_1.join)(meshDir, "inbox", "war_room");
     const approvedDir = (0, node_path_1.join)(meshDir, "approved");
-    const logsDir = (0, node_path_1.join)(home, ".openclaw-data/milimo", "logs");
+    const logsDir = (0, node_path_1.join)(home, ".openclaw/milimo", "logs");
     if (!(0, node_fs_1.existsSync)(warRoomInbox)) {
         logger.error("No pending actions found. War Room inbox does not exist.");
         process.exit(1);
@@ -65,10 +65,10 @@ function cliActionApprove(options) {
 function cliActionBlock(options) {
     const { logger, actionId, reason } = options;
     const home = (0, node_os_1.homedir)();
-    const meshDir = (0, node_path_1.join)(home, ".openclaw-data/milimo", "mesh");
+    const meshDir = (0, node_path_1.join)(home, ".openclaw/milimo", "mesh");
     const warRoomInbox = (0, node_path_1.join)(meshDir, "inbox", "war_room");
     const rejectedDir = (0, node_path_1.join)(meshDir, "rejected");
-    const logsDir = (0, node_path_1.join)(home, ".openclaw-data/milimo", "logs");
+    const logsDir = (0, node_path_1.join)(home, ".openclaw/milimo", "logs");
     if (!(0, node_fs_1.existsSync)(warRoomInbox)) {
         logger.error("No pending actions found. War Room inbox does not exist.");
         process.exit(1);
@@ -113,7 +113,7 @@ function cliActionBlock(options) {
 }
 function listPendingActions() {
     const home = (0, node_os_1.homedir)();
-    const warRoomInbox = (0, node_path_1.join)(home, ".openclaw-data/milimo", "mesh", "inbox", "war_room");
+    const warRoomInbox = (0, node_path_1.join)(home, ".openclaw/milimo", "mesh", "inbox", "war_room");
     if (!(0, node_fs_1.existsSync)(warRoomInbox)) {
         return [];
     }

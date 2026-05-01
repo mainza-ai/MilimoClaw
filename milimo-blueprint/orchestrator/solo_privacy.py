@@ -16,6 +16,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
 
+from .milimo_paths import logs_dir as milimo_logs_dir
+
 logger = logging.getLogger("milimo.solo_privacy")
 
 
@@ -213,7 +215,7 @@ class SoloPrivacyRouter:
         )
 
         if log_dir is None:
-            log_dir = Path.home() / ".milimo" / "logs"
+            log_dir = milimo_logs_dir()
         self.log_dir = log_dir
         self.log_dir.mkdir(parents=True, exist_ok=True)
 

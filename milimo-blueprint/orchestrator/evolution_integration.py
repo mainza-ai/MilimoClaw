@@ -26,6 +26,7 @@ from .evolution_cycle import (
 )
 from .inference_client import NvidiaInferenceClient
 from .metrics_collector import MetricsCollector
+from .milimo_paths import metrics_dir
 
 logger = logging.getLogger("milimo.evolution_scheduler_integration")
 
@@ -146,7 +147,7 @@ class EvolutionIntegration:
     def get_metrics_summary(self) -> dict[str, Any]:
         """Get performance metrics summary for all claws."""
         summary = {}
-        metrics_base = Path.home() / ".milimo" / "metrics"
+        metrics_base = metrics_dir()
 
         for role in ["build", "content", "ops", "analytics", "finance", "assistant"]:
             collector = MetricsCollector(

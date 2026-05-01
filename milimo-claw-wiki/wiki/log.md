@@ -2,7 +2,7 @@
 
 **Summary**: Append-only record of all wiki operations.
 
-**Last updated**: 2026-04-29
+**Last updated**: 2026-04-30
 
 **Tags**: #log #meta
 
@@ -564,6 +564,55 @@ Each entry follows this format:
 - best-practices.md — Auth Profile Permissions and Image Digest Pinning sections added
 - policy-overview.md — Read-Only Paths table updated with `/sandbox` as read-only via Landlock + Level column
 - policy-overview.md — Seccomp Filters section wording clarified: OpenShell applies seccomp internally; NemoClaw does NOT add its own BPF filters
+
+### 2026-04-29 — Sixth wiki correction pass (index layer count fix + acpx/ACP documentation + plugin system docs + assistant module page)
+
+**Pages changed**: index.md, common-issues.md, openclaw-controls.md, modules/assistant/lucy.md (new)
+
+**Fixes**:
+- index.md — corrected "Eight-layer architecture overview" to "Nine-layer architecture overview" to match system-overview.md
+- common-issues.md — added "Plugin and Config Issues" section documenting the acpx plugin config warning (benign): plugins.entries.acpx disabled-by-default config is purely informational; ACP sessions run on host runtime, disabled in sandbox by design
+- openclaw-controls.md — added "Plugin System Security" section: plugin allowlist/denylist (plugins.allow, plugins.deny), plugin states (Disabled/Missing/Invalid), bundled plugins table (model providers, browser, copilot-proxy, acpx, memory-core, memory-lancedb), acpx in NemoClaw Sandboxes explanation, dangerous config flags (permissionMode=approve-all)
+- modules/assistant/lucy.md — NEW page: runtime coordinator module documentation for lucy.py (PendingQuery, LucyAssistant, message routing, operator message parsing, consolidation)
+- index.md — updated Assistant module line to link to lucy module page
+
+---
+
+---
+
+## 2026-04-30
+
+### 2026-04-30 — NemoClaw Unified Layout Migration (.openclaw-data → .openclaw)
+
+**Pages**: installation-scripts.md, sandbox-isolation.md, log.md, docker-compose.yml, Dockerfile
+**Source**: NemoClaw Dockerfile analysis + official docs
+**Changes**:
+- Confirmed NemoClaw Dockerfile actively removes `.openclaw-data/` — 150+ line migration block flattens to unified `.openclaw/` layout
+- Migrated all MilimoClaw paths from `.openclaw-data/milimo/` to `.openclaw/milimo/` across:
+  - `milimo_paths.py` — centralized path resolver with legacy fallback
+  - `bridge_cli.py` — blueprints dir + handle_collect_health
+  - `assistant_setup.py` — config candidates
+  - `ops/comms_manager.py` — config path
+  - `milimo-blueprint/orchestrator/milimo_paths.py` — centralized path resolver
+  - Dockerfile — extended `sandbox-base:latest`, `openclaw plugins install`
+  - docker-compose.yml — 6 hardened services, all paths migrated
+  - install.sh — 56 refs migrated, `openclaw plugins install` pattern
+  - TypeScript files — 69 refs across `milimo/src/**/*.ts`
+- Added critical NemoClaw isolation warnings to installation-scripts.md and sandbox-isolation.md: claws MUST run through `nemoclaw onboard --from`, Docker Compose mode DEPRECATED/UNSUPPORTED
+- Deprecated `milimo-start.sh` reference in docker-compose.yml header
+- Docker Compose hardened per official NemoClaw Sandbox Hardening docs: `cap_drop: ALL`, `security_opt: no-new-privileges`, `ulimits nproc: 512:512`
+- Updated docker-compose.yml deprecation header to explain only `nemoclaw onboard --from` provides full isolation
+
+**Notes**:
+- NemoClaw Dockerfile.base confirms: "No separate .openclaw-data or symlink bridge"
+- Plugin install: `openclaw plugins install /opt/milimo` (NOT manual cp to extensions dir)
+- 171 Python .py files pass syntax check after migration
+- Docker Compose mode bypasses NemoClaw isolation — UNSUPPORTED
+- Remaining: tests (56 Python refs + 4 TS refs), scripts/milimo-start.sh, wiki docs still reference .openclaw-data
+
+---
+
+*This log is append-only. Never delete entries.*
 
 ---
 

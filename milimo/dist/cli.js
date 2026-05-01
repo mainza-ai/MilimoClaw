@@ -160,7 +160,7 @@ function registerCliCommands(ctx, api) {
         const { existsSync } = await import("node:fs");
         const { readFile } = await import("node:fs/promises");
         const squadId = opts.squad || process.env.MILIMO_SQUAD || "default";
-        const healthPath = path.join(os.homedir(), ".openclaw-data/milimo", "health", "health.json");
+        const healthPath = path.join(os.homedir(), ".openclaw/milimo", "health", "health.json");
         if (!existsSync(healthPath)) {
             logger.info("No health data available. Run with --collect to gather data.");
             return;

@@ -103,20 +103,20 @@ This prevents agents from modifying gateway configuration, injecting malicious s
 
 The NemoClaw sandbox applies filesystem access at two levels with different semantics:
 
-| Level | `/sandbox` | `/sandbox/.openclaw` | `/sandbox/.openclaw-data` | `/sandbox/.nemoclaw` | `/tmp` |
-|---|---|---|---|---|---|
-| **Container mount** | Read-write | Read-only | Read-write | Read-write | Read-write |
-| **Landlock LSM** (5.13+) | Read-only | Read-only | Read-write | Read-write | Read-write |
-| **DAC / fallback** | Read-write | Read-only (root-owned, `chattr +i`) | Read-write | Read-write (root-owned subdirs) | Read-write |
+| Level | `/sandbox` | `/sandbox/.openclaw` | `/sandbox/.nemoclaw` | `/tmp` |
+|---|---|---|---|---|
+| **Container mount** | Read-write | Read-only | Read-write | Read-write |
+| **Landlock LSM** (5.13+) | Read-only | Read-only | Read-write | Read-write |
+| **DAC / fallback** | Read-write | Read-only (root-owned, `chattr +i`) | Read-write (root-owned subdirs) | Read-write |
 
-On kernels with Landlock support (5.13+), `/sandbox` is restricted to read-only at the kernel level. Only the explicitly declared subdirectories (`.openclaw-data`, `.nemoclaw`, `/tmp`) are writable. On older kernels or macOS Docker, Landlock is silently skipped and protection falls back to DAC (file ownership and permissions) only.
+On kernels with Landlock support (5.13+), `/sandbox` is restricted to read-only at the kernel level. Only the explicitly declared subdirectories (`.openclaw/milimo/`, `.nemoclaw/`, `/tmp`) are writable. On older kernels or macOS Docker, Landlock is silently skipped and protection falls back to DAC (file ownership and permissions) only.
 
 The official docs reflect this two-level design: [Security Best Practices](https://docs.nvidia.com/nemoclaw/latest/security/best-practices.html) lists `/sandbox` as read-write (mount level), while [Sandbox Hardening](https://docs.nvidia.com/nemoclaw/latest/deployment/sandbox-hardening.html) and [Architecture](https://docs.nvidia.com/nemoclaw/latest/reference/architecture.html) describe `/sandbox` as read-only (Landlock level).
 
 Key writable paths under `/sandbox`:
 
-- `/sandbox/.openclaw-data/` — agent state, workspace, plugins (via symlinks)
-- `/sandbox/.openclaw/workspace/` — workspace files (symlinked into `.openclaw-data/`)
+- `/sandbox/.openclaw/milimo/` — MilimoClaw plugin data (blueprints, claws, config, mesh)
+- `/sandbox/.openclaw/workspace/` — agent workspace files
 - `/sandbox/.nemoclaw/` — plugin state and config (DAC-protected, root-owned blueprints)
 - `/tmp` — temporary files and logs
 - `/dev/null`

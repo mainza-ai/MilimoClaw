@@ -27,8 +27,8 @@ else:
 
 ### Permission Check
 
-- If `/sandbox` exists and `/sandbox/.openclaw-data/` is writable → System sandbox (note: `/sandbox` is writable at the container mount level; `/sandbox/.openclaw/` is the only read-only exception)
-- If `/sandbox/.openclaw-data/` doesn't exist or isn't writable → Fall back to user sandbox
+- If `/sandbox` exists and `/sandbox/.openclaw/` is writable → System sandbox (note: `/sandbox` is writable at the container mount level; `/sandbox/.openclaw/` is the only read-only exception per official NemoClaw docs)
+- If `/sandbox/.openclaw/` doesn't exist or isn't writable → Fall back to user sandbox
 
 ## Required Fields
 

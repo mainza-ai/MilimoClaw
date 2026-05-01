@@ -6,9 +6,17 @@
 - `raw/ARCHITECTURE.md`
 - `raw/AGENTS.md`
 
-**Last updated**: 2026-04-29
+**Last updated**: 2026-04-30
 
-**Tags**: #architecture #sandbox #isolation #security
+---
+
+## Critical: Claws MUST Run Through NemoClaw
+
+> **WARNING: The MilimoClaw sandbox IS the NemoClaw sandbox. Claws MUST NEVER run outside of it.**
+>
+> The ONLY supported deployment path is `nemoclaw onboard --from` which bakes MilimoClaw into a NemoClaw sandbox image with full isolation (Landlock + seccomp + netns + policy engine + OpenShell gateway credential injection). Any deployment that bypasses NemoClaw's isolation — including standalone `docker compose up` or manual `docker run` — is **UNSUPPORTED** and defeats the entire purpose of MilimoClaw as a secured multi-agent system.
+
+All claws share a single NemoClaw sandbox created via `nemoclaw onboard --from`. Per-claw data isolation is enforced by Landlock writable-path rules and the Python orchestrator's path conventions. The plugin is installed via `openclaw plugins install` (NemoClaw's own pattern) into the unified `.openclaw/` directory structure.
 
 ---
 
@@ -16,11 +24,13 @@
 
 Each claw runs inside a **shared** NemoClaw sandbox with **kernel-level isolation** enforced per-path. All claws share the same sandbox instance; per-claw data isolation is enforced by Landlock writable-path rules and the Python orchestrator's path conventions. Even if a claw is compromised, it cannot access data belonging to other claws at the Landlock level.
 
+> **CRITICAL: All claws MUST run through NemoClaw's sandbox isolation. Only `nemoclaw onboard --from` provides the full NemoClaw security stack — OpenShell gateway, policy engine, Landlock filesystem isolation, egress policy enforcement, process capability dropping, and credential injection. NEVER bypass the OpenShell gateway or policy engine by running claws outside the sandbox.**
+
 ## Isolation Layers
 
 | Layer | Mechanism | What It Protects |
 |-------|-----------|------------------|
-| **Filesystem** | Landlock LSM | Each claw can only access its own `/sandbox/.openclaw-data/milimo/claws/<role>` mount |
+| **Filesystem** | Landlock LSM | Each claw can only access its own `/sandbox/.openclaw/milimo/claws/<role>` mount |
 | **Network** | OpenShell netns + egress policy | Per-claw API allowlists — Finance can't reach social APIs |
 | **Process** | ulimit + cap-drop + capsh + no-new-privileges | `ulimit -u 512` limits processes, `--cap-drop=ALL` + entrypoint `capsh` drops 8 capabilities, 5 retained for `gosu` (`CHOWN`, `SETUID`, `SETGID`, `FOWNER`, `KILL`), `no-new-privileges` prevents escalation, non-root sandbox user (UID 999), PATH hardening |
 | **Inference** | Privacy router intercept | Sensitive data routed to local NIM (NEMOCLAW_MODEL), never to cloud |
@@ -30,23 +40,23 @@ Each claw runs inside a **shared** NemoClaw sandbox with **kernel-level isolatio
 
 ### Mount Structure
 
-> **Note:** All claws share a single NemoClaw sandbox. Per-claw isolation is enforced by path conventions and the Python orchestrator, not separate sandbox instances. `/sandbox` is writable at the container mount level; the only read-only exception is `/sandbox/.openclaw/` (root-owned, immutable). Writable claw data is under `/sandbox/.openclaw-data/milimo/claws/`.
+> **Note:** All claws share a single NemoClaw sandbox created via `nemoclaw onboard --from`. Per-claw isolation is enforced by path conventions and the Python orchestrator, not separate sandbox instances. `/sandbox` is writable at the container mount level; the only read-only exception is `/sandbox/.openclaw/` (root-owned, immutable). Writable claw data is under `/sandbox/.openclaw/milimo/claws/`.
 
 ```
-/sandbox/.openclaw-data/milimo/claws/
+/sandbox/.openclaw/milimo/claws/
 ├── content/ # Content Claw — brand assets, drafts, style guides
 ├── ops/ # Ops Claw — client records, project histories
 ├── analytics/ # Analytics Claw — performance data, reports
-│ └── reports/ # Read-only cross-mount for all claws
+│   └── reports/ # Read-only cross-mount for all claws
 ├── finance/ # Finance Claw — invoices, revenue, pricing
 ├── build/ # Build Claw — codebase, secrets, deploy configs
-│ ├── repo/ # Codebase (GitHub mount)
-│ ├── context/ # Sprint plans, error patterns, cost tracking
-│ ├── prs/ # PR state tracking
-│ ├── deployments/ # Deploy state
-│ ├── docs/ # Changelog, API docs, devlog
-│ ├── memory/ # Filesystem memory pattern
-│ └── logs/ # Operational logs
+│   ├── repo/ # Codebase (GitHub mount)
+│   ├── context/ # Sprint plans, error patterns, cost tracking
+│   ├── prs/ # PR state tracking
+│   ├── deployments/ # Deploy state
+│   ├── docs/ # Changelog, API docs, devlog
+│   ├── memory/ # Filesystem memory pattern
+│   └── logs/ # Operational logs
 └── assistant/ # Assistant Claw — sessions, context, logs
 ```
 /sandbox/
@@ -77,7 +87,7 @@ Each claw has:
 One exception exists — Analytics Claw's shared read export:
 
 ```
-/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json
+/sandbox/.openclaw/milimo/claws/analytics/reports/weekly-intelligence.json
 ```
 
 This file must be configured as a read-only mount in **all six** claw sandbox policies. It's the only file in the entire mesh that all claws can read directly without a message contract.
@@ -167,9 +177,9 @@ filesystem_policy:
   read_only:
   - /usr
   - /lib
-  - /sandbox/.openclaw-data/milimo/claws/analytics/reports # Cross-mount
+  - /sandbox/.openclaw/milimo/claws/analytics/reports # Cross-mount
   read_write:
-  - /sandbox/.openclaw-data/milimo/claws/content
+  - /sandbox/.openclaw/milimo/claws/content
 
 landlock:
   compatibility: best_effort

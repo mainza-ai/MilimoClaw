@@ -28,7 +28,9 @@ from .provenance_signer import ProvenanceSigner, Attestation
 
 logger = logging.getLogger("milimo.attestation_generator")
 
-ATTESTATION_DIR = Path.home() / ".milimo" / "attestations"
+from .milimo_paths import attestations_dir
+
+ATTESTATION_DIR = attestations_dir()
 
 
 # ---------------------------------------------------------------------------

@@ -32,7 +32,7 @@ Describe the claw's primary function and responsibilities.
 
 | Path | Purpose | Access |
 |------|---------|--------|
-| `/sandbox/.openclaw-data/milimo/claws/{{mount}}/` | Primary workspace (must be under `.openclaw-data/` for writability — `/sandbox/` is read-only per NemoClaw Landlock) | Read-write |
+| `/sandbox/.openclaw/milimo/claws/{{mount}}/` | Primary workspace (writable under `/sandbox/.openclaw/milimo/`) | Read-write |
 
 ## What It Does
 

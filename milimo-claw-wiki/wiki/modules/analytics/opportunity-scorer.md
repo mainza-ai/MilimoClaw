@@ -65,7 +65,7 @@ Runs daily at 06:00.
 ## Storage
 
 Opportunities stored at:
-`/sandbox/.openclaw-data/milimo/claws/analytics/reports/opportunity-scores.json`
+`/sandbox/.openclaw/milimo/claws/analytics/reports/opportunity-scores.json`
 
 ## Evolution
 

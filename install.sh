@@ -155,8 +155,8 @@ do_uninstall() {
     gateway=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -i "openshell\|nemoclaw\|cluster" | head -1 || true)
     if [ -n "$gateway" ]; then
       docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c '
-        rm -rf /sandbox/.openclaw-data/extensions/milimo
-        rm -rf /sandbox/.openclaw-data/milimo
+        rm -rf /sandbox/.openclaw/extensions/milimo
+        rm -rf /sandbox/.openclaw/milimo
         echo "Milimo files removed from sandbox"
       ' 2>/dev/null || true
     fi
@@ -260,26 +260,30 @@ check_prerequisites() {
     ok "Python $py_version"
   fi
 
-  # NemoClaw sandbox must be running (runtime deploy mode only — Dockerfile mode creates it)
-  if [ "$RUNTIME_DEPLOY" = true ]; then
-    local gateway
-    gateway=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -i "openshell\|nemoclaw\|cluster" | head -1 || true)
-    if [ -z "$gateway" ]; then
-      error "No NemoClaw gateway container found.
-Install NemoClaw first: curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash"
+  # NemoClaw — detect existing sandbox vs fresh install using nemoclaw list
+  # (list is connection-agnostic; status requires agent Connected which may be down)
+  export PATH="$HOME/.local/bin:$HOME/.nvm/current/bin:$PATH"
+  if command_exists nemoclaw; then
+    if nemoclaw list 2>/dev/null | grep -qE "^\s+$SANDBOX_NAME "; then
+      local sandbox_status
+      sandbox_status=$(nemoclaw "$SANDBOX_NAME" status 2>/dev/null | awk '/Phase:/{print $NF}' || echo "Unknown")
+      if [ "$sandbox_status" = "Running" ] || [ "$sandbox_status" = "Ready" ]; then
+        info "Existing sandbox '$SANDBOX_NAME' detected ($sandbox_status)"
+        info "MilimoClaw will be injected into the existing sandbox"
+        ok "Sandbox '$SANDBOX_NAME' is $sandbox_status"
+      elif [ "$sandbox_status" = "Stopped" ] || [ "$sandbox_status" = "Exited" ]; then
+        warn "Sandbox '$SANDBOX_NAME' exists but is $sandbox_status"
+        warn "Start it with: nemoclaw $SANDBOX_NAME connect"
+      else
+        info "Sandbox '$SANDBOX_NAME' found (status: $sandbox_status)"
+      fi
+    else
+      info "No existing sandbox found — will create one via nemoclaw onboard"
     fi
-    ok "Gateway: $gateway"
-
-    # Check sandbox pod
-    local pod_status
-    pod_status=$(docker exec "$gateway" kubectl get pod "$SANDBOX_NAME" -n openshell --no-headers -o custom-columns=":status.phase" 2>/dev/null || echo "NotFound")
-    if [ "$pod_status" != "Running" ]; then
-      error "Sandbox pod '$SANDBOX_NAME' is not Running (status: $pod_status).
-Start it with: nemoclaw $SANDBOX_NAME connect"
-    fi
-    ok "Sandbox '$SANDBOX_NAME' is Running"
   else
-    ok "Dockerfile mode — sandbox will be created by nemoclaw onboard"
+    warn "nemoclaw CLI not found in PATH."
+    warn "After NemoClaw install, run: source ~/.zshrc  (or ~/.bashrc)"
+    warn "Then re-run: ./install.sh --solo --operator-name \"$OPERATOR_NAME\" --squad-name \"$SQUAD_NAME\""
   fi
 }
 
@@ -298,15 +302,14 @@ FROM ${SANDBOX_BASE}
 COPY milimo/ /opt/milimo/
 WORKDIR /opt/milimo
 RUN npm ci --no-audit --no-fund && npm run build
-RUN mkdir -p /sandbox/.openclaw-data/extensions \
-    && cp -a /opt/milimo /sandbox/.openclaw-data/extensions/milimo \
-    && openclaw doctor --fix
+RUN openclaw doctor --fix > /dev/null 2>&1 || true \
+    && openclaw plugins install /opt/milimo > /dev/null 2>&1 || true
 
 # Copy Milimo blueprint
-COPY milimo-blueprint/ /sandbox/.openclaw-data/milimo/milimo-blueprint/
+COPY milimo-blueprint/ /sandbox/.openclaw/milimo/milimo-blueprint/
 
 # Create claw data directories
-RUN BASE="/sandbox/.openclaw-data/milimo/claws" \
+RUN BASE="/sandbox/.openclaw/milimo/claws" \
     && mkdir -p "$BASE/ops/clients/active" "$BASE/ops/clients/archived" \
     && mkdir -p "$BASE/ops/projects/active" "$BASE/ops/projects/completed" \
     && mkdir -p "$BASE/ops/calendar" "$BASE/ops/queue/hold" "$BASE/ops/queue/review" "$BASE/ops/queue/auto" \
@@ -342,17 +345,17 @@ RUN ARCH=$(uname -m) \
     && GH_VERSION="2.67.0" \
     && GH_URL="https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz" \
     && cd /tmp && curl -sL "$GH_URL" -o gh.tar.gz && tar xzf gh.tar.gz \
-    && mkdir -p /sandbox/.openclaw-data/milimo/bin \
-    && cp gh_*_linux_${GH_ARCH}/bin/gh /sandbox/.openclaw-data/milimo/bin/gh \
-    && chmod +x /sandbox/.openclaw-data/milimo/bin/gh \
-    && ln -sf /sandbox/.openclaw-data/milimo/bin/gh /usr/local/bin/gh \
+    && mkdir -p /sandbox/.openclaw/milimo/bin \
+    && cp gh_*_linux_${GH_ARCH}/bin/gh /sandbox/.openclaw/milimo/bin/gh \
+    && chmod +x /sandbox/.openclaw/milimo/bin/gh \
+    && ln -sf /sandbox/.openclaw/milimo/bin/gh /usr/local/bin/gh \
     && rm -rf /tmp/gh*
 
 # Create blueprint symlink + backward compat symlink
-RUN mkdir -p /sandbox/.openclaw-data/milimo/blueprints \
-    && ln -sfn /sandbox/.openclaw-data/milimo/milimo-blueprint /sandbox/.openclaw-data/milimo/blueprints/0.1.0 \
+RUN mkdir -p /sandbox/.openclaw/milimo/blueprints \
+    && ln -sfn /sandbox/.openclaw/milimo/milimo-blueprint /sandbox/.openclaw/milimo/blueprints/0.1.0 \
     && rm -rf /sandbox/.milimo 2>/dev/null || true \
-    && ln -sfn /sandbox/.openclaw-data/milimo /sandbox/.milimo
+    && ln -sfn /sandbox/.openclaw/milimo /sandbox/.milimo
 
 WORKDIR /opt/nemoclaw
 DOCKERFILE_EOF
@@ -437,6 +440,33 @@ deploy_to_sandbox() {
   local gateway
   gateway=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -i "openshell\|nemoclaw\|cluster" | head -1 || true)
 
+  # ---- Step 0: Preserve user's pre-selected inference model ----
+  log_step "Preserving inference model"
+
+  local inferred_model
+  inferred_model=$(
+    export PATH="$HOME/.local/bin:$HOME/.nvm/current/bin:$PATH"
+    nemoclaw list 2>/dev/null | grep -A1 "my-assistant" | grep "model:" | sed 's/.*model: *\([^ ]*\).*/\1/' | tr -d ' '
+  )
+
+  if [ -n "$inferred_model" ]; then
+    info "Detected model from nemoclaw list: $inferred_model"
+    sandbox_exec "$gateway" '
+      set -a
+      . /etc/environment 2>/dev/null || true
+      set +a
+      if ! grep -q "NEMOCLAW_MODEL=" /etc/environment 2>/dev/null; then
+        echo "NEMOCLAW_MODEL='"$inferred_model"'" >> /etc/environment
+        echo "NEMOCLAW_MODEL injected into /etc/environment"
+      else
+        echo "NEMOCLAW_MODEL already present in /etc/environment — preserving"
+      fi
+    '
+  else
+    warn "Could not detect model from nemoclaw list — skipping model preservation"
+  fi
+  ok "Inference model preserved"
+
   # ---- Step 1: Build plugin on host ----
   log_step "Building Milimo plugin"
   cd "$ROOT_DIR/milimo"
@@ -467,9 +497,9 @@ deploy_to_sandbox() {
   rm -f /tmp/milimo-source-deploy.tar.gz
 
   sandbox_exec "$gateway" '
-    mkdir -p /sandbox/.openclaw-data/extensions/milimo && \
-    tar xzf /tmp/milimo-source-deploy.tar.gz -C /sandbox/.openclaw-data/extensions/milimo && \
-    echo "Plugin source extracted to .openclaw-data/extensions/milimo"
+    mkdir -p /sandbox/.openclaw/extensions/milimo && \
+    tar xzf /tmp/milimo-source-deploy.tar.gz -C /sandbox/.openclaw/extensions/milimo && \
+    echo "Plugin source extracted to .openclaw/extensions/milimo"
   '
   sandbox_exec_root "$gateway" 'rm -f /tmp/milimo-source-deploy.tar.gz'
   ok "Plugin source transferred"
@@ -477,16 +507,16 @@ deploy_to_sandbox() {
   # ---- Step 3: Build plugin inside sandbox ----
   info "Building plugin inside sandbox..."
   sandbox_exec "$gateway" '
-    cd /sandbox/.openclaw-data/extensions/milimo && \
+    cd /sandbox/.openclaw/extensions/milimo && \
     npm install 2>&1 | tail -3 && \
     npx tsc 2>&1 | tail -3 && \
     echo "Build complete"
   '
 
-  if ! sandbox_exec "$gateway" 'test -f /sandbox/.openclaw-data/extensions/milimo/dist/index.js'; then
+  if ! sandbox_exec "$gateway" 'test -f /sandbox/.openclaw/extensions/milimo/dist/index.js'; then
     error "Plugin build failed — dist/index.js not found in sandbox"
   fi
-  ok "Plugin built in sandbox (.openclaw-data/extensions/milimo)"
+  ok "Plugin built in sandbox (.openclaw/extensions/milimo)"
 
   # ---- Step 5: Deploy blueprint ----
   log_step "Deploying blueprint"
@@ -501,17 +531,17 @@ deploy_to_sandbox() {
   rm -f /tmp/milimo-blueprint-deploy.tar.gz
 
   sandbox_exec "$gateway" '
-    mkdir -p /sandbox/.openclaw-data/milimo && \
-    cd /sandbox/.openclaw-data/milimo && \
+    mkdir -p /sandbox/.openclaw/milimo && \
+    cd /sandbox/.openclaw/milimo && \
     tar xzf /tmp/milimo-blueprint-deploy.tar.gz && \
     echo "Blueprint deployed"
   '
   sandbox_exec_root "$gateway" 'rm -f /tmp/milimo-blueprint-deploy.tar.gz'
 
-  if ! sandbox_exec "$gateway" 'test -d /sandbox/.openclaw-data/milimo/milimo-blueprint/orchestrator/build'; then
+  if ! sandbox_exec "$gateway" 'test -d /sandbox/.openclaw/milimo/milimo-blueprint/orchestrator/build'; then
     error "Blueprint extraction failed — orchestrator/build/ not found"
   fi
-  ok "Blueprint deployed to /sandbox/.openclaw-data/milimo/milimo-blueprint"
+  ok "Blueprint deployed to /sandbox/.openclaw/milimo/milimo-blueprint"
 
   # ---- Step 6: Deploy assistant template ----
   log_step "Deploying support files"
@@ -522,8 +552,8 @@ deploy_to_sandbox() {
     docker cp "$template_file" "$gateway":/tmp/assistant_template.md 2>/dev/null
     sandbox_cp "$gateway" /tmp/assistant_template.md /tmp/assistant_template.md
     sandbox_exec "$gateway" '
-      mkdir -p /sandbox/.openclaw-data/milimo/templates && \
-      cp /tmp/assistant_template.md /sandbox/.openclaw-data/milimo/templates/assistant_system_prompt.md && \
+      mkdir -p /sandbox/.openclaw/milimo/templates && \
+      cp /tmp/assistant_template.md /sandbox/.openclaw/milimo/templates/assistant_system_prompt.md && \
       echo "Template deployed"
     '
     sandbox_exec_root "$gateway" 'rm -f /tmp/assistant_template.md'
@@ -534,8 +564,8 @@ deploy_to_sandbox() {
       docker cp "$template_file" "$gateway":/tmp/assistant_template.md 2>/dev/null
       sandbox_cp "$gateway" /tmp/assistant_template.md /tmp/assistant_template.md
       sandbox_exec "$gateway" '
-        mkdir -p /sandbox/.openclaw-data/milimo/templates && \
-        cp /tmp/assistant_template.md /sandbox/.openclaw-data/milimo/templates/assistant_system_prompt.md && \
+        mkdir -p /sandbox/.openclaw/milimo/templates && \
+        cp /tmp/assistant_template.md /sandbox/.openclaw/milimo/templates/assistant_system_prompt.md && \
         echo "Template deployed from milimo-claw-docs"
       '
       sandbox_exec_root "$gateway" 'rm -f /tmp/assistant_template.md'
@@ -548,16 +578,16 @@ deploy_to_sandbox() {
   # ---- Step 6b: Initialize sandbox directories for all claws ----
   log_step "Initializing sandbox directories"
 
-  # All claw data goes under .openclaw-data/milimo/claws/ (writable path)
+  # All claw data goes under .openclaw/milimo/claws/ (writable path)
   sandbox_exec "$gateway" '
-    BASE="/sandbox/.openclaw-data/milimo/claws"
+    BASE="/sandbox/.openclaw/milimo/claws"
     mkdir -p $BASE/ops/{clients/{active,archived},projects/{active,completed},calendar,queue/{hold,review,auto},memory,context,logs,tools}
     mkdir -p $BASE/content/{drafts/{pending,approved,rejected},calendar,queue/{hold,review,auto},memory,context,logs,tools}
     mkdir -p $BASE/analytics/{reports/{daily,weekly,monthly},metrics,queue/{hold,review,auto},memory,context,logs,tools}
     mkdir -p $BASE/finance/{invoices/{draft,sent,paid,overdue},expenses,revenue,queue/{hold,review,auto},memory,context,logs,tools}
     mkdir -p $BASE/build/{prs/{open,merged,closed},deployments/{staging,production},tasks,docs,context,queue/{hold,review,auto},memory,logs,tools,data}
     mkdir -p $BASE/assistant/{context,memory,logs,tools,queue/{hold,review,auto}}
-    echo "All sandbox directories initialized under .openclaw-data/milimo/claws/"
+    echo "All sandbox directories initialized under .openclaw/milimo/claws/"
   '
   ok "Sandbox directories initialized for all 6 claws"
 
@@ -576,8 +606,8 @@ deploy_to_sandbox() {
   # ---- Step 6e: Install gh CLI (GitHub CLI) ----
   log_step "Installing GitHub CLI"
 
-  # Install gh CLI to /sandbox/.openclaw-data/milimo/bin/ so it survives rebuilds
-  # (per NemoClaw docs, .openclaw-data is the persistent writable subtree;
+  # Install gh CLI to /sandbox/.openclaw/milimo/bin/ so it survives rebuilds
+  # (per NemoClaw docs, .openclaw is the persistent writable subtree;
   # /sandbox/.local/bin/ is under the read-only /sandbox/ root on production kernels)
   sandbox_exec "$gateway" '
     ARCH=$(uname -m)
@@ -587,39 +617,39 @@ deploy_to_sandbox() {
         GH_ARCH="amd64"
     fi
 
-    mkdir -p /sandbox/.openclaw-data/milimo/bin
+    mkdir -p /sandbox/.openclaw/milimo/bin
     GH_VERSION="2.67.0"
     GH_URL="https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz"
 
     cd /tmp && curl -sL "$GH_URL" -o gh.tar.gz && tar xzf gh.tar.gz
-    cp gh_*_linux_${GH_ARCH}/bin/gh /sandbox/.openclaw-data/milimo/bin/gh
-    chmod +x /sandbox/.openclaw-data/milimo/bin/gh
+    cp gh_*_linux_${GH_ARCH}/bin/gh /sandbox/.openclaw/milimo/bin/gh
+    chmod +x /sandbox/.openclaw/milimo/bin/gh
     rm -rf /tmp/gh*
 
     # Create symlink in /usr/local/bin so gh is on PATH
-    ln -sf /sandbox/.openclaw-data/milimo/bin/gh /usr/local/bin/gh 2>/dev/null || true
+    ln -sf /sandbox/.openclaw/milimo/bin/gh /usr/local/bin/gh 2>/dev/null || true
     echo "gh CLI installed (linux/${GH_ARCH})"
 '
-  ok "GitHub CLI (gh) installed at /sandbox/.openclaw-data/milimo/bin/gh"
+  ok "GitHub CLI (gh) installed at /sandbox/.openclaw/milimo/bin/gh"
 
   # ---- Step 6f: Create milimo CLI wrapper ----
   log_step "Creating milimo CLI wrapper"
 
   sandbox_exec "$gateway" '
-    mkdir -p /sandbox/.openclaw-data/milimo/bin
-    cat > /sandbox/.openclaw-data/milimo/bin/milimo << '\''MILIMO_EOF'\''
+    mkdir -p /sandbox/.openclaw/milimo/bin
+    cat > /sandbox/.openclaw/milimo/bin/milimo << '\''MILIMO_EOF'\''
 #!/usr/bin/env python3
 """Milimo Claw CLI wrapper — delegates to bridge_cli.py"""
 import sys
-BLUEPRINT_PATH = "/sandbox/.openclaw-data/milimo/blueprints/0.1.0"
+BLUEPRINT_PATH = "/sandbox/.openclaw/milimo/blueprints/0.1.0"
 if BLUEPRINT_PATH not in sys.path:
     sys.path.insert(0, BLUEPRINT_PATH)
 from orchestrator.bridge_cli import main
 if __name__ == "__main__":
     main()
 MILIMO_EOF
-    chmod +x /sandbox/.openclaw-data/milimo/bin/milimo
-    echo "milimo CLI wrapper created at /sandbox/.openclaw-data/milimo/bin/milimo"
+    chmod +x /sandbox/.openclaw/milimo/bin/milimo
+    echo "milimo CLI wrapper created at /sandbox/.openclaw/milimo/bin/milimo"
   '
   ok "milimo CLI wrapper created"
 
@@ -711,7 +741,7 @@ echo "Created milimo-local.pth"
   log_step "Cleaning stale PID files"
   sandbox_exec "$gateway" '
 # Remove stale launcher PID file (persistent volumes retain old PIDs)
-LAUNCHER_PID="/sandbox/.openclaw-data/milimo/mesh/launcher.pid"
+LAUNCHER_PID="/sandbox/.openclaw/milimo/mesh/launcher.pid"
 if [ -f "$LAUNCHER_PID" ]; then
     OLD_PID=$(cat "$LAUNCHER_PID" 2>/dev/null)
     if [ -n "$OLD_PID" ]; then
@@ -725,7 +755,7 @@ if [ -f "$LAUNCHER_PID" ]; then
 fi
 
 # Remove stale heartbeat files older than 5 minutes
-find /sandbox/.openclaw-data/milimo/mesh/heartbeats -name "*.json" -mmin +5 -delete 2>/dev/null || true
+find /sandbox/.openclaw/milimo/mesh/heartbeats -name "*.json" -mmin +5 -delete 2>/dev/null || true
 echo "Cleanup complete"
 '
   ok "Stale PID files cleaned"
@@ -733,12 +763,12 @@ echo "Cleanup complete"
   # ---- Step 7: Fix permissions and backward compatibility ----
   log_step "Fixing permissions"
   sandbox_exec "$gateway" '
-mkdir -p /sandbox/.openclaw-data/milimo
-mkdir -p /sandbox/.openclaw-data/milimo/blueprints
-ln -sfn /sandbox/.openclaw-data/milimo/milimo-blueprint /sandbox/.openclaw-data/milimo/blueprints/0.1.0
+mkdir -p /sandbox/.openclaw/milimo
+mkdir -p /sandbox/.openclaw/milimo/blueprints
+ln -sfn /sandbox/.openclaw/milimo/milimo-blueprint /sandbox/.openclaw/milimo/blueprints/0.1.0
 # Remove any stale .milimo directory - ln -sfn cannot replace a dir with a symlink
 rm -rf /sandbox/.milimo 2>/dev/null || true
-ln -sfn /sandbox/.openclaw-data/milimo /sandbox/.milimo
+ln -sfn /sandbox/.openclaw/milimo /sandbox/.milimo
 echo "Permissions verified and compatibility symlinks created"
 '
   ok "Permissions fixed"
@@ -750,14 +780,14 @@ echo "Permissions verified and compatibility symlinks created"
 
     # Verify orchestrator files exist in primary location
     for claw in ops analytics content finance build; do
-        f="/sandbox/.openclaw-data/milimo/milimo-blueprint/orchestrator/${claw}/${claw}_claw.py"
+        f="/sandbox/.openclaw/milimo/milimo-blueprint/orchestrator/${claw}/${claw}_claw.py"
       if [ ! -f "$f" ]; then
         echo "MISSING: $f"
         ERRORS=$((ERRORS + 1))
       fi
     done
     # Assistant uses lucy.py, not assistant_claw.py
-    f="/sandbox/.openclaw-data/milimo/milimo-blueprint/orchestrator/assistant/lucy.py"
+    f="/sandbox/.openclaw/milimo/milimo-blueprint/orchestrator/assistant/lucy.py"
     if [ ! -f "$f" ]; then
      echo "MISSING: $f"
      ERRORS=$((ERRORS + 1))
@@ -775,7 +805,7 @@ echo "Permissions verified and compatibility symlinks created"
   log_step "Registering plugin"
 
   sandbox_exec "$gateway" '
-openclaw plugins install --dangerously-force-unsafe-install /sandbox/.openclaw-data/extensions/milimo
+openclaw plugins install /sandbox/.openclaw/extensions/milimo
 echo "Plugin registered"
 '
   sandbox_exec "$gateway" '
@@ -864,12 +894,12 @@ orchestrator_config = {
     },
     "operator": { "name": operator },
     "claws": {
- "content": { "enabled": True, "mount": "/sandbox/.openclaw-data/milimo/claws/content" },
- "ops": { "enabled": True, "mount": "/sandbox/.openclaw-data/milimo/claws/ops" },
- "analytics": { "enabled": True, "mount": "/sandbox/.openclaw-data/milimo/claws/analytics" },
- "finance": { "enabled": True, "mount": "/sandbox/.openclaw-data/milimo/claws/finance" },
- "build": { "enabled": True, "mount": "/sandbox/.openclaw-data/milimo/claws/build" },
- "assistant": { "enabled": True, "mount": "/sandbox/.openclaw-data/milimo/claws/assistant" }
+ "content": { "enabled": True, "mount": "/sandbox/.openclaw/milimo/claws/content" },
+ "ops": { "enabled": True, "mount": "/sandbox/.openclaw/milimo/claws/ops" },
+ "analytics": { "enabled": True, "mount": "/sandbox/.openclaw/milimo/claws/analytics" },
+ "finance": { "enabled": True, "mount": "/sandbox/.openclaw/milimo/claws/finance" },
+ "build": { "enabled": True, "mount": "/sandbox/.openclaw/milimo/claws/build" },
+ "assistant": { "enabled": True, "mount": "/sandbox/.openclaw/milimo/claws/assistant" }
     },
     "war_room": { "mode": warroom },
     "mesh": { "enabled": False, "secret": None },
@@ -884,10 +914,10 @@ orchestrator_config = {
     }
 }
 
-# Write configs to .openclaw-data/milimo
-os.makedirs("/sandbox/.openclaw-data/milimo", exist_ok=True)
+# Write configs to .openclaw/milimo
+os.makedirs("/sandbox/.openclaw/milimo", exist_ok=True)
 
-with open("/sandbox/.openclaw-data/milimo/config.json", "w") as f:
+with open("/sandbox/.openclaw/milimo/config.json", "w") as f:
     json.dump(plugin_config, f, indent=2)
 
 print("Both configs written")
@@ -910,9 +940,9 @@ PYEOF
   info "Configuring squad assistant..."
   sandbox_exec "$gateway" '
 # Clear old memory so the assistant loads fresh context
-rm -f /sandbox/.openclaw-data/milimo/workspace/MEMORY.md 2>/dev/null || true
+rm -f /sandbox/.openclaw/milimo/workspace/MEMORY.md 2>/dev/null || true
 
-cd /sandbox/.openclaw-data/milimo/milimo-blueprint && HOME=/sandbox python3 orchestrator/assistant_setup.py 2>&1 || echo "Assistant setup skipped — run manually with: openclaw milimo assistant setup"
+cd /sandbox/.openclaw/milimo/milimo-blueprint && HOME=/sandbox python3 orchestrator/assistant_setup.py 2>&1 || echo "Assistant setup skipped — run manually with: openclaw milimo assistant setup"
 '
 }
 
@@ -942,8 +972,8 @@ verify_installation() {
   elif echo "$plugin_check" | grep -qi "MILIMO_COMMAND_NOT_FOUND\|unknown command"; then
     error "Milimo Claw plugin is NOT loaded.
 To fix manually inside the sandbox:
-  1. cd /sandbox/.openclaw-data/extensions/milimo && npm install && npx tsc
-  2. openclaw plugins install /sandbox/.openclaw-data/extensions/milimo
+  1. cd /sandbox/.openclaw/extensions/milimo && npm install && npx tsc
+  2. openclaw plugins install /sandbox/.openclaw/extensions/milimo
   3. pkill -f openclaw (gateway auto-restarts)"
   else
     warn "Plugin status unclear. Output:
@@ -953,12 +983,12 @@ $plugin_check"
   # Check Build Claw modules
   local build_check
   build_check=$(sandbox_exec "$gateway" '
-    ls /sandbox/.openclaw-data/milimo/milimo-blueprint/orchestrator/build/build_claw.py 2>/dev/null && echo "OK" || echo "MISSING"
+    ls /sandbox/.openclaw/milimo/milimo-blueprint/orchestrator/build/build_claw.py 2>/dev/null && echo "OK" || echo "MISSING"
   ') || true
 
   if [ "$build_check" = "OK" ]; then
     local module_count
-    module_count=$(sandbox_exec "$gateway" 'ls /sandbox/.openclaw-data/milimo/milimo-blueprint/orchestrator/build/*.py 2>/dev/null | grep -v __init__ | wc -l') || true
+    module_count=$(sandbox_exec "$gateway" 'ls /sandbox/.openclaw/milimo/milimo-blueprint/orchestrator/build/*.py 2>/dev/null | grep -v __init__ | wc -l') || true
     ok "Build Claw present ($module_count modules)"
   else
     warn "Build Claw blueprint not found"
@@ -967,7 +997,7 @@ $plugin_check"
   # Check config
   local config_check
   config_check=$(sandbox_exec "$gateway" '
-    cat /sandbox/.openclaw-data/milimo/config.json 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get(\"squad\",{}).get(\"name\",\"?\"))" 2>/dev/null || echo "MISSING"
+    cat /sandbox/.openclaw/milimo/config.json 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get(\"squad\",{}).get(\"name\",\"?\"))" 2>/dev/null || echo "MISSING"
   ') || true
 
   if [ "$config_check" != "MISSING" ] && [ "$config_check" != "ERROR" ]; then
@@ -1013,12 +1043,25 @@ print_summary() {
 # ---------------------------------------------------------------------------
 main() {
   _INSTALL_START=$SECONDS
+
+  # Expand PATH FIRST — nemoclaw installs to ~/.local/bin or ~/.nvm
+  export PATH="$HOME/.local/bin:$HOME/.nvm/current/bin:$PATH"
+
   print_banner
   check_prerequisites
 
+  # Determine deploy mode.
+  # nemoclaw list is connection-agnostic (shows sandboxes regardless of Connected state).
+  # nemoclaw status requires agent Connected and returns non-zero when disconnected,
+  # making it unreliable for Apple Silicon / no-GPU environments where Connected=no.
   if [ "$RUNTIME_DEPLOY" = true ]; then
+    info "Mode: Runtime deploy (forced via --runtime-deploy)"
+    deploy_to_sandbox
+  elif command_exists nemoclaw && nemoclaw list 2>/dev/null | grep -qE "^\s+$SANDBOX_NAME "; then
+    info "Mode: Runtime deploy (existing sandbox detected via nemoclaw list)"
     deploy_to_sandbox
   else
+    info "Mode: Fresh deploy (no existing sandbox detected)"
     deploy_via_dockerfile
   fi
 

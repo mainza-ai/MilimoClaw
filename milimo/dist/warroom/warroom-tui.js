@@ -422,8 +422,8 @@ Press H to close this help.
         };
         try {
             const home = process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
-            const sandboxMesh = (0, node_path_1.join)("/sandbox", ".openclaw-data/milimo");
-            const homeMesh = (0, node_path_1.join)(home, ".openclaw-data/milimo");
+            const sandboxMesh = (0, node_path_1.join)("/sandbox", ".openclaw/milimo");
+            const homeMesh = (0, node_path_1.join)(home, ".openclaw/milimo");
             const meshRoot = (0, node_fs_1.existsSync)(sandboxMesh) ? sandboxMesh : homeMesh;
             const registryPath = (0, node_path_1.join)(meshRoot, "tools", this.squadId, role, "registry.json");
             if ((0, node_fs_1.existsSync)(registryPath)) {
@@ -541,8 +541,8 @@ Press H to close this help.
     fetchRevenueData() {
         try {
             const home = process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
-            const sandboxMesh = (0, node_path_1.join)("/sandbox", ".openclaw-data/milimo");
-            const homeMesh = (0, node_path_1.join)(home, ".openclaw-data/milimo");
+            const sandboxMesh = (0, node_path_1.join)("/sandbox", ".openclaw/milimo");
+            const homeMesh = (0, node_path_1.join)(home, ".openclaw/milimo");
             const meshRoot = (0, node_fs_1.existsSync)(sandboxMesh) ? sandboxMesh : homeMesh;
             const summaryPath = (0, node_path_1.join)(meshRoot, "finance", "revenue", "weekly_summary.json");
             if ((0, node_fs_1.existsSync)(summaryPath)) {

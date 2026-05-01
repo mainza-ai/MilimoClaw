@@ -101,7 +101,7 @@ function slashRole(_api) {
         content: [
             "**🎨 Content Claw**",
             "",
-            "**Mount:** `~/.openclaw-data/milimo/claws/content`",
+            "**Mount:** `~/.openclaw/milimo/claws/content`",
             "**Responsibility:** All creative output — posts, copy, campaigns, brand voice",
             "",
             "**Inference Routing:**",
@@ -117,7 +117,7 @@ function slashRole(_api) {
         ops: [
             "**📋 Ops Claw**",
             "",
-            "**Mount:** `~/.openclaw-data/milimo/claws/ops`",
+            "**Mount:** `~/.openclaw/milimo/claws/ops`",
             "**Responsibility:** Client lifecycle — intake, scoping, delivery, follow-up",
             "",
             "**Inference Routing:**",
@@ -133,7 +133,7 @@ function slashRole(_api) {
         analytics: [
             "**📊 Analytics Claw**",
             "",
-            "**Mount:** `~/.openclaw-data/milimo/claws/analytics`",
+            "**Mount:** `~/.openclaw/milimo/claws/analytics`",
             "**Responsibility:** Intelligence — performance, trends, opportunities",
             "",
             "**Inference Routing:**",
@@ -149,7 +149,7 @@ function slashRole(_api) {
         finance: [
             "**💰 Finance Claw**",
             "",
-            "**Mount:** `~/.openclaw-data/milimo/claws/finance`",
+            "**Mount:** `~/.openclaw/milimo/claws/finance`",
             "**Responsibility:** Financial ops — invoicing, pricing, margins",
             "",
             "**Inference Routing:**",
@@ -163,7 +163,7 @@ function slashRole(_api) {
         build: [
             "**🔧 Build Claw** *(Tech Squads)*",
             "",
-            "**Mount:** `~/.openclaw-data/milimo/claws/build`",
+            "**Mount:** `~/.openclaw/milimo/claws/build`",
             "**Responsibility:** Engineering — code, PRs, deploys, monitoring",
             "",
             "**Inference Routing:**",
@@ -180,7 +180,7 @@ function slashRole(_api) {
         assistant: [
             "**👽 Assistant Claw**",
             "",
-            "**Mount:** `/sandbox/.openclaw-data/milimo/claws/assistant`",
+            "**Mount:** `/sandbox/.openclaw/milimo/claws/assistant`",
             "**Responsibility:** Cross-claw coordination, operator bridge (Telegram), research, scheduling",
             "",
             "**Inference Routing:**",
@@ -203,7 +203,7 @@ function slashRole(_api) {
 }
 function slashFinals() {
     const home = process.env["HOME"] ?? process.env["USERPROFILE"] ?? "/tmp";
-    const finalsPath = (0, node_path_1.join)(home, ".openclaw-data/milimo", "finals-mode.json");
+    const finalsPath = (0, node_path_1.join)(home, ".openclaw/milimo", "finals-mode.json");
     if (!(0, node_fs_1.existsSync)(finalsPath)) {
         return {
             text: [
@@ -318,7 +318,7 @@ function slashHealth(_api) {
     const lines = ["**🦀 Claw Health Summary**", ""];
     const claws = state.meshMembers.length > 0 ? state.meshMembers : [state.clawRole];
     for (const claw of claws) {
-        const registryPath = (0, node_path_1.join)(home, ".openclaw-data/milimo", "tools", state.squadName, claw, "registry.json");
+        const registryPath = (0, node_path_1.join)(home, ".openclaw/milimo", "tools", state.squadName, claw, "registry.json");
         let status = "○";
         let tools = 0;
         try {
@@ -344,7 +344,7 @@ function slashEvolution(_api) {
     const lines = ["**🔧 Evolution Log**", ""];
     const claws = state.meshMembers.length > 0 ? state.meshMembers : [state.clawRole];
     for (const claw of claws) {
-        const registryPath = (0, node_path_1.join)(home, ".openclaw-data/milimo", "tools", state.squadName, claw, "registry.json");
+        const registryPath = (0, node_path_1.join)(home, ".openclaw/milimo", "tools", state.squadName, claw, "registry.json");
         try {
             if ((0, node_fs_1.existsSync)(registryPath)) {
                 const data = JSON.parse((0, node_fs_1.readFileSync)(registryPath, "utf-8"));

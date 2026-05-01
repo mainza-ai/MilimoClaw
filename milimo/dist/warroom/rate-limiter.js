@@ -104,7 +104,7 @@ function getEffectiveTier(configPath) {
 }
 function loadConfig(configPath) {
     const home = process.env.HOME || process.env.USERPROFILE || "/tmp";
-    const configPathResolved = configPath || path.join(home, ".openclaw-data/milimo", "config.json");
+    const configPathResolved = configPath || path.join(home, ".openclaw/milimo", "config.json");
     try {
         if (!fs.existsSync(configPathResolved)) {
             return null;
@@ -164,7 +164,7 @@ class RateLimiter extends node_events_1.EventEmitter {
         };
         // Setup state persistence
         const baseDir = stateDir || process.env.HOME || "/tmp";
-        this.statePath = path.join(baseDir, ".openclaw-data/milimo", "rate-limits");
+        this.statePath = path.join(baseDir, ".openclaw/milimo", "rate-limits");
         this.loadState();
     }
     /**

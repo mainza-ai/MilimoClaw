@@ -297,7 +297,7 @@ network_policies:
         access: read-write
     binaries:
       - { path: /usr/local/bin/gh }
-      - { path: /sandbox/.openclaw-data/milimo/bin/gh }
+      - { path: /sandbox/.openclaw/milimo/bin/gh }
       - { path: /usr/bin/git }
       - { path: /usr/bin/python3 }
 
@@ -352,7 +352,7 @@ network_policies:
       access: read-write
     binaries:
     - { path: /usr/local/bin/gh }
-    - { path: /sandbox/.openclaw-data/milimo/bin/gh }
+    - { path: /sandbox/.openclaw/milimo/bin/gh }
     - { path: /usr/bin/git }
     - { path: /usr/local/bin/node }
     - { path: /usr/bin/python3 }

@@ -207,7 +207,7 @@ describe("ConfigManager", () => {
     it("returns config directory path", () => {
       const result = ConfigManager.getConfigDir();
 
-      expect(result).toContain(".openclaw-data/milimo");
+      expect(result).toContain(".openclaw/milimo");
     });
   });
 

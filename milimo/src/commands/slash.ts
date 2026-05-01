@@ -129,7 +129,7 @@ function slashRole(_api: OpenClawPluginApi): PluginCommandResult {
     content: [
       "**🎨 Content Claw**",
       "",
-      "**Mount:** `~/.openclaw-data/milimo/claws/content`",
+      "**Mount:** `~/.openclaw/milimo/claws/content`",
       "**Responsibility:** All creative output — posts, copy, campaigns, brand voice",
       "",
       "**Inference Routing:**",
@@ -145,7 +145,7 @@ function slashRole(_api: OpenClawPluginApi): PluginCommandResult {
     ops: [
       "**📋 Ops Claw**",
       "",
-      "**Mount:** `~/.openclaw-data/milimo/claws/ops`",
+      "**Mount:** `~/.openclaw/milimo/claws/ops`",
       "**Responsibility:** Client lifecycle — intake, scoping, delivery, follow-up",
       "",
       "**Inference Routing:**",
@@ -161,7 +161,7 @@ function slashRole(_api: OpenClawPluginApi): PluginCommandResult {
     analytics: [
       "**📊 Analytics Claw**",
       "",
-      "**Mount:** `~/.openclaw-data/milimo/claws/analytics`",
+      "**Mount:** `~/.openclaw/milimo/claws/analytics`",
       "**Responsibility:** Intelligence — performance, trends, opportunities",
       "",
       "**Inference Routing:**",
@@ -177,7 +177,7 @@ function slashRole(_api: OpenClawPluginApi): PluginCommandResult {
     finance: [
       "**💰 Finance Claw**",
       "",
-      "**Mount:** `~/.openclaw-data/milimo/claws/finance`",
+      "**Mount:** `~/.openclaw/milimo/claws/finance`",
       "**Responsibility:** Financial ops — invoicing, pricing, margins",
       "",
       "**Inference Routing:**",
@@ -191,7 +191,7 @@ function slashRole(_api: OpenClawPluginApi): PluginCommandResult {
     build: [
       "**🔧 Build Claw** *(Tech Squads)*",
       "",
-      "**Mount:** `~/.openclaw-data/milimo/claws/build`",
+      "**Mount:** `~/.openclaw/milimo/claws/build`",
       "**Responsibility:** Engineering — code, PRs, deploys, monitoring",
       "",
       "**Inference Routing:**",
@@ -208,7 +208,7 @@ function slashRole(_api: OpenClawPluginApi): PluginCommandResult {
     assistant: [
       "**👽 Assistant Claw**",
       "",
-      "**Mount:** `/sandbox/.openclaw-data/milimo/claws/assistant`",
+      "**Mount:** `/sandbox/.openclaw/milimo/claws/assistant`",
       "**Responsibility:** Cross-claw coordination, operator bridge (Telegram), research, scheduling",
       "",
       "**Inference Routing:**",
@@ -234,7 +234,7 @@ function slashRole(_api: OpenClawPluginApi): PluginCommandResult {
 
 function slashFinals(): PluginCommandResult {
   const home = process.env["HOME"] ?? process.env["USERPROFILE"] ?? "/tmp";
-  const finalsPath = join(home, ".openclaw-data/milimo", "finals-mode.json");
+  const finalsPath = join(home, ".openclaw/milimo", "finals-mode.json");
 
   if (!existsSync(finalsPath)) {
     return {
@@ -374,7 +374,7 @@ function slashHealth(_api: OpenClawPluginApi): PluginCommandResult {
   for (const claw of claws) {
     const registryPath = join(
       home,
-      ".openclaw-data/milimo",
+      ".openclaw/milimo",
       "tools",
       state.squadName,
       claw,
@@ -414,7 +414,7 @@ function slashEvolution(_api: OpenClawPluginApi): PluginCommandResult {
   for (const claw of claws) {
     const registryPath = join(
       home,
-      ".openclaw-data/milimo",
+      ".openclaw/milimo",
       "tools",
       state.squadName,
       claw,

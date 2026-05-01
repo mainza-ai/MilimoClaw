@@ -146,8 +146,8 @@ Claws reported permission denied on operational.log files.
 ### Fix
 
 ```bash
-chown -R sandbox:sandbox /sandbox/.openclaw-data/milimo/claws/*/logs/
-chmod -R 755 /sandbox/.openclaw-data/milimo/claws/*/logs/
+chown -R sandbox:sandbox /sandbox/.openclaw/milimo/claws/*/logs/
+chmod -R 755 /sandbox/.openclaw/milimo/claws/*/logs/
 ```
 
 ---

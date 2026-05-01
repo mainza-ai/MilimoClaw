@@ -19,17 +19,17 @@ class ApprovalEngine {
     constructor(squadId, tier = "free") {
         const home = process.env.HOME || process.env.USERPROFILE || (0, os_1.homedir)() || "/tmp";
         // Mesh data directory — supports both host and container environments
-        // Container: /sandbox/.openclaw-data/milimo/mesh/ (Path.home() in Python)
-        // Host: ~/.openclaw-data/milimo/mesh/
-        const sandboxMesh = (0, path_1.join)("/sandbox", ".openclaw-data/milimo", "mesh");
-        const homeMesh = (0, path_1.join)(home, ".openclaw-data/milimo", "mesh");
+        // Container: /sandbox/.openclaw/milimo/mesh/ (Path.home() in Python)
+        // Host: ~/.openclaw/milimo/mesh/
+        const sandboxMesh = (0, path_1.join)("/sandbox", ".openclaw/milimo", "mesh");
+        const homeMesh = (0, path_1.join)(home, ".openclaw/milimo", "mesh");
         this.meshDir = (0, fs_1.existsSync)(sandboxMesh) ? sandboxMesh : homeMesh;
         this.warRoomInbox = (0, path_1.join)(this.meshDir, "inbox", "war_room");
         this.audit = new audit_1.AuditLogger(squadId);
         this.tier = (0, rate_limiter_1.getTierFromString)(tier);
         // Initialize rate limiter
         try {
-            this.rateLimiter = new rate_limiter_1.RateLimiter(this.tier, (0, path_1.join)(home, ".openclaw-data/milimo"));
+            this.rateLimiter = new rate_limiter_1.RateLimiter(this.tier, (0, path_1.join)(home, ".openclaw/milimo"));
         }
         catch (_e) {
             console.warn("Failed to initialize rate limiter:", _e);
@@ -41,8 +41,8 @@ class ApprovalEngine {
             // Try multiple locations: host, container blueprint, container sandbox
             const candidates = [
                 (0, path_1.join)(process.cwd(), "milimo-blueprint", "mesh_config.yaml"),
-                (0, path_1.join)("/sandbox", ".openclaw-data/milimo", "milimo-blueprint", "mesh_config.yaml"),
-                (0, path_1.join)("/sandbox", ".openclaw-data/milimo", "blueprints", "0.1.0", "mesh_config.yaml"),
+                (0, path_1.join)("/sandbox", ".openclaw/milimo", "milimo-blueprint", "mesh_config.yaml"),
+                (0, path_1.join)("/sandbox", ".openclaw/milimo", "blueprints", "0.1.0", "mesh_config.yaml"),
                 (0, path_1.join)(process.cwd(), "mesh_config.yaml"),
             ];
             const configPath = candidates.find((p) => (0, fs_1.existsSync)(p));

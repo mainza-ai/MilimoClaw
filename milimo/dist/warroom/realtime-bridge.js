@@ -97,7 +97,7 @@ class RealtimeBridge {
     }
     sendInitialState(ws) {
         const home = (0, node_os_1.homedir)();
-        const meshDir = (0, node_path_1.join)(home, ".openclaw-data/milimo", "mesh");
+        const meshDir = (0, node_path_1.join)(home, ".openclaw/milimo", "mesh");
         const initialState = {
             type: "initial_state",
             timestamp: new Date().toISOString(),
@@ -113,7 +113,7 @@ class RealtimeBridge {
     }
     setupFileWatchers() {
         const home = (0, node_os_1.homedir)();
-        const baseDir = (0, node_path_1.join)(home, ".openclaw-data/milimo");
+        const baseDir = (0, node_path_1.join)(home, ".openclaw/milimo");
         const watchPaths = [
             (0, node_path_1.join)(baseDir, "mesh", "inbox", "war_room"),
             (0, node_path_1.join)(baseDir, "queue", "pending"),
@@ -192,7 +192,7 @@ class RealtimeBridge {
     }
     checkClawStatusChange(role) {
         const home = (0, node_os_1.homedir)();
-        const baseDir = (0, node_path_1.join)(home, ".openclaw-data/milimo");
+        const baseDir = (0, node_path_1.join)(home, ".openclaw/milimo");
         const registryPath = (0, node_path_1.join)(baseDir, "tools", this.squadId, role, "registry.json");
         let newStatus = "idle";
         let toolCount = 0;
@@ -250,7 +250,7 @@ class RealtimeBridge {
     }
     checkForRevenueUpdate() {
         const home = (0, node_os_1.homedir)();
-        const summaryPath = (0, node_path_1.join)(home, ".openclaw-data/milimo", "finance", "revenue", "weekly_summary.json");
+        const summaryPath = (0, node_path_1.join)(home, ".openclaw/milimo", "finance", "revenue", "weekly_summary.json");
         try {
             if (!(0, node_fs_1.existsSync)(summaryPath))
                 return;
@@ -306,7 +306,7 @@ class RealtimeBridge {
     }
     getClawStatuses() {
         const home = (0, node_os_1.homedir)();
-        const baseDir = (0, node_path_1.join)(home, ".openclaw-data/milimo");
+        const baseDir = (0, node_path_1.join)(home, ".openclaw/milimo");
         const clawRoles = ["content", "ops", "analytics", "finance", "build", "assistant"];
         const statuses = {};
         for (const role of clawRoles) {

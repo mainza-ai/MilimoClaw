@@ -24,12 +24,12 @@ Lucy is the **conversational assistant** that serves as the primary user interfa
 | Path | Purpose | Access |
 |------|---------|--------|
 | `/sandbox/.openclaw/` | Gateway config (immutable, root-owned, integrity-verified) | Read-only |
-| `/sandbox/.openclaw-data/milimo/` | Agent state, workspace, plugins, mesh communication | Read-write |
-| `/sandbox/.openclaw-data/milimo/claws/ops/` | Client data (read-only) | Read-only |
-| `/sandbox/.openclaw-data/milimo/claws/content/drafts/` | Content drafts (read-only) | Read-only |
-| `/sandbox/.openclaw-data/milimo/claws/finance/revenue/` | Revenue data | Read-only |
-| `/sandbox/.openclaw-data/milimo/claws/build/prs/` | PR data | Read-only |
-| `/sandbox/.openclaw-data/milimo/claws/analytics/reports/` | Intelligence reports | Read-only |
+| `/sandbox/.openclaw/milimo/` | Agent state, workspace, plugins, mesh communication | Read-write |
+| `/sandbox/.openclaw/milimo/claws/ops/` | Client data (read-only) | Read-only |
+| `/sandbox/.openclaw/milimo/claws/content/drafts/` | Content drafts (read-only) | Read-only |
+| `/sandbox/.openclaw/milimo/claws/finance/revenue/` | Revenue data | Read-only |
+| `/sandbox/.openclaw/milimo/claws/build/prs/` | PR data | Read-only |
+| `/sandbox/.openclaw/milimo/claws/analytics/reports/` | Intelligence reports | Read-only |
 
 ## What It Does
 

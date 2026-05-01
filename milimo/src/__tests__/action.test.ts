@@ -50,7 +50,7 @@ describe("Action CLI", () => {
     squad_id: "test-squad",
     timestamp: "2026-03-20T10:00:00Z",
     needs_approval: true,
-    file_path: `/tmp/milimo-test-home/.openclaw-data/milimo/mesh/inbox/war_room/msg_001.json`,
+    file_path: `/tmp/milimo-test-home/.openclaw/milimo/mesh/inbox/war_room/msg_001.json`,
     priority: "REVIEW",
   };
 

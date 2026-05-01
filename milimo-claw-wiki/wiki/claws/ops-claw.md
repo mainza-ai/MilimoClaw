@@ -18,12 +18,12 @@ The Ops Claw is the **account manager and project manager** of MilimoClaw. It ow
 
 ## Sandbox
 
-**Mount**: `/sandbox/.openclaw-data/milimo/claws/ops`
+**Mount**: `/sandbox/.openclaw/milimo/claws/ops`
 
 | Path | Purpose | Access |
 |------|---------|--------|
-| `/sandbox/.openclaw-data/milimo/claws/ops/` | Client records, project histories | Read-write |
-| `/sandbox/.openclaw-data/milimo/claws/analytics/reports/` | Intelligence reports | Read-only |
+| `/sandbox/.openclaw/milimo/claws/ops/` | Client records, project histories | Read-write |
+| `/sandbox/.openclaw/milimo/claws/analytics/reports/` | Intelligence reports | Read-only |
 
 ## What It Does
 
@@ -36,7 +36,7 @@ The Ops Claw is the **account manager and project manager** of MilimoClaw. It ow
 
 ## What It Cannot Do
 
-- Read `/sandbox/.openclaw-data/milimo/claws/finance`, `/sandbox/.openclaw-data/milimo/claws/content`, or `/sandbox/.openclaw-data/milimo/claws/build`
+- Read `/sandbox/.openclaw/milimo/claws/finance`, `/sandbox/.openclaw/milimo/claws/content`, or `/sandbox/.openclaw/milimo/claws/build`
 - Send any client-facing message without operator REVIEW approval
 - Send a `project_brief` before receiving a `pricing_response` from Finance Claw
 - Generate or send invoices — Finance Claw only

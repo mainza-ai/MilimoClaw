@@ -35,7 +35,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,6 +42,7 @@ from typing import Any
 
 import yaml
 
+from .milimo_paths import blueprints_dir
 from .tool_registry import ToolRegistry
 
 logger = logging.getLogger("milimo.blueprint_manager")
@@ -141,10 +141,7 @@ class BlueprintManager:
         if versions_dir:
             self._versions_dir = Path(versions_dir)
         else:
-            home = os.environ.get("HOME", os.environ.get("USERPROFILE", "/tmp"))
-            self._versions_dir = (
-                Path(home) / ".milimo" / "blueprints" / squad_id / claw_role
-            )
+            self._versions_dir = blueprints_dir(squad_id, claw_role)
         self._versions_dir.mkdir(parents=True, exist_ok=True)
         self._state_file = self._versions_dir / "state.json"
 

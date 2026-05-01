@@ -8,7 +8,7 @@ exports.configPath = configPath;
  * Legacy config path export for backwards compatibility.
  */
 const node_path_1 = require("node:path");
-exports.CONFIG_DIR = (0, node_path_1.join)(process.env.HOME ?? "/tmp", ".openclaw-data/milimo");
+exports.CONFIG_DIR = (0, node_path_1.join)(process.env.HOME ?? "/tmp", ".openclaw/milimo");
 function configPath() {
     return (0, node_path_1.join)(exports.CONFIG_DIR, "config.json");
 }

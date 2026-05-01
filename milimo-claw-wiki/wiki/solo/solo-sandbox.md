@@ -47,7 +47,7 @@ metadata:
   version: 1.0.0
   schema: milimo-sandbox-policy-v1
 filesystem:
-  mount: /sandbox/.openclaw-data/milimo/claws/content
+  mount: /sandbox/.openclaw/milimo/claws/content
   permissions: rw
   isolation: landlock
 network:
@@ -80,7 +80,7 @@ security:
 
 Creates standard subdirectories for each claw:
 ```
-/sandbox/.openclaw-data/milimo/claws/{claw}/
+/sandbox/.openclaw/milimo/claws/{claw}/
 ├── tools/
 ├── data/
 └── logs/

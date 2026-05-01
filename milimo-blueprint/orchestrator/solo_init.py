@@ -80,7 +80,9 @@ CLAWS = ["content", "ops", "analytics", "finance", "build", "assistant"]
 LOCKED_ROUTES = ["financial_data", "source_code"]
 
 SYSTEM_SANDBOX_BASE = Path("/sandbox")
-USER_SANDBOX_BASE = Path.home() / ".milimo" / "sandboxes"
+from .milimo_paths import sandboxes_dir
+
+USER_SANDBOX_BASE = sandboxes_dir()
 
 
 # ---------------------------------------------------------------------------

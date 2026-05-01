@@ -17,7 +17,7 @@ function cliLogsSearch(options) {
     const { logger, query, from, to, clawRole, decision, limit = 100, json, squad } = options;
     const squadId = squad || process.env.MILIMO_SQUAD || "default";
     const home = (0, node_os_1.homedir)();
-    const auditDir = (0, node_path_1.join)(home, ".openclaw-data/milimo", "audit", squadId);
+    const auditDir = (0, node_path_1.join)(home, ".openclaw/milimo", "audit", squadId);
     if (!(0, node_fs_1.existsSync)(auditDir)) {
         logger.error(`No audit logs found for squad: ${squadId}`);
         return Promise.resolve();
@@ -120,7 +120,7 @@ function cliLogsList(options) {
     const { logger, squad } = options;
     const squadId = squad || process.env.MILIMO_SQUAD || "default";
     const home = (0, node_os_1.homedir)();
-    const auditDir = (0, node_path_1.join)(home, ".openclaw-data/milimo", "audit", squadId);
+    const auditDir = (0, node_path_1.join)(home, ".openclaw/milimo", "audit", squadId);
     if (!(0, node_fs_1.existsSync)(auditDir)) {
         logger.error(`No audit logs found for squad: ${squadId}`);
         return Promise.resolve();

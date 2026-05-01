@@ -11,7 +11,7 @@
 
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 
 interface AssistantConfig {
@@ -22,15 +22,8 @@ interface AssistantConfig {
 function resolveAssistantScript(): string {
   const home = homedir();
   const candidates = [
-    join(
-      home,
-      ".openclaw-data/milimo",
-      "blueprints",
-      "0.1.0",
-      "orchestrator",
-      "assistant_setup.py",
-    ),
-    join(home, ".openclaw-data/milimo", "milimo-blueprint", "orchestrator", "assistant_setup.py"),
+    join(home, ".openclaw/milimo", "blueprints", "0.1.0", "orchestrator", "assistant_setup.py"),
+    join(home, ".openclaw/milimo", "milimo-blueprint", "orchestrator", "assistant_setup.py"),
     join(process.cwd(), "milimo-blueprint", "orchestrator", "assistant_setup.py"),
     "/opt/milimo-blueprint/orchestrator/assistant_setup.py",
   ];
@@ -41,7 +34,7 @@ function resolveAssistantScript(): string {
 }
 
 export function getAssistantConfig(): AssistantConfig | null {
-  const configPath = join(homedir(), ".openclaw-data/milimo", "config.json");
+  const configPath = join(homedir(), ".openclaw/milimo", "config.json");
   try {
     const config = JSON.parse(readFileSync(configPath, "utf-8"));
     const assistant = config?.assistant;
@@ -58,8 +51,11 @@ export async function assistantSetup(): Promise<void> {
   console.log("Setting up squad assistant...\n");
 
   const scriptPath = resolveAssistantScript();
-  const result = spawn("python3", [scriptPath], {
+  const blueprintDir = dirname(dirname(scriptPath));
+  const result = spawn("python3", ["-m", "orchestrator.assistant_setup"], {
+    cwd: blueprintDir,
     stdio: "inherit",
+    env: { ...process.env, PYTHONPATH: blueprintDir },
   });
 
   return new Promise((resolve, reject) => {

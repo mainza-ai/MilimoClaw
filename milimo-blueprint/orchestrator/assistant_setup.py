@@ -24,6 +24,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from .milimo_paths import MILIMO_DIR, config_path as milimo_config_path
+
 import yaml
 
 # Blueprint base path — works in both Docker container and host installs
@@ -41,17 +43,17 @@ _TEMPLATE_CANDIDATES = [
     Path(__file__).resolve().parent.parent
     / "docs"
     / "MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md",
-    # 3. Home-relative (sandbox deployment — .openclaw-data is the writable path)
+    # 3. Home-relative (deployment — .openclaw/milimo is the writable path)
     Path.home()
-    / ".openclaw-data"
+    / ".openclaw"
     / "milimo"
     / "MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md",
-    Path.home() / ".milimo" / "MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md",
+    MILIMO_DIR / "MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md",
 ]
 
 _MILIMO_CONFIG_CANDIDATES = [
-    Path.home() / ".openclaw-data" / "milimo" / "config.json",
-    Path.home() / ".milimo" / "config.json",
+    Path.home() / ".openclaw" / "milimo" / "config.json",
+    milimo_config_path(),
 ]
 
 MILIMO_CONFIG_PATH = next(

@@ -38,9 +38,9 @@ filesystem_policy:
   read_only:
     - /usr
     - /lib
-    - /sandbox/.openclaw-data/milimo/claws/analytics/reports
+    - /sandbox/.openclaw/milimo/claws/analytics/reports
   read_write:
-    - /sandbox/.openclaw-data/milimo/claws/content
+    - /sandbox/.openclaw/milimo/claws/content
     - /tmp
 
 landlock:
@@ -69,25 +69,26 @@ network_policies:
 
 ### Writable Paths
 
+> **Note:** `.openclaw/` is read-only at the Landlock level (root-owned, `chattr +i`). MilimoClaw's data lives in `.openclaw/milimo/` which is created writable at the mount level during the Dockerfile build.
+
 | Path | Purpose |
 |------|---------|
 | `/tmp` | Temporary files and logs |
-| `/sandbox/.openclaw-data/` | Agent state, workspace, plugins, extensions (via symlinks) |
-| `/sandbox/.openclaw-data/milimo/` | MilimoClaw plugin data |
+| `/sandbox/.openclaw/milimo/` | MilimoClaw plugin data (claw mounts, blueprints, config, mesh) |
 | `/sandbox/.nemoclaw/` | Plugin state and config; blueprints are DAC-protected (root-owned) |
 | `/sandbox/.openclaw/workspace/` | Agent workspace files (persist across restarts, not across rebuilds) |
 | `/dev/null` | Null device (write-only) |
 
-Each claw also has full write access to its own data directory under `.openclaw-data/milimo/claws/`:
+Each claw also has full write access to its own data directory under `.openclaw/milimo/claws/`:
 
 | Claw | Mount |
 |------|-------|
-| Content | `/sandbox/.openclaw-data/milimo/claws/content` |
-| Ops | `/sandbox/.openclaw-data/milimo/claws/ops` |
-| Analytics | `/sandbox/.openclaw-data/milimo/claws/analytics` |
-| Finance | `/sandbox/.openclaw-data/milimo/claws/finance` |
-| Build | `/sandbox/.openclaw-data/milimo/claws/build` |
-| Assistant | `/sandbox/.openclaw-data/milimo/claws/assistant` |
+| Content | `/sandbox/.openclaw/milimo/claws/content` |
+| Ops | `/sandbox/.openclaw/milimo/claws/ops` |
+| Analytics | `/sandbox/.openclaw/milimo/claws/analytics` |
+| Finance | `/sandbox/.openclaw/milimo/claws/finance` |
+| Build | `/sandbox/.openclaw/milimo/claws/build` |
+| Assistant | `/sandbox/.openclaw/milimo/claws/assistant` |
 
 ### Read-Only Paths
 
@@ -111,7 +112,7 @@ Analytics Claw's shared report:
 
 ```yaml
 read_only:
-- /sandbox/.openclaw-data/milimo/claws/analytics/reports # All claws can read
+- /sandbox/.openclaw/milimo/claws/analytics/reports # All claws can read
 ```
 
 ---

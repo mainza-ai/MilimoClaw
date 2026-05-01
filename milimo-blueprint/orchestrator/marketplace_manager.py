@@ -10,11 +10,11 @@ blueprints.
 
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
 
+from .milimo_paths import marketplace_dir as milimo_marketplace_dir
 from .blueprint_manager import BlueprintSnapshot
 
 logger = logging.getLogger("milimo.marketplace_manager")
@@ -27,8 +27,7 @@ class MarketplaceManager:
         if marketplace_dir:
             self._dir = Path(marketplace_dir)
         else:
-            home = os.environ.get("HOME", os.environ.get("USERPROFILE", "/tmp"))
-            self._dir = Path(home) / ".milimo" / "marketplace"
+            self._dir = milimo_marketplace_dir()
 
         self._registry_file = self._dir / "registry.json"
         self._blueprints_dir = self._dir / "blueprints"

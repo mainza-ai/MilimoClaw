@@ -23,7 +23,6 @@ from __future__ import annotations
 import json
 import logging
 import math
-import os
 import statistics
 import threading
 import time
@@ -31,6 +30,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
+from .milimo_paths import latency_dir
 import urllib.request
 import urllib.error
 
@@ -177,8 +177,7 @@ class LatencyMonitor:
             self._storage_dir = Path(storage_dir)
             self._storage_dir.mkdir(parents=True, exist_ok=True)
         else:
-            home = os.environ.get("HOME", os.environ.get("USERPROFILE", "/tmp"))
-            self._storage_dir = Path(home) / ".milimo" / "latency"
+            self._storage_dir = latency_dir()
             self._storage_dir.mkdir(parents=True, exist_ok=True)
 
         self._load_historical_data()

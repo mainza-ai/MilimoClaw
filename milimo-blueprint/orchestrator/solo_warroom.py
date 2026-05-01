@@ -17,6 +17,8 @@ from datetime import datetime, timezone, time as time_type
 from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
+
+from .milimo_paths import MILIMO_DIR, logs_dir as milimo_logs_dir
 import uuid
 
 logger = logging.getLogger("milimo.solo_warroom")
@@ -114,7 +116,7 @@ class SoloWarRoom:
         )
 
         if log_dir is None:
-            log_dir = Path.home() / ".milimo" / "logs"
+            log_dir = milimo_logs_dir()
         self.log_dir = log_dir
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -453,7 +455,7 @@ class SoloWarRoom:
             RevenueSummary with week revenue, WoW %, invoice counts
         """
         if sandbox_dir is None:
-            sandbox_dir = Path.home() / ".milimo"
+            sandbox_dir = MILIMO_DIR
 
         summary_file = sandbox_dir / "finance" / "revenue" / "weekly_summary.json"
 

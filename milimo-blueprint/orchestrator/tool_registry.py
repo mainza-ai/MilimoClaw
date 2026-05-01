@@ -24,12 +24,12 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .milimo_paths import tools_dir
 from .tool_builder import BuiltTool
 
 logger = logging.getLogger("milimo.tool_registry")
@@ -123,8 +123,7 @@ class ToolRegistry:
         if registry_dir:
             self._dir = Path(registry_dir)
         else:
-            home = os.environ.get("HOME", os.environ.get("USERPROFILE", "/tmp"))
-            self._dir = Path(home) / ".milimo" / "tools" / squad_id / claw_role
+            self._dir = tools_dir(squad_id, claw_role)
 
         self._dir.mkdir(parents=True, exist_ok=True)
         self._registry_file = self._dir / "registry.json"

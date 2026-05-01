@@ -33,6 +33,7 @@ from .ops_init import (
 from .signal_dispatcher import OpsSignalDispatcher
 from .approval_handler import OpsApprovalHandler
 from .scope_monitor import ScopeMonitor
+from ..milimo_paths import config_path as milimo_config_path
 
 logger = logging.getLogger("milimo.ops")
 
@@ -105,12 +106,12 @@ class CommsManager:
             (
                 p
                 for p in [
-                    Path.home() / ".openclaw-data" / "milimo" / "config.json",
-                    Path.home() / ".milimo" / "config.json",
+                    Path.home() / ".openclaw" / "milimo" / "config.json",
+                    milimo_config_path(),
                 ]
                 if p.exists()
             ),
-            Path.home() / ".openclaw-data" / "milimo" / "config.json",
+            Path.home() / ".openclaw" / "milimo" / "config.json",
         )
 
     def handle_inbound(

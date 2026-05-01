@@ -230,13 +230,11 @@ export function cliBlueprintFork(opts: BlueprintForkOptions): Promise<void> {
     const snapshot = JSON.parse(result);
     // Locally save the forked blueprint
     const home = process.env["HOME"] ?? process.env["USERPROFILE"] ?? "/tmp";
-    const forkDir = path.join(home, ".openclaw-data/milimo", "blueprints", targetName);
+    const forkDir = path.join(home, ".openclaw/milimo", "blueprints", targetName);
     fs.mkdirSync(forkDir, { recursive: true });
     fs.writeFileSync(path.join(forkDir, "v0.1.0.json"), JSON.stringify(snapshot, null, 2));
 
-    logger.info(
-      ` ✓ Blueprint forked and saved to ~/.openclaw-data/milimo/blueprints/${targetName}/`,
-    );
+    logger.info(` ✓ Blueprint forked and saved to ~/.openclaw/milimo/blueprints/${targetName}/`);
   } catch (err) {
     logger.error(`  ✗ Error forking blueprint: ${(err as Error).message}`);
   }

@@ -66,7 +66,7 @@ class WarRoomAction:
 
 ## Revenue Summary Widget
 
-Reads from `/sandbox/.openclaw-data/milimo/claws/finance/revenue/weekly_summary.json`:
+Reads from `/sandbox/.openclaw/milimo/claws/finance/revenue/weekly_summary.json`:
 - `week_revenue` — Current week total
 - `week_over_week_pct` — WoW change percentage
 - `invoices_paid` — Paid invoice count

@@ -45,6 +45,7 @@ from pathlib import Path
 from typing import Any
 
 from milimo_paths import claw_base
+from ..milimo_paths import mesh_dir
 
 logger = logging.getLogger("milimo.assistant")
 
@@ -100,9 +101,7 @@ class LucyAssistant:
     ) -> None:
         self._squad_id = squad_id
         self._mesh_gateway = mesh_gateway
-        self._inbox_dir = (
-            inbox_dir or Path.home() / ".milimo" / "mesh" / "inbox" / "assistant"
-        )
+        self._inbox_dir = inbox_dir or mesh_dir() / "inbox" / "assistant"
         self._base_path = base_path or claw_base("assistant")
 
         self._pending: dict[str, PendingQuery] = {}

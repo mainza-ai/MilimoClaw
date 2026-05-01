@@ -96,8 +96,7 @@ The official NemoClaw docs grant read-write access to `/sandbox`, `/tmp`, and `/
 |---|---|---|
 | `/sandbox` | Read-write | Home directory (container mount level; Landlock may restrict on 5.13+ kernels) |
 | `/sandbox/.openclaw` | Read-only | Immutable gateway config (root-owned, `chattr +i`, SHA256 verified) |
-| `/sandbox/.openclaw-data` | Read-write | Agent state, workspace, plugins (via symlinks) |
-| `/sandbox/.openclaw/workspace` | Read-write | Workspace files (symlinked into `.openclaw-data/`) |
+| `/sandbox/.openclaw/workspace` | Read-write | Workspace files (writable at mount level) |
 | `/sandbox/.nemoclaw` | Read-write | Plugin state and config; blueprints are DAC-protected (root-owned) |
 | `/tmp` | Read-write | Temporary files and logs |
 

@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,6 +42,7 @@ from .gateway_adapter import (
     WebSocketGateway,
     ConnectionState,
 )
+from .milimo_paths import mesh_dir as milimo_mesh_dir
 from .privacy_router import PrivacyRouter
 from .mesh_encryption import MessageEncryption, HAS_CRYPTOGRAPHY
 
@@ -141,8 +141,7 @@ class MeshCoordinator:
         if mesh_dir:
             self._mesh_dir = Path(mesh_dir)
         else:
-            home = os.environ.get("HOME", os.environ.get("USERPROFILE", "/tmp"))
-            self._mesh_dir = Path(home) / ".milimo" / "mesh"
+            self._mesh_dir = milimo_mesh_dir()
         self._mesh_dir.mkdir(parents=True, exist_ok=True)
         (self._mesh_dir / "inbox").mkdir(exist_ok=True)
         (self._mesh_dir / "outbox").mkdir(exist_ok=True)

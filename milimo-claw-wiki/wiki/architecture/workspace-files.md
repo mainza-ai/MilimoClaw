@@ -103,7 +103,7 @@ nemoclaw my-squad snapshot list
 nemoclaw my-squad snapshot restore pre-upgrade
 ```
 
-For critical agent state that must survive rebuilds, store durable data in `/sandbox/.openclaw-data/milimo/claws/<role>/` — this path is persisted via symlinks into `.openclaw-data/` and may survive certain deployment configurations.
+For critical agent state that must survive rebuilds, store durable data in `/sandbox/.openclaw/milimo/claws/<role>/` — this path is persisted via symlinks into `.openclaw-data/` and may survive certain deployment configurations.
 
 ## Related Pages
 

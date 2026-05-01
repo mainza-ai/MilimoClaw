@@ -61,7 +61,7 @@ import sys
 
 # Check for existing attestation
 home = Path.home()
-attestation_file = home / ".openclaw-data/milimo" / "attestations" / "${blueprintId}.json"
+attestation_file = home / ".openclaw/milimo" / "attestations" / "${blueprintId}.json"
 
 if attestation_file.exists():
     data = json.loads(attestation_file.read_text())
@@ -173,7 +173,7 @@ attestation_data["attestation_hash"] = f"sha256:{attestation_hash}"
 attestation_data["signature"] = f"ed25519:{signer.public_key_hex}"
 
 # Save attestation
-attestation_dir = Path.home() / ".openclaw-data/milimo" / "attestations"
+attestation_dir = Path.home() / ".openclaw/milimo" / "attestations"
 attestation_dir.mkdir(parents=True, exist_ok=True)
 attestation_file = attestation_dir / f"{blueprint_id}.json"
 attestation_file.write_text(json.dumps(attestation_data, indent=2))
@@ -246,7 +246,7 @@ attestation_file = Path(${JSON.stringify(opts.verify)})
 if not attestation_file.exists():
     # Try in attestations directory
     home = Path.home()
-    attestation_file = home / ".openclaw-data/milimo" / "attestations" / ${JSON.stringify(opts.verify)}
+    attestation_file = home / ".openclaw/milimo" / "attestations" / ${JSON.stringify(opts.verify)}
 
 if attestation_file.exists():
     data = json.loads(attestation_file.read_text())
@@ -283,7 +283,7 @@ function listAttestations(opts, state, logger) {
 import json
 from pathlib import Path
 
-attestation_dir = Path.home() / ".openclaw-data/milimo" / "attestations"
+attestation_dir = Path.home() / ".openclaw/milimo" / "attestations"
 if not attestation_dir.exists():
     print(json.dumps([]))
 else:

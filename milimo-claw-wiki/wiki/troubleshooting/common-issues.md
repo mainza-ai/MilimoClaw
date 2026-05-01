@@ -23,7 +23,7 @@
 ```yaml
 filesystem_policy:
   read_only:
-    - /sandbox/.openclaw-data/milimo/claws/analytics/reports
+    - /sandbox/.openclaw/milimo/claws/analytics/reports
 ```
 
 Run: `pytest -m phase_a`
@@ -212,6 +212,25 @@ binaries:
 **Cause**: `_handle_assistant_query` and `_handle_assistant_task` not implemented.
 
 **Fix**: Add handlers to all claws.
+
+---
+
+## Plugin and Config Issues
+
+### acpx Plugin Config Warning (BENIGN)
+
+**Symptom**:
+```
+plugins.entries.acpx: plugin disabled (bundled (disabled by default)) but config is present
+```
+
+**Cause**: `acpx` is a bundled OpenClaw plugin providing the Agent Client Protocol (ACP) runtime — used to launch external coding harnesses (Claude Code, Codex, Gemini CLI) through ACP sessions. It is disabled by default in NemoClaw sandboxes because ACP sessions run on the **host runtime, not inside the sandbox**, bypassing sandbox policy. The warning simply notes that `openclaw.json` contains an `acpx` config entry while the plugin itself is disabled.
+
+**Impact**: None. The config is inert. ACP sessions cannot run inside NemoClaw sandboxes (`Sandboxed sessions cannot spawn ACP sessions`), so the disabled state is correct and expected.
+
+**Fix**: No action needed. The warning is purely informational. If you want to suppress it, remove the `plugins.entries.acpx` config block from `openclaw.json` (or run `openclaw doctor --fix` which can quarantine unused plugin config). Do **not** enable `acpx` in a NemoClaw sandbox — it would not function and is flagged by `openclaw security audit` as a dangerous flag when `permissionMode=approve-all`.
+
+**See also**: [[openclaw-controls]] — Plugin system security controls
 
 ---
 

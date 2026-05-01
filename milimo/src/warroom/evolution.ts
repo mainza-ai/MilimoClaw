@@ -28,7 +28,7 @@ export class EvolutionManager {
     blueprintDir?: string,
   ) {
     const home = process.env.HOME || process.env.USERPROFILE || homedir() || "/tmp";
-    this.toolsDir = join(home, ".openclaw-data/milimo", "tools", squadId);
+    this.toolsDir = join(home, ".openclaw/milimo", "tools", squadId);
     this.blueprintDir = blueprintDir || process.env.MILIMO_BLUEPRINT_DIR || "/opt/milimo-blueprint";
   }
 

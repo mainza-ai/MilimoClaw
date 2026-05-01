@@ -29,6 +29,8 @@ from pathlib import Path
 from typing import Any, Optional
 from enum import Enum
 
+from .milimo_paths import health_dir
+
 logger = logging.getLogger("milimo.health_collector")
 
 
@@ -290,10 +292,7 @@ class HealthCollector:
         if storage_dir:
             self._storage_dir = Path(storage_dir)
         else:
-            import os
-
-            home = os.environ.get("HOME", os.environ.get("USERPROFILE", "/tmp"))
-            self._storage_dir = Path(home) / ".milimo" / "health"
+            self._storage_dir = health_dir()
 
         self._storage_dir.mkdir(parents=True, exist_ok=True)
 

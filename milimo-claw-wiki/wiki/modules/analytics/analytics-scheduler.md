@@ -126,7 +126,7 @@ if self.signal_dispatcher:
 | Path | Purpose |
 |------|---------|
 | `/sandbox/analytics/logs/operational.json` | Job execution log |
-| `/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly/` | Generated reports |
+| `/sandbox/.openclaw/milimo/claws/analytics/reports/weekly/` | Generated reports |
 | `/sandbox/analytics/baselines/` | Baseline data |
 
 ---

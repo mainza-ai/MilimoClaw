@@ -48,8 +48,8 @@ export interface WebhookHandlerOptions {
   alertDir?: string;
 }
 
-const DEFAULT_CONFIG_PATH = join(homedir(), ".openclaw-data/milimo", "config.json");
-const DEFAULT_ALERT_DIR = join(homedir(), ".openclaw-data/milimo", "alerts");
+const DEFAULT_CONFIG_PATH = join(homedir(), ".openclaw/milimo", "config.json");
+const DEFAULT_ALERT_DIR = join(homedir(), ".openclaw/milimo", "alerts");
 
 export class StripeWebhookHandler {
   private configPath: string;

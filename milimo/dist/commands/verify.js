@@ -258,7 +258,7 @@ function cliProvenanceKeygen(opts) {
     logger.info("");
     try {
         const home = process.env.HOME || process.env.USERPROFILE || "/tmp";
-        const keyDir = path.join(home, ".openclaw-data/milimo", "keys");
+        const keyDir = path.join(home, ".openclaw/milimo", "keys");
         const keyFile = path.join(keyDir, `${opts.squad}.json`);
         if (fs.existsSync(keyFile) && !opts.force) {
             logger.error(`  ✗ Key file already exists: ${keyFile}`);

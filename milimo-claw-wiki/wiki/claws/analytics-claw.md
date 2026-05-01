@@ -18,14 +18,14 @@ The Analytics Claw is the **intelligence layer** of MilimoClaw. It observes ever
 
 ## Sandbox
 
-**Mount**: `/sandbox/.openclaw-data/milimo/claws/analytics`
+**Mount**: `/sandbox/.openclaw/milimo/claws/analytics`
 
 | Path | Purpose | Access |
 |------|---------|--------|
-| `/sandbox/.openclaw-data/milimo/claws/analytics/` | Performance data, reports | Read-write |
-| `/sandbox/.openclaw-data/milimo/claws/analytics/reports/` | Weekly intelligence report | Read-write (shared) |
-| `/sandbox/.openclaw-data/milimo/claws/ops/` | Client data | **NO ACCESS** |
-| `/sandbox/.openclaw-data/milimo/claws/finance/` | Financial data | **NO ACCESS** |
+| `/sandbox/.openclaw/milimo/claws/analytics/` | Performance data, reports | Read-write |
+| `/sandbox/.openclaw/milimo/claws/analytics/reports/` | Weekly intelligence report | Read-write (shared) |
+| `/sandbox/.openclaw/milimo/claws/ops/` | Client data | **NO ACCESS** |
+| `/sandbox/.openclaw/milimo/claws/finance/` | Financial data | **NO ACCESS** |
 
 ## What It Does
 
@@ -39,7 +39,7 @@ The Analytics Claw is the **intelligence layer** of MilimoClaw. It observes ever
 ## What It Cannot Do
 
 - Write to any external platform — read-only network access only
-- Read `/sandbox/.openclaw-data/milimo/claws/ops`, `/sandbox/.openclaw-data/milimo/claws/finance`, or `/sandbox/.openclaw-data/milimo/claws/build` raw records
+- Read `/sandbox/.openclaw/milimo/claws/ops`, `/sandbox/.openclaw/milimo/claws/finance`, or `/sandbox/.openclaw/milimo/claws/build` raw records
 - Queue HOLD actions in the War Room — it observes, never blocks
 - Perform any write operation to external APIs
 
@@ -48,7 +48,7 @@ The Analytics Claw is the **intelligence layer** of MilimoClaw. It observes ever
 **CRITICAL**: The weekly intelligence report is the only file all claws can read directly:
 
 ```
-/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json
+/sandbox/.openclaw/milimo/claws/analytics/reports/weekly-intelligence.json
 ```
 
 This file must be configured as a read-only mount in **every** claw's sandbox policy file. If any claw cannot read this file, the intelligence layer is silently broken.

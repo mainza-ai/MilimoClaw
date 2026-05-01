@@ -28,11 +28,12 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+
+from .milimo_paths import logs_dir as milimo_logs_dir
 
 logger = logging.getLogger("milimo.operation_log")
 
@@ -122,8 +123,7 @@ class OperationLog:
         if log_dir:
             self._log_dir = Path(log_dir)
         else:
-            home = os.environ.get("HOME", os.environ.get("USERPROFILE", "/tmp"))
-            self._log_dir = Path(home) / ".milimo" / "logs" / squad_id / claw_role
+            self._log_dir = milimo_logs_dir(squad_id, claw_role)
 
         self._log_dir.mkdir(parents=True, exist_ok=True)
         self._operations_file = self._log_dir / "operations.jsonl"

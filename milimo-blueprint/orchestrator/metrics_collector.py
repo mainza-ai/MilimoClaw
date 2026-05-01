@@ -29,6 +29,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .milimo_paths import metrics_dir as milimo_metrics_dir
+
 logger = logging.getLogger("milimo.metrics")
 
 
@@ -67,9 +69,7 @@ class MetricsCollector:
 
     def __init__(self, claw_role: str, metrics_dir: Path | None = None) -> None:
         self.claw_role = claw_role
-        self.metrics_dir = (
-            metrics_dir or Path.home() / ".milimo" / "metrics" / claw_role
-        )
+        self.metrics_dir = metrics_dir or milimo_metrics_dir(claw_role)
         self.metrics_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._counters: dict[str, int] = {}

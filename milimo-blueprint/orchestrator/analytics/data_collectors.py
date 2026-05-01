@@ -27,6 +27,8 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from ..milimo_paths import analytics_dir
+
 logger = logging.getLogger("milimo.analytics.collectors")
 
 
@@ -64,7 +66,7 @@ class YouTubeDataCollector:
     ) -> None:
         self.channel_id = channel_id or os.environ.get("YOUTUBE_CHANNEL_ID", "")
         self.api_key = api_key or os.environ.get("YOUTUBE_API_KEY", "")
-        self.data_dir = data_dir or Path.home() / ".milimo" / "analytics" / "youtube"
+        self.data_dir = data_dir or analytics_dir("youtube")
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self._last_collection: datetime | None = None
 
@@ -321,9 +323,7 @@ class GoogleAnalyticsCollector:
         self.credentials_path = credentials_path or os.environ.get(
             "GOOGLE_APPLICATION_CREDENTIALS", ""
         )
-        self.data_dir = (
-            data_dir or Path.home() / ".milimo" / "analytics" / "google_analytics"
-        )
+        self.data_dir = data_dir or analytics_dir("google_analytics")
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self._access_token: str | None = None
         self._token_expiry: datetime | None = None
@@ -679,7 +679,7 @@ class GenericAPICollector:
         self.headers = headers or {}
         if api_key:
             self.headers["Authorization"] = f"Bearer {api_key}"
-        self.data_dir = data_dir or Path.home() / ".milimo" / "analytics" / name
+        self.data_dir = data_dir or analytics_dir(name)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self._last_collection: datetime | None = None
 

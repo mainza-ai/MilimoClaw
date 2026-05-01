@@ -135,6 +135,55 @@ OpenClaw provides controls for managing what context is visible to the agent and
 
 ---
 
+## Plugin System Security
+
+OpenClaw loads plugins **in-process** with the Gateway — they run as trusted code. The plugin system has several security layers:
+
+### Plugin Allowlist and Denylist
+
+- **`plugins.allow`**: Restrictive allowlist — only listed plugins can load. When set, bundled default-on plugins (including `acpx`) must be explicitly included or they are blocked.
+- **`plugins.deny`**: Blocklist — deny always wins over allow.
+- **`plugins.enabled: false`**: Master toggle that disables all plugins and skips discovery/load.
+
+### Plugin States
+
+| State | Meaning |
+|-------|---------|
+| **Disabled** | Plugin exists but enablement rules turned it off. Config is preserved. |
+| **Missing** | Config references a plugin id that discovery did not find. |
+| **Invalid** | Plugin exists but config does not match declared schema. Gateway skips only that plugin; `openclaw doctor --fix` can quarantine the invalid entry. |
+
+### Bundled Plugins
+
+OpenClaw ships with bundled plugins. Most are enabled by default (model providers, speech, browser). Others require explicit enablement or are disabled by default:
+
+| Plugin | Default | Purpose |
+|--------|---------|---------|
+| Model providers (`anthropic`, `openai`, `nvidia`, etc.) | Enabled | LLM inference |
+| `browser` | Enabled | Web browser control |
+| `copilot-proxy` | Disabled | VS Code Copilot bridge |
+| `acpx` | Disabled | ACP runtime for external coding harnesses (Claude Code, Codex, Gemini CLI) |
+| `memory-core` | Enabled (slot) | Bundled memory search |
+| `memory-lancedb` | Install-on-demand | Long-term memory with auto-recall |
+
+### acpx in NemoClaw Sandboxes
+
+The `acpx` plugin is **disabled by default** in NemoClaw sandboxes because:
+
+- ACP sessions run on the **host runtime**, not inside the sandbox
+- OpenShell sandbox policy does **not** wrap ACP harness execution
+- Sandboxed sessions cannot spawn ACP sessions at all
+
+The warning `plugins.entries.acpx: plugin disabled (bundled (disabled by default)) but config is present` is benign — it means `openclaw.json` contains an `acpx` config block while the plugin is disabled. The config is inert. See [[common-issues]] for details.
+
+### Dangerous Config Flags
+
+`openclaw security audit` flags these plugin-related dangerous settings:
+
+- `plugins.entries.acpx.config.permissionMode=approve-all` — allows all ACP permissions without prompts (dangerous in non-interactive sessions)
+
+---
+
 ## Safe Regex (ReDoS Prevention)
 
 OpenClaw implements safe regex evaluation to prevent Regular Expression Denial of Service (ReDoS) attacks. All regex patterns used in policy evaluation, prompt injection detection, and other security-critical paths are evaluated with safeguards against catastrophic backtracking. This prevents a maliciously crafted input from causing exponential evaluation time and resource exhaustion.

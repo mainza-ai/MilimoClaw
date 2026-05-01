@@ -35,7 +35,7 @@ System architecture and design documentation.
 
 | Page | Description | Status |
 |------|-------------|--------|
-| [[system-overview]] | Eight-layer architecture overview | ✓ |
+| [[system-overview]] | Nine-layer architecture overview | ✓ |
 | [[sandbox-isolation]] | Landlock, process limits, capability drop, and filesystem isolation | ✓ |
 | [[inter-claw-communication]] | Typed message contracts and routing | ✓ |
 | [[mesh-coordinator]] | Inter-sandbox gateway and policies | ✓ |
@@ -76,7 +76,7 @@ Detailed documentation for each code module:
 
 **[[build-claw|Build]]**: build-init • issue-manager • code-generator • pr-manager • deploy-manager • error-monitor
 
-**[[assistant-lucy|Assistant]]**: lucy.py (PendingQuery • LucyAssistant)
+**[[assistant-lucy|Assistant]]**: [[lucy]] (PendingQuery • LucyAssistant)
 
 ---
 
@@ -291,6 +291,7 @@ See [[log]] for complete operation history.
 
 | Date | Change | Pages Affected |
 |------|--------|----------------|
+| 2026-04-29 | Sixth wiki correction pass: Nine-layer fix, acpx/ACP plugin docs, plugin system security, assistant module page | index.md, common-issues.md, openclaw-controls.md, modules/assistant/lucy.md |
 | 2026-04-29 | Fifth wiki correction pass: Dockerfile install mode, filesystem two-level model, posture profiles vs policy tiers, Common Mistakes, Known Limitations, Gateway Auth Controls | installation-scripts.md, best-practices.md, policy-overview.md, index.md |
 | 2026-04-29 | Fourth wiki correction pass: Node.js >=22.16, posture profile naming, seccomp conflation, inference-client default model | install.sh, installation-scripts.md, best-practices.md, policy-overview.md, inference-client.md |
 | 2026-04-17 | Evolution module pages (tool-generator, evolution-integration, sandbox-runner, marketplace-manager) | 4 new pages |

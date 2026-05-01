@@ -25,6 +25,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal, Optional
 
+from .milimo_paths import cohorts_dir
+
 logger = logging.getLogger("milimo.cohort_creator")
 
 # ---------------------------------------------------------------------------
@@ -156,7 +158,7 @@ class CohortCreator:
             storage_dir: Directory to store cohort data
         """
         self.tenant_id = tenant_id
-        self.storage_dir = storage_dir or Path.home() / ".milimo" / "cohorts"
+        self.storage_dir = storage_dir or cohorts_dir()
         self.storage_dir.mkdir(parents=True, exist_ok=True)
 
         self._cohorts: dict[str, CohortCreationProgress] = {}

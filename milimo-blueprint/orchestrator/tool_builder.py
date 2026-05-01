@@ -34,6 +34,7 @@ from typing import Any
 
 from .operation_log import ActionRecord
 from .tool_proposal import ToolProposal
+from .milimo_paths import inference_dir
 
 logger = logging.getLogger("milimo.tool_builder")
 
@@ -626,8 +627,7 @@ class ToolBuilder:
 
         try:
             # Use file-based gateway for inference request
-            home = os.environ.get("HOME", "/tmp")
-            gateway_dir = Path(home) / ".milimo" / "inference"
+            gateway_dir = inference_dir()
             gateway_dir.mkdir(parents=True, exist_ok=True)
 
             # Write inference request

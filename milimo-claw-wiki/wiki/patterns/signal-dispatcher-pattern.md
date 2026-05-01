@@ -75,7 +75,7 @@ def send_project_brief(...):
         )
 ```
 
-Confirmation tracked in `/sandbox/.openclaw-data/milimo/claws/ops/pricing_confirmed/{project_id}.json`
+Confirmation tracked in `/sandbox/.openclaw/milimo/claws/ops/pricing_confirmed/{project_id}.json`
 
 ## Error Handling
 

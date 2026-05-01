@@ -19,10 +19,10 @@ import logging
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from .build_init import BuildFilesystemInit, BuildOperationalLog, BuildLogEntry
+from ..milimo_paths import mesh_dir
 
 logger = logging.getLogger(__name__)
 
@@ -354,7 +354,7 @@ class BuildSignalDispatcher:
         """
 
         recipient_role = message.get("recipient_role", "unknown")
-        mesh_inbox = Path.home() / ".milimo" / "mesh" / "inbox" / recipient_role
+        mesh_inbox = mesh_dir() / "inbox" / recipient_role
         mesh_inbox.mkdir(parents=True, exist_ok=True)
 
         msg_id = message.get(

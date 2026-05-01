@@ -15,8 +15,8 @@ exports.createWebhookHandler = createWebhookHandler;
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 const node_os_1 = require("node:os");
-const DEFAULT_CONFIG_PATH = (0, node_path_1.join)((0, node_os_1.homedir)(), ".openclaw-data/milimo", "config.json");
-const DEFAULT_ALERT_DIR = (0, node_path_1.join)((0, node_os_1.homedir)(), ".openclaw-data/milimo", "alerts");
+const DEFAULT_CONFIG_PATH = (0, node_path_1.join)((0, node_os_1.homedir)(), ".openclaw/milimo", "config.json");
+const DEFAULT_ALERT_DIR = (0, node_path_1.join)((0, node_os_1.homedir)(), ".openclaw/milimo", "alerts");
 class StripeWebhookHandler {
     configPath;
     alertDir;

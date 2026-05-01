@@ -57,7 +57,7 @@ describe("AuditLogger", () => {
       new AuditLogger(squadId);
 
       expect(mockMkdirSync).toHaveBeenCalledWith(
-        expect.stringContaining(".openclaw-data/milimo/audit"),
+        expect.stringContaining(".openclaw/milimo/audit"),
         {
           recursive: true,
         },

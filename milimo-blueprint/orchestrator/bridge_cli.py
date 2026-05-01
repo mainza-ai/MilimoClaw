@@ -26,6 +26,7 @@ import sys
 from pathlib import Path
 from typing import Any
 from datetime import datetime, timedelta, timezone
+import milimo_paths
 from milimo_paths import claw_base
 
 # Configure logging to stderr only
@@ -266,13 +267,12 @@ def handle_marketplace_publish(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_mesh_flow_state(args: dict[str, Any]) -> dict[str, Any]:
     """Get cross-claw mesh signal flow state — live topology and pending messages."""
-    from pathlib import Path
 
     _squad_id = args.get("squad", "default")
 
     try:
-        mesh_dir = Path.home() / ".milimo" / "mesh"
-        topology_file = mesh_dir / "topology.json"
+        _mesh_dir = milimo_paths.mesh_dir()
+        topology_file = _mesh_dir / "topology.json"
 
         # Load live topology
         nodes: dict[str, Any] = {}
@@ -286,8 +286,8 @@ def handle_mesh_flow_state(args: dict[str, Any]) -> dict[str, Any]:
         # Count pending messages per claw
         pending_counts: dict[str, int] = {}
         total_pending = 0
-        if (mesh_dir / "inbox").exists():
-            for claw_dir in (mesh_dir / "inbox").iterdir():
+        if (_mesh_dir / "inbox").exists():
+            for claw_dir in (_mesh_dir / "inbox").iterdir():
                 if claw_dir.is_dir():
                     count = len(list(claw_dir.glob("*.json")))
                     pending_counts[claw_dir.name] = count
@@ -296,8 +296,8 @@ def handle_mesh_flow_state(args: dict[str, Any]) -> dict[str, Any]:
         # Count delivered messages this week
         delivered_this_week = 0
         week_ago = datetime.now(timezone.utc) - timedelta(days=7)
-        if (mesh_dir / "delivered").exists():
-            for msg_file in (mesh_dir / "delivered").glob("*.json"):
+        if (_mesh_dir / "delivered").exists():
+            for msg_file in (_mesh_dir / "delivered").glob("*.json"):
                 try:
                     data = json.loads(msg_file.read_text())
                     ts = data.get("timestamp", "")
@@ -336,15 +336,13 @@ def handle_health_status(args: dict[str, Any]) -> dict[str, Any]:
     squad_id = args.get("squad_id", "default")
 
     try:
-        from pathlib import Path
         import json
 
-        home = Path.home()
-        health_dir = home / ".milimo" / "health" / squad_id
-        if not health_dir.exists():
+        _health_dir = milimo_paths.health_dir(squad_id)
+        if not _health_dir.exists():
             return {}
         status = {}
-        for f in health_dir.glob("*.json"):
+        for f in _health_dir.glob("*.json"):
             try:
                 data = json.loads(f.read_text())
                 claw = f.stem
@@ -541,14 +539,11 @@ def handle_collect_health(args: dict[str, Any]) -> dict[str, Any]:
     squad_id = args.get("squad_id", "default")
 
     try:
-        home = Path.home()
-        base_dir = home / ".milimo"
-
         result: dict[str, Any] = {}
         claw_roles = ["content", "ops", "analytics", "finance", "build", "assistant"]
 
         for role in claw_roles:
-            claw_health = _collect_claw_health(role, squad_id, base_dir)
+            claw_health = _collect_claw_health(role, squad_id)
             result[role] = claw_health
 
         return result
@@ -557,13 +552,7 @@ def handle_collect_health(args: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError(f"Collect health error: {e}") from e
 
 
-_MILIMO_CONFIG_CANDIDATES = [
-    Path.home() / ".openclaw-data" / "milimo" / "config.json",
-    Path.home() / ".milimo" / "config.json",
-]
-MILIMO_CONFIG_PATH = next(
-    (p for p in _MILIMO_CONFIG_CANDIDATES if p.exists()), _MILIMO_CONFIG_CANDIDATES[0]
-)
+MILIMO_CONFIG_PATH = milimo_paths.config_path()
 
 
 def handle_squad_config(args: dict[str, Any]) -> dict[str, Any]:
@@ -599,7 +588,7 @@ def handle_squad_config(args: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError(f"Squad config error: {e}") from e
 
 
-def _collect_claw_health(role: str, squad_id: str, base_dir: Path) -> dict[str, Any]:
+def _collect_claw_health(role: str, squad_id: str) -> dict[str, Any]:
     """Collect health for a single claw."""
     _now = datetime.now(timezone.utc).isoformat()
 
@@ -613,7 +602,7 @@ def _collect_claw_health(role: str, squad_id: str, base_dir: Path) -> dict[str, 
         "sparkline": [0, 0, 0, 0, 0, 0, 0],
     }
 
-    registry_path = base_dir / "tools" / squad_id / role / "registry.json"
+    registry_path = milimo_paths.tools_dir(squad_id, role) / "registry.json"
     if registry_path.exists():
         try:
             data = json.loads(registry_path.read_text())
@@ -626,7 +615,7 @@ def _collect_claw_health(role: str, squad_id: str, base_dir: Path) -> dict[str, 
         except Exception:
             pass
 
-    warroom_log = base_dir / "logs" / "warroom.log"
+    warroom_log = milimo_paths.logs_dir() / "warroom.log"
     if warroom_log.exists():
         try:
             claw_health["last_action"] = _get_last_action_time(role, warroom_log)
@@ -637,7 +626,7 @@ def _collect_claw_health(role: str, squad_id: str, base_dir: Path) -> dict[str, 
         except Exception:
             pass
 
-    pending_dir = base_dir / "queue" / "pending"
+    pending_dir = milimo_paths.mesh_dir() / "queue" / "pending"
     if pending_dir.exists():
         pending_hold = 0
         pending_review = 0
@@ -798,14 +787,14 @@ def handle_send_to_claw(args: dict[str, Any]) -> dict[str, Any]:
     )
 
     # Route through MeshCoordinator using the real mesh config
-    mesh_dir = Path.home() / ".milimo" / "mesh"
+    _mesh_dir = milimo_paths.mesh_dir()
     config_path = Path(__file__).parent.parent / "mesh_config.yaml"
     if config_path.exists():
         mesh = MeshCoordinator.from_config_file(
-            str(config_path), squad_id=squad_id, mesh_dir=str(mesh_dir)
+            str(config_path), squad_id=squad_id, mesh_dir=str(_mesh_dir)
         )
     else:
-        mesh = MeshCoordinator.from_dict({}, squad_id=squad_id, mesh_dir=str(mesh_dir))
+        mesh = MeshCoordinator.from_dict({}, squad_id=squad_id, mesh_dir=str(_mesh_dir))
 
     # Register all known claws so the mesh knows who exists
     for claw_role in ["content", "ops", "analytics", "finance", "build", "assistant"]:
@@ -860,11 +849,9 @@ def handle_claw_status(args: dict[str, Any]) -> dict[str, Any]:
     }:
         raise RuntimeError(f"Invalid claw role: {claw_role}")
 
-    home = Path.home()
     result: dict[str, Any] = {"role": claw_role}
 
-    # Read health data
-    health_file = home / ".milimo" / "health" / squad_id / f"{claw_role}.json"
+    health_file = milimo_paths.health_dir(squad_id) / f"{claw_role}.json"
     if health_file.exists():
         try:
             result["health"] = json.loads(health_file.read_text())
@@ -877,7 +864,7 @@ def handle_claw_status(args: dict[str, Any]) -> dict[str, Any]:
         result["health"] = {"status": "no_health_data"}
 
     # Read tool registry
-    registry_file = home / ".milimo" / "tools" / squad_id / claw_role / "registry.json"
+    registry_file = milimo_paths.tools_dir(squad_id, claw_role) / "registry.json"
     if registry_file.exists():
         try:
             reg_data = json.loads(registry_file.read_text())
@@ -890,8 +877,8 @@ def handle_claw_status(args: dict[str, Any]) -> dict[str, Any]:
         result["tool_count"] = 0
 
     # Read pending messages for this claw
-    mesh_dir = home / ".milimo" / "mesh"
-    inbox = mesh_dir / "inbox" / claw_role
+    _mesh_dir = milimo_paths.mesh_dir()
+    inbox = _mesh_dir / "inbox" / claw_role
     if inbox.exists():
         pending = []
         for msg_file in sorted(inbox.glob("*.json")):
@@ -1194,9 +1181,7 @@ def handle_generate_weekly_report(args: dict[str, Any]) -> dict[str, Any]:
         claw_info: dict[str, Any] = {"role": role}
 
         # Tool count
-        registry_file = (
-            Path.home() / ".milimo" / "tools" / squad_id / role / "registry.json"
-        )
+        registry_file = milimo_paths.tools_dir(squad_id, role) / "registry.json"
         if registry_file.exists():
             try:
                 reg_data = json.loads(registry_file.read_text())
@@ -1208,7 +1193,7 @@ def handle_generate_weekly_report(args: dict[str, Any]) -> dict[str, Any]:
             claw_info["tool_count"] = 0
 
         # Health status
-        health_file = Path.home() / ".milimo" / "health" / squad_id / f"{role}.json"
+        health_file = milimo_paths.health_dir(squad_id) / f"{role}.json"
         if health_file.exists():
             try:
                 claw_info["health"] = json.loads(health_file.read_text())
@@ -1218,7 +1203,7 @@ def handle_generate_weekly_report(args: dict[str, Any]) -> dict[str, Any]:
             claw_info["health"] = "no_data"
 
         # Pending messages
-        inbox = Path.home() / ".milimo" / "mesh" / "inbox" / role
+        inbox = milimo_paths.mesh_dir() / "inbox" / role
         if inbox.exists():
             claw_info["pending_messages"] = len(list(inbox.glob("*.json")))
         else:
@@ -1412,9 +1397,7 @@ def handle_discover_tools(args: dict[str, Any]) -> dict[str, Any]:
     for role in ["content", "ops", "analytics", "finance", "build", "assistant"]:
         claw_tools: dict[str, Any] = {"tools": [], "count": 0, "last_evolution": None}
 
-        registry_file = (
-            Path.home() / ".milimo" / "tools" / squad_id / role / "registry.json"
-        )
+        registry_file = milimo_paths.tools_dir(squad_id, role) / "registry.json"
         if registry_file.exists():
             try:
                 reg_data = json.loads(registry_file.read_text())
@@ -1453,8 +1436,8 @@ def handle_get_result(args: dict[str, Any]) -> dict[str, Any]:
     if not message_id:
         raise RuntimeError("message_id is required")
 
-    mesh_dir = Path.home() / ".milimo" / "mesh"
-    outbox_dir = mesh_dir / "outbox"
+    _mesh_dir = milimo_paths.mesh_dir()
+    outbox_dir = _mesh_dir / "outbox"
 
     if not outbox_dir.exists():
         return {"status": "not_found", "message": "No outbox directory exists"}
@@ -1529,9 +1512,9 @@ def handle_start_claw(args: dict[str, Any]) -> dict[str, Any]:
             f"Invalid role '{role}'. Must be one of: {', '.join(valid_roles)}"
         )
 
-    mesh_dir = Path.home() / ".milimo" / "mesh"
-    launcher_pid_file = mesh_dir / "launcher.pid"
-    blueprint_path = Path("/sandbox/.openclaw-data/milimo/blueprints/0.1.0")
+    _mesh_dir = milimo_paths.mesh_dir()
+    launcher_pid_file = _mesh_dir / "launcher.pid"
+    blueprint_path = milimo_paths.blueprints_dir("0.1.0")
 
     if not launcher_pid_file.exists():
         raise RuntimeError("Launcher not running. Start the launcher first.")
@@ -1543,7 +1526,7 @@ def handle_start_claw(args: dict[str, Any]) -> dict[str, Any]:
     except ProcessLookupError:
         raise RuntimeError(f"Launcher (PID {launcher_pid}) is not running")
 
-    hb_file = mesh_dir / "heartbeats" / f"{role}.json"
+    hb_file = _mesh_dir / "heartbeats" / f"{role}.json"
     if hb_file.exists():
         try:
             hb = json.loads(hb_file.read_text())
@@ -1602,8 +1585,8 @@ def handle_stop_claw(args: dict[str, Any]) -> dict[str, Any]:
     if not role:
         raise RuntimeError("role is required")
 
-    mesh_dir = Path.home() / ".milimo" / "mesh"
-    hb_file = mesh_dir / "heartbeats" / f"{role}.json"
+    _mesh_dir = milimo_paths.mesh_dir()
+    hb_file = _mesh_dir / "heartbeats" / f"{role}.json"
 
     if not hb_file.exists():
         return {
@@ -1700,8 +1683,8 @@ def handle_claw_logs(args: dict[str, Any]) -> dict[str, Any]:
 
     lines = args.get("lines", 50)
 
-    mesh_dir = Path.home() / ".milimo" / "mesh"
-    log_file = mesh_dir / "logs" / "launcher.log"
+    _mesh_dir = milimo_paths.mesh_dir()
+    log_file = _mesh_dir / "logs" / "launcher.log"
 
     if not log_file.exists():
         return {
@@ -1735,8 +1718,8 @@ def handle_launcher_status(args: dict[str, Any]) -> dict[str, Any]:
     """
     import os
 
-    mesh_dir = Path.home() / ".milimo" / "mesh"
-    launcher_pid_file = mesh_dir / "launcher.pid"
+    _mesh_dir = milimo_paths.mesh_dir()
+    launcher_pid_file = _mesh_dir / "launcher.pid"
 
     status = {
         "launcher_running": False,
@@ -1759,7 +1742,7 @@ def handle_launcher_status(args: dict[str, Any]) -> dict[str, Any]:
 
     roles = ["content", "ops", "analytics", "finance", "build", "assistant"]
     for role in roles:
-        hb_file = mesh_dir / "heartbeats" / f"{role}.json"
+        hb_file = _mesh_dir / "heartbeats" / f"{role}.json"
         if hb_file.exists():
             try:
                 hb = json.loads(hb_file.read_text())

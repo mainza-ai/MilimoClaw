@@ -149,7 +149,7 @@ async function cliInit(opts) {
         activeClaws: (0, config_js_1.getActiveClawsForTemplate)(template),
     };
     config_js_1.ConfigManager.save(config);
-    logger.info(" ✓ State directory created (~/.openclaw-data/milimo/)");
+    logger.info(" ✓ State directory created (~/.openclaw/milimo/)");
     logger.info(" ✓ Blueprint directories initialized");
     logger.info(" ✓ Claw configuration saved");
     logger.info("");

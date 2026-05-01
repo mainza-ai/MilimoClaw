@@ -1,27 +1,36 @@
 # Installation Scripts
 
+> **CRITICAL WARNING: All claws MUST run through NemoClaw's sandbox isolation layer. The ONLY supported deployment path is `nemoclaw onboard --from` which provides full isolation (Landlock + seccomp + network namespaces + policy engine + OpenShell gateway credential injection). Any deployment that bypasses NemoClaw's isolation — including standalone `docker compose up` or manual `docker run` — is UNSUPPORTED and defeats the entire purpose of MilimoClaw as a secured multi-agent system.**
+
 **Summary**: One-command installer for deploying MilimoClaw into a NemoClaw sandbox.
 
 **Sources**: `install.sh`, [Install OpenClaw Plugins (official)](https://docs.nvidia.com/nemoclaw/latest/deployment/install-openclaw-plugins.html)
 
-**Last updated**: 2026-04-29
+**Last updated**: 2026-04-30
 
 **Tags**: #scripts #installation #deployment
 
 ---
 
+> **CRITICAL**: Claws MUST run through NemoClaw's sandbox isolation. Only `nemoclaw onboard --from` provides the full NemoClaw security stack — OpenShell gateway, policy engine, Landlock filesystem isolation, egress policy enforcement, process capability dropping, and credential injection. NEVER bypass the OpenShell gateway or policy engine by running claws outside the sandbox. Docker Compose mode is **DEPRECATED and UNSUPPORTED** — it does not provide NemoClaw isolation.
+
+---
+
 ## Overview
 
-The MilimoClaw installer supports two installation modes:
+The MilimoClaw installer supports a single supported installation mode and one iteration-only auxiliary mode:
 
-| Mode | Flag | Mechanism | When to use |
-|------|------|-----------|-------------|
-| **Dockerfile** (default) | _(none)_ | `nemoclaw onboard --from <Dockerfile>` | First install; clean builds; official path |
-| **Runtime deploy** | `--runtime-deploy` | `docker cp` + `kubectl cp` into running sandbox | Quick updates; testing; no rebuild |
+| Mode | Flag | Mechanism | Status |
+|------|------|-----------|--------|
+| **Onboard** (default) | _(none)_ | `nemoclaw onboard --from <Dockerfile>` | **SUPPORTED** — first install; clean builds; official path |
+| **Runtime deploy** | `--runtime-deploy` | `docker cp` + `kubectl cp` into running NemoClaw sandbox | **Supported** — quick updates; testing; no rebuild |
+| ~~**Docker Compose**~~ | _(removed)_ | Standalone `docker compose up` | **DEPRECATED / UNSUPPORTED** — no NemoClaw isolation |
 
-The Dockerfile mode is the **official NemoClaw plugin installation path** per [Install OpenClaw Plugins](https://docs.nvidia.com/nemoclaw/latest/deployment/install-openclaw-plugins.html). It bakes the plugin into a custom sandbox image so it survives `nemoclaw <name> rebuild`.
+The Onboard mode is the **only supported NemoClaw installation path** per [Install OpenClaw Plugins](https://docs.nvidia.com/nemoclaw/latest/deployment/install-openclaw-plugins.html). It bakes the plugin into a custom sandbox image so it survives `nemoclaw <name> rebuild`. The sandbox is created via `nemoclaw onboard --from`, which provisions the full NemoClaw isolation stack: OpenShell gateway, policy engine, credential injection, Landlock filesystem rules, egress policies, process capability dropping, and no-new-privileges enforcement.
 
-The runtime deploy mode injects files into a running sandbox. Changes are **lost on rebuild** — use it only for iteration.
+The runtime deploy mode injects files into an already-running NemoClaw sandbox — the claw still operates within the OpenShell gateway and policy engine isolation boundaries. Changes are **lost on rebuild** — use it only for iteration.
+
+Docker Compose mode (standalone `docker compose up`) is **deprecated and unsupported**. It bypasses the NemoClaw isolation stack entirely — no OpenShell gateway, no policy engine, no credential injection, no Landlock enforcement. All claws MUST run through `nemoclaw onboard --from`.
 
 **File**: `install.sh`
 
@@ -65,19 +74,19 @@ cd /path/to/MilimoClaw
 
 ---
 
-## Dockerfile Mode (Default)
+## Onboard Mode (Default — REQUIRED)
 
-This is the official path per [Install OpenClaw Plugins](https://docs.nvidia.com/nemoclaw/latest/deployment/install-openclaw-plugins.html).
+This is the only supported path per [Install OpenClaw Plugins](https://docs.nvidia.com/nemoclaw/latest/deployment/install-openclaw-plugins.html). Claws MUST run through `nemoclaw onboard --from` to receive the full NemoClaw isolation stack.
 
 ### How It Works
 
 1. Build TypeScript plugin on host (`npm ci && npm run build`)
 2. Prepare a build directory with plugin source + blueprint (macOS xattrs stripped)
-3. Generate a `Dockerfile` using `ARG SANDBOX_BASE=ghcr.io/nvidia/nemoclaw/sandbox-base:latest`
-4. The Dockerfile copies plugin into `/sandbox/.openclaw-data/extensions/milimo/` and runs `openclaw doctor --fix`
+3. Generate a `Dockerfile` using `FROM ghcr.io/nvidia/nemoclaw/sandbox-base:latest`
+4. The Dockerfile copies plugin into `/sandbox/.openclaw/milimo/` and installs via `openclaw plugins install` (NemoClaw's own plugin pattern)
 5. Run `nemoclaw onboard --from <Dockerfile> --name <sandbox>`
 
-### Prerequisites (Dockerfile mode)
+### Prerequisites (Onboard mode)
 
 - Docker installed and running
 - Node.js >= 22.16 (per [official prerequisites](https://docs.nvidia.com/nemoclaw/latest/get-started/prerequisites.html))
@@ -90,22 +99,22 @@ No running sandbox is required — `nemoclaw onboard --from` creates one.
 ### Generated Dockerfile Pattern
 
 ```dockerfile
-ARG SANDBOX_BASE=ghcr.io/nvidia/nemoclaw/sandbox-base:latest
-FROM ${SANDBOX_BASE}
+FROM ghcr.io/nvidia/nemoclaw/sandbox-base:latest
 
 # Copy Milimo plugin source
 COPY milimo/ /opt/milimo/
 WORKDIR /opt/milimo
 RUN npm ci --no-audit --no-fund && npm run build
-RUN mkdir -p /sandbox/.openclaw-data/extensions \
-    && cp -a /opt/milimo /sandbox/.openclaw-data/extensions/milimo \
+RUN mkdir -p /sandbox/.openclaw/extensions \
+    && cp -a /opt/milimo /sandbox/.openclaw/extensions/milimo \
+    && openclaw plugins install /sandbox/.openclaw/extensions/milimo \
     && openclaw doctor --fix
 
 # Copy Milimo blueprint
-COPY milimo-blueprint/ /sandbox/.openclaw-data/milimo/milimo-blueprint/
+COPY milimo-blueprint/ /sandbox/.openclaw/milimo/milimo-blueprint/
 
 # Create claw data directories
-RUN BASE="/sandbox/.openclaw-data/milimo/claws" \
+RUN BASE="/sandbox/.openclaw/milimo/claws" \
     && mkdir -p "$BASE/ops/clients/active" "$BASE/ops/clients/archived" ...
 
 # Install Python dependencies
@@ -117,7 +126,7 @@ RUN ARCH=$(uname -m) ...
 WORKDIR /opt/nemoclaw
 ```
 
-This follows the official pattern from the [plugin install docs](https://docs.nvidia.com/nemoclaw/latest/deployment/install-openclaw-plugins.html): `ARG SANDBOX_BASE`, `COPY` plugin, `npm ci && npm run build`, copy to `/sandbox/.openclaw-data/extensions/`, `openclaw doctor --fix`, final `WORKDIR /opt/nemoclaw`.
+This follows the official pattern from the [plugin install docs](https://docs.nvidia.com/nemoclaw/latest/deployment/install-openclaw-plugins.html): `FROM` sandbox-base, `COPY` plugin, `npm ci && npm run build`, copy to `/sandbox/.openclaw/extensions/`, `openclaw plugins install`, `openclaw doctor --fix`, final `WORKDIR /opt/nemoclaw`. All claws share a single NemoClaw sandbox created via `nemoclaw onboard --from`.
 
 ### Build Context
 
@@ -144,7 +153,7 @@ Per [official docs](https://docs.nvidia.com/nemoclaw/latest/reference/commands.h
 
 ## Runtime Deploy Mode
 
-For quick iteration without rebuilding the sandbox image.
+For quick iteration without rebuilding the sandbox image. The sandbox MUST have been created via `nemoclaw onboard --from` first — runtime deploy injects into an existing NemoClaw sandbox (still within isolation boundaries: OpenShell gateway, policy engine, Landlock rules).
 
 ### How It Works
 
@@ -152,7 +161,7 @@ For quick iteration without rebuilding the sandbox image.
 2. Transfer plugin source to running sandbox via `docker cp` + `kubectl cp`
 3. Build plugin inside sandbox
 4. Deploy blueprint, assistant template, and support files
-5. Initialize claw data directories
+5. Initialize claw data directories under `/sandbox/.openclaw/milimo/claws/`
 6. Install Python dependencies and GitHub CLI
 7. Create milimo CLI wrapper and backward-compat symlinks
 8. Inject environment variables
@@ -161,13 +170,13 @@ For quick iteration without rebuilding the sandbox image.
 
 ### Prerequisites (Runtime deploy)
 
-Same as Dockerfile mode **plus**:
-- NemoClaw sandbox must already be running
+Same as Onboard mode **plus**:
+- NemoClaw sandbox must already be running (created via `nemoclaw onboard --from`)
 - Gateway container must be reachable
 
 ### Warning
 
-Changes made via `--runtime-deploy` are **lost on `nemoclaw <name> rebuild`**. Use Dockerfile mode for persistent installations.
+Changes made via `--runtime-deploy` are **lost on `nemoclaw <name> rebuild`**. Use Onboard mode for persistent installations. Never use Docker Compose — it bypasses NemoClaw isolation entirely.
 
 ---
 
@@ -180,7 +189,8 @@ Checks:
 - Node.js >= 22.16 (per [official prerequisites](https://docs.nvidia.com/nemoclaw/latest/get-started/prerequisites.html))
 - npm installed
 - Python 3 installed
-- NemoClaw sandbox running (runtime deploy only — Dockerfile mode creates it)
+- NemoClaw CLI installed (`nemoclaw` on PATH)
+- NemoClaw sandbox running (runtime deploy only — Onboard mode creates it via `nemoclaw onboard --from`)
 
 ### Phase 2: Build & Deploy
 
@@ -188,7 +198,7 @@ See mode-specific sections above.
 
 ### Phase 3: Onboarding
 
-- Write plugin config to `/sandbox/.openclaw-data/milimo/config.json`
+- Write plugin config to `/sandbox/.openclaw/milimo/config.json`
 - Write orchestrator config
 - Run assistant setup (`assistant_setup.py`)
 
@@ -218,30 +228,28 @@ Per [Credential Storage](https://docs.nvidia.com/nemoclaw/latest/security/creden
 
 ```
 /sandbox/
-├── .milimo/ → symlink to .openclaw-data/milimo
-├── .openclaw/ → read-only (root-owned, chattr +i)
-│   ├── extensions/milimo/ → built plugin source
-│   ├── workspace/ → symlink into .openclaw-data/ (writable)
-│   └── openclaw.json → read-only at runtime
-├── .openclaw-data/ → persistent writable subtree
-│   ├── extensions/milimo/ → built plugin source (mirrored)
-│   └── milimo/
-│       ├── blueprints/0.1.0/ → symlink to milimo-blueprint/
-│       ├── bin/ → gh CLI, milimo wrapper
-│       ├── config.json → plugin + orchestrator config
-│       ├── claws/
-│       │   ├── ops/ → Ops Claw mount (clients, projects, calendar, queue, memory, …)
-│       │   ├── content/ → Content Claw mount (drafts, calendar, queue, memory, …)
-│       │   ├── analytics/ → Analytics Claw mount (reports, metrics, queue, memory, …)
-│       │   ├── finance/ → Finance Claw mount (invoices, expenses, revenue, queue, …)
-│       │   ├── build/ → Build Claw mount (prs, deployments, tasks, docs, …)
-│       │   └── assistant/ → Assistant Claw mount (context, memory, logs, tools, …)
-│       ├── milimo-blueprint/ → blueprint (orchestrator, policies, templates)
-│       ├── mesh/ → heartbeats, PID files
-│       └── templates/ → assistant system prompt
-├── milimo-blueprint/ → symlink to .openclaw-data/milimo/milimo-blueprint
-└── .local/lib/python3.11/site-packages/ → pip --target packages
+├── .openclaw/ → unified agent config/state/plugins (root-owned, immutable at runtime)
+│   ├── extensions/milimo/ → built plugin source (NemoClaw sandbox-base provides this)
+│   ├── workspace/ → read-only at Landlock level (symlink target is writable)
+│   ├── openclaw.json → read-only at runtime
+│   └── .nemoclaw/ → root-owned NemoClaw plugin state (NOT milimo data)
+└── .openclaw/milimo/ → MilimoClaw data subtree (symlink or explicit mount)
+    ├── blueprints/0.1.0/ → symlink to milimo-blueprint/
+    ├── bin/ → gh CLI, milimo wrapper
+    ├── config.json → plugin + orchestrator config
+    ├── claws/
+    │   ├── ops/ → Ops Claw mount (clients, projects, calendar, queue, memory, …)
+    │   ├── content/ → Content Claw mount (drafts, calendar, queue, memory, …)
+    │   ├── analytics/ → Analytics Claw mount (reports, metrics, queue, memory, …)
+    │   ├── finance/ → Finance Claw mount (invoices, expenses, revenue, queue, …)
+    │   ├── build/ → Build Claw mount (prs, deployments, tasks, docs, …)
+    │   └── assistant/ → Assistant Claw mount (context, memory, logs, tools, …)
+    ├── milimo-blueprint/ → blueprint (orchestrator, policies, templates)
+    ├── mesh/ → heartbeats, PID files
+    └── templates/ → assistant system prompt
 ```
+
+> **Note:** Per official NemoClaw docs, `.openclaw/` is the unified layout. MilimoClaw data lives under `.openclaw/milimo/`. The legacy `.openclaw-data/` layout was removed by NemoClaw's Dockerfile migration block.
 
 ---
 

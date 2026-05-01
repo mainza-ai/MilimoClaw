@@ -43,7 +43,9 @@ except ImportError:
 
 logger = logging.getLogger("milimo.provenance_signer")
 
-KEYSTORE_DIR = Path.home() / ".milimo" / "keys"
+from .milimo_paths import keys_dir
+
+KEYSTORE_DIR = keys_dir()
 
 
 # ---------------------------------------------------------------------------

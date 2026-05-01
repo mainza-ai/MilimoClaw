@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import queue
 import socket
 import threading
@@ -38,6 +37,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
+from .milimo_paths import mesh_dir
 from typing import Any, Callable, Optional
 
 logger = logging.getLogger("milimo.gateway_adapter")
@@ -592,8 +592,7 @@ class FileBasedGateway(GatewayAdapter):
 
     def connect(self) -> bool:
         """Initialize file-based message directories."""
-        home = os.environ.get("HOME", os.environ.get("USERPROFILE", "/tmp"))
-        self._base_dir = Path(home) / ".milimo" / "mesh"
+        self._base_dir = mesh_dir()
         self._inbox = self._base_dir / "inbox" / self.config.role
 
         try:

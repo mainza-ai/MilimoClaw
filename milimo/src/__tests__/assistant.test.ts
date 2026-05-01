@@ -14,6 +14,7 @@ vi.mock("node:fs", () => ({
 
 vi.mock("node:path", () => ({
   join: vi.fn((...args: string[]) => args.join("/")),
+  dirname: vi.fn((p: string) => p.split("/").slice(0, -1).join("/")),
 }));
 
 vi.mock("node:os", () => ({
@@ -105,11 +106,13 @@ describe("assistant commands", () => {
 
       await setupPromise;
 
-      expect(mockedSpawn).toHaveBeenCalledWith(
-        "python3",
-        ["/home/test/.openclaw-data/milimo/blueprints/0.1.0/orchestrator/assistant_setup.py"],
-        { stdio: "inherit" },
-      );
+      expect(mockedSpawn).toHaveBeenCalledWith("python3", ["-m", "orchestrator.assistant_setup"], {
+        cwd: "/home/test/.openclaw/milimo/blueprints/0.1.0",
+        stdio: "inherit",
+        env: expect.objectContaining({
+          PYTHONPATH: "/home/test/.openclaw/milimo/blueprints/0.1.0",
+        }),
+      });
     });
 
     it("rejects on non-zero exit code", async () => {
@@ -142,7 +145,7 @@ describe("assistant commands", () => {
       expect(mockedSpawn).toHaveBeenCalledWith(
         "python3",
         [
-          "/home/test/.openclaw-data/milimo/blueprints/0.1.0/orchestrator/assistant_setup.py",
+          "/home/test/.openclaw/milimo/blueprints/0.1.0/orchestrator/assistant_setup.py",
           "--verify",
         ],
         { stdio: "inherit" },

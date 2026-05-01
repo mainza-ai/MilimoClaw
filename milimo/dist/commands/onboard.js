@@ -82,7 +82,7 @@ function isNonInteractive(opts) {
 }
 function createMilimoDirectories() {
     const home = process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
-    const baseDir = path.join(home, ".openclaw-data/milimo");
+    const baseDir = path.join(home, ".openclaw/milimo");
     const dirs = [
         baseDir,
         path.join(baseDir, "blueprints"),
@@ -409,7 +409,7 @@ async function cliOnboard(opts) {
     logger.info("Applying configuration...");
     // Create directories
     createMilimoDirectories();
-    logger.info(" ✓ Created ~/.openclaw-data/milimo/ directory structure");
+    logger.info(" ✓ Created ~/.openclaw/milimo/ directory structure");
     // Save configuration
     const config = {
         squadName,
@@ -430,7 +430,7 @@ async function cliOnboard(opts) {
             : {}),
     };
     (0, config_js_1.saveOnboardConfig)(config);
-    logger.info(" ✓ Saved configuration to ~/.openclaw-data/milimo/config.json");
+    logger.info(" ✓ Saved configuration to ~/.openclaw/milimo/config.json");
     // Step 11a: Sandbox auto-creation (unless --no-sandbox)
     if (!opts.noSandbox) {
         logger.info("");
@@ -439,8 +439,8 @@ async function cliOnboard(opts) {
             const { execFileSync } = await import("child_process");
             const home = process.env.HOME ?? "/tmp";
             const candidates = [
-                path.join(home, ".openclaw-data/milimo", "blueprints", "0.1.0"),
-                path.join(home, ".openclaw-data/milimo", "milimo-blueprint"),
+                path.join(home, ".openclaw/milimo", "blueprints", "0.1.0"),
+                path.join(home, ".openclaw/milimo", "milimo-blueprint"),
                 "/opt/milimo-blueprint",
             ];
             const blueprintDir = candidates.find((d) => fs.existsSync(path.join(d, "orchestrator", "solo_init.py"))) ??
@@ -448,10 +448,11 @@ async function cliOnboard(opts) {
             const soloInitPath = path.join(blueprintDir, "orchestrator", "solo_init.py");
             if (fs.existsSync(soloInitPath)) {
                 const roleArg = solo ? "solo" : clawRole;
-                execFileSync("python3", [soloInitPath, "--role", roleArg, "--template", template], {
+                execFileSync("python3", ["-m", "orchestrator.solo_init", "--role", roleArg, "--template", template], {
                     cwd: blueprintDir,
                     timeout: 120_000,
                     stdio: ["pipe", "pipe", "pipe"],
+                    env: { ...process.env, PYTHONPATH: blueprintDir },
                 });
                 logger.info(` ✓ Sandbox directories created for: ${activeClaws.join(", ")}`);
             }

@@ -168,7 +168,7 @@ export class RealtimeBridge {
 
   private sendInitialState(ws: WebSocket): void {
     const home = homedir();
-    const meshDir = join(home, ".openclaw-data/milimo", "mesh");
+    const meshDir = join(home, ".openclaw/milimo", "mesh");
 
     const initialState = {
       type: "initial_state",
@@ -187,7 +187,7 @@ export class RealtimeBridge {
 
   private setupFileWatchers(): void {
     const home = homedir();
-    const baseDir = join(home, ".openclaw-data/milimo");
+    const baseDir = join(home, ".openclaw/milimo");
 
     const watchPaths = [
       join(baseDir, "mesh", "inbox", "war_room"),
@@ -272,7 +272,7 @@ export class RealtimeBridge {
 
   private checkClawStatusChange(role: string): void {
     const home = homedir();
-    const baseDir = join(home, ".openclaw-data/milimo");
+    const baseDir = join(home, ".openclaw/milimo");
     const registryPath = join(baseDir, "tools", this.squadId, role, "registry.json");
 
     let newStatus: "active" | "idle" | "processing" | "error" = "idle";
@@ -334,13 +334,7 @@ export class RealtimeBridge {
 
   private checkForRevenueUpdate(): void {
     const home = homedir();
-    const summaryPath = join(
-      home,
-      ".openclaw-data/milimo",
-      "finance",
-      "revenue",
-      "weekly_summary.json",
-    );
+    const summaryPath = join(home, ".openclaw/milimo", "finance", "revenue", "weekly_summary.json");
 
     try {
       if (!existsSync(summaryPath)) return;
@@ -410,7 +404,7 @@ export class RealtimeBridge {
 
   private getClawStatuses(): Record<string, { status: string; tool_count: number }> {
     const home = homedir();
-    const baseDir = join(home, ".openclaw-data/milimo");
+    const baseDir = join(home, ".openclaw/milimo");
     const clawRoles = ["content", "ops", "analytics", "finance", "build", "assistant"];
     const statuses: Record<string, { status: string; tool_count: number }> = {};
 

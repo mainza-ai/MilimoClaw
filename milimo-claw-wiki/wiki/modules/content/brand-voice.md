@@ -50,7 +50,7 @@ class BrandVoiceManager:
 ## Voice Profile Storage
 
 ```
-/sandbox/.openclaw-data/milimo/claws/content/brand/
+/sandbox/.openclaw/milimo/claws/content/brand/
 ├── style-guides/      # brand voice docs
 ├── assets/            # approved images, logos
 └── voice-profiles/    # per-client voice adapters

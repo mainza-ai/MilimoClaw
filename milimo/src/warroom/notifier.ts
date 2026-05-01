@@ -7,7 +7,7 @@
  * Platform-specific notification delivery:
  * - macOS: osascript (no new deps)
  * - Linux: notify-send (no new deps)
- * - Fallback: write to ~/.openclaw-data/milimo/notifications/pending.json
+ * - Fallback: write to ~/.openclaw/milimo/notifications/pending.json
  */
 
 import { spawnSync } from "node:child_process";
@@ -30,7 +30,7 @@ export interface NotificationResult {
   error?: string;
 }
 
-const NOTIFICATION_DIR = ".openclaw-data/milimo/notifications";
+const NOTIFICATION_DIR = ".openclaw/milimo/notifications";
 const PENDING_FILE = "pending.json";
 
 export class OperatorNotifier {
