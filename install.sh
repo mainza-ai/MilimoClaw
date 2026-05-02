@@ -942,7 +942,7 @@ PYEOF
 # Clear old memory so the assistant loads fresh context
 rm -f /sandbox/.openclaw/milimo/workspace/MEMORY.md 2>/dev/null || true
 
-cd /sandbox/.openclaw/milimo/milimo-blueprint && HOME=/sandbox python3 orchestrator/assistant_setup.py 2>&1 || echo "Assistant setup skipped — run manually with: openclaw milimo assistant setup"
+cd /sandbox/.openclaw/milimo/milimo-blueprint && HOME=/sandbox PYTHONPATH=/sandbox/.openclaw/milimo/milimo-blueprint python3 -m orchestrator.assistant_setup 2>&1 || echo "Assistant setup skipped — run manually with: openclaw milimo assistant setup"
 '
 }
 
