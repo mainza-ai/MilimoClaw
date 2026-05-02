@@ -33,6 +33,7 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -143,6 +144,32 @@ class CycleResult:
         if self.tool_deployed:
             d["tool_deployed"] = self.tool_deployed.to_dict()
         return d
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "CycleResult":
+        proposal = None
+        if data.get("proposal"):
+            try:
+                proposal = ToolProposal.from_dict(data["proposal"])
+            except Exception:
+                pass
+        tool_deployed = None
+        if data.get("tool_deployed"):
+            try:
+                tool_deployed = BuiltTool.from_dict(data["tool_deployed"])
+            except Exception:
+                pass
+        return cls(
+            claw_role=data.get("claw_role", ""),
+            squad_id=data.get("squad_id", ""),
+            stage_reached=data.get("stage_reached", ""),
+            patterns_found=data.get("patterns_found", 0),
+            proposal=proposal,
+            build_result=None,
+            tool_deployed=tool_deployed,
+            skipped_reason=data.get("skipped_reason", ""),
+            timestamp=data.get("timestamp", ""),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -402,6 +429,30 @@ class EvolutionCycle:
 # ---------------------------------------------------------------------------
 
 
+_STATE_DIR = Path("/sandbox/.openclaw/milimo/state")
+_EVOLUTION_DIR = _STATE_DIR / "evolution"
+_HISTORY_FILE = _EVOLUTION_DIR / "history.jsonl"
+_SUMMARY_FILE = _EVOLUTION_DIR / "summary.json"
+
+
+def _load_history() -> list[dict[str, Any]]:
+    if not _HISTORY_FILE.exists():
+        return []
+    results = []
+    with _HISTORY_FILE.open() as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                results.append(json.loads(line))
+    return results
+
+
+def _save_summary(summary: dict[str, Any]) -> None:
+    _EVOLUTION_DIR.mkdir(parents=True, exist_ok=True)
+    with _SUMMARY_FILE.open("w") as f:
+        json.dump(summary, f, indent=2, default=str)
+
+
 class EvolutionScheduler:
     """
     Manages weekly evolution scheduling for all claws in a squad.
@@ -412,7 +463,8 @@ class EvolutionScheduler:
 
     def __init__(self) -> None:
         self._cycles: dict[str, EvolutionCycle] = {}
-        self._history: list[CycleResult] = []
+        loaded = _load_history()
+        self._history: list[CycleResult] = [CycleResult.from_dict(d) for d in loaded]
 
     def register(self, cycle: EvolutionCycle) -> None:
         """Register a claw's evolution cycle."""
@@ -452,6 +504,8 @@ class EvolutionScheduler:
                 result = cycle.run(dry_run=dry_run)
                 results.append(result)
                 self._history.append(result)
+                self._append_history(result.to_dict())
+                self._update_summary()
             except Exception as e:
                 logger.error("Evolution cycle failed for %s: %s", role, e)
                 results.append(
@@ -464,6 +518,36 @@ class EvolutionScheduler:
                 )
 
         return results
+
+    def _append_history(self, cycle_dict: dict[str, Any]) -> None:
+        _EVOLUTION_DIR.mkdir(parents=True, exist_ok=True)
+        with _HISTORY_FILE.open("a") as f:
+            f.write(json.dumps(cycle_dict, default=str) + "\n")
+
+    def _update_summary(self) -> None:
+        by_role: dict[str, dict[str, Any]] = {}
+        for entry in reversed(self._history):
+            role = getattr(entry, "claw_role", "")
+            if role and role not in by_role:
+                by_role[role] = {
+                    "claw_role": role,
+                    "last_run": getattr(entry, "timestamp", None),
+                    "last_stage": getattr(entry, "stage_reached", None),
+                    "last_skipped_reason": getattr(entry, "skipped_reason", "") or None,
+                    "tools_deployed": sum(
+                        1
+                        for e in self._history
+                        if getattr(e, "claw_role", "") == role
+                        and getattr(e, "tool_deployed", None) is not None
+                    ),
+                }
+        _save_summary(
+            {
+                "total_cycles": len(self._history),
+                "registered_claws": list(self._cycles.keys()),
+                "by_role": by_role,
+            }
+        )
 
     def get_history(self, limit: int = 10) -> list[CycleResult]:
         """Get the most recent cycle results."""

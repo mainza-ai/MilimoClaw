@@ -42,32 +42,72 @@ logger = logging.getLogger("milimo.bridge_cli")
 # ---------------------------------------------------------------------------
 
 
+def _read_evolution_summary() -> dict[str, Any]:
+    """Read the lightweight evolution summary file without importing the scheduler."""
+    summary_path = Path("/sandbox/.openclaw/milimo/state/evolution/summary.json")
+    if not summary_path.exists():
+        return {}
+    try:
+        return json.loads(summary_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _query_evolution_status(squad_id: str, claw_role: str) -> dict[str, Any]:
+    """Query evolution status from persisted state — no scheduler import needed."""
+    summary = _read_evolution_summary()
+    by_role = summary.get("by_role", {})
+    role_data = by_role.get(claw_role, {})
+
+    registry_file = (
+        milimo_paths.claw_base(claw_role) / "sandbox" / "tools" / "registry.json"
+    )
+    tools: dict[str, Any] = {}
+    if registry_file.exists():
+        try:
+            tools = json.loads(registry_file.read_text()).get("tools", {})
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    has_ever_run = claw_role in by_role
+    last_run = role_data.get("last_run")
+    last_stage = role_data.get("last_stage")
+    tools_deployed = role_data.get("tools_deployed", 0)
+
+    if last_stage == "deploy":
+        status = "success"
+    elif last_stage == "error":
+        status = "error"
+    elif last_stage is not None:
+        status = "incomplete"
+    elif not has_ever_run:
+        status = "never_run"
+    else:
+        status = "unknown"
+
+    return {
+        "status": status,
+        "last_cycle": last_run,
+        "last_stage_reached": last_stage,
+        "last_skipped_reason": role_data.get("last_skipped_reason"),
+        "tools_deployed": tools_deployed,
+        "tool_count": len(tools),
+        "evolution_ever_run": has_ever_run,
+        "diagnostic_note": (
+            "Evolution cycle has never run on this claw"
+            if not has_ever_run
+            else f"Last cycle reached '{last_stage}' on {last_run}"
+            if last_run
+            else None
+        ),
+    }
+
+
 def handle_evolution_status(args: dict[str, Any]) -> dict[str, Any]:
     """Get evolution status for a specific claw."""
-    from .evolution_cycle import EvolutionCycle
-    from .tool_registry import ToolRegistry
-
     squad_id = args.get("squad_id", "default")
     claw_role = args.get("claw", "content")
-    blueprint_dir = args.get("blueprint_dir", ".")
-
-    try:
-        registry = ToolRegistry(squad_id, claw_role)
-        _cycle = EvolutionCycle(
-            squad_id=squad_id,
-            claw_role=claw_role,
-            blueprint_dir=blueprint_dir,
-        )
-        tools = registry.get_inventory()
-        return {
-            "status": "idle",
-            "last_cycle": None,
-            "tools_deployed": len(tools),
-            "pending_proposals": 0,
-        }
-    except Exception as e:
-        logger.exception("Failed to get evolution status")
-        raise RuntimeError(f"Evolution status error: {e}") from e
+    return _query_evolution_status(squad_id, claw_role)
 
 
 def handle_blueprint_info(args: dict[str, Any]) -> dict[str, Any]:
@@ -868,7 +908,9 @@ def handle_claw_status(args: dict[str, Any]) -> dict[str, Any]:
         result["health"] = {"status": "no_health_data"}
 
     # Read tool registry
-    registry_file = milimo_paths.tools_dir(squad_id, claw_role) / "registry.json"
+    registry_file = (
+        milimo_paths.claw_base(claw_role) / "sandbox" / "tools" / "registry.json"
+    )
     if registry_file.exists():
         try:
             reg_data = json.loads(registry_file.read_text())
@@ -879,6 +921,24 @@ def handle_claw_status(args: dict[str, Any]) -> dict[str, Any]:
             result["tool_count"] = 0
     else:
         result["tool_count"] = 0
+
+    # Evolution status from summary.json
+    evo = _query_evolution_status(squad_id, claw_role)
+    result["evolution_status"] = evo.get("status", "never_run")
+    result["evolution_ever_run"] = evo.get("evolution_ever_run", False)
+
+    # Interpretation metadata
+    result["tool_count_interpretation"] = (
+        "Tools are registered by the weekly evolution cycle; 0 tools means evolution has not yet run"
+        if result["tool_count"] == 0
+        else f"{result['tool_count']} tool(s) registered via evolution cycle"
+    )
+    result["health_interpretation"] = (
+        "No health data collected yet — health collector may not be running"
+        if result["health"].get("status") == "no_health_data"
+        else f"Health score: {result['health'].get('score', 'unknown')}"
+    )
+    result["diagnostic_note"] = evo.get("diagnostic_note")
 
     # Read pending messages for this claw
     _mesh_dir = milimo_paths.mesh_dir()
@@ -1819,22 +1879,95 @@ def handle_launcher_status(args: dict[str, Any]) -> dict[str, Any]:
                 hb = json.loads(hb_file.read_text())
                 timestamp = hb.get("timestamp", "")
                 if not timestamp:
-                    status["claws"][role] = {"status": "unknown"}
+                    status["claws"][role] = {
+                        "status": "unknown",
+                        "diagnostic_note": "Heartbeat file has no timestamp — may be corrupt",
+                    }
                 else:
                     hb_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
                     age = (datetime.now(timezone.utc) - hb_time).total_seconds()
+                    claw_status = "running" if age < 90 else "stale"
                     status["claws"][role] = {
-                        "status": "running" if age < 90 else "stale",
+                        "status": claw_status,
                         "pid": hb.get("pid"),
                         "uptime_seconds": hb.get("uptime_seconds"),
                         "heartbeat_age_seconds": round(age, 1),
                     }
+                    if claw_status == "stale":
+                        status["claws"][role]["diagnostic_note"] = (
+                            f"Heartbeat is {round(age)}s old — claw may be unresponsive"
+                        )
             except Exception:
-                status["claws"][role] = {"status": "unknown"}
+                status["claws"][role] = {
+                    "status": "unknown",
+                    "diagnostic_note": "Failed to parse heartbeat file",
+                }
         else:
-            status["claws"][role] = {"status": "stopped"}
+            status["claws"][role] = {
+                "status": "stopped",
+                "diagnostic_note": "No heartbeat file — claw was never started or has been stopped",
+            }
 
-    return status
+        return status
+
+
+def handle_milimo_status(args: dict[str, Any]) -> dict[str, Any]:
+    """Aggregate overview: launcher + health + evolution + pending for all claws."""
+    squad_id = args.get("squad_id", "default")
+    roles = ["content", "ops", "analytics", "finance", "build", "assistant"]
+
+    launcher = handle_launcher_status({})
+    health_file = milimo_paths.health_dir(squad_id) / "health.json"
+    health_data: dict[str, Any] = {}
+    if health_file.exists():
+        try:
+            health_data = json.loads(health_file.read_text()).get("claws", {})
+        except (json.JSONDecodeError, OSError):
+            pass
+    evolution_summary = _read_evolution_summary()
+    by_role = evolution_summary.get("by_role", {})
+
+    claws: dict[str, Any] = {}
+    for role in roles:
+        launcher_claw = launcher.get("claws", {}).get(role, {})
+        claw_health = health_data.get(role, {})
+        evo_role = by_role.get(role, {})
+        last_stage = evo_role.get("last_stage")
+        if last_stage == "deploy":
+            evo_status = "success"
+        elif last_stage == "error":
+            evo_status = "error"
+        elif last_stage is not None:
+            evo_status = "incomplete"
+        elif role in by_role:
+            evo_status = "unknown"
+        else:
+            evo_status = "never_run"
+
+        pending_count = 0
+        inbox = milimo_paths.mesh_dir() / "inbox" / role
+        if inbox.exists():
+            pending_count = sum(1 for _ in inbox.glob("*.json"))
+
+        claws[role] = {
+            "launcher_status": launcher_claw.get("status", "unknown"),
+            "health_score": claw_health.get("score"),
+            "evolution_status": evo_status,
+            "tools_deployed": evo_role.get("tools_deployed", 0),
+            "pending_messages": pending_count,
+        }
+
+    return {
+        "launcher_running": launcher.get("launcher_running", False),
+        "launcher_pid": launcher.get("launcher_pid"),
+        "claws": claws,
+        "evolution_ever_run": bool(by_role),
+        "diagnostic_note": (
+            "Evolution cycle has never run — 0 tools is expected"
+            if not by_role
+            else None
+        ),
+    }
 
 
 COMMAND_HANDLERS: dict[str, Any] = {
@@ -1880,6 +2013,7 @@ COMMAND_HANDLERS: dict[str, Any] = {
     "start_launcher": handle_start_launcher,
     "claw_logs": handle_claw_logs,
     "launcher_status": handle_launcher_status,
+    "milimo_status": handle_milimo_status,
 }
 
 

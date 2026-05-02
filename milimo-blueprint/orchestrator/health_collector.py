@@ -362,8 +362,29 @@ class HealthCollector:
         # Message throughput (simulated - would read from actual metrics)
         metrics.message_throughput_per_min = 12.0
 
-        # Evolution status (would read from evolution cycle state)
-        metrics.evolution_status = "success"
+        # Evolution status — read from persisted summary.json
+        _evolution_status = "unknown"
+        _summary_path = Path("/sandbox/.openclaw/milimo/state/evolution/summary.json")
+        if _summary_path.exists():
+            try:
+                _summary = json.loads(_summary_path.read_text())
+                _role_data = _summary.get("by_role", {}).get(role, {})
+                _last_stage = _role_data.get("last_stage")
+                if _last_stage == "deploy":
+                    _evolution_status = "success"
+                elif _last_stage == "error":
+                    _evolution_status = "error"
+                elif _last_stage is not None:
+                    _evolution_status = "incomplete"
+                elif role in _summary.get("by_role", {}):
+                    _evolution_status = "unknown"
+                else:
+                    _evolution_status = "never_run"
+            except (json.JSONDecodeError, OSError):
+                pass
+        else:
+            _evolution_status = "never_run"
+        metrics.evolution_status = _evolution_status
 
         # Approval backlog (would read from War Room)
         metrics.approval_backlog = 3

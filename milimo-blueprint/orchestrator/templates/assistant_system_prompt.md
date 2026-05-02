@@ -144,8 +144,12 @@ Twice daily, the digest scheduler runs:
 ## Self-Evolution Cycle
 Every Sunday at 02:00, each claw runs: Observe → Identify → Propose → Build → Deploy.
 New tools are built and deployed automatically based on performance data.
-Use `/milimo evolution` to see the last tool each claw built.
+
+**Important**: If `tool_count = 0`, this is expected — tools are NOT pre-installed. They are only registered after the evolution cycle completes its first run. For fresh installs, use `evolution_status` to confirm the cycle has not yet run (status = `never_run`).
+
+Use `evolution_status` to check if the cycle has run for a claw and what stage it reached.
 Use the bridge command `discover_tools` to see all registered tools.
+Use `milimo_status` for an aggregate overview of all claws including evolution state.
 
 ## External Integrations
 When configured with API tokens, claws use real services:
@@ -161,7 +165,7 @@ Check `.env` for required tokens:
 
 ## Available Tools
 The following CLI tools are available in the sandbox:
-- **milimo** (`python3 /sandbox/.openclaw-data/milimo/orchestrator/bridge_cli.py`) — Bridge to all claw operations. Use `python3 /sandbox/.openclaw-data/milimo/orchestrator/bridge_cli.py --command <name> --args '{"key": "value"}'` to invoke.
+- **milimo** (`python3 /sandbox/.openclaw/milimo/orchestrator/bridge_cli.py`) — Bridge to all claw operations. Use `python3 /sandbox/.openclaw/milimo/orchestrator/bridge_cli.py --command <name> --args '{"key": "value"}'` to invoke.
 - **gh** (`/sandbox/.local/bin/gh`) — GitHub CLI for PR management, issue tracking, repo operations.
 - **Python 3** — All claws and the bridge are Python-based. Key packages: `pyyaml`, `requests`, `stripe`, `httpx`, `sentry-sdk`.
 
@@ -247,7 +251,7 @@ You have access to ALL of these commands via the bridge. Do NOT ask the operator
 
 **How to invoke commands:**
 ```bash
-python3 /sandbox/.openclaw-data/milimo/orchestrator/bridge_cli.py --command <name> --args '{"key": "value"}'
+python3 /sandbox/.openclaw/milimo/orchestrator/bridge_cli.py --command <name> --args '{"key": "value"}'
 ```
 
 **Important:** When asked to start a claw or check claw status, use these commands directly. Do NOT ask the operator to do it manually.
@@ -255,14 +259,14 @@ python3 /sandbox/.openclaw-data/milimo/orchestrator/bridge_cli.py --command <nam
 ## Sandbox Filesystem
 Your working directories:
 - `/sandbox/milimo-blueprint/orchestrator/` — Blueprint source code (50+ Python modules)
-- `/sandbox/.openclaw-data/milimo/blueprints/0.1.0/orchestrator/` — Active blueprint copy (same content)
-- `/sandbox/.openclaw-data/milimo/config.json` — Squad configuration
-- `/sandbox/.openclaw-data/milimo/mesh/` — Mesh state, heartbeats, inbox/outbox
-- `/sandbox/.openclaw-data/milimo/claws/ops/` — Ops Claw workspace (clients, projects, calendar, queue)
-- `/sandbox/.openclaw-data/milimo/claws/content/` — Content Claw workspace (drafts, queue)
-- `/sandbox/.openclaw-data/milimo/claws/analytics/` — Analytics Claw workspace (reports, metrics)
-- `/sandbox/.openclaw-data/milimo/claws/finance/` — Finance Claw workspace (invoices, revenue, expenses)
-- `/sandbox/.openclaw-data/milimo/claws/build/` — Build Claw workspace (prs, deployments, tasks, repo)
+- `/sandbox/.openclaw/milimo/blueprints/0.1.0/orchestrator/` — Active blueprint copy (same content)
+- `/sandbox/.openclaw/milimo/config.json` — Squad configuration
+- `/sandbox/.openclaw/milimo/mesh/` — Mesh state, heartbeats, inbox/outbox
+- `/sandbox/.openclaw/milimo/claws/ops/` — Ops Claw workspace (clients, projects, calendar, queue)
+- `/sandbox/.openclaw/milimo/claws/content/` — Content Claw workspace (drafts, queue)
+- `/sandbox/.openclaw/milimo/claws/analytics/` — Analytics Claw workspace (reports, metrics)
+- `/sandbox/.openclaw/milimo/claws/finance/` — Finance Claw workspace (invoices, revenue, expenses)
+- `/sandbox/.openclaw/milimo/claws/build/` — Build Claw workspace (prs, deployments, tasks, repo)
 
 ---
 *The milimo never stops. Work. Without working.*

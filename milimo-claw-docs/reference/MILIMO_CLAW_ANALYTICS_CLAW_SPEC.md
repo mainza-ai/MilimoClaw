@@ -1,26 +1,21 @@
 # MILIMO CLAW — ANALYTICS CLAW FUNCTIONAL SPECIFICATION
 
-> **NemoClaw Compliance Notice (2026-04-28)**
+> **NemoClaw Path Notice (2026-05-01)**
 >
-> This spec has been updated to comply with NVIDIA NemoClaw v0.0.28 and OpenShell v0.0.26 as documented at [docs.nvidia.com/nemoclaw/latest/](https://docs.nvidia.com/nemoclaw/latest/) and [docs.nvidia.com/openshell/latest/](https://docs.nvidia.com/openshell/latest/).
+> This spec uses `/sandbox/.openclaw/milimo/` as the canonical base directory. The older `/sandbox/.openclaw/milimo/` path is deprecated.
 >
-> **Key changes applied:**
+> **Key paths:**
 >
-> - **Filesystem paths migrated** from `/sandbox/<role>/` to `/sandbox/.openclaw-data/milimo/claws/<role>/` — NemoClaw's Landlock LSM makes `/sandbox/` root read-only; only `/sandbox/.openclaw-data/`, `/sandbox/.nemoclaw/`, and `/tmp/` are writable (see [Sandbox Hardening](https://docs.nvidia.com/nemoclaw/latest/deployment/sandbox-hardening.html)).
-> - **Shared analytics report path** updated from `/sandbox/analytics/reports/` to `/sandbox/.openclaw-data/milimo/claws/analytics/reports/` — same Landlock compliance reason.
-> - **`/sandbox/.openclaw/`** is read-only — contains immutable gateway config (auth tokens, CORS); agents cannot modify it.
-> - **`/sandbox/.openclaw/workspace/`** is the canonical workspace files location (SOUL.md, USER.md, AGENTS.md, MEMORY.md, etc.) — persisted via symlink into `.openclaw-data/`.
-> - **`/sandbox/.local/bin/milimo` does NOT exist** — was referenced in old policy YAMLs; Milimo bridge CLI is at `python3 /sandbox/.openclaw-data/milimo/orchestrator/bridge_cli.py`.
-> - **Credentials** are stored in the OpenShell gateway store only — NOT in `~/.nemoclaw/credentials.json` (which is legacy, auto-migrated and deleted on `nemoclaw onboard`). See [Credential Storage](https://docs.nvidia.com/nemoclaw/latest/security/credential-storage.html).
-> - **Network policy** uses `protocol: rest` with `enforcement` and `access`/`rules`/`deny_rules` for L7 HTTP inspection — see [OpenShell Policy Schema](https://docs.nvidia.com/openshell/latest/reference/policy-schema.html).
-> - **GitHub is NOT in the baseline policy** — it's a preset only, applied via `nemoclaw <name> policy-add github` or during onboarding tier selection.
-> - **`include_workdir: false`** in filesystem_policy — NemoClaw default; `/sandbox/` root is read-only.
-> - **Policy tiers**: Restricted / Balanced (default) / Open — determine which presets are included at onboarding.
-> - **`openshell policy set` REPLACES** the live policy (does NOT merge) — use `nemoclaw <name> policy-add` for non-destructive merging.
-> - **Sandbox process** runs as `sandbox:sandbox` (UID 999), not root — `run_as_user: root` is rejected by OpenShell.
-> - **`/sandbox/.openclaw/openclaw.json`** is read-only at runtime — `openclaw channels remove` cannot modify it from inside the sandbox; use `nemoclaw <name> channels remove` from the host.
+> - **Claw data**: `/sandbox/.openclaw/milimo/claws/<role>/` — each claw's sandbox, tools, and operational data
+> - **Bridge CLI**: `python3 /sandbox/.openclaw/milimo/milimo-blueprint/orchestrator/bridge_cli.py --command <name> --args '{...}'`
+> - **Mesh**: `/sandbox/.openclaw/milimo/mesh/` — heartbeats, inbox, outbox, topology
+> - **State**: `/sandbox/.openclaw/milimo/state/` — evolution history, deep work sessions
+> - **Health**: `/sandbox/.openclaw/milimo/health/` — per-squad health metrics
+> - **Evolution tools**: registered at `/sandbox/.openclaw/milimo/claws/<role>/sandbox/tools/` after evolution cycle runs
 >
-> If this spec conflicts with the official NemoClaw/OpenShell docs, the official docs win. See the [Ground Truth Hierarchy](../../.agents/AGENTS.md) for resolution rules.
+> **Evolution cycle**: Tools are NOT pre-installed. The weekly evolution cycle (observe → identify → propose → build → deploy) registers tools automatically. If `tool_count = 0`, that means the evolution cycle has not yet run — this is expected for fresh installs.
+>
+> If this spec conflicts with the official NemoClaw/OpenShell docs, the official docs win.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Give this prompt to any AI assistant when you need it to understand
@@ -136,7 +131,7 @@ Everything the Analytics Claw owns lives under `/sandbox/analytics`:
 
 **Shared-read output (readable by ALL claws):**
 ```
-/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json
+/sandbox/.openclaw/milimo/claws/analytics/reports/weekly-intelligence.json
 ```
 This is the only file in the entire Milimo Claw mesh that all claws
 can read directly without a message contract. It is written by the
@@ -145,7 +140,7 @@ for the Content, Ops, Finance, Build, and Assistant Claws.
 
 **What the Analytics Claw can read:**
 - Everything under `/sandbox/analytics/`
-- `/sandbox/.openclaw-data/milimo/claws/analytics/reports/` (owns and writes this)
+- `/sandbox/.openclaw/milimo/claws/analytics/reports/` (owns and writes this)
 
 **What the Analytics Claw CANNOT read under any circumstances:**
 - `/sandbox/clients/` — raw client contact data (Ops Claw only)
@@ -238,8 +233,8 @@ generates the weekly intelligence report.
 6. Generate anomaly detection pass against all baselines
 7. Generate opportunity scoring pass
 8. Synthesize narrative summary via inference
-9. Write complete report to `/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json`
-10. Archive previous report to `/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence-archive/{date}.json`
+9. Write complete report to `/sandbox/.openclaw/milimo/claws/analytics/reports/weekly-intelligence.json`
+10. Archive previous report to `/sandbox/.openclaw/milimo/claws/analytics/reports/weekly-intelligence-archive/{date}.json`
 
 **Report schema:**
 ```json
@@ -329,7 +324,7 @@ in near-real-time and dispatches alerts when thresholds are crossed.
 - Pull latest trend data from approved external endpoints
 - Compare against squad's content and product portfolio
 - Score opportunities on: potential impact, squad readiness, timing
-- Update `/sandbox/.openclaw-data/milimo/claws/analytics/reports/opportunity-scores.json`
+- Update `/sandbox/.openclaw/milimo/claws/analytics/reports/opportunity-scores.json`
 - If high-confidence opportunity (>0.85): dispatch immediately to
   relevant claw — do not wait for weekly report
 
@@ -563,7 +558,7 @@ access. Evolution cannot grant write access to any endpoint.
 **Most important thing to test first:** The shared filesystem mount.
 The weekly-intelligence.json file must be readable by ALL claws. Before
 building any intelligence generation, verify that:
-- Content Claw can read `/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json`
+- Content Claw can read `/sandbox/.openclaw/milimo/claws/analytics/reports/weekly-intelligence.json`
 - Ops Claw can read the same path
 - Finance Claw can read the same path
 - Build Claw can read the same path
