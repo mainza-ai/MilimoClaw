@@ -2,7 +2,7 @@
 
 **Summary**: Append-only record of all wiki operations.
 
-**Last updated**: 2026-04-30
+**Last updated**: 2026-05-06
 
 **Tags**: #log #meta
 
@@ -20,6 +20,27 @@ Each entry follows this format:
 **Changes**: What was changed
 **Notes**: Additional context
 ```
+
+---
+
+## 2026-05-02
+
+### 2026-05-02 14:30 — install.sh Plugin Installation Rewrite + Wiki Update
+
+**Pages**: installation-scripts.md, common-issues.md, index.md, log.md
+
+**Source**: Rewriting `install.sh` plugin installation for NemoClaw v0.0.33 / OpenClaw v2026.4.24 compatibility
+
+**Changes**:
+- **Runtime deploy (Steps 2-3)**: Build TypeScript + production node_modules on host (`npm install --omit=dev`); transfer only deployable artifacts (openclaw.plugin.json, package.json, dist/, node_modules/); stage at `/tmp/milimo-plugin-install/` instead of `.openclaw/extensions/milimo/` (avoids Landlock path restrictions during extraction)
+- **Step 9 (Plugin registration)**: `openclaw plugins install --force` + `--dangerously-force-unsafe-install` retry on exit 1; removed destructive `plugins.allow '["milimo"]'` override; verification via `openclaw plugins list | grep milimo` + `openclaw milimo --help`; proper exit code capture (not swallowed by `|| true`)
+- **Step 10 (Gateway restart)**: `openclaw gateway restart` + health check loop polling `openclaw doctor` for up to 30s (replaces blind `pkill openclaw; sleep 8`)
+- **generate_dockerfile()**: Added `--force`, removed `|| true`, added `openclaw plugins list | grep -q "milimo"` verification step; added `--legacy-peer-deps` to npm install
+- **deploy_via_dockerfile()**: Build production node_modules on host before creating build context; Dockerfile COPY includes pre-built dist/ + node_modules/ (no npm install needed in Docker build)
+- **Secondary fixes**: venv path `/sandbox/milimo-blueprint` → `/sandbox/.openclaw/milimo/milimo-blueprint`; gh CLI PATH via `/sandbox/.bashrc` (sandbox_exec_root writes PATH export since `.bashrc` is root-owned 444); Python .pth file path fixed to `/sandbox/.local/lib/python3.11/site-packages/`
+- **Wiki**: Updated installation-scripts.md (new install flow, Dockerfile pattern, directory structure); added Plugin and Config Issues section to common-issues.md documenting 3 fixed issues (plugin not registered, destructive plugins.allow override, gateway restart without health check); updated index.md last updated date and recent changes table
+
+**Notes**: Tested against running sandbox (my-assistant, NemoClaw v0.0.33, OpenClaw v2026.4.24). Plugin shows as "loaded" (51/108 plugins). `openclaw milimo --help` responds correctly. First `openclaw plugins install --force` returned exit 1 during gateway restart, retry with `--dangerously-force-unsafe-install` succeeded — handled in script.
 
 ---
 
@@ -616,4 +637,61 @@ Each entry follows this format:
 
 ---
 
+### 2026-05-06 09:20 — Bridge CLI Import Fix + Mesh Memory-Only Mode + mesh_config.yaml Indentation Fix
+
+**Pages**: bridge-cli.md, mesh-coordinator.md, mesh-config.md, bridge-tools.md, common-issues.md, log.md
+**Source**: Bug fix session — bridge CLI `send_to_claw` failing with ImportError + AttributeError
+**Changes**:
+- bridge-cli.md: Updated import architecture from relative/mixed to absolute `from orchestrator.X import Y`; documented PYTHONPATH requirement
+- mesh-coordinator.md: Added memory-only mode documentation (`_memory_only` flag, `_ensure_dir()` helper); documented graceful degradation when `/sandbox` unavailable
+- mesh-config.md: Fixed YAML indentation note; added assistant claw routes to message matrix tables
+- bridge-tools.md: Added PYTHONPATH injection in python-bridge.ts spawn env
+- common-issues.md: Added two new entries — Bridge CLI ImportError on send_to_claw, mesh_config.yaml message_matrix parsed as None
+**Notes**:
+- 4 bugs fixed: (1) bridge_cli.py relative imports, (2) python-bridge.ts missing PYTHONPATH, (3) mesh.py unguarded mkdir calls, (4) mesh_config.yaml broken indentation
+- All integration tests pass: `send_to_claw` returns `{"success": true, "delivered": true}`
+- TypeScript build compiles clean after installing @types/blessed
+
+---
+
 *This log is append-only. Never delete entries.*
+
+---
+
+## 2026-05-12
+
+### 2026-05-12 14:00 — System Audit & Remediation (11 Critical Fixes)
+
+**Pages**: index.md, log.md
+**Source**: User request for codebase audit and Milimo Claw fix
+**Changes**:
+- **BUG 1**: Fixed `ContentClaw.startup()` hard crash. Passed default constructors for `PrivacyRouter` and `ToolRegistry` when not provided.
+- **BUG 2**: Fixed `generate_draft` handler stub. Now wires task payload directly to the brief management pipeline.
+- **BUG 3**: Reduced `minimum_actions` threshold in `evolution_config.yaml` from 20 to 5 to unblock evolution bootstrapping.
+- **BUG 4**: Updated `EvolutionManager` in TypeScript to use sandbox-aware path resolution (`resolveToolsDir()`) to match Python orchestrator expectations.
+- **BUG 5**: Suppressed `oom_score_adj` stderr noise in `claw-launcher-service.ts` to prevent log pollution.
+- **BUG 6**: Added NemoClaw credential store fallback for `GITHUB_TOKEN` in `Build Claw` injection.
+- **BUG 7**: Fixed `InboxPoller` race condition. Reordered launcher startup to bind handlers *before* starting the message poller to prevent dropped messages.
+- **BUG 8**: Installed `@types/blessed` to resolve TypeScript compilation errors.
+- **BUG 9**: Deprecated `callPython` in `python-bridge.ts` to prevent code injection risks.
+- **BUG 10**: Fixed false positive `_is_sandbox()` detection in `milimo_paths.py` by requiring `/sandbox` to actually exist (not just checking `NEMOCLAW_MODEL`).
+- **BUG 11**: Wrapped `ToolRegistry` directory creation in a try/except block to allow for graceful memory-only fallback when directory creation fails on the host.
+
+**Notes**: All fixes deployed. Path resolution is robust across host and sandbox, ContentClaw starts successfully, evolution thresholds are reachable, and all integration tests pass perfectly.
+
+---
+
+*This log is append-only. Never delete entries.*
+### 2026-05-12 19:00 — Ops Claw Messaging Gaps & IDE Error Fixes
+
+**Pages**: log.md, ops-claw.md
+**Source**: User request to investigate missing data and handlers
+**Changes**:
+- **BUG 12**: Fixed missing `project_id` in Ops payload handling. Updated `ProjectManager` and `OpsClaw` handlers to correctly unwrap the `payload` dict from incoming messages.
+- **BUG 13**: Implemented and registered `_handle_feature_brief_acknowledged` in `OpsClaw` to fix missing handler warnings during startup. Fixed `float.__new__` map and string annotations.
+- **BUG 14**: Corrected message type from `brief` to `project_brief` in `signal_dispatcher.py` to match `ContentClaw`'s registered handlers, fixing the issue of messages being silently discarded to the processed folder. Enforced `str()` on `entity_id` in `OpsLogEntry`.
+- Fixed Ruff linter errors by removing unused `project_id` assignments in `_handle_invoice_ready` and `_handle_payment_overdue`.
+
+**Notes**: Ops Claw is now fully stable and correctly routing payloads.
+
+---
