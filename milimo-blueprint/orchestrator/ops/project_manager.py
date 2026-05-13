@@ -177,12 +177,13 @@ class ProjectManager:
         return status
 
     def handle_deliverable_complete(self, message: dict[str, Any]) -> None:
-        project_id = message.get("project_id")
+        payload = message.get("payload", message)
+        project_id = payload.get("project_id")
         if not project_id:
             logger.warning("deliverable_complete missing project_id")
             return
 
-        client_id = message.get("client_id")
+        client_id = payload.get("client_id")
         if not client_id:
             client_id = self._find_client_for_project(project_id)
 
@@ -200,7 +201,7 @@ class ProjectManager:
         status.last_updated = datetime.now(timezone.utc).isoformat()
         self._save_project_status(client_id, project_id, status)
 
-        deliverables_summary = self._format_deliverables_summary(message)
+        deliverables_summary = self._format_deliverables_summary(payload)
 
         delivery_draft = self._draft_delivery_message(
             client_id=client_id,
@@ -230,12 +231,13 @@ class ProjectManager:
         )
 
     def handle_deploy_complete(self, message: dict[str, Any]) -> None:
-        project_id = message.get("project_id")
+        payload = message.get("payload", message)
+        project_id = payload.get("project_id")
         if not project_id:
             logger.warning("deploy_complete missing project_id")
             return
 
-        client_id = message.get("client_id") or self._find_client_for_project(
+        client_id = payload.get("client_id") or self._find_client_for_project(
             project_id
         )
         if not client_id:
@@ -247,8 +249,8 @@ class ProjectManager:
             status.last_updated = datetime.now(timezone.utc).isoformat()
             self._save_project_status(client_id, project_id, status)
 
-        deploy_url = message.get("deploy_url") or message.get("url", "")
-        version = message.get("version", "unknown")
+        deploy_url = payload.get("deploy_url") or payload.get("url", "")
+        version = payload.get("version", "unknown")
 
         notification_draft = (
             f"Deployment complete for project {project_id}.\n\n"

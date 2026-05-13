@@ -96,7 +96,7 @@ class OpsSignalDispatcher:
             "platform_targets": platform_targets,
         }
 
-        self._send("brief", recipient_role, payload)
+        self._send("project_brief", recipient_role, payload)
 
         self._operational_log.append(
             OpsLogEntry(
@@ -264,8 +264,11 @@ class OpsSignalDispatcher:
                     OpsLogEntry(
                         timestamp=datetime.now(timezone.utc).isoformat(),
                         action_type=f"{message_type}_send_failed",
-                        entity_id=payload.get(
-                            "project_id", payload.get("client_id", "unknown")
+                        entity_id=str(
+                            payload.get(
+                                "project_id", payload.get("client_id", "unknown")
+                            )
+                            or "unknown"
                         ),
                         outcome="failed",
                         details={
@@ -285,8 +288,9 @@ class OpsSignalDispatcher:
                 OpsLogEntry(
                     timestamp=datetime.now(timezone.utc).isoformat(),
                     action_type=f"{message_type}_send_exception",
-                    entity_id=payload.get(
-                        "project_id", payload.get("client_id", "unknown")
+                    entity_id=str(
+                        payload.get("project_id", payload.get("client_id", "unknown"))
+                        or "unknown"
                     ),
                     outcome="failed",
                     details={"recipient_role": recipient_role, "error": str(e)},

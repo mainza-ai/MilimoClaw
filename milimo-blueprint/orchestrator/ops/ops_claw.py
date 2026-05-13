@@ -360,6 +360,9 @@ class OpsClaw:
         self._inbound_handlers["brief_acknowledged"] = self._handle_brief_acknowledged
         self._inbound_handlers["assistant_query"] = self._handle_assistant_query
         self._inbound_handlers["assistant_task"] = self._handle_assistant_task
+        self._inbound_handlers["feature_brief_acknowledged"] = (
+            self._handle_feature_brief_acknowledged
+        )
 
     def _register_approval_handlers(self) -> None:
         """Register default approval thresholds for ops actions.
@@ -406,12 +409,21 @@ class OpsClaw:
         }
 
     def _handle_pricing_response(self, message: dict[str, Any]) -> dict[str, Any]:
-        project_id = message.get("project_id") or message.get("query_id", "").replace(
+        payload = message.get("payload", message)
+        project_id = payload.get("project_id") or payload.get("query_id", "").replace(
             "query_", "project_"
         )
-        floor_price = float(message.get("floor", message.get("floor_price", 0)))
-        ceiling_price = float(message.get("ceiling", message.get("ceiling_price", 0)))
-        scope_notes = message.get("notes", message.get("scope_notes", ""))
+        floor_val = payload.get("floor")
+        if floor_val is None:
+            floor_val = payload.get("floor_price", 0)
+        floor_price = float(floor_val if floor_val is not None else 0)
+
+        ceil_val = payload.get("ceiling")
+        if ceil_val is None:
+            ceil_val = payload.get("ceiling_price", 0)
+        ceiling_price = float(ceil_val if ceil_val is not None else 0)
+
+        scope_notes = str(payload.get("notes") or payload.get("scope_notes", ""))
 
         if self._intake_manager:
             self._intake_manager.handle_pricing_response(
@@ -435,9 +447,10 @@ class OpsClaw:
         }
 
     def _handle_invoice_ready(self, message: dict[str, Any]) -> dict[str, Any]:
-        invoice_id = message.get("invoice_id")
-        client_id = message.get("client_id")
-        amount = message.get("amount")
+        payload = message.get("payload", message)
+        invoice_id = payload.get("invoice_id")
+        client_id = payload.get("client_id")
+        amount = payload.get("amount")
 
         if self._approval_handler:
             self._approval_handler.log_auto(
@@ -453,10 +466,11 @@ class OpsClaw:
         }
 
     def _handle_payment_overdue(self, message: dict[str, Any]) -> dict[str, Any]:
-        invoice_id = message.get("invoice_id")
-        client_id = message.get("client_id")
-        days_overdue = message.get("days_overdue", 0)
-        amount = message.get("amount", 0)
+        payload = message.get("payload", message)
+        invoice_id = payload.get("invoice_id")
+        client_id = payload.get("client_id")
+        days_overdue = payload.get("days_overdue", 0)
+        amount = payload.get("amount", 0)
 
         if self._approval_handler:
             self._approval_handler.queue_review(
@@ -481,8 +495,9 @@ class OpsClaw:
         }
 
     def _handle_brief_acknowledged(self, message: dict[str, Any]) -> dict[str, Any]:
-        project_id = message.get("project_id")
-        estimated_time = message.get("estimated_first_draft_time")
+        payload = message.get("payload", message)
+        project_id = payload.get("project_id")
+        estimated_time = payload.get("estimated_first_draft_time")
 
         if self._operational_log:
             self._operational_log.append(
@@ -498,6 +513,30 @@ class OpsClaw:
             "status": "processed",
             "role": "ops",
             "message_type": "brief_acknowledged",
+            "project_id": project_id,
+        }
+
+    def _handle_feature_brief_acknowledged(
+        self, message: dict[str, Any]
+    ) -> dict[str, Any]:
+        payload = message.get("payload", message)
+        project_id = payload.get("project_id")
+        estimated_time = payload.get("estimated_first_draft_time")
+
+        if self._operational_log:
+            self._operational_log.append(
+                OpsLogEntry(
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    action_type="feature_brief_acknowledged",
+                    entity_id=project_id or "unknown",
+                    outcome="success",
+                    details={"estimated_time": estimated_time},
+                )
+            )
+        return {
+            "status": "processed",
+            "role": "ops",
+            "message_type": "feature_brief_acknowledged",
             "project_id": project_id,
         }
 
