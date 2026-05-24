@@ -12,10 +12,8 @@ from pathlib import Path
 import pytest
 
 # Import the module under test
-sys.path.insert(
-    0, str(Path(__file__).parent.parent.parent / "milimo-blueprint" / "orchestrator")
-)
-from assistant_setup import (
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "milimo-blueprint"))
+from orchestrator.assistant_setup import (
     AssistantConfig,
     TEMPLATE_CLAW_MAP,
     load_assistant_config,
@@ -175,7 +173,7 @@ class TestLoadAssistantConfig:
         config_path.write_text(json.dumps(sample_config), encoding="utf-8")
 
         # Patch the global path
-        import assistant_setup
+        from orchestrator import assistant_setup
 
         monkeypatch.setattr(assistant_setup, "MILIMO_CONFIG_PATH", config_path)
 
@@ -192,7 +190,7 @@ class TestLoadAssistantConfig:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Should raise FileNotFoundError when config doesn't exist."""
-        import assistant_setup
+        from orchestrator import assistant_setup
 
         monkeypatch.setattr(
             assistant_setup,
@@ -221,7 +219,7 @@ class TestLoadAssistantConfig:
         config_path = temp_config_dir / "config.json"
         config_path.write_text(json.dumps(config_without_name), encoding="utf-8")
 
-        import assistant_setup
+        from orchestrator import assistant_setup
 
         monkeypatch.setattr(assistant_setup, "MILIMO_CONFIG_PATH", config_path)
 
@@ -243,7 +241,7 @@ class TestLoadAssistantConfig:
         config_path = temp_config_dir / "config.json"
         config_path.write_text(json.dumps(minimal_config), encoding="utf-8")
 
-        import assistant_setup
+        from orchestrator import assistant_setup
 
         monkeypatch.setattr(assistant_setup, "MILIMO_CONFIG_PATH", config_path)
 
@@ -262,7 +260,7 @@ class TestRenderTemplate:
         self, sample_template: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """All 8 placeholders should be substituted."""
-        import assistant_setup
+        from orchestrator import assistant_setup
 
         monkeypatch.setattr(assistant_setup, "TEMPLATE_PATH", sample_template)
 
@@ -299,7 +297,7 @@ class TestRenderTemplate:
         # This template has {{assistant_name}} but we won't substitute it
         template_path.write_text("Name: {{assistant_name}}. Extra content here.")
 
-        import assistant_setup
+        from orchestrator import assistant_setup
 
         monkeypatch.setattr(assistant_setup, "TEMPLATE_PATH", template_path)
 
@@ -350,7 +348,7 @@ class TestRenderTemplate:
         template_content = "\n".join(all_placeholders)
         template_path.write_text(template_content)
 
-        import assistant_setup
+        from orchestrator import assistant_setup
 
         monkeypatch.setattr(assistant_setup, "TEMPLATE_PATH", template_path)
 
@@ -381,7 +379,7 @@ class TestRenderTemplate:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Should raise FileNotFoundError if template file doesn't exist."""
-        import assistant_setup
+        from orchestrator import assistant_setup
 
         monkeypatch.setattr(
             assistant_setup,
@@ -454,7 +452,7 @@ class TestVerifySetup:
         (agents_dir / "system.md").write_text("rendered content")
         (agents_dir / "config.yaml").write_text("agent: {}")
 
-        import assistant_setup
+        from orchestrator import assistant_setup
 
         monkeypatch.setattr(assistant_setup, "MILIMO_CONFIG_PATH", config_path)
         monkeypatch.setattr(assistant_setup, "TEMPLATE_PATH", sample_template)

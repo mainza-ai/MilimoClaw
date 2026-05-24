@@ -8,6 +8,8 @@ exports.default = register;
 const cli_js_1 = require("./cli.js");
 const slash_js_1 = require("./commands/slash.js");
 const squad_js_1 = require("./commands/squad.js");
+const runtime_context_js_1 = require("./hooks/runtime-context.js");
+const claw_launcher_service_js_1 = require("./hooks/claw-launcher-service.js");
 const config_js_1 = require("./onboard/config.js");
 const onboard_js_1 = require("./commands/onboard.js");
 /** All valid claw roles (excluding "solo" which is a mode indicator). */
@@ -60,9 +62,18 @@ function register(api) {
     // 3. Load onboarding config for banner display
     const onboardConfig = (0, config_js_1.loadOnboardConfig)();
     const config = getPluginConfig(api);
-    // 4. Auto-resume check for Finals mode
+    // 4. Register NemoClaw lifecycle hooks (squad context + cost guard)
+    try {
+        (0, runtime_context_js_1.registerMilimoRuntimeContext)(api, config);
+    }
+    catch (err) {
+        api.logger.warn(`[milimo] Could not register runtime hooks: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    // 4b. Register claw launcher as managed OpenClaw service
+    (0, claw_launcher_service_js_1.registerClawLauncherService)(api, config);
+    // 5. Auto-resume check for Finals mode
     (0, squad_js_1.checkFinalsModeAutoResume)(api.logger);
-    // 5. Display registration banner with onboarding status (once per process)
+    // 6. Display registration banner with onboarding status (once per process)
     if (!_bannerDisplayed) {
         _bannerDisplayed = true;
         const roleDisplay = (0, onboard_js_1.formatRoleDisplay)((onboardConfig ?? { clawRole: config.clawRole, activeClaws: [] })) || "not assigned";

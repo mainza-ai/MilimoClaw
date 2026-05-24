@@ -15,6 +15,8 @@ import type { Command } from "commander";
 import { registerCliCommands } from "./cli.js";
 import { handleSlashCommand } from "./commands/slash.js";
 import { checkFinalsModeAutoResume } from "./commands/squad.js";
+import { registerMilimoRuntimeContext } from "./hooks/runtime-context.js";
+import { registerClawLauncherService } from "./hooks/claw-launcher-service.js";
 import { loadOnboardConfig, type MilimoOnboardConfig } from "./onboard/config.js";
 import { formatRoleDisplay } from "./commands/onboard.js";
 
@@ -89,8 +91,17 @@ export interface OpenClawPluginApi {
   logger: PluginLogger;
   registerCommand: (command: PluginCommandDefinition) => void;
   registerCli: (registrar: PluginCliRegistrar, opts?: { commands?: string[] }) => void;
+  registerService?: (service: {
+    id: string;
+    start: (ctx: { config: OpenClawConfig; logger: PluginLogger }) => void | Promise<void>;
+    stop?: (ctx: { config: OpenClawConfig; logger: PluginLogger }) => void | Promise<void>;
+  }) => void;
   resolvePath: (input: string) => string;
-  on: (hookName: string, handler: (...args: unknown[]) => void) => void;
+  on: (
+    hookName: string,
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+    handler: (...args: unknown[]) => unknown | Promise<unknown>,
+  ) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -175,10 +186,22 @@ export default function register(api: OpenClawPluginApi): void {
   const onboardConfig = loadOnboardConfig();
   const config = getPluginConfig(api);
 
-  // 4. Auto-resume check for Finals mode
+  // 4. Register NemoClaw lifecycle hooks (squad context + cost guard)
+  try {
+    registerMilimoRuntimeContext(api, config);
+  } catch (err) {
+    api.logger.warn(
+      `[milimo] Could not register runtime hooks: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  // 4b. Register claw launcher as managed OpenClaw service
+  registerClawLauncherService(api, config);
+
+  // 5. Auto-resume check for Finals mode
   checkFinalsModeAutoResume(api.logger);
 
-  // 5. Display registration banner with onboarding status (once per process)
+  // 6. Display registration banner with onboarding status (once per process)
   if (!_bannerDisplayed) {
     _bannerDisplayed = true;
     const roleDisplay =

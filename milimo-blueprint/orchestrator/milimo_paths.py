@@ -45,10 +45,16 @@ _LEGACY_CLAWS_BASE = Path("/sandbox")
 
 
 def _is_sandbox() -> bool:
+    """Detect if running inside a NemoClaw sandbox container.
+
+    NEMOCLAW_MODEL alone is NOT sufficient — it is also set on the host
+    when nemoclaw is configured. We require the sandbox data directory
+    to actually exist on the filesystem.
+    """
     return (
-        bool(os.environ.get("NEMOCLAW_MODEL"))
-        or _SANDBOX_MILIMO_DIR.is_dir()
+        _SANDBOX_MILIMO_DIR.is_dir()
         or _LEGACY_OPENCLAW_DATA_DIR.is_dir()
+        or (bool(os.environ.get("NEMOCLAW_MODEL")) and Path("/sandbox").is_dir())
     )
 
 
@@ -77,9 +83,10 @@ def _resolve_base() -> Path:
 def _resolve_claws_base() -> Path:
     """Return the base directory for claw mount points.
 
-    In a NemoClaw sandbox /sandbox/ is read-only (Landlock).
-    Claw data directories live under /sandbox/.openclaw/milimo/claws/<role>.
-    Falls back to /sandbox/<role> for non-sandbox environments.
+    In a NemoClaw sandbox, claw data directories live under
+    /sandbox/.openclaw/milimo/claws/<role>.
+    On the host, they live under ~/.milimo/claws/<role> or
+    ~/.openclaw/milimo/claws/<role>.
     """
     if _SANDBOX_CLAWS_BASE.is_dir():
         return _SANDBOX_CLAWS_BASE
@@ -88,7 +95,8 @@ def _resolve_claws_base() -> Path:
         return legacy_sandbox_claws
     if _is_sandbox():
         return _SANDBOX_CLAWS_BASE
-    return _LEGACY_CLAWS_BASE
+    # Host fallback: claws under the resolved MILIMO base
+    return _resolve_base() / "claws"
 
 
 def claw_base(role: str) -> Path:

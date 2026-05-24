@@ -257,10 +257,13 @@ class BuildClaw:
             self._mesh_gateway.send(
                 {
                     "message_id": original_message.get("message_id", ""),
-                    "message_type": result.get("message_type", "assistant_response"),
+                    "message_type": "assistant_response",
                     "sender_role": "build",
                     "recipient_role": "assistant",
-                    "payload": result,
+                    "payload": {
+                        "original_message_id": original_message.get("message_id", ""),
+                        "response": result,
+                    },
                     "squad_id": self._squad_id,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                 }

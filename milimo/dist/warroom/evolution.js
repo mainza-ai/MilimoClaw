@@ -7,14 +7,26 @@ const fs_1 = require("fs");
 const path_1 = require("path");
 const os_1 = require("os");
 const python_bridge_js_1 = require("../lib/python-bridge.js");
+/**
+ * Resolve the tools directory using sandbox-aware path resolution.
+ * Matches the Python milimo_paths.py logic:
+ *   - Sandbox: /sandbox/.openclaw/milimo/tools/<squadId>
+ *   - Host: ~/.openclaw/milimo/tools/<squadId>
+ */
+function resolveToolsDir(squadId) {
+    const sandboxPath = "/sandbox/.openclaw/milimo/tools";
+    if ((0, fs_1.existsSync)(sandboxPath))
+        return (0, path_1.join)(sandboxPath, squadId);
+    const home = process.env.HOME || process.env.USERPROFILE || (0, os_1.homedir)() || "/tmp";
+    return (0, path_1.join)(home, ".openclaw/milimo", "tools", squadId);
+}
 class EvolutionManager {
     squadId;
     toolsDir;
     blueprintDir;
     constructor(squadId, blueprintDir) {
         this.squadId = squadId;
-        const home = process.env.HOME || process.env.USERPROFILE || (0, os_1.homedir)() || "/tmp";
-        this.toolsDir = (0, path_1.join)(home, ".openclaw/milimo", "tools", squadId);
+        this.toolsDir = resolveToolsDir(squadId);
         this.blueprintDir = blueprintDir || process.env.MILIMO_BLUEPRINT_DIR || "/opt/milimo-blueprint";
     }
     showEvolutionLog() {

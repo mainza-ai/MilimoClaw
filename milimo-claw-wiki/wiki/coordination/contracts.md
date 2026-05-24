@@ -4,7 +4,7 @@
 
 **Sources**: `milimo-blueprint/orchestrator/contracts.py`
 
-**Last updated**: 2026-04-23
+**Last updated**: 2026-05-24
 
 **Tags**: #coordination #contracts
 
@@ -109,7 +109,7 @@ class ValidationResult:
 
 | Type | From | To | Required Payload |
 |------|------|-----|------------------|
-| `pricing_response` | finance | ops | project_id, floor_price, ceiling_price |
+| `pricing_response` | finance | ops | query_id, floor, ceiling *(or project_id, floor_price, ceiling_price)* |
 | `invoice_ready` | finance | ops | project_id, client_id, amount |
 | `payment_overdue` | finance | ops | client_id, invoice_id, days_overdue |
 | `revenue_summary` | finance | analytics | week_total, invoices_paid |
@@ -121,6 +121,14 @@ class ValidationResult:
 | `deploy_complete` | build | ops | project_id, deploy_url |
 | `shipping_summary` | build | content | week_of, prs_merged |
 | `behavior_query` | build | analytics | query, lookback_days |
+
+### Assistant Messages
+
+| Type | From | To | Required Payload |
+|------|------|-----|------------------|
+| `assistant_query` | assistant | any | query_type |
+| `assistant_task` | assistant | any | task_description, deadline |
+| `assistant_response` | any | assistant | query_id, response *(or original_message_id, response)* |
 
 ---
 

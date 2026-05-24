@@ -5,7 +5,7 @@
 **Sources**:
 - `milimo-claw-docs/troubleshooting/ISSUES_AND_FIXES_AUDIT.md`
 
-**Last updated**: 2026-04-29
+**Last updated**: 2026-05-06
 
 **Tags**: #troubleshooting #issues #fixes
 
@@ -182,6 +182,43 @@ self._voice_manager = BrandVoiceManager(
 
 ## Assistant (Lucy) Issues
 
+### Bridge CLI ImportError on send_to_claw (FIXED)
+
+**Symptom**:
+```
+ModuleNotFoundError: No module named 'milimo_paths'
+ImportError: attempted relative import with no known parent package
+```
+
+**Cause** (before 2026-05-06 fix): `bridge_cli.py` used bare `import milimo_paths` and relative `from .contracts import ...` imports. These fail when the script is executed directly (`python3 path/to/bridge_cli.py`) because Python cannot resolve relative imports without a package context, and bare imports only work if CWD happens to be `orchestrator/`.
+
+**Fix** (2026-05-06):
+- Converted all 22 relative imports to absolute: `from orchestrator.contracts import ...`
+- Converted all 26 `milimo_paths.X` references to direct imports
+- Added `PYTHONPATH: options.blueprintDir` to spawn env in `python-bridge.ts`
+
+**See also**: [[bridge-cli]] — Import architecture documentation
+
+---
+
+### mesh_config.yaml message_matrix Parsed as None (FIXED)
+
+**Symptom**:
+```
+AttributeError: 'NoneType' object has no attribute 'get'
+```
+at `contracts.py:669` in `ContractValidator.validate()`.
+
+**Cause** (before 2026-05-06 fix): The `message_matrix` sub-keys (`content:`, `ops:`, etc.) were at YAML root level instead of indented under `message_matrix:`. PyYAML parsed the key as `message_matrix: null`, causing `self._matrix` to be `None` in `ContractValidator.__init__`.
+
+**Fix** (2026-05-06): Indented all message_matrix sub-keys with 2 spaces under `message_matrix:`.
+
+**Verification**: `python3 -c "import yaml; d=yaml.safe_load(open('mesh_config.yaml')); print(type(d.get('message_matrix')))"` should return `<class 'dict'>`, not `<class 'NoneType'>`.
+
+**See also**: [[mesh-config]] — YAML indentation note
+
+---
+
 ### Node.js Network Policy Blocked
 
 **Symptom**:
@@ -217,6 +254,47 @@ binaries:
 
 ## Plugin and Config Issues
 
+### Plugin Not Registered After Install (FIXED)
+
+**Symptom**: `openclaw plugins list` shows no `milimo` entry; `openclaw milimo --help` returns "unknown command".
+
+**Cause** (before 2026-05-02 fix): Install flow transferred full plugin source to `.openclaw/extensions/milimo/` and attempted `npm install` + `npx tsc` inside the sandbox. This failed silently because: (1) sandbox network restrictions blocked npm package downloads, (2) build errors were swallowed by `|| true`, (3) staging directory was cleaned before verification could confirm install.
+
+**Fix** (2026-05-02):
+- Build TypeScript + production `node_modules` on host (`npm install --omit=dev` on host)
+- Transfer only deployable artifacts: `openclaw.plugin.json`, `package.json`, `dist/`, `node_modules/`
+- Stage at `/tmp/milimo-plugin-install/` (not `.openclaw/extensions/`) to avoid Landlock path restrictions
+- Use `openclaw plugins install --force /tmp/milimo-plugin-install/`
+- Retry with `--dangerously-force-unsafe-install` on exit code 1
+- Verify: `openclaw plugins list | grep milimo` must show `loaded` before continuing
+- Clean up staging dir only after successful verification
+
+**See also**: [[installation-scripts]] — Full install flow documentation
+
+---
+
+### Destructive `plugins.allow` Override (FIXED)
+
+**Symptom**: After install, all other OpenClaw plugins (telegram, github-copilot, etc.) disappear from `openclaw plugins list` or appear disabled.
+
+**Cause**: Previous install script ran `openclaw config set plugins.allow '["milimo"]'` which sets a flat whitelist — only the listed plugins are enabled, all others are disabled.
+
+**Fix** (2026-05-02): Removed entirely. `openclaw plugins install` already registers the plugin correctly without needing a plugins.allow override. The proper way to register a plugin is `openclaw plugins install --force <path>` — this adds the plugin to `plugins.entries` with default enabled state.
+
+**See also**: [[openclaw-controls]] — Plugin system security controls
+
+---
+
+### Gateway Restart Without Health Check (FIXED)
+
+**Symptom**: `openclaw plugins install` returns success but plugin not loaded; `openclaw milimo --help` still returns "unknown command".
+
+**Cause**: Gateway restart (`pkill openclaw; sleep 8`) was unreliable — `sleep 8` was a blind wait that didn't confirm the gateway actually restarted. If the gateway took longer than 8s, subsequent commands ran against a gateway that hadn't fully reloaded plugins.
+
+**Fix** (2026-05-02): `openclaw gateway restart` (graceful) followed by health check loop polling `openclaw doctor` for up to 30s until gateway is confirmed ready.
+
+---
+
 ### acpx Plugin Config Warning (BENIGN)
 
 **Symptom**:
@@ -231,6 +309,29 @@ plugins.entries.acpx: plugin disabled (bundled (disabled by default)) but config
 **Fix**: No action needed. The warning is purely informational. If you want to suppress it, remove the `plugins.entries.acpx` config block from `openclaw.json` (or run `openclaw doctor --fix` which can quarantine unused plugin config). Do **not** enable `acpx` in a NemoClaw sandbox — it would not function and is flagged by `openclaw security audit` as a dangerous flag when `permissionMode=approve-all`.
 
 **See also**: [[openclaw-controls]] — Plugin system security controls
+
+---
+
+### `kubectl not found in $PATH` during `--solo` deploy
+
+**Symptom**: Running `./install.sh --solo` produces:
+```
+OCI runtime exec failed: exec failed: unable to start container process: exec: "kubectl": executable file not found in $PATH
+```
+
+**Cause**: `install.sh` helper functions (`sandbox_exec`, `sandbox_exec_root`, `sandbox_cp`) and direct `docker exec "$gateway" kubectl exec` calls assumed a K8s-in-Docker architecture where `kubectl` exists inside the gateway container. In `--solo` local deploy mode, the sandbox is a plain Docker container with no kubectl.
+
+**Fix** (2026-05-15, BUG 16): Helpers now auto-detect whether `kubectl` exists inside the gateway container. If not found, they fall back to direct `docker exec "$SANDBOX_NAME"` — the correct path for `--solo` local deploy. All raw kubectl invocations replaced with helper calls.
+
+---
+
+### `requests` Module Not Found (Deprecated Dependency)
+
+**Symptom**: Python import errors for `requests` module inside the sandbox.
+
+**Cause**: The `requests` library was removed as a dependency (commit `b2741c5`). All HTTP calls now route through NemoClaw's L7 inference proxy via `httpx`.
+
+**Fix**: Ensure no code imports `requests` directly. Use `httpx` for any HTTP calls that bypass the proxy. The `install.sh` venv setup (`pip install ... httpx ...`) includes `httpx` as a replacement.
 
 ---
 

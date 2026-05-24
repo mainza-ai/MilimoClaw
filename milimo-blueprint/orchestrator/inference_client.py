@@ -6,12 +6,28 @@ NVIDIA NIM Inference Client with fallback chain and category-based model routing
 
 Wraps the NVIDIA NIM API (OpenAI-compatible) for all inference needs across
 Build, Content, and Ops claws. Implements the fallback chain defined in
-build_init.py (NEMOCLAW_MODEL → claude-sonnet-4-6 → gemini-3.1-pro) and
+build_init.py (NEMOCLAW_MODEL → llama-3.3-70b → mixtral-8x22b) and
 category-based model/temperature selection from BUILD_CATEGORIES.
 
+Architecture note (post-audit 2026-05-11):
+    Inside the NemoClaw sandbox, all HTTP traffic is routed through the
+    OpenShell L7 proxy automatically. This client no longer manually
+    configures proxy settings or disables SSL verification — the gateway
+    handles TLS termination and credential injection transparently.
+
+    The client uses httpx (already a sandbox dependency) instead of
+    stdlib urllib for better timeout handling and connection pooling.
+
+    Milimo-unique features PRESERVED (no NemoClaw equivalent):
+    - InferenceUsage tracking (token cost guard)
+    - CATEGORY_MODELS routing (temperature per task category)
+    - Fallback chain retry logic
+
 Environment variables:
-    NVIDIA_API_KEY — API key for NVIDIA NIM endpoint
+    NVIDIA_API_KEY — API key for NVIDIA NIM endpoint (injected by gateway in sandbox)
     NVIDIA_API_BASE — Base URL (default: https://integrate.api.nvidia.com/v1)
+    NEMOCLAW_MODEL — Active model from NemoClaw (set by the sandbox)
+    NEMOCLAW_INFERENCE_BASE_URL — Proxy-routed inference endpoint (set by NemoClaw)
     INFERENCE_FALLBACK — Comma-separated fallback model list (optional override)
 """
 
@@ -21,7 +37,6 @@ import json
 import logging
 import os
 import time
-import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -85,9 +100,34 @@ class InferenceResponse:
     error: str | None = None
 
 
+def _resolve_api_base() -> str:
+    """Resolve the inference API base URL.
+
+    Priority:
+    1. NEMOCLAW_INFERENCE_BASE_URL (set by NemoClaw sandbox — proxy-routed)
+    2. NVIDIA_API_BASE (explicit override)
+    3. Default NVIDIA NIM endpoint
+
+    Inside the sandbox the L7 proxy intercepts outbound HTTP transparently,
+    so all three paths work without manual proxy configuration.
+    """
+    inference_base = os.environ.get("NEMOCLAW_INFERENCE_BASE_URL", "")
+    if inference_base:
+        return inference_base.rstrip("/")
+    return DEFAULT_API_BASE
+
+
+def _is_sandbox_mode() -> bool:
+    """Return True when running inside a NemoClaw sandbox."""
+    return bool(os.environ.get("NEMOCLAW_MODEL"))
+
+
 class NvidiaInferenceClient:
     """
     NVIDIA NIM inference client with automatic fallback chain retry.
+
+    Routes all HTTP through httpx, which respects the L7 proxy automatically
+    inside the NemoClaw sandbox. No manual proxy or SSL configuration needed.
 
     Usage:
         client = NvidiaInferenceClient()
@@ -104,34 +144,31 @@ class NvidiaInferenceClient:
         max_retries: int = 3,
         timeout: int = 120,
     ) -> None:
-        _sandbox_mode = bool(os.environ.get("NEMOCLAW_MODEL"))
-        _proxy_host = os.environ.get("NEMOCLAW_PROXY_HOST", "10.200.0.1")
-        _proxy_port = os.environ.get("NEMOCLAW_PROXY_PORT", "3128")
+        self._sandbox_mode = _is_sandbox_mode()
 
         self.api_key = api_key or os.environ.get("NVIDIA_API_KEY", "")
-        self.api_base = (api_base or DEFAULT_API_BASE).rstrip("/")
+        self.api_base = (api_base or _resolve_api_base()).rstrip("/")
         self.fallback_chain = fallback_chain or DEFAULT_FALLBACK_CHAIN
         self.max_retries = max_retries
         self.timeout = timeout
 
         self._usage_history: list[InferenceUsage] = []
         self._total_cost_usd: float = 0.0
-        self._sandbox_mode = _sandbox_mode
 
-        if _sandbox_mode:
-            inference_base = os.environ.get("NEMOCLAW_INFERENCE_BASE_URL", "")
-            if inference_base:
-                self.api_base = inference_base.rstrip("/")
-            if not self.api_key:
-                self.api_key = "unused"
-            proxy_url = f"http://{_proxy_host}:{_proxy_port}"
-            os.environ["HTTP_PROXY"] = proxy_url
-            os.environ["HTTPS_PROXY"] = proxy_url
-            logger.info(
-                "NvidiaInferenceClient: sandbox mode — using proxy %s", proxy_url
-            )
-        elif not self.api_key:
+        # Inside the sandbox the gateway injects credentials into the
+        # Authorization header automatically — use a sentinel value so
+        # the client doesn't refuse to make requests.
+        if self._sandbox_mode and not self.api_key:
+            self.api_key = "unused"
+
+        if not self.api_key and not self._sandbox_mode:
             logger.warning("NVIDIA_API_KEY not set — inference calls will fail")
+
+        logger.info(
+            "NvidiaInferenceClient: base=%s sandbox=%s",
+            self.api_base,
+            self._sandbox_mode,
+        )
 
     def complete(
         self,
@@ -239,7 +276,13 @@ class NvidiaInferenceClient:
         max_tokens: int,
         system_prompt: str | None = None,
     ) -> dict[str, Any]:
-        """Make a single API call to the specified model using stdlib urllib."""
+        """Make a single API call to the specified model via httpx.
+
+        Inside the NemoClaw sandbox the L7 proxy intercepts all outbound
+        HTTP automatically — no manual proxy env vars or SSL bypass needed.
+        Falls back to stdlib urllib if httpx is unavailable (e.g. host-side
+        development without the venv).
+        """
         if not self.api_key and not self._sandbox_mode:
             raise RuntimeError("NVIDIA_API_KEY is not configured")
 
@@ -261,18 +304,39 @@ class NvidiaInferenceClient:
         }
 
         url = f"{self.api_base}/chat/completions"
+
+        try:
+            return self._call_httpx(url, headers, payload)
+        except ImportError:
+            logger.debug("httpx not available — falling back to urllib")
+            return self._call_urllib(url, headers, payload)
+
+    def _call_httpx(
+        self,
+        url: str,
+        headers: dict[str, str],
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        """HTTP call via httpx — preferred path inside the sandbox."""
+        import httpx
+
+        with httpx.Client(timeout=self.timeout, verify=True) as client:
+            resp = client.post(url, json=payload, headers=headers)
+            resp.raise_for_status()
+            return resp.json()
+
+    def _call_urllib(
+        self,
+        url: str,
+        headers: dict[str, str],
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Fallback HTTP call via stdlib urllib (host-side development)."""
+        import urllib.request
+
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-
-        ctx = None
-        if self._sandbox_mode:
-            import ssl
-
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-
-        with urllib.request.urlopen(req, timeout=self.timeout, context=ctx) as response:
+        with urllib.request.urlopen(req, timeout=self.timeout) as response:
             return json.loads(response.read())
 
     @staticmethod

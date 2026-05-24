@@ -21,12 +21,14 @@ const node_child_process_1 = require("node:child_process");
 const node_path_1 = require("node:path");
 const BRIDGE_CLI_PATH = "orchestrator/bridge_cli.py";
 function callPythonBridge(command, args, options) {
-    const bridgePath = (0, node_path_1.join)(options.blueprintDir, BRIDGE_CLI_PATH);
+    const rawPath = (0, node_path_1.join)(options.blueprintDir, BRIDGE_CLI_PATH);
+    const bridgePath = options.resolvePath ? options.resolvePath(rawPath) : rawPath;
     const argsJson = JSON.stringify(args);
     const result = (0, node_child_process_1.spawnSync)("python3", [bridgePath, "--command", command, "--args", argsJson], {
         cwd: options.blueprintDir,
         encoding: "utf-8",
         timeout: options.timeout ?? 30000,
+        env: { ...process.env, PYTHONPATH: options.blueprintDir },
     });
     if (result.error) {
         throw result.error;
@@ -49,6 +51,11 @@ function callPythonBridgeSafe(command, args, options) {
         return { success: false, error: error.message };
     }
 }
+/**
+ * @deprecated Use `callPythonBridge()` instead. This function accepts raw code
+ * strings which is an injection surface. All new callers should use the
+ * structured `--command` / `--args` interface via `callPythonBridge()`.
+ */
 function callPython(blueprintDir, code, options) {
     const safeCode = `import sys; sys.path.insert(0, ${JSON.stringify(blueprintDir)}); ${code}`;
     const result = (0, node_child_process_1.spawnSync)("python3", ["-c", safeCode], {

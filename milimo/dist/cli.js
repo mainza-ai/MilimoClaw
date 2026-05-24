@@ -15,6 +15,7 @@ const badge_js_1 = require("./commands/badge.js");
 const action_js_1 = require("./commands/action.js");
 const logs_js_1 = require("./commands/logs.js");
 const assistant_js_1 = require("./commands/assistant.js");
+const channels_js_1 = require("./commands/channels.js");
 function registerCliCommands(ctx, api) {
     const { program, logger } = ctx;
     const pluginConfig = (0, index_js_1.getPluginConfig)(api);
@@ -378,6 +379,52 @@ function registerCliCommands(ctx, api) {
         .description("Start the assistant in NemoClaw terminal")
         .action(async () => {
         await (0, assistant_js_1.assistantStart)();
+    });
+    // ── openclaw milimo channels ─────────────────────────────────────────
+    const channels = milimo
+        .command("channels")
+        .description("NemoClaw channel bridges (Telegram, Discord, Slack)");
+    channels
+        .command("list")
+        .description("List available messaging channels")
+        .action(() => {
+        (0, channels_js_1.cliChannelsList)();
+    });
+    channels
+        .command("add <type>")
+        .description("Add a messaging channel (telegram, discord, slack)")
+        .action((type) => {
+        (0, channels_js_1.cliChannelsAdd)(type);
+    });
+    channels
+        .command("remove <type>")
+        .description("Remove a messaging channel")
+        .action((type) => {
+        (0, channels_js_1.cliChannelsRemove)(type);
+    });
+    channels
+        .command("start")
+        .description("Start channel bridges")
+        .action(() => {
+        (0, channels_js_1.cliChannelsStart)();
+    });
+    channels
+        .command("stop")
+        .description("Stop channel bridges")
+        .action(() => {
+        (0, channels_js_1.cliChannelsStop)();
+    });
+    channels
+        .command("status")
+        .description("Show Milimo notification delivery status")
+        .action(() => {
+        (0, channels_js_1.cliChannelsStatus)(logger);
+    });
+    channels
+        .command("test")
+        .description("Send a test notification through active channels")
+        .action(() => {
+        (0, channels_js_1.cliChannelsTest)(logger);
     });
 }
 //# sourceMappingURL=cli.js.map

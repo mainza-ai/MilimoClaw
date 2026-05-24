@@ -5,7 +5,7 @@
 **Sources**:
 - `milimo-claw-docs/troubleshooting/ISSUES_AND_FIXES_AUDIT.md`
 
-**Last updated**: 2026-04-29
+**Last updated**: 2026-05-24
 
 **Tags**: #troubleshooting #audit #fixes
 
@@ -176,12 +176,65 @@ Both local and sandbox already had `requires_approval: false`. No fix needed.
 
 ---
 
+## Issue 9: Indentation Drift in `solo-founder.yaml` (HIGH)
+
+### Problem
+
+The `build` and `assistant` claws under the `operator_policy.approval_modes` and `evolution.per_claw` keys were indented with two spaces instead of four in `templates/solo-founder.yaml`. This violated the core YAML schema expectations of the launcher parsing configuration, causing initialization to fail.
+
+### Fix
+
+Re-aligned indentation to a consistent four spaces for the `build` and `assistant` subsections.
+
+---
+
+## Issue 10: Premature Loop Termination in `handle_launcher_status` (HIGH)
+
+### Problem
+
+In `orchestrator/bridge_cli.py`, the `return status` statement inside `handle_launcher_status` was prematurely indented with 8 spaces inside the `for role in roles:` loop. As a result, the launcher query returned immediately after checking the first claw (`content`), failing to fetch status or heartbeats for any of the other five claws.
+
+### Fix
+
+Adjusted indentation of `return status` to 4 spaces, ensuring that all six claws are fully iterated before returning the status map.
+
+---
+
+## Issue 11: Sliding Window Log Age Date Drift (MEDIUM)
+
+### Problem
+
+Tests query local claw history using static logs. However, the production operational log logic filters records with a sliding 10-day lookback window based on the actual system clock. As the host system clock moved past mid-May 2026, the static test logs (dated April 2026) were filtered out as stale, causing tests like `test_finance_init.py` to receive empty logs and fail.
+
+### Fix
+
+Refactored unit tests to dynamically generate logs using ISO timestamps computed relative to `datetime.now(timezone.utc)`, ensuring environment-agnostic tests that remain valid indefinitely.
+
+---
+
+## Issue 12: Inter-Claw Message Contract Schema Rejections (CRITICAL)
+
+### Problem
+
+Integration testing of multi-agent tasks resulted in message drops due to contract rejections:
+1. `assistant_response` sent by worker claws used `"original_message_id"` to reference the query, but the schema required `"query_id"`.
+2. `pricing_response` sent by the Finance Claw used `"project_id"`, `"floor_price"`, and `"ceiling_price"`, but the schema required `"query_id"`, `"floor"`, and `"ceiling"`.
+3. `build_claw.py` passed its outbound envelope `message_type` using the original query's type instead of hardcoding to `"assistant_response"`, and failed to wrap response payloads inside correct keys.
+
+### Fix
+
+1. Added alias-relaxation handling in `contracts.py` so the validation engine automatically resolves aliases for missing schema requirements.
+2. Structured the Build Claw outbound response payload to map exactly to the standard envelope structure.
+
+---
+
 ## Verification Checklist
 
 1. All claws have assistant handlers: `grep -c "assistant" /sandbox/.milimo/blueprints/0.1.0/orchestrator/*/claw.py`
 2. Content claw starts: Check launcher log for "started successfully"
 3. Network policy allows Node.js: `grep "node" policies/assistant-sandbox.yaml`
-4. All claws running: `grep "started successfully" logs/launcher.log`
+4. All claws running: Check `milimo_status` and see that all six claws show `"launcher_status": "running"`.
+5. Message contract verification: Run `PYTHONPATH=.:orchestrator python3 -m pytest tests/ -v` and verify all 1,216 tests pass successfully.
 
 ---
 

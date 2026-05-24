@@ -4,8 +4,9 @@
 
 **Sources**:
 - `milimo-blueprint/orchestrator/bridge_cli.py`
+- `milimo/src/lib/python-bridge.ts`
 
-**Last updated**: 2026-04-17
+**Last updated**: 2026-05-06
 
 **Tags**: #module #bridge #cli #typescript
 
@@ -14,6 +15,24 @@
 ## Overview
 
 BridgeCLI provides a structured JSON interface for TypeScript to call Python functions. All output goes to stdout, debug logs to stderr.
+
+## Import Architecture
+
+All imports in `bridge_cli.py` use **absolute package imports**:
+
+```python
+from orchestrator.contracts import ClawMessage, ContractValidator, ValidationResult
+from orchestrator.mesh import MeshCoordinator
+from orchestrator.milimo_paths import milimo_mesh_dir
+```
+
+This requires `PYTHONPATH` to include the blueprint root directory. The TypeScript bridge (`python-bridge.ts`) injects this automatically when spawning the process:
+
+```typescript
+env: { ...process.env, PYTHONPATH: options.blueprintDir }
+```
+
+> **Historical note** (2026-05-06): Previous versions used a mix of bare `import milimo_paths` and relative `from .contracts import ...` imports. These failed with `ImportError` / `ModuleNotFoundError` when the script was executed directly (not as a package module). All 22 relative imports and 26 bare `milimo_paths.X` references were converted to absolute imports.
 
 ---
 

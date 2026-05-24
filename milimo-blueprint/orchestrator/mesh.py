@@ -138,15 +138,23 @@ class MeshCoordinator:
             )
 
         # Message queue directory (for file-based fallback and persistence)
+        self._memory_only = False
         if mesh_dir:
             self._mesh_dir = Path(mesh_dir)
         else:
             self._mesh_dir = milimo_mesh_dir()
-        self._mesh_dir.mkdir(parents=True, exist_ok=True)
-        (self._mesh_dir / "inbox").mkdir(exist_ok=True)
-        (self._mesh_dir / "outbox").mkdir(exist_ok=True)
-        (self._mesh_dir / "delivered").mkdir(exist_ok=True)
-        (self._mesh_dir / "rejected").mkdir(exist_ok=True)
+        try:
+            self._mesh_dir.mkdir(parents=True, exist_ok=True)
+            (self._mesh_dir / "inbox").mkdir(exist_ok=True)
+            (self._mesh_dir / "outbox").mkdir(exist_ok=True)
+            (self._mesh_dir / "delivered").mkdir(exist_ok=True)
+            (self._mesh_dir / "rejected").mkdir(exist_ok=True)
+        except OSError:
+            self._memory_only = True
+            logger.warning(
+                "Cannot create mesh directory %s — mesh will operate in memory-only mode",
+                self._mesh_dir,
+            )
 
     @classmethod
     def from_config_file(
@@ -285,6 +293,20 @@ class MeshCoordinator:
             self._gateway = None
             self._gateway_role = ""
 
+    def _ensure_dir(self, path: Path) -> bool:
+        """Create directory if possible; return False if filesystem unavailable."""
+        if self._memory_only:
+            return False
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            return True
+        except OSError:
+            self._memory_only = True
+            logger.warning(
+                "Cannot create directory %s — operating in memory-only mode", path
+            )
+            return False
+
     # ── Registration ──────────────────────────────────────────────────
 
     def register_claw(self, role: str, address: str) -> bool:
@@ -294,8 +316,7 @@ class MeshCoordinator:
 
         self._nodes[role] = ClawNode(role=role, address=address)
 
-        # Create per-claw inbox directory
-        (self._mesh_dir / "inbox" / role).mkdir(exist_ok=True)
+        self._ensure_dir(self._mesh_dir / "inbox" / role)
 
         logger.info("Registered claw: %s @ %s", role, address)
         self._save_topology()
@@ -540,9 +561,10 @@ class MeshCoordinator:
         }
 
         target = self._mesh_dir / "inbox" / "war_room"
-        target.mkdir(parents=True, exist_ok=True)
+        self._ensure_dir(target)
         filename = f"{message.timestamp.replace(':', '-')}_{message.message_id}.json"
-        (target / filename).write_text(json.dumps(warroom_msg, indent=2))
+        if target.exists():
+            (target / filename).write_text(json.dumps(warroom_msg, indent=2))
 
         logger.info(
             "Message %s routed to War Room for approval (original recipient: %s)",
@@ -580,12 +602,15 @@ class MeshCoordinator:
         else:
             target = self._mesh_dir / "inbox" / message.recipient_role
 
-        target.mkdir(exist_ok=True)
+        self._ensure_dir(target)
         filename = f"{message.timestamp.replace(':', '-')}_{message.message_id}.json"
-        (target / filename).write_text(json.dumps(msg_data, indent=2))
+        if target.exists():
+            (target / filename).write_text(json.dumps(msg_data, indent=2))
 
     def _write_rejected(self, message: ClawMessage, reason: str) -> None:
         """Write a rejected message to the rejected queue."""
+        if self._memory_only:
+            return
         msg_data = {
             "message_id": message.message_id,
             "sender_role": message.sender_role,
@@ -595,12 +620,14 @@ class MeshCoordinator:
             "timestamp": message.timestamp,
         }
         filename = f"{message.timestamp.replace(':', '-')}_{message.message_id}.json"
-        (self._mesh_dir / "rejected" / filename).write_text(
-            json.dumps(msg_data, indent=2)
-        )
+        rejected_dir = self._mesh_dir / "rejected"
+        if self._ensure_dir(rejected_dir):
+            (rejected_dir / filename).write_text(json.dumps(msg_data, indent=2))
 
     def _save_topology(self) -> None:
         """Persist the current mesh topology to disk."""
+        if self._memory_only:
+            return
         topo = {
             "squad_id": self._squad_id,
             "updated_at": datetime.now(timezone.utc).isoformat(),

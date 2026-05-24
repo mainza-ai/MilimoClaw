@@ -129,15 +129,27 @@ remove_sandbox_plugin() {
     return 0
   fi
 
-  # Uninstall plugin via OpenClaw
-  docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c "
-    openclaw plugins uninstall milimo 2>/dev/null || true
-    rm -rf /sandbox/extensions/milimo
-    rm -rf /sandbox/milimo-blueprint
-    rm -rf /sandbox/.milimo
-    rm -rf /sandbox/.nemoclaw/config.json
-    echo 'Milimo plugin removed from sandbox'
-  " 2>/dev/null || warn "Could not remove plugin from sandbox (it may not be installed)"
+  # Auto-detect K8s-in-Docker vs direct Docker (--solo local) topology
+  local is_k8s=false
+  if [ -n "$gateway" ] && docker exec "$gateway" which kubectl &>/dev/null 2>&1; then
+    is_k8s=true
+  fi
+
+  if [ "$is_k8s" = "true" ]; then
+    docker exec "$gateway" kubectl exec -n openshell "$SANDBOX_NAME" -- bash -c "openclaw plugins uninstall milimo 2>/dev/null || true
+rm -rf /sandbox/extensions/milimo
+rm -rf /sandbox/milimo-blueprint
+rm -rf /sandbox/.milimo
+rm -rf /sandbox/.nemoclaw/config.json
+echo 'Milimo plugin removed from sandbox'" 2>/dev/null || warn "Could not remove plugin from sandbox (it may not be installed)"
+  else
+    docker exec "$gateway" bash -c "openclaw plugins uninstall milimo 2>/dev/null || true
+rm -rf /sandbox/extensions/milimo
+rm -rf /sandbox/milimo-blueprint
+rm -rf /sandbox/.milimo
+rm -rf /sandbox/.nemoclaw/config.json
+echo 'Milimo plugin removed from sandbox'" 2>/dev/null || warn "Could not remove plugin from sandbox (it may not be installed)"
+  fi
 
   ok "Plugin removed from sandbox"
 }

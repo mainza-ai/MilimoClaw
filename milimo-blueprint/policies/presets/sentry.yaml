@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Sentry access preset for Milimo Claw.
+#
+# Enables Ops Claw access to the Sentry API for error tracking,
+# performance monitoring, and release management.
+#
+# Apply via: nemoclaw <name> policy-add sentry
+# (requires this file in nemoclaw-blueprint/policies/presets/)
+
+preset:
+  name: sentry
+  description: "Sentry error tracking API access (issues, releases, performance)"
+
+network_policies:
+  sentry:
+    name: sentry
+    endpoints:
+      - host: sentry.io
+        port: 443
+        access: full
+      - host: "*.ingest.sentry.io"
+        port: 443
+        access: full
+      - host: "*.ingest.us.sentry.io"
+        port: 443
+        access: full

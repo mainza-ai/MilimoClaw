@@ -37,6 +37,15 @@ import { cliBadge } from "./commands/badge.js";
 import { cliActionApprove, cliActionBlock, listPendingActions } from "./commands/action.js";
 import { cliLogsSearch, cliLogsList } from "./commands/logs.js";
 import { assistantSetup, assistantVerify, assistantStart } from "./commands/assistant.js";
+import {
+  cliChannelsList,
+  cliChannelsAdd,
+  cliChannelsRemove,
+  cliChannelsStart,
+  cliChannelsStop,
+  cliChannelsStatus,
+  cliChannelsTest,
+} from "./commands/channels.js";
 
 export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginApi): void {
   const { program, logger } = ctx;
@@ -510,5 +519,59 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
     .description("Start the assistant in NemoClaw terminal")
     .action(async () => {
       await assistantStart();
+    });
+
+  // ── openclaw milimo channels ─────────────────────────────────────────
+  const channels = milimo
+    .command("channels")
+    .description("NemoClaw channel bridges (Telegram, Discord, Slack)");
+
+  channels
+    .command("list")
+    .description("List available messaging channels")
+    .action(() => {
+      cliChannelsList();
+    });
+
+  channels
+    .command("add <type>")
+    .description("Add a messaging channel (telegram, discord, slack)")
+    .action((type: string) => {
+      cliChannelsAdd(type);
+    });
+
+  channels
+    .command("remove <type>")
+    .description("Remove a messaging channel")
+    .action((type: string) => {
+      cliChannelsRemove(type);
+    });
+
+  channels
+    .command("start")
+    .description("Start channel bridges")
+    .action(() => {
+      cliChannelsStart();
+    });
+
+  channels
+    .command("stop")
+    .description("Stop channel bridges")
+    .action(() => {
+      cliChannelsStop();
+    });
+
+  channels
+    .command("status")
+    .description("Show Milimo notification delivery status")
+    .action(() => {
+      cliChannelsStatus(logger);
+    });
+
+  channels
+    .command("test")
+    .description("Send a test notification through active channels")
+    .action(() => {
+      cliChannelsTest(logger);
     });
 }

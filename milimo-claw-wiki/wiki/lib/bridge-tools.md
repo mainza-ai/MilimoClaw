@@ -4,8 +4,9 @@
 
 **Sources**:
 - `milimo/src/lib/bridge-tools.ts`
+- `milimo/src/lib/python-bridge.ts`
 
-**Last updated**: 2026-04-15
+**Last updated**: 2026-05-06
 
 **Tags**: #typescript #bridge #tools
 
@@ -164,6 +165,19 @@ const response = await callPythonBridgeSafe("claw_status", {
   role: "build"
 });
 ```
+
+### PYTHONPATH Injection
+
+`python-bridge.ts` sets `PYTHONPATH` in the spawn environment to the blueprint directory, enabling absolute `from orchestrator.X import Y` imports in [[bridge-cli]]:
+
+```typescript
+const proc = spawn(pythonPath, [bridgeCliPath, ...], {
+  cwd: options.blueprintDir,
+  env: { ...process.env, PYTHONPATH: options.blueprintDir },
+});
+```
+
+> **Historical note** (2026-05-06): Previously, `PYTHONPATH` was not set in the spawn environment. This caused `ModuleNotFoundError` when bridge_cli.py tried to import from the `orchestrator` package, since the script was executed directly (not as `python3 -m orchestrator.bridge_cli`).
 
 ---
 

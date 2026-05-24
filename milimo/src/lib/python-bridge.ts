@@ -36,6 +36,13 @@ export interface BridgeResponse<T = unknown> {
 export interface BridgeCommandOptions {
   blueprintDir: string;
   timeout?: number;
+  /**
+   * Optional path resolver for SSRF-safe path resolution.
+   * When provided, all constructed paths are resolved through this
+   * function before use. Pass `api.resolvePath` from the OpenClaw
+   * plugin API to prevent symlink-based path traversal attacks.
+   */
+  resolvePath?: (input: string) => string;
 }
 
 const BRIDGE_CLI_PATH = "orchestrator/bridge_cli.py";
@@ -45,13 +52,15 @@ export function callPythonBridge<T = unknown>(
   args: Record<string, unknown>,
   options: BridgeCommandOptions,
 ): T {
-  const bridgePath = join(options.blueprintDir, BRIDGE_CLI_PATH);
+  const rawPath = join(options.blueprintDir, BRIDGE_CLI_PATH);
+  const bridgePath = options.resolvePath ? options.resolvePath(rawPath) : rawPath;
   const argsJson = JSON.stringify(args);
 
   const result = spawnSync("python3", [bridgePath, "--command", command, "--args", argsJson], {
     cwd: options.blueprintDir,
     encoding: "utf-8",
     timeout: options.timeout ?? 30000,
+    env: { ...process.env, PYTHONPATH: options.blueprintDir },
   });
 
   if (result.error) {
@@ -84,6 +93,11 @@ export function callPythonBridgeSafe<T = unknown>(
   }
 }
 
+/**
+ * @deprecated Use `callPythonBridge()` instead. This function accepts raw code
+ * strings which is an injection surface. All new callers should use the
+ * structured `--command` / `--args` interface via `callPythonBridge()`.
+ */
 export function callPython(
   blueprintDir: string,
   code: string,

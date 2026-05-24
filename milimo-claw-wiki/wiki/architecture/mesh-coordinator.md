@@ -6,7 +6,7 @@
 - `milimo-blueprint/orchestrator/mesh.py`
 - `raw/ARCHITECTURE.md`
 
-**Last updated**: 2026-04-23
+**Last updated**: 2026-05-06
 
 **Tags**: #architecture #mesh #coordination #routing
 
@@ -162,6 +162,29 @@ Manages inbox directories for each claw.
 ```
 
 ## Error Handling
+
+### Memory-Only Mode
+
+When the mesh directory (`/sandbox/.openclaw/milimo/mesh`) cannot be created — e.g., running on macOS host outside the NemoClaw sandbox — the MeshCoordinator enters **memory-only mode**:
+
+- `_memory_only` flag is set to `True` on first `OSError` during `__init__`
+- `_ensure_dir(path)` helper short-circuits when `_memory_only` is `True`
+- All disk writes are skipped: `_save_topology()`, `_write_rejected()`, file-based message delivery
+- In-memory routing and validation continue to work normally
+- Logged at WARNING level: `"Cannot create mesh directory — mesh will operate in memory-only mode"`
+
+Affected operations:
+| Operation | Behavior in Memory-Only Mode |
+|-----------|------------------------------|
+| `register_claw()` | Registers in-memory, skips inbox dir creation |
+| `send_message()` | Validates and routes in-memory, skips file delivery |
+| `_save_topology()` | Skipped entirely |
+| `_write_rejected()` | Skipped entirely |
+| `_deliver_message()` | Logs delivery, skips writing to inbox |
+| `receive_message()` | Returns empty list (no inbox to read) |
+| `ack_message()` | Returns `False` (no files to move) |
+
+> **Historical note** (2026-05-06): Previously, all `mkdir()` calls in mesh.py were unguarded. Running outside the sandbox caused `FileNotFoundError` cascades in `register_claw()`, `_route_to_war_room()`, and `_deliver_message()`. The `_ensure_dir()` helper and `_memory_only` flag were added to enable graceful degradation.
 
 ### Delivery Failures
 

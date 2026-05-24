@@ -20,24 +20,24 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 _test_dir = Path(__file__).parent
-_orchestrator_dir = _test_dir.parent / "orchestrator"
-if str(_orchestrator_dir) not in sys.path:
-    sys.path.insert(0, str(_orchestrator_dir))
+_orchestrator_parent = _test_dir.parent
+if str(_orchestrator_parent) not in sys.path:
+    sys.path.insert(0, str(_orchestrator_parent))
 
-from build.build_claw import BuildClaw
-from build.build_init import (
+from orchestrator.build.build_claw import BuildClaw
+from orchestrator.build.build_init import (
     REQUIRED_DIRS,
     REQUIRED_FILES,
     BuildFilesystemInit,
     BuildLogEntry,
     BuildOperationalLog,
 )
-from build.approval_handler import (
+from orchestrator.build.approval_handler import (
     BuildApprovalHandler,
     DeployActivityLog,
     PRActivityLog,
 )
-from build.signal_dispatcher import (
+from orchestrator.build.signal_dispatcher import (
     BuildSignalDispatcher,
 )
 

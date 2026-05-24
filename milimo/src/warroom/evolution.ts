@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { readdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { callPythonBridgeSafe } from "../lib/python-bridge.js";
@@ -19,6 +19,19 @@ interface MeshFlowState {
   signal_count_this_week: number;
 }
 
+/**
+ * Resolve the tools directory using sandbox-aware path resolution.
+ * Matches the Python milimo_paths.py logic:
+ *   - Sandbox: /sandbox/.openclaw/milimo/tools/<squadId>
+ *   - Host: ~/.openclaw/milimo/tools/<squadId>
+ */
+function resolveToolsDir(squadId: string): string {
+  const sandboxPath = "/sandbox/.openclaw/milimo/tools";
+  if (existsSync(sandboxPath)) return join(sandboxPath, squadId);
+  const home = process.env.HOME || process.env.USERPROFILE || homedir() || "/tmp";
+  return join(home, ".openclaw/milimo", "tools", squadId);
+}
+
 export class EvolutionManager {
   private toolsDir: string;
   private blueprintDir: string;
@@ -27,8 +40,7 @@ export class EvolutionManager {
     private squadId: string,
     blueprintDir?: string,
   ) {
-    const home = process.env.HOME || process.env.USERPROFILE || homedir() || "/tmp";
-    this.toolsDir = join(home, ".openclaw/milimo", "tools", squadId);
+    this.toolsDir = resolveToolsDir(squadId);
     this.blueprintDir = blueprintDir || process.env.MILIMO_BLUEPRINT_DIR || "/opt/milimo-blueprint";
   }
 

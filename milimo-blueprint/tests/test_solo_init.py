@@ -29,7 +29,7 @@ template:
   name: solo-founder
   display_name: "Solo Founder"
   category: founder
-  description: "All five claws on one machine"
+  description: "All six claws on one machine"
   squad_size: 1
   claws_active:
     - content
@@ -37,6 +37,7 @@ template:
     - analytics
     - finance
     - build
+    - assistant
 
 operator_policy:
   squad_lead: mainza
@@ -56,6 +57,9 @@ operator_policy:
     build:
       pr_open: REVIEW
       pr_merge: HOLD
+    assistant:
+      cross_claw_query: AUTO
+      cross_claw_task: REVIEW
 
 filesystem:
   content: /sandbox/content
@@ -63,6 +67,7 @@ filesystem:
   analytics: /sandbox/analytics
   finance: /sandbox/finance
   build: /sandbox/build
+  assistant: /sandbox/assistant
   shared_read:
     - /sandbox/analytics/reports/weekly-intelligence.json
 
@@ -122,6 +127,10 @@ evolution:
       enabled: true
       min_prs_merged: 5
       performance_threshold: 5
+    assistant:
+      enabled: true
+      min_coordinated_tasks: 10
+      performance_threshold: 5
   capacity:
     max_tools_per_claw: 30
     evolution_log_retention: 90
@@ -145,6 +154,9 @@ network_egress:
     approved:
       - api.github.com
       - api.vercel.com
+  assistant:
+    approved:
+      - api.telegram.org
 
 deep_work_mode:
   alias: finals-mode
@@ -154,6 +166,7 @@ deep_work_mode:
     analytics: passive
     finance: invoices_only
     build: issues_only
+    assistant: reduced
   auto_response_template: "Hey [name], I'm heads-down until [resume_date]."
   resume_on: scheduled
 """
@@ -175,7 +188,7 @@ class TestLoadSoloFounderTemplate:
         assert config is not None
         assert config["template"]["name"] == "solo-founder"
         assert config["template"]["squad_size"] == 1
-        assert len(config["template"]["claws_active"]) == 5
+        assert len(config["template"]["claws_active"]) == 6
         assert "operator_policy" in config
         assert "filesystem" in config
         assert "inference" in config
@@ -339,14 +352,13 @@ class TestHelperFunctions:
         """Test extracting claw paths from config."""
         paths = get_claw_paths(valid_config)
 
-        assert len(paths) == 5
-        assert paths["content"] == Path("/sandbox/.openclaw-data/milimo/claws/content")
-        assert paths["ops"] == Path("/sandbox/.openclaw-data/milimo/claws/ops")
-        assert paths["analytics"] == Path(
-            "/sandbox/.openclaw-data/milimo/claws/analytics"
-        )
-        assert paths["finance"] == Path("/sandbox/.openclaw-data/milimo/claws/finance")
-        assert paths["build"] == Path("/sandbox/.openclaw-data/milimo/claws/build")
+        assert len(paths) == 6
+        assert paths["content"] == Path("/sandbox/content")
+        assert paths["ops"] == Path("/sandbox/clients")
+        assert paths["analytics"] == Path("/sandbox/analytics")
+        assert paths["finance"] == Path("/sandbox/finance")
+        assert paths["build"] == Path("/sandbox/build")
+        assert paths["assistant"] == Path("/sandbox/assistant")
 
     def test_get_claw_network_policy(self, valid_config: dict[str, Any]) -> None:
         """Test extracting network policy for a claw."""
@@ -367,7 +379,7 @@ class TestHelperFunctions:
         """Test extracting approval modes from config."""
         modes = get_approval_modes(valid_config)
 
-        assert len(modes) == 5
+        assert len(modes) == 6
         assert "content" in modes
         assert modes["content"]["social_post_draft"] == "AUTO"
         assert modes["finance"]["invoice_send"] == "HOLD"

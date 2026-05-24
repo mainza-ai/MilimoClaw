@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Vercel access preset for Milimo Claw.
+#
+# Enables Build Claw access to the Vercel API for deployment management,
+# project configuration, and domain operations.
+#
+# Apply via: nemoclaw <name> policy-add vercel
+# (requires this file in nemoclaw-blueprint/policies/presets/)
+
+preset:
+  name: vercel
+  description: "Vercel deployment API access (deployments, projects, domains)"
+
+network_policies:
+  vercel:
+    name: vercel
+    endpoints:
+      - host: api.vercel.com
+        port: 443
+        access: full
+      - host: vercel.com
+        port: 443
+        access: full
+      - host: vercel.live
+        port: 443
+        access: full

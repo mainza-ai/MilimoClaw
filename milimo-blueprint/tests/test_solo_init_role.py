@@ -84,8 +84,8 @@ def test_defaults_to_all_claws_when_role_missing():
 
     config = {}  # no clawRole key
     result = get_claws_to_initialize(config)
-    assert len(result) == 5
-    assert result == ["content", "ops", "analytics", "finance", "build"]
+    assert len(result) == 6
+    assert result == ["content", "ops", "analytics", "finance", "build", "assistant"]
 
 
 def test_defaults_to_all_claws_when_role_is_solo_and_active_claws_missing():
@@ -94,7 +94,7 @@ def test_defaults_to_all_claws_when_role_is_solo_and_active_claws_missing():
 
     config = {"clawRole": "solo"}  # no activeClaws key
     result = get_claws_to_initialize(config)
-    assert len(result) == 5
+    assert len(result) == 6
 
 
 def test_mesh_mode_with_content_role():
@@ -136,6 +136,7 @@ def test_detect_filesystem_config_respects_claws_to_init():
     assert "analytics" in fs_config.claw_paths
     assert "finance" not in fs_config.claw_paths
     assert "build" not in fs_config.claw_paths
+    assert "assistant" not in fs_config.claw_paths
 
 
 def test_detect_filesystem_config_defaults_to_all_claws():
@@ -144,9 +145,10 @@ def test_detect_filesystem_config_defaults_to_all_claws():
 
     fs_config = detect_filesystem_config("test-squad")
 
-    assert len(fs_config.claw_paths) == 5
+    assert len(fs_config.claw_paths) == 6
     assert "content" in fs_config.claw_paths
     assert "ops" in fs_config.claw_paths
     assert "analytics" in fs_config.claw_paths
     assert "finance" in fs_config.claw_paths
     assert "build" in fs_config.claw_paths
+    assert "assistant" in fs_config.claw_paths

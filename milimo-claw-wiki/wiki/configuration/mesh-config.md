@@ -1,6 +1,13 @@
 # Mesh Configuration
 
-Inter-claw message routing and escalation rules.
+**Summary**: Inter-claw message routing and escalation rules.
+
+**Sources**:
+- `milimo-blueprint/mesh_config.yaml`
+
+**Last updated**: 2026-05-06
+
+**Tags**: #configuration #mesh #routing
 
 ## Purpose
 
@@ -19,6 +26,7 @@ Defines the message matrix showing which claws can send which message types to w
 | Ops | `deliverable`, `deliverable_complete` |
 | Analytics | `query`, `content_performance_query`, `performance_signal` |
 | War Room | `draft_ready` |
+| Assistant | `assistant_response` |
 
 ### Ops Claw Sends
 
@@ -29,6 +37,7 @@ Defines the message matrix showing which claws can send which message types to w
 | Build | `brief`, `feature_brief` |
 | Analytics | `client_onboarded` |
 | War Room | `signal`, `deliverable` |
+| Assistant | `assistant_response` |
 
 ### Analytics Claw Sends
 
@@ -39,6 +48,7 @@ Defines the message matrix showing which claws can send which message types to w
 | Finance | `summary`, `revenue_anomaly` |
 | Build | `response`, `signal`, `retention_signals` |
 | War Room | `signal`, `summary` |
+| Assistant | `assistant_response` |
 
 ### Finance Claw Sends
 
@@ -47,6 +57,7 @@ Defines the message matrix showing which claws can send which message types to w
 | Ops | `response`, `signal`, `pricing_response`, `invoice_ready` |
 | Analytics | `summary`, `revenue_summary` |
 | War Room | `signal`, `deliverable`, `finance_summary`, `overdue_alert` |
+| Assistant | `assistant_response` |
 
 ### Build Claw Sends
 
@@ -56,6 +67,18 @@ Defines the message matrix showing which claws can send which message types to w
 | Analytics | `query`, `behavior_query` |
 | Content | `summary`, `shipping_summary` |
 | War Room | `signal`, `deliverable`, `tool_proposal` |
+| Assistant | `assistant_response` |
+
+### Assistant Sends
+
+| Recipient | Message Types |
+|-----------|--------------|
+| Content | `assistant_query`, `assistant_task` |
+| Ops | `assistant_query`, `assistant_task` |
+| Analytics | `assistant_query`, `assistant_task` |
+| Finance | `assistant_query`, `assistant_task` |
+| Build | `assistant_query`, `assistant_task` |
+| War Room | `assistant_response` |
 
 ## Message Types Requiring Approval
 
@@ -95,3 +118,5 @@ Defines the message matrix showing which claws can send which message types to w
 ## Source
 
 `milimo-blueprint/mesh_config.yaml`
+
+> **YAML Indentation Note** (2026-05-06): The `message_matrix` key's children must be indented with 2 spaces under `message_matrix:`. A previous version had the sub-keys (`content:`, `ops:`, etc.) at root level, causing PyYAML to parse `message_matrix` as `None` — resulting in `AttributeError: 'NoneType' object has no attribute 'get'` in [[contracts]] validation.

@@ -176,11 +176,11 @@ Returns check results:
 ## CLI Usage
 
 ```bash
-# Setup assistant
-python3 orchestrator/assistant_setup.py
+# Setup assistant (module execution mode — resolves relative imports correctly)
+python3 -m orchestrator.assistant_setup
 
 # Verify setup
-python3 orchestrator/assistant_setup.py --verify
+python3 -m orchestrator.assistant_setup --verify
 
 # Via milimo CLI
 milimo assistant setup

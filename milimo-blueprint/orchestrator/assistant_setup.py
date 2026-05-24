@@ -9,7 +9,7 @@ Renders MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md with squad values.
 Writes rendered prompt to .openclaw/agents/main/system.md.
 
 Run after onboarding:
-    python milimo-blueprint/orchestrator/assistant_setup.py
+    python3 -m orchestrator.assistant_setup
 
 Or via CLI:
     milimo assistant setup
@@ -43,28 +43,22 @@ _TEMPLATE_CANDIDATES = [
     Path(__file__).resolve().parent.parent
     / "docs"
     / "MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md",
-    # 3. Home-relative (deployment — .openclaw/milimo is the writable path)
-    Path.home()
-    / ".openclaw"
-    / "milimo"
-    / "MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md",
+    # 3. Centralized milimo_paths resolver (sandbox and host)
     MILIMO_DIR / "MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md",
 ]
 
 _MILIMO_CONFIG_CANDIDATES = [
-    Path.home() / ".openclaw" / "milimo" / "config.json",
     milimo_config_path(),
+    Path.home() / ".openclaw" / "milimo" / "config.json",
 ]
 
 MILIMO_CONFIG_PATH = next(
     (p for p in _MILIMO_CONFIG_CANDIDATES if p.exists()), _MILIMO_CONFIG_CANDIDATES[0]
 )
-# Use home-relative path so it works for both root and sandbox users
-OPENCLAW_AGENTS_DIR = Path.home() / ".openclaw" / "agents" / "main"
+OPENCLAW_AGENTS_DIR = MILIMO_DIR.parent / "agents" / "main"
 SYSTEM_PROMPT_DEST = OPENCLAW_AGENTS_DIR / "system.md"
 AGENT_CONFIG_DEST = OPENCLAW_AGENTS_DIR / "config.yaml"
-# OpenClaw workspace paths (these are actually used by the gateway)
-WORKSPACE_DIR = Path.home() / ".openclaw" / "workspace"
+WORKSPACE_DIR = MILIMO_DIR.parent / "workspace"
 BOOTSTRAP_FILE = WORKSPACE_DIR / "BOOTSTRAP.md"
 IDENTITY_FILE = WORKSPACE_DIR / "IDENTITY.md"
 USER_FILE = WORKSPACE_DIR / "USER.md"

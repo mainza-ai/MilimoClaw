@@ -16,13 +16,13 @@ from pathlib import Path
 import pytest
 
 _test_dir = Path(__file__).parent
-_orchestrator_dir = _test_dir.parent / "orchestrator"
-if str(_orchestrator_dir) not in sys.path:
-    sys.path.insert(0, str(_orchestrator_dir))
+_orchestrator_parent = _test_dir.parent
+if str(_orchestrator_parent) not in sys.path:
+    sys.path.insert(0, str(_orchestrator_parent))
 
-from ops.signal_dispatcher import PricingNotConfirmedError
-from ops.project_manager import ProjectStatus
-from ops.ops_claw import OpsClaw, MockMeshGateway
+from orchestrator.ops.signal_dispatcher import PricingNotConfirmedError
+from orchestrator.ops.project_manager import ProjectStatus
+from orchestrator.ops.ops_claw import OpsClaw, MockMeshGateway
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -394,7 +394,7 @@ class TestMVR07PricingResponse:
         )
 
         brief_calls = [
-            c for c in mock_gateway.calls if c.get("message_type") == "brief"
+            c for c in mock_gateway.calls if c.get("message_type") == "project_brief"
         ]
         assert len(brief_calls) == 1
 
@@ -486,7 +486,7 @@ class TestMVR10CreativeClawReceives:
         assert len(mock_gateway.calls) == 1
 
         message = mock_gateway.calls[0]
-        assert message["message_type"] == "brief"
+        assert message["message_type"] == "project_brief"
         assert message["sender_role"] == "ops"
         assert message["recipient_role"] == "content"
         assert message["payload"]["project_id"] == "project-1"

@@ -1,0 +1,1 @@
+{"version":3,"file":"runtime-context.d.ts","sourceRoot":"","sources":["../../src/hooks/runtime-context.ts"],"names":[],"mappings":"AAyBA,OAAO,KAAK,EAAE,iBAAiB,EAAE,YAAY,EAAE,MAAM,aAAa,CAAC;AA+NnE;;;;;;;;;GASG;AACH,wBAAgB,4BAA4B,CAC1C,GAAG,EAAE,iBAAiB,EACtB,YAAY,EAAE,YAAY,GACzB,IAAI,CAoEN"}

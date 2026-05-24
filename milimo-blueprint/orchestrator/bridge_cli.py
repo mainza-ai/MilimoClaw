@@ -26,8 +26,17 @@ import sys
 from pathlib import Path
 from typing import Any
 from datetime import datetime, timedelta, timezone
-import milimo_paths
-from milimo_paths import claw_base
+from orchestrator.milimo_paths import (
+    CLAWS_DIR,
+    config_path,
+    claw_base,
+    mesh_dir as milimo_mesh_dir,
+    health_dir,
+    tools_dir,
+    logs_dir,
+    blueprints_dir,
+    state_dir,
+)
 
 # Configure logging to stderr only
 logging.basicConfig(
@@ -44,7 +53,7 @@ logger = logging.getLogger("milimo.bridge_cli")
 
 def _read_evolution_summary() -> dict[str, Any]:
     """Read the lightweight evolution summary file without importing the scheduler."""
-    summary_path = Path("/sandbox/.openclaw/milimo/state/evolution/summary.json")
+    summary_path = state_dir() / "evolution" / "summary.json"
     if not summary_path.exists():
         return {}
     try:
@@ -59,9 +68,7 @@ def _query_evolution_status(squad_id: str, claw_role: str) -> dict[str, Any]:
     by_role = summary.get("by_role", {})
     role_data = by_role.get(claw_role, {})
 
-    registry_file = (
-        milimo_paths.claw_base(claw_role) / "sandbox" / "tools" / "registry.json"
-    )
+    registry_file = claw_base(claw_role) / "sandbox" / "tools" / "registry.json"
     tools: dict[str, Any] = {}
     if registry_file.exists():
         try:
@@ -124,7 +131,7 @@ def handle_blueprint_info(args: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError(f"Blueprint directory does not exist: {blueprint_dir}")
 
     try:
-        from .blueprint_manager import BlueprintManager
+        from orchestrator.blueprint_manager import BlueprintManager
 
         mgr = BlueprintManager(squad_id, claw_role, blueprint_dir)
         current_version = mgr.current_version()
@@ -147,7 +154,7 @@ def handle_blueprint_info(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_blueprint_list(args: dict[str, Any]) -> dict[str, Any]:
     """List available blueprints."""
-    from .blueprint_manager import BlueprintManager
+    from orchestrator.blueprint_manager import BlueprintManager
 
     squad_id = args.get("squad_id", "default")
     claw_role = args.get("claw_role", "content")
@@ -170,7 +177,7 @@ def handle_blueprint_list(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_blueprint_diff(args: dict[str, Any]) -> dict[str, Any]:
     """Get diff between two blueprint versions."""
-    from .blueprint_manager import BlueprintManager
+    from orchestrator.blueprint_manager import BlueprintManager
 
     squad_id = args.get("squad_id", "default")
     claw_role = args.get("claw_role", "content")
@@ -196,7 +203,7 @@ def handle_blueprint_diff(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_blueprint_export(args: dict[str, Any]) -> dict[str, Any]:
     """Export blueprint snapshot."""
-    from .blueprint_manager import BlueprintManager
+    from orchestrator.blueprint_manager import BlueprintManager
 
     squad_id = args.get("squad_id", "default")
     claw_role = args.get("claw_role", "content")
@@ -213,7 +220,7 @@ def handle_blueprint_export(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_blueprint_rollback(args: dict[str, Any]) -> dict[str, Any]:
     """Rollback blueprint to a specific version."""
-    from .blueprint_manager import BlueprintManager
+    from orchestrator.blueprint_manager import BlueprintManager
 
     squad_id = args.get("squad_id", "default")
     claw_role = args.get("claw_role", "content")
@@ -232,7 +239,7 @@ def handle_blueprint_rollback(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_tool_registry(args: dict[str, Any]) -> dict[str, Any]:
     """Get tool registry inventory."""
-    from .tool_registry import ToolRegistry
+    from orchestrator.tool_registry import ToolRegistry
 
     squad_id = args.get("squad_id", "default")
     claw_role = args.get("claw_role", "content")
@@ -251,7 +258,7 @@ def handle_tool_registry(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_marketplace_search(args: dict[str, Any]) -> dict[str, Any]:
     """Search marketplace for blueprints."""
-    from .marketplace_manager import MarketplaceManager
+    from orchestrator.marketplace_manager import MarketplaceManager
 
     query = args.get("query", "")
     category = args.get("category", "")
@@ -267,7 +274,7 @@ def handle_marketplace_search(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_marketplace_download(args: dict[str, Any]) -> dict[str, Any]:
     """Download a blueprint from marketplace."""
-    from .marketplace_manager import MarketplaceManager
+    from orchestrator.marketplace_manager import MarketplaceManager
 
     blueprint_id = args.get("blueprint_id", "")
 
@@ -284,8 +291,8 @@ def handle_marketplace_download(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_marketplace_publish(args: dict[str, Any]) -> dict[str, Any]:
     """Publish a blueprint to marketplace."""
-    from .blueprint_manager import BlueprintManager
-    from .marketplace_manager import MarketplaceManager
+    from orchestrator.blueprint_manager import BlueprintManager
+    from orchestrator.marketplace_manager import MarketplaceManager
 
     squad_id = args.get("squad_id", "default")
     claw_role = args.get("claw_role", "content")
@@ -311,7 +318,7 @@ def handle_mesh_flow_state(args: dict[str, Any]) -> dict[str, Any]:
     _squad_id = args.get("squad", "default")
 
     try:
-        _mesh_dir = milimo_paths.mesh_dir()
+        _mesh_dir = milimo_mesh_dir()
         topology_file = _mesh_dir / "topology.json"
 
         # Load live topology
@@ -378,7 +385,7 @@ def handle_health_status(args: dict[str, Any]) -> dict[str, Any]:
     try:
         import json
 
-        _health_dir = milimo_paths.health_dir(squad_id)
+        _health_dir = health_dir(squad_id)
         if not _health_dir.exists():
             return {}
         status = {}
@@ -397,8 +404,8 @@ def handle_health_status(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_provenance_verify(args: dict[str, Any]) -> dict[str, Any]:
     """Verify blueprint provenance."""
-    from .provenance_verifier import ProvenanceVerifier
-    from .provenance_signer import Attestation
+    from orchestrator.provenance_verifier import ProvenanceVerifier
+    from orchestrator.provenance_signer import Attestation
 
     blueprint_dir = args.get("blueprint_dir", ".")
     version = args.get("version", "latest")
@@ -428,7 +435,7 @@ def handle_provenance_verify(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_provenance_keygen(args: dict[str, Any]) -> dict[str, Any]:
     """Generate provenance signing key pair."""
-    from .provenance_signer import generate_key_pair, save_key_pair
+    from orchestrator.provenance_signer import generate_key_pair, save_key_pair
 
     squad_id = args.get("squad", "default")
 
@@ -448,7 +455,7 @@ def handle_provenance_keygen(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_revenue_summary(args: dict[str, Any]) -> dict[str, Any]:
     """Get revenue summary for War Room widget."""
-    from .solo_warroom import SoloWarRoom
+    from orchestrator.solo_warroom import SoloWarRoom
     from pathlib import Path
 
     _squad_id = args.get("squad_id", "default")
@@ -475,7 +482,7 @@ def handle_revenue_summary(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_morning_brief(args: dict[str, Any]) -> dict[str, Any]:
     """Generate morning brief digest."""
-    from .solo_warroom import SoloWarRoom
+    from orchestrator.solo_warroom import SoloWarRoom
 
     _squad_id = args.get("squad_id", "default")
 
@@ -510,7 +517,7 @@ def handle_morning_brief(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_evening_wrap(args: dict[str, Any]) -> dict[str, Any]:
     """Generate evening wrap digest."""
-    from .solo_warroom import SoloWarRoom
+    from orchestrator.solo_warroom import SoloWarRoom
 
     _squad_id = args.get("squad_id", "default")
 
@@ -532,7 +539,7 @@ def handle_evening_wrap(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_activate_deep_work(args: dict[str, Any]) -> dict[str, Any]:
     """Activate deep work mode."""
-    from .solo_deep_work import activate_deep_work_mode
+    from orchestrator.solo_deep_work import activate_deep_work_mode
 
     resume_date = args.get("resume_date", "")
     if not resume_date:
@@ -551,7 +558,7 @@ def handle_activate_deep_work(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_resume_deep_work(args: dict[str, Any]) -> dict[str, Any]:
     """Resume from deep work mode."""
-    from .solo_deep_work import deactivate_deep_work_mode
+    from orchestrator.solo_deep_work import deactivate_deep_work_mode
 
     try:
         config = {"war_room": {"operator": "operator", "mode": "solo"}}
@@ -564,7 +571,7 @@ def handle_resume_deep_work(args: dict[str, Any]) -> dict[str, Any]:
 
 def handle_deep_work_status(args: dict[str, Any]) -> dict[str, Any]:
     """Get deep work mode status."""
-    from .solo_deep_work import get_deep_work_status
+    from orchestrator.solo_deep_work import get_deep_work_status
 
     try:
         result = get_deep_work_status()
@@ -592,7 +599,7 @@ def handle_collect_health(args: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError(f"Collect health error: {e}") from e
 
 
-MILIMO_CONFIG_PATH = milimo_paths.config_path()
+MILIMO_CONFIG_PATH = config_path()
 
 
 def handle_squad_config(args: dict[str, Any]) -> dict[str, Any]:
@@ -642,7 +649,7 @@ def _collect_claw_health(role: str, squad_id: str) -> dict[str, Any]:
         "sparkline": [0, 0, 0, 0, 0, 0, 0],
     }
 
-    registry_path = milimo_paths.tools_dir(squad_id, role) / "registry.json"
+    registry_path = tools_dir(squad_id, role) / "registry.json"
     if registry_path.exists():
         try:
             data = json.loads(registry_path.read_text())
@@ -655,7 +662,7 @@ def _collect_claw_health(role: str, squad_id: str) -> dict[str, Any]:
         except Exception:
             pass
 
-    warroom_log = milimo_paths.logs_dir() / "warroom.log"
+    warroom_log = logs_dir() / "warroom.log"
     if warroom_log.exists():
         try:
             claw_health["last_action"] = _get_last_action_time(role, warroom_log)
@@ -666,7 +673,7 @@ def _collect_claw_health(role: str, squad_id: str) -> dict[str, Any]:
         except Exception:
             pass
 
-    pending_dir = milimo_paths.mesh_dir() / "queue" / "pending"
+    pending_dir = milimo_mesh_dir() / "queue" / "pending"
     if pending_dir.exists():
         pending_hold = 0
         pending_review = 0
@@ -784,14 +791,14 @@ def handle_send_to_claw(args: dict[str, Any]) -> dict[str, Any]:
     """
     import time
 
-    from .contracts import (
+    from orchestrator.contracts import (
         ClawMessage,
         VALID_SENDERS,
         VALID_RECIPIENTS,
         VALID_MESSAGE_TYPES,
         ASSISTANT_ROLE,
     )
-    from .mesh import MeshCoordinator
+    from orchestrator.mesh import MeshCoordinator
 
     recipient_role = args.get("role", "")
     message_type = args.get("type", "")
@@ -827,7 +834,7 @@ def handle_send_to_claw(args: dict[str, Any]) -> dict[str, Any]:
     )
 
     # Route through MeshCoordinator using the real mesh config
-    _mesh_dir = milimo_paths.mesh_dir()
+    _mesh_dir = milimo_mesh_dir()
     config_path = Path(__file__).parent.parent / "mesh_config.yaml"
     if config_path.exists():
         mesh = MeshCoordinator.from_config_file(
@@ -891,7 +898,7 @@ def handle_claw_status(args: dict[str, Any]) -> dict[str, Any]:
 
     result: dict[str, Any] = {"role": claw_role}
 
-    health_file = milimo_paths.health_dir(squad_id) / "health.json"
+    health_file = health_dir(squad_id) / "health.json"
     if health_file.exists():
         try:
             data = json.loads(health_file.read_text())
@@ -908,9 +915,7 @@ def handle_claw_status(args: dict[str, Any]) -> dict[str, Any]:
         result["health"] = {"status": "no_health_data"}
 
     # Read tool registry
-    registry_file = (
-        milimo_paths.claw_base(claw_role) / "sandbox" / "tools" / "registry.json"
-    )
+    registry_file = claw_base(claw_role) / "sandbox" / "tools" / "registry.json"
     if registry_file.exists():
         try:
             reg_data = json.loads(registry_file.read_text())
@@ -941,7 +946,7 @@ def handle_claw_status(args: dict[str, Any]) -> dict[str, Any]:
     result["diagnostic_note"] = evo.get("diagnostic_note")
 
     # Read pending messages for this claw
-    _mesh_dir = milimo_paths.mesh_dir()
+    _mesh_dir = milimo_mesh_dir()
     inbox = _mesh_dir / "inbox" / claw_role
     if inbox.exists():
         pending = []
@@ -963,7 +968,7 @@ def handle_claw_status(args: dict[str, Any]) -> dict[str, Any]:
         result["pending_messages"] = []
 
     # Read sandbox status (check if sandbox directory exists)
-    sandbox_path = milimo_paths.CLAWS_DIR / claw_role
+    sandbox_path = CLAWS_DIR / claw_role
     result["sandbox_exists"] = sandbox_path.exists()
     if sandbox_path.exists():
         try:
@@ -1160,7 +1165,7 @@ def handle_analytics_latest_report_summary(args: dict[str, Any]) -> dict[str, An
 
 def handle_generate_sprint_plan(args: dict[str, Any]) -> dict[str, Any]:
     """Trigger sprint plan generation by writing to the Build claw's sprint context."""
-    from .build.build_init import BuildFilesystemInit
+    from orchestrator.build.build_init import BuildFilesystemInit
 
     result: dict[str, Any] = {"status": "pending", "plan_path": ""}
 
@@ -1245,7 +1250,7 @@ def handle_generate_weekly_report(args: dict[str, Any]) -> dict[str, Any]:
         claw_info: dict[str, Any] = {"role": role}
 
         # Tool count
-        registry_file = milimo_paths.tools_dir(squad_id, role) / "registry.json"
+        registry_file = tools_dir(squad_id, role) / "registry.json"
         if registry_file.exists():
             try:
                 reg_data = json.loads(registry_file.read_text())
@@ -1257,7 +1262,7 @@ def handle_generate_weekly_report(args: dict[str, Any]) -> dict[str, Any]:
             claw_info["tool_count"] = 0
 
         # Health status
-        health_file = milimo_paths.health_dir(squad_id) / f"{role}.json"
+        health_file = health_dir(squad_id) / f"{role}.json"
         if health_file.exists():
             try:
                 claw_info["health"] = json.loads(health_file.read_text())
@@ -1267,7 +1272,7 @@ def handle_generate_weekly_report(args: dict[str, Any]) -> dict[str, Any]:
             claw_info["health"] = "no_data"
 
         # Pending messages
-        inbox = milimo_paths.mesh_dir() / "inbox" / role
+        inbox = milimo_mesh_dir() / "inbox" / role
         if inbox.exists():
             claw_info["pending_messages"] = len(list(inbox.glob("*.json")))
         else:
@@ -1461,7 +1466,7 @@ def handle_discover_tools(args: dict[str, Any]) -> dict[str, Any]:
     for role in ["content", "ops", "analytics", "finance", "build", "assistant"]:
         claw_tools: dict[str, Any] = {"tools": [], "count": 0, "last_evolution": None}
 
-        registry_file = milimo_paths.tools_dir(squad_id, role) / "registry.json"
+        registry_file = tools_dir(squad_id, role) / "registry.json"
         if registry_file.exists():
             try:
                 reg_data = json.loads(registry_file.read_text())
@@ -1500,7 +1505,7 @@ def handle_get_result(args: dict[str, Any]) -> dict[str, Any]:
     if not message_id:
         raise RuntimeError("message_id is required")
 
-    _mesh_dir = milimo_paths.mesh_dir()
+    _mesh_dir = milimo_mesh_dir()
     outbox_dir = _mesh_dir / "outbox"
 
     if not outbox_dir.exists():
@@ -1576,9 +1581,9 @@ def handle_start_claw(args: dict[str, Any]) -> dict[str, Any]:
             f"Invalid role '{role}'. Must be one of: {', '.join(valid_roles)}"
         )
 
-    _mesh_dir = milimo_paths.mesh_dir()
+    _mesh_dir = milimo_mesh_dir()
     launcher_pid_file = _mesh_dir / "launcher.pid"
-    blueprint_path = milimo_paths.blueprints_dir("0.1.0")
+    blueprint_path = blueprints_dir("0.1.0")
 
     if not launcher_pid_file.exists():
         raise RuntimeError("Launcher not running. Start the launcher first.")
@@ -1649,7 +1654,7 @@ def handle_stop_claw(args: dict[str, Any]) -> dict[str, Any]:
     if not role:
         raise RuntimeError("role is required")
 
-    _mesh_dir = milimo_paths.mesh_dir()
+    _mesh_dir = milimo_mesh_dir()
     hb_file = _mesh_dir / "heartbeats" / f"{role}.json"
 
     if not hb_file.exists():
@@ -1741,7 +1746,7 @@ def handle_start_launcher(args: dict[str, Any]) -> dict[str, Any]:
     import subprocess
     import time
 
-    _mesh_dir = milimo_paths.mesh_dir()
+    _mesh_dir = milimo_mesh_dir()
     launcher_pid_file = _mesh_dir / "launcher.pid"
 
     if launcher_pid_file.exists():
@@ -1756,7 +1761,7 @@ def handle_start_launcher(args: dict[str, Any]) -> dict[str, Any]:
         except ProcessLookupError:
             launcher_pid_file.unlink(missing_ok=True)
 
-    blueprint_path = milimo_paths.blueprints_dir("0.1.0")
+    blueprint_path = blueprints_dir("0.1.0")
     launcher_script = blueprint_path / "orchestrator" / "claw_launcher.py"
 
     if not launcher_script.exists():
@@ -1814,7 +1819,7 @@ def handle_claw_logs(args: dict[str, Any]) -> dict[str, Any]:
 
     lines = args.get("lines", 50)
 
-    _mesh_dir = milimo_paths.mesh_dir()
+    _mesh_dir = milimo_mesh_dir()
     log_file = _mesh_dir / "logs" / "launcher.log"
 
     if not log_file.exists():
@@ -1849,7 +1854,7 @@ def handle_launcher_status(args: dict[str, Any]) -> dict[str, Any]:
     """
     import os
 
-    _mesh_dir = milimo_paths.mesh_dir()
+    _mesh_dir = milimo_mesh_dir()
     launcher_pid_file = _mesh_dir / "launcher.pid"
 
     status = {
@@ -1908,7 +1913,7 @@ def handle_launcher_status(args: dict[str, Any]) -> dict[str, Any]:
                 "diagnostic_note": "No heartbeat file — claw was never started or has been stopped",
             }
 
-        return status
+    return status
 
 
 def handle_milimo_status(args: dict[str, Any]) -> dict[str, Any]:
@@ -1917,7 +1922,7 @@ def handle_milimo_status(args: dict[str, Any]) -> dict[str, Any]:
     roles = ["content", "ops", "analytics", "finance", "build", "assistant"]
 
     launcher = handle_launcher_status({})
-    health_file = milimo_paths.health_dir(squad_id) / "health.json"
+    health_file = health_dir(squad_id) / "health.json"
     health_data: dict[str, Any] = {}
     if health_file.exists():
         try:
@@ -1945,7 +1950,7 @@ def handle_milimo_status(args: dict[str, Any]) -> dict[str, Any]:
             evo_status = "never_run"
 
         pending_count = 0
-        inbox = milimo_paths.mesh_dir() / "inbox" / role
+        inbox = milimo_mesh_dir() / "inbox" / role
         if inbox.exists():
             pending_count = sum(1 for _ in inbox.glob("*.json"))
 

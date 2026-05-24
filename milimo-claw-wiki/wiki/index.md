@@ -2,7 +2,7 @@
 
 **Summary**: Master table of contents for the MilimoClaw knowledge base.
 
-**Last updated**: 2026-04-29
+**Last updated**: 2026-05-24
 
 **Tags**: #index #navigation
 
@@ -291,6 +291,9 @@ See [[log]] for complete operation history.
 
 | Date | Change | Pages Affected |
 |------|--------|----------------|
+| 2026-05-24 | Operational stabilization audit, YAML indentation fixes for solo-founder, loop correction in launcher status, dual-namespace mock test containment, sliding window log aging timestamp correction, contract alias relaxation for assistant_response/pricing_response, and Build Claw response envelope mapping | index.md, log.md, contracts.md, message-contracts.md, issues-and-fixes.md |
+| 2026-05-12 | Full code audit fixes: Path resolution false positive `_is_sandbox`, ToolRegistry `mkdir` fallback, ContentClaw assert crash, InboxPoller race condition, Evolution minimum actions, Build Claw auth fallback | index.md, log.md, milimo_paths.py, tool_registry.py, content_claw.py, claw_launcher.py, evolution.ts |
+| 2026-05-02 | install.sh rewrite: host-based build + pre-built artifacts, --force plugin install, remove destructive plugins.allow override, gateway restart with health check loop, Dockerfile plugin verification step, venv path fix (was /sandbox/milimo-blueprint → correct /sandbox/.openclaw/milimo/milimo-blueprint), gh CLI PATH via /sandbox/.bashrc | installation-scripts.md, common-issues.md, index.md, log.md |
 | 2026-04-29 | Sixth wiki correction pass: Nine-layer fix, acpx/ACP plugin docs, plugin system security, assistant module page | index.md, common-issues.md, openclaw-controls.md, modules/assistant/lucy.md |
 | 2026-04-29 | Fifth wiki correction pass: Dockerfile install mode, filesystem two-level model, posture profiles vs policy tiers, Common Mistakes, Known Limitations, Gateway Auth Controls | installation-scripts.md, best-practices.md, policy-overview.md, index.md |
 | 2026-04-29 | Fourth wiki correction pass: Node.js >=22.16, posture profile naming, seccomp conflation, inference-client default model | install.sh, installation-scripts.md, best-practices.md, policy-overview.md, inference-client.md |

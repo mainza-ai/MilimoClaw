@@ -106,12 +106,12 @@ class CommsManager:
             (
                 p
                 for p in [
-                    Path.home() / ".openclaw" / "milimo" / "config.json",
                     milimo_config_path(),
+                    Path.home() / ".openclaw" / "milimo" / "config.json",
                 ]
                 if p.exists()
             ),
-            Path.home() / ".openclaw" / "milimo" / "config.json",
+            milimo_config_path(),
         )
 
     def handle_inbound(

@@ -63,6 +63,7 @@ export class ApprovalEngine {
       // Try multiple locations: host, container blueprint, container sandbox
       const candidates = [
         join(process.cwd(), "milimo-blueprint", "mesh_config.yaml"),
+        join(process.cwd(), "..", "milimo-blueprint", "mesh_config.yaml"),
         join("/sandbox", ".openclaw/milimo", "milimo-blueprint", "mesh_config.yaml"),
         join("/sandbox", ".openclaw/milimo", "blueprints", "0.1.0", "mesh_config.yaml"),
         join(process.cwd(), "mesh_config.yaml"),

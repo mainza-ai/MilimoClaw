@@ -45,6 +45,7 @@ import yaml
 from .operation_log import OperationLog
 from .pattern_detector import PatternDetector
 from .tool_builder import BuildResult, BuiltTool, ToolBuilder
+from .milimo_paths import state_dir
 from .tool_proposal import (
     ToolProposal,
     generate_proposal,
@@ -429,7 +430,7 @@ class EvolutionCycle:
 # ---------------------------------------------------------------------------
 
 
-_STATE_DIR = Path("/sandbox/.openclaw/milimo/state")
+_STATE_DIR = state_dir()
 _EVOLUTION_DIR = _STATE_DIR / "evolution"
 _HISTORY_FILE = _EVOLUTION_DIR / "history.jsonl"
 _SUMMARY_FILE = _EVOLUTION_DIR / "summary.json"

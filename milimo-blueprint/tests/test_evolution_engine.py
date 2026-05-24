@@ -724,6 +724,36 @@ class TestEvolutionCycle(unittest.TestCase):
 
 
 class TestEvolutionScheduler(unittest.TestCase):
+    def setUp(self):
+        self.tmp_sched = tempfile.mkdtemp()
+        self.tmp_path = Path(self.tmp_sched)
+        from unittest.mock import patch
+
+        self.patchers = [
+            patch("orchestrator.evolution_cycle._STATE_DIR", self.tmp_path),
+            patch(
+                "orchestrator.evolution_cycle._EVOLUTION_DIR",
+                self.tmp_path / "evolution",
+            ),
+            patch(
+                "orchestrator.evolution_cycle._HISTORY_FILE",
+                self.tmp_path / "evolution" / "history.jsonl",
+            ),
+            patch(
+                "orchestrator.evolution_cycle._SUMMARY_FILE",
+                self.tmp_path / "evolution" / "summary.json",
+            ),
+        ]
+        for patcher in self.patchers:
+            patcher.start()
+
+    def tearDown(self):
+        for patcher in self.patchers:
+            patcher.stop()
+        import shutil
+
+        shutil.rmtree(self.tmp_sched, ignore_errors=True)
+
     def test_register_and_trigger(self):
         tmp = tempfile.mkdtemp()
         bp_dir = Path(tmp) / "bp"

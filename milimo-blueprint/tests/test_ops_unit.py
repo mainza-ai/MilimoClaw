@@ -14,24 +14,27 @@ from pathlib import Path
 import pytest
 
 _test_dir = Path(__file__).parent
-_orchestrator_dir = _test_dir.parent / "orchestrator"
-if str(_orchestrator_dir) not in sys.path:
-    sys.path.insert(0, str(_orchestrator_dir))
+_orchestrator_parent = _test_dir.parent
+if str(_orchestrator_parent) not in sys.path:
+    sys.path.insert(0, str(_orchestrator_parent))
 
-from ops.ops_init import (
+from orchestrator.ops.ops_init import (
     OpsFilesystemInit,
     OpsOperationalLog,
     OpsCommsLog,
     OpsLogEntry,
     CommsLogEntry,
 )
-from ops.signal_dispatcher import OpsSignalDispatcher, PricingNotConfirmedError
-from ops.approval_handler import OpsApprovalHandler
-from ops.intake_manager import IntakeManager, TriageScore
-from ops.health_scorer import ClientHealthScorer, ClientHealthScore
-from ops.project_manager import ProjectManager, ProjectStatus
-from ops.scope_monitor import ScopeMonitor
-from ops.ops_claw import OpsClaw, MockMeshGateway
+from orchestrator.ops.signal_dispatcher import (
+    OpsSignalDispatcher,
+    PricingNotConfirmedError,
+)
+from orchestrator.ops.approval_handler import OpsApprovalHandler
+from orchestrator.ops.intake_manager import IntakeManager, TriageScore
+from orchestrator.ops.health_scorer import ClientHealthScorer, ClientHealthScore
+from orchestrator.ops.project_manager import ProjectManager, ProjectStatus
+from orchestrator.ops.scope_monitor import ScopeMonitor
+from orchestrator.ops.ops_claw import OpsClaw, MockMeshGateway
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -340,7 +343,7 @@ class TestOpsSignalDispatcher:
         )
 
         assert len(mock_gateway.calls) == 1
-        assert mock_gateway.calls[0]["message_type"] == "brief"
+        assert mock_gateway.calls[0]["message_type"] == "project_brief"
 
     def test_send_client_health_signal(
         self,
@@ -745,7 +748,8 @@ class TestProjectManager:
         ]
         assert len(complete_calls) == 1
 
-        updated_status = fs.read_json(project_dir / "status.json")
+        completed_dir = fs._base / "completed" / "client-1" / "project-1"
+        updated_status = fs.read_json(completed_dir / "status.json")
         assert updated_status is not None
         assert updated_status["client_confirmed"] is True
         assert updated_status["status"] == "completed"

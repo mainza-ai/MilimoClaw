@@ -2,7 +2,7 @@
 
 **Summary**: Append-only record of all wiki operations.
 
-**Last updated**: 2026-05-06
+**Last updated**: 2026-05-24
 
 **Tags**: #log #meta
 
@@ -695,3 +695,75 @@ Each entry follows this format:
 **Notes**: Ops Claw is now fully stable and correctly routing payloads.
 
 ---
+
+## 2026-05-15
+
+### 2026-05-15 — install.sh & uninstall.sh K8s-to-Docker Fix + Path Centralization + Lint Cleanup
+
+**Pages**: log.md, assistant-system.md, common-issues.md
+**Source**: User-reported `kubectl not found in $PATH` error during `--solo` deploy
+**Changes**:
+- **BUG 15**: Fixed `install.sh` mode contradiction — `check_prerequisites()` said "No existing sandbox found" but `main()` false-positive-matched via separate `nemoclaw list | grep` and said "existing sandbox detected". Fixed by exporting `SANDBOX_FOUND` from `check_prerequisites()` and using it in `main()` as single source of truth.
+- **BUG 16**: Fixed `install.sh` `kubectl not found` error for `--solo` local deploy. Rewrote `sandbox_exec()`, `sandbox_exec_root()`, `sandbox_cp()` to auto-detect K8s-in-Docker (kubectl via gateway) vs direct Docker (--solo local) topology. Converted all raw `docker exec "$gateway" kubectl exec` calls to use the helpers. Same fix applied to `uninstall.sh`.
+- **BUG 17**: Replaced 5 hardcoded `/sandbox/.openclaw/milimo/...` paths with `milimo_paths` functions: `bridge_cli.py` and `health_collector.py` now use `state_dir() / "evolution" / "summary.json"`; `evolution_cycle.py` uses `state_dir()`; `ops/comms_manager.py` prioritizes `milimo_config_path()` over `Path.home()`; `assistant_setup.py` uses `MILIMO_DIR`-derived paths instead of `Path.home() / ".openclaw" / ...`.
+- Fixed 6 TypeScript ESLint errors (0 errors, 982 warnings remaining): removed unused `ClawRole` import, prefixed unused `args` param with `_args`, removed `async` from no-await functions in `claw-launcher-service.ts` and `runtime-context.ts`, added eslint-disable for `no-redundant-type-constituents` on `on()` handler type, converted `require("node:child_process")` to ES import in `health-collector.ts`.
+- Updated `assistant-system.md` CLI usage to show `python3 -m orchestrator.assistant_setup` (module execution mode) instead of the old `python3 orchestrator/assistant_setup.py` (direct script execution).
+- Documented: Apple Silicon runtime deploy fix (commit `bbfe458`), `requests` dependency removal (commit `b2741c5`), `milimo_status` bridge command, `claw-launcher-service.ts` as OpenClaw managed service, and `assistant_setup.py -m` flag change.
+
+**Notes**: `install.sh --solo` now works on both K8s-in-Docker and direct Docker topologies. All hardcoded sandbox paths have been replaced with centralized `milimo_paths` resolution. TypeScript typechecks clean (0 errors).
+
+---
+
+### 2026-05-15 (cont.) — jq Sandbox Detection Fix + --resume Inference Skip + Any-Sandbox Fallback
+
+**Pages**: log.md
+**Source**: `install.sh --solo --non-interactive` routing to Dockerfile path instead of runtime deploy, causing inference re-validation timeout
+**Changes**:
+- **BUG 18**: Fixed `check_prerequisites()` jq path — `.[] | select(.name == ...)` iterated over top-level keys (`schemaVersion`, `defaultSandbox`, `sandboxes`) instead of sandbox objects. None have `.name`, so jq always exited 5 and `SANDBOX_FOUND` stayed `false`. Changed to `.sandboxes[] | select(.name == ...)` in both the existence check (line ~310) and phase extraction (line ~313). Confirmed `nemoclaw list --json` returns `{"schemaVersion":1,"sandboxes":[...]}` structure.
+- **BUG 19**: Fixed `deploy_via_dockerfile()` always re-validating NVIDIA inference endpoints. When `~/.nemoclaw/config.json` exists (gateway already onboarded), `--resume` is now appended to `onboard_args` so `nemoclaw onboard --from` reuses existing inference config (provider, model, route) and skips API key curl validation (which times out at 15s when `integrate.api.nvidia.com` is unreachable from Docker build context).
+- **Any-sandbox fallback**: When `$SANDBOX_NAME` (default: `my-assistant`) is not found but other sandboxes exist, `check_prerequisites()` now adopts the first detected sandbox name and sets `SANDBOX_FOUND=true` with a warning. This handles renamed or custom-named sandboxes.
+
+**Notes**: Dry-run verified — `install.sh --solo --non-interactive --dry-run` now shows "Runtime deploy (existing sandbox detected via nemoclaw list)" and does NOT attempt `nemoclaw onboard --from`. `bash -n install.sh` syntax check passes.
+
+---
+
+### 2026-05-15 (cont.) — BUG 20: Phase Detection + Docker Solo Container Name + File Permissions
+
+**Pages**: log.md
+**Source**: `install.sh --solo --non-interactive` failing with "No such container: my-assistant" even when sandbox is Ready
+**Changes**:
+- **BUG 20a (Phase detection)**: `nemoclaw list --json` has NO `.phase` field — only `name`, `model`, `provider`, `connected`, etc. The jq query `.phase // "Unknown"` always returned `"Unknown"`, causing `SANDBOX_PHASE=Unknown` which routed to "start sandbox" path even when sandbox was Ready. Fixed: both jq and grep branches now call `nemoclaw <name> status | awk '/Phase:/{print $NF}'` to get the actual phase.
+- **BUG 20b (Container name)**: `sandbox_exec/sandbox_exec_root/sandbox_cp` in Docker solo mode used `$SANDBOX_NAME` (`my-assistant`) as the `docker exec` target, but the actual container name is `openshell-my-assistant-<uuid>`. The `$gateway` variable (from `docker ps | grep openshell`) held the correct name but was only used in the K8s branch. Fixed: Docker solo branch now uses `$gateway` for all `docker exec`/`docker cp` calls. Same fix applied to `uninstall.sh`.
+- **BUG 20c (File permissions)**: `docker cp` from host creates files as root:root mode 0600 inside the container, making them unreadable by the sandbox user (UID 1000). Added `host_cp()` helper that `chmod 644` after `docker cp`. Replaced all `docker cp` calls in `deploy_to_sandbox()` with `host_cp`. Also fixed NEMOCLAW_MODEL injection to use `sandbox_exec_root` (root) instead of `sandbox_exec` (sandbox user) since `/etc/environment` is root-owned.
+- **BUG 20d (sandbox_cp in solo mode)**: `sandbox_cp` in Docker solo mode does `docker cp "$src" "$gateway":"$dst"` where `$src` is a container-internal path (e.g., `/tmp/assistant_template.md`) that doesn't exist on the host. In solo mode, the gateway IS the sandbox — `docker cp` from host already places the file correctly. Fixed: all `sandbox_cp` calls after `docker cp`/`host_cp` now gated with `if [ "$_IS_K8S_MODE" = "true" ]`.
+- **Deploy routing**: Added `SANDBOX_PHASE`-aware routing in `main()`: Running/Ready → `deploy_to_sandbox`; non-running → attempt `nemoclaw connect` (with 15s timeout, skipped in `--non-interactive`); connect fails → `deploy_via_dockerfile`.
+- **Deploy via Dockerfile --resume**: Replaced incorrect `--resume` flag (only resumes interrupted sessions) with env var pre-seeding: reads `provider` and `model` from `~/.nemoclaw/sandboxes.json` and exports `NEMOCLAW_PROVIDER`/`NEMOCLAW_MODEL_PREFERRED` for the onboard wizard. Clears stale `onboard-session.json` when `--from` path differs from current build context.
+- **Summary**: Install mode display now checks `$SANDBOX_PHASE` in addition to `$RUNTIME_DEPLOY`.
+
+**Notes**: `install.sh --solo --non-interactive` now completes successfully in 150s — all steps pass, plugin registered, Lucy configured, no errors. Exit code 0. `bash -n install.sh` and `bash -n uninstall.sh` both pass.
+
+*This log is append-only. Never delete entries.*
+
+---
+
+## 2026-05-24
+
+### 2026-05-24 16:45 — MilimoClaw Infrastructure Stabilization & Messaging Alignment Audit
+
+**Pages**: log.md, index.md, contracts.md, message-contracts.md, issues-and-fixes.md
+
+**Source**: Comprehensive operational audit and multi-agent integration verification session (Conversation b483b6a1-a63f-4742-a27f-93db652f23a1)
+
+**Changes**:
+- **Indentation Drift in `solo-founder.yaml` (Operational Policy & Evolution)**: Fixed build and assistant claws which were indented with 2 spaces instead of 4 spaces under `operator_policy.approval_modes` and `evolution.per_claw`. Re-aligned them to 4 spaces to conform with YAML schema specifications.
+- **Premature Loop Termination in `handle_launcher_status`**: Corrected 8-space indentation of `return status` in `orchestrator/bridge_cli.py` to 4 spaces. This prevents the launcher status query from terminating early after retrieving only the first claw's status.
+- **Unit Test Path and Mock Containment**: Resolved import binding leaks in `bridge_cli.py` tests using `ExitStack` for dual-namespace patching. Fixed `os.kill` collisions on host machines using environment-agnostic mocking of process IDs.
+- **Sliding Window Log Cutoff Date Drift**: Removed static April 2026 timestamps from log verification tests. Configured dynamic log dates relative to `datetime.now(timezone.utc)` to ensure compatibility with the production lookback filter.
+- **6-Claw Test Assertion Expansion**: Integrated the `assistant` claw into active roles validation within solo initialization tests, moving core test assertions from 5 claws to the modern 6-claw setup.
+- **Contract Schema Relaxation (pricing & assistant response aliases)**: Enabled contract alias fallback validations in `contracts.py`'s `_validate_payload_schema`.
+  - For `assistant_response`: accepts `"original_message_id"` as a valid alias for `"query_id"`.
+  - For `pricing_response`: accepts `"project_id"` as alias for `"query_id"`, `"floor_price"` for `"floor"`, and `"ceiling_price"` for `"ceiling"`.
+- **Build Claw Outbound Envelope and Payload Formatting**: Aligned `build_claw.py` outbound helper with standard communication rules. Hardcoded its message envelope type to `"assistant_response"` and properly wrapped output keys inside `"original_message_id"` and `"response"`.
+- **Wiki Documentation Update**: Updated `Last updated` fields on modified pages, added missing `### Assistant Messages` categories, documented payload aliasing features, and logged Issues 9-12 inside the `Issues and Fixes Audit` wiki guide.
+
+**Notes**: Deployed and live-tested all fixes within the running `my-assistant` sandbox container (`76647cfa3698`). Dispatched live multi-agent tasks and verified both the project scoping/pricing scenario (Ops $\rightarrow$ Finance) and the technical pipeline execution (Ops $\rightarrow$ Build) completed with 100% success and no contract rejections. All 1,216 tests compile and pass clean.

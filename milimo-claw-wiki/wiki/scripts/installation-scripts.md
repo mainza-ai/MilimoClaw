@@ -6,7 +6,7 @@
 
 **Sources**: `install.sh`, [Install OpenClaw Plugins (official)](https://docs.nvidia.com/nemoclaw/latest/deployment/install-openclaw-plugins.html)
 
-**Last updated**: 2026-04-30
+**Last updated**: 2026-05-02
 
 **Tags**: #scripts #installation #deployment
 
@@ -101,14 +101,24 @@ No running sandbox is required — `nemoclaw onboard --from` creates one.
 ```dockerfile
 FROM ghcr.io/nvidia/nemoclaw/sandbox-base:latest
 
-# Copy Milimo plugin source
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# Copy Milimo plugin (pre-built dist/ + node_modules/ on host)
 COPY milimo/ /opt/milimo/
 WORKDIR /opt/milimo
-RUN npm ci --no-audit --no-fund && npm run build
-RUN mkdir -p /sandbox/.openclaw/extensions \
-    && cp -a /opt/milimo /sandbox/.openclaw/extensions/milimo \
-    && openclaw plugins install /sandbox/.openclaw/extensions/milimo \
-    && openclaw doctor --fix
+
+# Install production node_modules (devDeps already stripped by --omit=dev on host)
+RUN npm install --omit=dev --ignore-scripts --legacy-peer-deps 2>&1 | tail -5
+
+# Install plugin with --force (idempotent) — FAIL BUILD if this fails
+RUN openclaw plugins install --force /opt/milimo \
+    && echo "PLUGIN_INSTALL_OK" \
+    || (echo "PLUGIN_INSTALL_FAILED" && exit 1)
+
+# Verify plugin is registered before continuing
+RUN openclaw plugins list 2>&1 | grep -q "milimo" \
+    && echo "PLUGIN_VERIFIED" \
+    || (echo "PLUGIN_VERIFICATION_FAILED" && exit 1)
 
 # Copy Milimo blueprint
 COPY milimo-blueprint/ /sandbox/.openclaw/milimo/milimo-blueprint/
@@ -120,13 +130,28 @@ RUN BASE="/sandbox/.openclaw/milimo/claws" \
 # Install Python dependencies
 RUN pip3 install --target /sandbox/.local/lib/python3.11/site-packages ...
 
-# Install GitHub CLI
-RUN ARCH=$(uname -m) ...
+# Install GitHub CLI and add to PATH via /etc/profile.d/ (survives Landlock)
+RUN ARCH=$(uname -m) \
+    && GH_ARCH=$([ "$ARCH" = "aarch64" ] && echo "arm64" || echo "amd64") \
+    && GH_VERSION="2.67.0" \
+    && GH_URL="https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz" \
+    && cd /tmp && curl -sL "$GH_URL" -o gh.tar.gz && tar xzf gh.tar.gz \
+    && mkdir -p /sandbox/.openclaw/milimo/bin \
+    && cp gh_*_linux_${GH_ARCH}/bin/gh /sandbox/.openclaw/milimo/bin/gh \
+    && chmod +x /sandbox/.openclaw/milimo/bin/gh \
+    && rm -rf /tmp/gh* \
+    && echo 'export PATH="/sandbox/.openclaw/milimo/bin:$PATH"' > /etc/profile.d/milimo.sh \
+    && echo "gh CLI installed at /sandbox/.openclaw/milimo/bin/gh"
 
 WORKDIR /opt/nemoclaw
 ```
 
-This follows the official pattern from the [plugin install docs](https://docs.nvidia.com/nemoclaw/latest/deployment/install-openclaw-plugins.html): `FROM` sandbox-base, `COPY` plugin, `npm ci && npm run build`, copy to `/sandbox/.openclaw/extensions/`, `openclaw plugins install`, `openclaw doctor --fix`, final `WORKDIR /opt/nemoclaw`. All claws share a single NemoClaw sandbox created via `nemoclaw onboard --from`.
+Key changes from older pattern:
+- **Pre-built node_modules**: `npm install --omit=dev` runs on host; Dockerfile copies them directly (no npm network access needed inside sandbox)
+- **`--force` flag**: Idempotent reinstall, safe to re-run
+- **Plugin verification**: `openclaw plugins list | grep -q "milimo"` after install — Docker build fails if plugin not registered
+- **No `|| true`**: Plugin install errors now fail the build (catches issues early)
+- **PATH via `/etc/profile.d/`**: Adds `milimo/bin` to PATH without relying on `/usr/local/bin` (may be read-only under Landlock)
 
 ### Build Context
 
@@ -135,11 +160,15 @@ The build context is the Dockerfile's parent directory (a temp dir under `/tmp/m
 ```
 build-dir/
 ├── Dockerfile
-├── milimo/           # Plugin source (node_modules excluded)
-└── milimo-blueprint/ # Blueprint (.__pycache__ excluded)
+├── milimo/
+│   ├── openclaw.plugin.json
+│   ├── package.json
+│   ├── dist/              # Pre-built TypeScript output (npx tsc on host)
+│   └── node_modules/      # Production node_modules (npm install --omit=dev on host)
+└── milimo-blueprint/      # Blueprint (orchestrator, policies, templates)
 ```
 
-macOS xattrs are stripped via `--no-xattrs --no-mac-metadata` + `COPYFILE_DISABLE=1` to prevent `LIBARCHIVE.xattr.*` pax headers that Linux GNU tar cannot parse.
+> **Note**: The Dockerfile now includes pre-built `node_modules/` (production only, `npm install --omit=dev` on host). This avoids npm network access inside the sandbox during Docker build, making builds faster and more reliable.
 
 ### NemoClaw Onboard Args
 
@@ -157,16 +186,18 @@ For quick iteration without rebuilding the sandbox image. The sandbox MUST have 
 
 ### How It Works
 
-1. Build TypeScript plugin on host
-2. Transfer plugin source to running sandbox via `docker cp` + `kubectl cp`
-3. Build plugin inside sandbox
-4. Deploy blueprint, assistant template, and support files
-5. Initialize claw data directories under `/sandbox/.openclaw/milimo/claws/`
-6. Install Python dependencies and GitHub CLI
-7. Create milimo CLI wrapper and backward-compat symlinks
-8. Inject environment variables
-9. Register plugin via `openclaw plugins install`
-10. Restart gateway
+1. Build TypeScript plugin on host (`npm ci && npm run build`)
+2. Build production `node_modules` on host (`npm install --omit=dev`) — avoids npm network access inside sandbox
+3. Package deployable artifacts: `openclaw.plugin.json`, `package.json`, `dist/`, `node_modules/` (prod only)
+4. Transfer to `/tmp/milimo-plugin-install/` inside running sandbox via `docker cp` + `kubectl cp`
+5. Verify plugin staging: `test -f /tmp/milimo-plugin-install/dist/index.js`
+6. Deploy blueprint to `/sandbox/.openclaw/milimo/milimo-blueprint/` (same sandbox isolation boundaries)
+7. Deploy assistant template, initialize claw data directories, install Python deps and GitHub CLI
+8. Register plugin via `openclaw plugins install --force /tmp/milimo-plugin-install/`
+   - Retry with `--dangerously-force-unsafe-install` on failure
+   - Verify: `openclaw plugins list | grep milimo` must show `loaded`
+   - Verify: `openclaw milimo --help` responds
+9. Restart gateway: `openclaw gateway restart` with health check loop (polls `openclaw doctor` for up to 30s)
 
 ### Prerequisites (Runtime deploy)
 
@@ -227,29 +258,47 @@ Per [Credential Storage](https://docs.nvidia.com/nemoclaw/latest/security/creden
 ## Directory Structure After Install
 
 ```
+/tmp/
+└── milimo-plugin-install/     # Plugin staging dir — transferred from host, cleaned after install
+    ├── openclaw.plugin.json
+    ├── package.json
+    ├── dist/
+    └── node_modules/           # Production node_modules (npm install --omit=dev)
+
 /sandbox/
-├── .openclaw/ → unified agent config/state/plugins (root-owned, immutable at runtime)
-│   ├── extensions/milimo/ → built plugin source (NemoClaw sandbox-base provides this)
-│   ├── workspace/ → read-only at Landlock level (symlink target is writable)
-│   ├── openclaw.json → read-only at runtime
-│   └── .nemoclaw/ → root-owned NemoClaw plugin state (NOT milimo data)
-└── .openclaw/milimo/ → MilimoClaw data subtree (symlink or explicit mount)
-    ├── blueprints/0.1.0/ → symlink to milimo-blueprint/
-    ├── bin/ → gh CLI, milimo wrapper
-    ├── config.json → plugin + orchestrator config
-    ├── claws/
-    │   ├── ops/ → Ops Claw mount (clients, projects, calendar, queue, memory, …)
-    │   ├── content/ → Content Claw mount (drafts, calendar, queue, memory, …)
-    │   ├── analytics/ → Analytics Claw mount (reports, metrics, queue, memory, …)
-    │   ├── finance/ → Finance Claw mount (invoices, expenses, revenue, queue, …)
-    │   ├── build/ → Build Claw mount (prs, deployments, tasks, docs, …)
-    │   └── assistant/ → Assistant Claw mount (context, memory, logs, tools, …)
-    ├── milimo-blueprint/ → blueprint (orchestrator, policies, templates)
-    ├── mesh/ → heartbeats, PID files
-    └── templates/ → assistant system prompt
+├── .openclaw/                  # Unified agent config/state (root-owned, read-only at runtime)
+│   ├── openclaw.json            # Gateway config (locked 444, not editable by sandbox user)
+│   ├── extensions/             # NemoClaw-builtin plugin extensions (stock plugins)
+│   ├── plugins.list             # NemoClaw plugin registry
+│   ├── workspace/               # Agent workspace (read-only at Landlock level)
+│   └── milimo/                  # MilimoClaw data subtree
+│       ├── blueprints/0.1.0/  # Symlink → milimo-blueprint/
+│       ├── bin/                 # gh CLI, milimo CLI wrapper
+│       │   ├── gh              # GitHub CLI v2.67.0
+│       │   └── milimo          # Python CLI wrapper → bridge_cli.py
+│       ├── config.json         # Plugin config (squadName, operatorName, etc.)
+│       ├── claws/              # Per-claw data directories
+│       │   ├── ops/            # Ops Claw (clients, projects, calendar, queue, memory, …)
+│       │   ├── content/        # Content Claw (drafts, calendar, queue, memory, …)
+│       │   ├── analytics/      # Analytics Claw (reports, metrics, queue, memory, …)
+│       │   ├── finance/        # Finance Claw (invoices, expenses, revenue, queue, …)
+│       │   ├── build/          # Build Claw (prs, deployments, tasks, docs, …)
+│       │   └── assistant/      # Assistant Claw (context, memory, logs, tools, …)
+│       ├── milimo-blueprint/   # Blueprint (orchestrator, policies, templates)
+│       │   └── .venv/          # Python venv (recreated with sandbox Python)
+│       ├── mesh/               # Heartbeats, PIDs, alerts
+│       └── templates/           # Assistant system prompt template
+└── .local/lib/python3.11/site-packages/  # Python packages (directly importable)
 ```
 
-> **Note:** Per official NemoClaw docs, `.openclaw/` is the unified layout. MilimoClaw data lives under `.openclaw/milimo/`. The legacy `.openclaw-data/` layout was removed by NemoClaw's Dockerfile migration block.
+**Key paths:**
+- **Plugin staging**: `/tmp/milimo-plugin-install/` — transient, cleaned after `openclaw plugins install`
+- **Plugin install target**: `~/.openclaw/` — `openclaw plugins install` handles placement internally
+- **Blueprint**: `/sandbox/.openclaw/milimo/milimo-blueprint/` — deployed from host tarball
+- **gh CLI**: `/sandbox/.openclaw/milimo/bin/gh` — PATH added via `/etc/profile.d/milimo.sh` and `/sandbox/.bashrc` (root writes PATH export to `.bashrc`)
+- **Python venv**: `/sandbox/.openclaw/milimo/milimo-blueprint/.venv` — recreated with sandbox Python (previously pointed to wrong `/sandbox/milimo-blueprint/` path)
+
+> **Note**: Per official NemoClaw docs, `.openclaw/` is the unified layout. MilimoClaw data lives under `.openclaw/milimo/`. The legacy `.openclaw-data/` layout was removed by NemoClaw's Dockerfile migration block.
 
 ---
 

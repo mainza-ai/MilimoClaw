@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any, Optional
 from enum import Enum
 
-from .milimo_paths import health_dir
+from .milimo_paths import health_dir, state_dir
 
 logger = logging.getLogger("milimo.health_collector")
 
@@ -286,13 +286,13 @@ class HealthCollector:
         self._health: dict[str, ClawHealth] = {}
         self._running = False
         self._thread: Optional[threading.Thread] = None
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._alerts: list[dict[str, Any]] = []
 
         if storage_dir:
             self._storage_dir = Path(storage_dir)
         else:
-            self._storage_dir = health_dir()
+            self._storage_dir = health_dir(self.mesh.squad_id)
 
         self._storage_dir.mkdir(parents=True, exist_ok=True)
 
@@ -364,7 +364,7 @@ class HealthCollector:
 
         # Evolution status — read from persisted summary.json
         _evolution_status = "unknown"
-        _summary_path = Path("/sandbox/.openclaw/milimo/state/evolution/summary.json")
+        _summary_path = state_dir() / "evolution" / "summary.json"
         if _summary_path.exists():
             try:
                 _summary = json.loads(_summary_path.read_text())
@@ -480,18 +480,15 @@ class HealthCollector:
         health_file = self._storage_dir / "health.json"
 
         with self._lock:
-            data = {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "squad_id": self.mesh.squad_id,
-                "claws": {
-                    role: health.to_dict() for role, health in self._health.items()
-                },
-                "alerts": self._alerts,
-            }
+            data = self.get_squad_health().to_dict()
 
         try:
             health_file.write_text(json.dumps(data, indent=2))
         except Exception as e:
+            import traceback
+
+            with open("/tmp/milimo-health-error.txt", "w") as f:
+                f.write(traceback.format_exc())
             logger.warning("Failed to save health data: %s", e)
 
     def get_claw_health(self, role: str) -> Optional[ClawHealth]:

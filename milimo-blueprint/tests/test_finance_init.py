@@ -226,12 +226,15 @@ class TestFinanceOperationalLog:
         log_path = tmp_path / "logs" / "operational.log"
         log = FinanceOperationalLog(log_path)
 
+        from datetime import timedelta, timezone
+
+        now = datetime.now(timezone.utc)
         timestamps = [
-            "2026-04-03T04:15:59",
-            "2026-04-02T04:15:59",
-            "2026-04-01T04:15:59",
-            "2026-03-31T04:15:59",
-            "2026-03-30T04:15:59",
+            (now - timedelta(days=1)).isoformat(),
+            (now - timedelta(days=2)).isoformat(),
+            (now - timedelta(days=3)).isoformat(),
+            (now - timedelta(days=4)).isoformat(),
+            (now - timedelta(days=5)).isoformat(),
         ]
         for i in range(5):
             entry = FinanceLogEntry(
@@ -252,9 +255,12 @@ class TestFinanceOperationalLog:
         log_path = tmp_path / "logs" / "operational.log"
         log = FinanceOperationalLog(log_path)
 
+        from datetime import timezone
+
+        now_str = datetime.now(timezone.utc).isoformat()
         for i in range(5):
             entry = FinanceLogEntry(
-                timestamp="2026-04-04T04:13:39",
+                timestamp=now_str,
                 action_type="invoice_generated" if i % 2 == 0 else "payment_received",
                 entity_id=f"entity_{i}",
                 amount=None,
@@ -271,9 +277,12 @@ class TestFinanceOperationalLog:
         log_path = tmp_path / "logs" / "operational.log"
         log = FinanceOperationalLog(log_path)
 
+        from datetime import timezone
+
+        now_str = datetime.now(timezone.utc).isoformat()
         for i in range(5):
             entry = FinanceLogEntry(
-                timestamp="2026-04-04T04:13:39",
+                timestamp=now_str,
                 action_type="invoice_generated",
                 entity_id=f"entity_{i}",
                 amount=None,
@@ -346,12 +355,15 @@ class TestPaymentEventsLog:
         log_path = tmp_path / "logs" / "payment-events.log"
         log = PaymentEventsLog(log_path)
 
+        from datetime import timedelta, timezone
+
+        now = datetime.now(timezone.utc)
         timestamps = [
-            "2026-04-03T04:15:59",
-            "2026-04-02T04:15:59",
-            "2026-04-01T04:15:59",
-            "2026-03-31T04:15:59",
-            "2026-03-30T04:15:59",
+            (now - timedelta(days=1)).isoformat(),
+            (now - timedelta(days=2)).isoformat(),
+            (now - timedelta(days=3)).isoformat(),
+            (now - timedelta(days=4)).isoformat(),
+            (now - timedelta(days=5)).isoformat(),
         ]
         for i in range(5):
             event = PaymentEvent(
@@ -372,9 +384,12 @@ class TestPaymentEventsLog:
         log_path = tmp_path / "logs" / "payment-events.log"
         log = PaymentEventsLog(log_path)
 
+        from datetime import timezone
+
+        now_str = datetime.now(timezone.utc).isoformat()
         for i in range(5):
             event = PaymentEvent(
-                timestamp="2026-04-04T04:13:39",
+                timestamp=now_str,
                 event_type="invoice_sent",
                 invoice_id=f"inv-{i}",
                 client_id=f"client-{i % 2}",
@@ -397,9 +412,12 @@ class TestPaymentEventsLog:
             "payment_overdue",
             "invoice_sent",
         ]
+        from datetime import timezone
+
+        now_str = datetime.now(timezone.utc).isoformat()
         for i, event_type in enumerate(event_types):
             event = PaymentEvent(
-                timestamp="2026-04-04T04:13:39",
+                timestamp=now_str,
                 event_type=event_type,
                 invoice_id=f"inv-{i}",
                 client_id="client-456",

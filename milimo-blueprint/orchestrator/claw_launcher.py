@@ -833,6 +833,8 @@ class ClawLauncher:
         check_interval: int = 60,
         unhealthy_threshold: int = UNHEALTHY_THRESHOLD,
     ):
+        from orchestrator.health_collector import HealthCollector
+
         self.heartbeat_interval = heartbeat_interval
         self.poll_interval = poll_interval
         self.check_interval = check_interval
@@ -857,6 +859,7 @@ class ClawLauncher:
 
         self._mesh_gateway = RealMeshGateway()
         logger.info("ClawLauncher: shared RealMeshGateway initialized")
+        self._health_collector = HealthCollector(self._mesh_gateway._mesh)
 
     def start_role(self, role: str) -> ClawComponents | None:
         """Start a single claw role."""
@@ -952,6 +955,7 @@ class ClawLauncher:
         self._monitor.set_restart_callback(self._monitor_restart_callback)
         self._monitor.start()
         self._outbox_cleaner.start()
+        self._health_collector.start()
 
         for role in ALL_ROLES:
             self.start_role(role)
@@ -961,6 +965,7 @@ class ClawLauncher:
         self._running = False
         self._monitor.stop()
         self._outbox_cleaner.stop()
+        self._health_collector.stop()
         with self._lock:
             for role in list(self._components.keys()):
                 self._components[role].stop()
@@ -1019,6 +1024,25 @@ class ClawLauncher:
             or os.environ.get("BUILD_CLAW_NVIDIA_API_KEY"),
             api_base=os.environ.get("NVIDIA_API_BASE"),
         )
+
+        # Try NemoClaw credential store if GitHub token not in environment
+        if not os.environ.get("GITHUB_TOKEN") and not os.environ.get("GH_TOKEN"):
+            try:
+                import subprocess
+
+                cred_result = subprocess.run(
+                    ["nemoclaw", "credentials", "get", "GITHUB_TOKEN"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if cred_result.returncode == 0 and cred_result.stdout.strip():
+                    os.environ["GITHUB_TOKEN"] = cred_result.stdout.strip()
+                    logger.info(
+                        "ClawLauncher: loaded GITHUB_TOKEN from NemoClaw credential store"
+                    )
+            except Exception:
+                pass
 
         try:
             github_client = GitHubClient(repo=os.environ.get("GITHUB_REPO"))
@@ -1199,10 +1223,7 @@ class ClawLauncher:
         """Start a generic claw with real clients when available."""
         claw = None
         heartbeat = HeartbeatEmitter(role, self.heartbeat_interval)
-        heartbeat.start()
-
         poller = InboxPoller(role, self.poll_interval, outbox_writer=write_outbox)
-        poller.start()
 
         try:
             if role == "content":
@@ -1317,6 +1338,17 @@ class ClawLauncher:
             )
         except Exception as e:
             logger.error("ClawLauncher: error starting %s claw: %s", role, e)
+
+        # Only start heartbeat and poller AFTER handler is wired to prevent
+        # silent message loss during the startup window (fixes message race)
+        heartbeat.start()
+        if poller._message_handler is not None:
+            poller.start()
+        else:
+            logger.warning(
+                "ClawLauncher: %s claw has no message handler — poller not started",
+                role,
+            )
 
         return claw, heartbeat, poller
 

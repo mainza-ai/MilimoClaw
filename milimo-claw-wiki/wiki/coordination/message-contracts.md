@@ -6,7 +6,7 @@
 - `milimo-blueprint/orchestrator/contracts.py`
 - `raw/AGENTS.md`
 
-**Last updated**: 2026-04-23
+**Last updated**: 2026-05-24
 
 **Tags**: #coordination #contracts #messaging
 
@@ -205,14 +205,11 @@ From: Finance Claw → To: Ops Claw
 
 ```python
 {
-    "project_id": str,
-    "pricing": {
-        "base_rate": float,
-        "complexity_multiplier": float,
-        "timeline_multiplier": float,
-        "total_estimate": float,
-    },
-    "valid_until": str,
+    "query_id": str,          # Required (alias "project_id" accepted)
+    "floor": float,           # Required (alias "floor_price" accepted)
+    "ceiling": float,         # Required (alias "ceiling_price" accepted)
+    "notes": str | None,      # Optional
+    "valid_until": str | None # Optional
 }
 ```
 
@@ -309,10 +306,11 @@ From: Any Claw → To: Assistant
 
 ```python
 {
-    "original_message_id": str,
-    "status": str,  # "success" | "queued" | "error"
-    "data": dict | None,
-    "error": str | None,
+    "query_id": str,          # Required (alias "original_message_id" accepted)
+    "response": str | dict,   # Required
+    "data": dict | None,      # Optional
+    "confidence": float | None, # Optional
+    "generated_at": str | None # Optional (ISO timestamp)
 }
 ```
 

@@ -69,8 +69,19 @@ export interface OpenClawPluginApi {
     registerCli: (registrar: PluginCliRegistrar, opts?: {
         commands?: string[];
     }) => void;
+    registerService?: (service: {
+        id: string;
+        start: (ctx: {
+            config: OpenClawConfig;
+            logger: PluginLogger;
+        }) => void | Promise<void>;
+        stop?: (ctx: {
+            config: OpenClawConfig;
+            logger: PluginLogger;
+        }) => void | Promise<void>;
+    }) => void;
     resolvePath: (input: string) => string;
-    on: (hookName: string, handler: (...args: unknown[]) => void) => void;
+    on: (hookName: string, handler: (...args: unknown[]) => unknown | Promise<unknown>) => void;
 }
 /** Valid claw role identifiers. "solo" indicates all claws run on one machine. */
 export type ClawRole = "content" | "ops" | "analytics" | "finance" | "build" | "assistant" | "solo";

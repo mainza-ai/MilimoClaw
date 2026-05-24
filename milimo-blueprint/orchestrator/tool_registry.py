@@ -125,7 +125,17 @@ class ToolRegistry:
         else:
             self._dir = tools_dir(squad_id, claw_role)
 
-        self._dir.mkdir(parents=True, exist_ok=True)
+        self._memory_only = False
+        try:
+            self._dir.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            self._memory_only = True
+            logger.warning(
+                "Cannot create tool registry directory %s (%s) — operating in memory-only mode",
+                self._dir,
+                e,
+            )
+
         self._registry_file = self._dir / "registry.json"
         self._tools: dict[str, BuiltTool] = {}
         self._provenances: dict[str, ToolProvenance] = {}
@@ -470,6 +480,8 @@ class ToolRegistry:
 
     def _save(self) -> None:
         """Persist the registry to disk."""
+        if self._memory_only:
+            return
         data = {
             "squad_id": self.squad_id,
             "claw_role": self.claw_role,

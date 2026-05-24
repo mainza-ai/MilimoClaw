@@ -526,6 +526,16 @@ def _validate_payload_schema(message: ClawMessage) -> ValidationResult:
 
     required_fields = schema.get("required_payload", [])
     missing = [f for f in required_fields if f not in message.payload]
+    if message.message_type == "assistant_response":
+        if "query_id" in missing and "original_message_id" in message.payload:
+            missing.remove("query_id")
+    if message.message_type == "pricing_response":
+        if "query_id" in missing and "project_id" in message.payload:
+            missing.remove("query_id")
+        if "floor" in missing and "floor_price" in message.payload:
+            missing.remove("floor")
+        if "ceiling" in missing and "ceiling_price" in message.payload:
+            missing.remove("ceiling")
     if missing:
         return ValidationResult(
             valid=False,

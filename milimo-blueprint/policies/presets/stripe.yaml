@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Stripe access preset for Milimo Claw.
+#
+# Enables Finance Claw access to the Stripe API for payment processing,
+# invoice management, and balance operations. Required for the Finance
+# Claw's REVIEW→HOLD approval flow.
+#
+# Apply via: nemoclaw <name> policy-add stripe
+# (requires this file in nemoclaw-blueprint/policies/presets/)
+
+preset:
+  name: stripe
+  description: "Stripe payment API access (invoices, charges, balances)"
+
+network_policies:
+  stripe:
+    name: stripe
+    endpoints:
+      - host: api.stripe.com
+        port: 443
+        access: full
+      - host: dashboard.stripe.com
+        port: 443
+        access: full
+      - host: files.stripe.com
+        port: 443
+        access: full

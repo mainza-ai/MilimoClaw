@@ -20,7 +20,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-from milimo_paths import claw_base
 
 from .ops_init import OpsFilesystemInit, OpsOperationalLog, OpsLogEntry
 from .signal_dispatcher import OpsSignalDispatcher
@@ -481,7 +480,7 @@ class ProjectManager:
     def _archive_project(self, client_id: str, project_id: str) -> None:
         """Move a completed project to the completed directory and log the action."""
         project_dir = self._fs.get_project_path(client_id, project_id)
-        completed_dir = claw_base("ops") / "completed" / client_id / project_id
+        completed_dir = self._fs._base / "completed" / client_id / project_id
         completed_dir.parent.mkdir(parents=True, exist_ok=True)
 
         if project_dir.exists():

@@ -19,7 +19,7 @@ schedule:
 # ── Observation Window ────────────────────────────────────────────────
 observation:
   window_days: 7                   # How many days of operation log to review
-  minimum_actions: 20              # Min actions in window to justify a cycle
+  minimum_actions: 5               # Min actions in window to justify a cycle (lowered from 20 for bootstrapping)
   cross_signal_lookback_days: 14   # How far back to look for cross-claw signals
 
 # ── Pattern Detection ─────────────────────────────────────────────────

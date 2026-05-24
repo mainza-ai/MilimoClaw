@@ -59,7 +59,7 @@ function resolveBlueprintDir(pluginConfig: MilimoConfig): string {
  */
 export function createClawLauncherService(pluginConfig: MilimoConfig): {
   id: string;
-  start: (ctx: { config: OpenClawConfig; logger: PluginLogger }) => Promise<void>;
+  start: (ctx: { config: OpenClawConfig; logger: PluginLogger }) => void;
   stop: (ctx: { config: OpenClawConfig; logger: PluginLogger }) => Promise<void>;
 } {
   let launcherProcess: ChildProcess | null = null;
@@ -68,7 +68,7 @@ export function createClawLauncherService(pluginConfig: MilimoConfig): {
   return {
     id: "milimo-claw-launcher",
 
-    start: async ({ logger }: { config: OpenClawConfig; logger: PluginLogger }) => {
+    start: ({ logger }: { config: OpenClawConfig; logger: PluginLogger }) => {
       const blueprintDir = resolveBlueprintDir(pluginConfig);
       const launcherScript = join(blueprintDir, "orchestrator", "claw_launcher.py");
 

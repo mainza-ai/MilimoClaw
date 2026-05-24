@@ -138,10 +138,16 @@ class ContentClaw:
         )
 
         # 4. Content generator
-        assert self._privacy_router is not None
-        assert self._tool_registry is not None
-        assert self._operational_log is not None
-        assert self._fs is not None
+        # Create default dependencies if not injected (graceful degradation)
+        if self._privacy_router is None:
+            self._privacy_router = PrivacyRouter.from_dict({})
+            logger.info("ContentClaw: using default PrivacyRouter")
+        if self._tool_registry is None:
+            self._tool_registry = ToolRegistry(
+                squad_id=self._squad_id, claw_role="content"
+            )
+            logger.info("ContentClaw: using default ToolRegistry")
+
         self._generator = ContentGenerator(
             privacy_router=self._privacy_router,
             tool_registry=self._tool_registry,
@@ -556,10 +562,31 @@ class ContentClaw:
         }
 
         if task_type == "generate_draft":
-            payload.get("brief", {})
+            brief_data = payload.get("brief", {})
             if self._generator and self._brief_manager:
-                result["status"] = "queued"
-                result["message"] = "Draft generation queued"
+                try:
+                    # Attempt to create a brief from the task payload
+                    if hasattr(self._brief_manager, "create_brief_from_task"):
+                        brief = self._brief_manager.create_brief_from_task(brief_data)
+                        result["status"] = "queued"
+                        result["brief_id"] = getattr(brief, "brief_id", "pending")
+                        result["message"] = "Draft generation queued from task"
+                    else:
+                        # Fallback: synthesize a project_brief message and route it
+                        synth_message = {
+                            "message_type": "project_brief",
+                            "sender_role": "assistant",
+                            "payload": brief_data,
+                        }
+                        brief = self._brief_manager.receive_brief(synth_message)
+                        self._brief_manager.acknowledge_brief(brief.brief_id)
+                        result["status"] = "queued"
+                        result["brief_id"] = brief.brief_id
+                        result["message"] = "Draft generation queued via brief pipeline"
+                except Exception as e:
+                    logger.error("generate_draft task failed: %s", e)
+                    result["status"] = "error"
+                    result["message"] = f"Draft generation failed: {e}"
             else:
                 result["status"] = "error"
                 result["message"] = "Content generator not initialized"

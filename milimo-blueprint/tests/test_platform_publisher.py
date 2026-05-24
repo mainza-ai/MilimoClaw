@@ -31,6 +31,38 @@ from orchestrator.content.publish_scheduler import (
 )
 
 
+@pytest.fixture(autouse=True)
+def mock_platform_publisher_dependencies(monkeypatch):
+    """Mock requests module in sys.modules and mock time.sleep to prevent hangs and missing module errors."""
+    import sys
+    from unittest.mock import MagicMock
+    import time
+
+    class MockResponse:
+        def __init__(self, status_code=201, data=None):
+            self.status_code = status_code
+            self._data = data or {
+                "data": {"id": "mock_post_123"},
+                "id": "mock_container_123",
+            }
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return self._data
+
+    # Create a mock requests module
+    mock_requests = MagicMock()
+    mock_requests.post.return_value = MockResponse()
+
+    # Inject it into sys.modules
+    monkeypatch.setitem(sys.modules, "requests", mock_requests)
+
+    # Mock time.sleep to take 0 seconds instead of 15 minutes
+    monkeypatch.setattr(time, "sleep", lambda seconds: None)
+
+
 class TestPlatformPublisher:
     """Tests for PlatformPublisher class."""
 

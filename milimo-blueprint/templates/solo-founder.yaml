@@ -72,20 +72,20 @@ operator_policy:
       pricing_recommendation: REVIEW
       expense_log: AUTO
 
-  # Build Claw — code changes need human eyes
-  build:
-    pr_open: REVIEW # you review every PR
-    pr_merge: HOLD # you explicitly merge
-    production_deploy: HOLD # you explicitly deploy
-    issue_triage: AUTO # let it score and sort issues
-    dependency_audit: AUTO # security PRs auto-drafted, you approve
-    documentation_update: AUTO
+    # Build Claw — code changes need human eyes
+    build:
+      pr_open: REVIEW # you review every PR
+      pr_merge: HOLD # you explicitly merge
+      production_deploy: HOLD # you explicitly deploy
+      issue_triage: AUTO # let it score and sort issues
+      dependency_audit: AUTO # security PRs auto-drafted, you approve
+      documentation_update: AUTO
 
-  # Assistant Claw — always auto, it only coordinates
-  assistant:
-    cross_claw_query: AUTO # read-only status checks to other claws
-    cross_claw_task: REVIEW # task assignments need your approval
-    operator_message: AUTO # relay operator messages via Telegram
+    # Assistant Claw — always auto, it only coordinates
+    assistant:
+      cross_claw_query: AUTO # read-only status checks to other claws
+      cross_claw_task: REVIEW # task assignments need your approval
+      operator_message: AUTO # relay operator messages via Telegram
 
 # ─────────────────────────────────────────────
 # FILESYSTEM LAYOUT
@@ -225,15 +225,15 @@ evolution:
       min_invoices: 3
       performance_threshold: 5
 
-  build:
-    enabled: true
-    min_prs_merged: 5 # needs real shipping history before evolving
-    performance_threshold: 5
+    build:
+      enabled: true
+      min_prs_merged: 5 # needs real shipping history before evolving
+      performance_threshold: 5
 
-  assistant:
-    enabled: true
-    min_coordinated_tasks: 10 # needs cross-claw task history before evolving
-    performance_threshold: 5
+    assistant:
+      enabled: true
+      min_coordinated_tasks: 10 # needs cross-claw task history before evolving
+      performance_threshold: 5
 
   capacity:
     max_tools_per_claw: 30

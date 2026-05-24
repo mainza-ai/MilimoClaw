@@ -79,7 +79,7 @@ class HealthDashboard extends EventEmitter {
     this.blueprintDir =
       process.env.MILIMO_BLUEPRINT_DIR ||
       join(homedir(), ".openclaw/milimo", "blueprints", squadId);
-    this.healthPath = join(homedir(), ".openclaw/milimo", "health", "health.json");
+    this.healthPath = join(homedir(), ".openclaw/milimo", "health", squadId, "health.json");
   }
 
   start(intervalMs: number = 5000): void {
