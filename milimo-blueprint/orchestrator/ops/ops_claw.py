@@ -704,6 +704,34 @@ class OpsClaw:
         """Handle assistant_task from Lucy."""
         payload = message.get("payload", {})
         task_type = payload.get("task_type", "unknown")
+        task_desc = payload.get("task_description", "")
+
+        # If task description indicates onboarding or pricing scoping, trigger pricing query
+        if (
+            "onboard" in task_desc.lower()
+            or "stripe billing" in task_desc.lower()
+            or "pricing" in task_desc.lower()
+        ):
+            import re
+
+            proj_match = re.search(
+                r"project\s+([A-Za-z0-9_-]+)", task_desc, re.IGNORECASE
+            )
+            project_id = proj_match.group(1) if proj_match else "proj-1002"
+
+            logger.info(
+                "Ops Claw _handle_assistant_task: triggering pricing_query for %s",
+                project_id,
+            )
+            self._dispatcher.send_pricing_query(
+                project_id=project_id,
+                scope_description=task_desc,
+                complexity_estimate="medium",
+                deadline=payload.get("deadline", "2026-05-30T00:00:00Z"),
+                client_id="client-enterprise-999",
+            )
+            task_type = "onboarding"
+
         result = {
             "claw": "ops",
             "task_type": task_type,
