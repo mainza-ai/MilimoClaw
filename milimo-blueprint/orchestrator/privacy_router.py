@@ -102,15 +102,20 @@ class PrivacyRouter:
     based on data type, claw role, and the squad's configured privacy policy.
     """
 
-    def __init__(self, policy: PrivacyPolicy) -> None:
+    def __init__(
+        self, policy: PrivacyPolicy, failover_broker: Any | None = None
+    ) -> None:
         self._policy = policy
         # Build lookup index for O(1) data type matching
         self._route_index: dict[str, RoutingRule] = {
             rule.data_type: rule for rule in policy.routes
         }
+        self._failover_broker = failover_broker
 
     @classmethod
-    def from_policy_file(cls, path: str | Path) -> PrivacyRouter:
+    def from_policy_file(
+        cls, path: str | Path, failover_broker: Any | None = None
+    ) -> PrivacyRouter:
         """Load a privacy router from a YAML policy file."""
         policy_path = Path(path)
         if not policy_path.exists():
@@ -120,13 +125,15 @@ class PrivacyRouter:
             raw: dict[str, Any] = yaml.safe_load(f)
 
         policy = _parse_policy(raw)
-        return cls(policy)
+        return cls(policy, failover_broker)
 
     @classmethod
-    def from_dict(cls, raw: dict[str, Any]) -> PrivacyRouter:
+    def from_dict(
+        cls, raw: dict[str, Any], failover_broker: Any | None = None
+    ) -> PrivacyRouter:
         """Create a privacy router from a parsed YAML dictionary."""
         policy = _parse_policy(raw)
-        return cls(policy)
+        return cls(policy, failover_broker)
 
     @property
     def policy(self) -> PrivacyPolicy:
@@ -146,11 +153,44 @@ class PrivacyRouter:
         Args:
             role: The claw role making the inference call.
             data_type: The data type tag on the inference request.
-            context: Optional additional context (reserved for future use).
+            context: Optional additional context.
 
         Returns:
             RoutingDecision with the selected backend and reasoning.
         """
+        decision = self._resolve_route(role, data_type, context=context)
+
+        # 4. Check if local backend is degraded and needs Cloud Failover
+        if self._failover_broker is not None and decision.backend in (
+            InferenceBackend.LOCAL_NIM,
+            InferenceBackend.LOCAL_VLLM,
+        ):
+            try:
+                # Benchmark edge latency dynamically
+                if self._failover_broker.evaluate_and_route():
+                    logger.warning(
+                        "Dynamic Failover: Routing %s inference request from %s to CLOUD due to edge latency.",
+                        data_type,
+                        decision.backend.value,
+                    )
+                    return RoutingDecision(
+                        backend=InferenceBackend.CLOUD,
+                        reason=f"Failed over from {decision.backend.value} due to high edge latency (Auto Broker)",
+                        matched_rule=decision.matched_rule,
+                        was_overridden=True,
+                    )
+            except Exception as e:
+                logger.error("Error evaluating failover broker: %s", e)
+
+        return decision
+
+    def _resolve_route(
+        self,
+        role: str,
+        data_type: str,
+        context: dict[str, Any] | None = None,
+    ) -> RoutingDecision:
+        """Internal routing classifier logic."""
         # 1. Check role-level override (highest priority)
         role_override = self._policy.role_overrides.get(role)
         if role_override is not None:
