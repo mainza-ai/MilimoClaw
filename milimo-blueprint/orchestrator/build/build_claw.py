@@ -281,14 +281,43 @@ class BuildClaw:
 
         logger.info("Assistant query received: %s", query)
 
+        if query == "diagnostics":
+            pending_actions = (
+                self._approval_handler.get_all_pending_actions()
+                if self._approval_handler
+                else []
+            )
+            review_len = len([a for a in pending_actions if a.mode == "REVIEW"])
+            hold_len = len([a for a in pending_actions if a.mode == "HOLD"])
+
+            recent_logs = []
+            if self._log and hasattr(self._log, "log_path"):
+                log_path = self._log.log_path
+                if log_path.exists():
+                    try:
+                        lines = log_path.read_text().splitlines()
+                        recent_logs = lines[-5:]
+                    except Exception:
+                        pass
+
+            response_data = {
+                "status": "diagnostics",
+                "queue_size": review_len + hold_len,
+                "review_queue_size": review_len,
+                "hold_queue_size": hold_len,
+                "recent_logs": recent_logs,
+            }
+        else:
+            response_data = {
+                "status": "running",
+                "squad_id": self._squad_id,
+            }
+
         result = {
             "status": "ok",
             "role": "build",
             "message_type": "assistant_query",
-            "response": {
-                "status": "running",
-                "squad_id": self._squad_id,
-            },
+            "response": response_data,
         }
         self._send_assistant_response(message, result)
         return result

@@ -649,19 +649,54 @@ class OpsClaw:
 
     def _handle_assistant_query(self, message: dict[str, Any]) -> dict[str, Any]:
         """Handle assistant_query from Lucy."""
-        result = {
-            "claw": "ops",
-            "status": "online" if self._running else "offline",
-            "components": {
-                "intake_manager": self._intake_manager is not None,
-                "project_manager": self._project_manager is not None,
-                "scheduler": self._scheduler is not None,
-                "health_scorer": self._health_scorer is not None,
-            },
-            "clients": len(list((self._base_path / "clients").glob("*")))
-            if self._base_path
-            else 0,
-        }
+        payload = message.get("payload", {})
+        query = payload.get("query", "")
+
+        if query == "diagnostics":
+            review_len = (
+                len(self._approval_handler.get_review_queue())
+                if self._approval_handler
+                else 0
+            )
+            hold_len = (
+                len(self._approval_handler.get_hold_queue())
+                if self._approval_handler
+                else 0
+            )
+
+            # Read recent log entries
+            recent_logs = []
+            if self._operational_log and hasattr(self._operational_log, "_log_path"):
+                log_path = self._operational_log._log_path
+                if log_path.exists():
+                    try:
+                        lines = log_path.read_text().splitlines()
+                        recent_logs = lines[-5:]
+                    except Exception:
+                        pass
+
+            result = {
+                "claw": "ops",
+                "status": "diagnostics",
+                "queue_size": review_len + hold_len,
+                "review_queue_size": review_len,
+                "hold_queue_size": hold_len,
+                "recent_logs": recent_logs,
+            }
+        else:
+            result = {
+                "claw": "ops",
+                "status": "online" if self._running else "offline",
+                "components": {
+                    "intake_manager": self._intake_manager is not None,
+                    "project_manager": self._project_manager is not None,
+                    "scheduler": self._scheduler is not None,
+                    "health_scorer": self._health_scorer is not None,
+                },
+                "clients": len(list((self._base_path / "clients").glob("*")))
+                if self._base_path
+                else 0,
+            }
         self._send_assistant_response(message, result)
         return result
 

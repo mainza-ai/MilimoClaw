@@ -402,17 +402,70 @@ class FinanceClaw:
                         )
 
             elif message_type == "assistant_query":
+                import json
+
                 result["claw"] = "finance"
-                result["components"] = {
-                    "pricing_engine": self._components.get("pricing_engine")
-                    is not None,
-                    "invoice_manager": self._components.get("invoice_manager")
-                    is not None,
-                    "payment_monitor": self._components.get("payment_monitor")
-                    is not None,
-                    "revenue_tracker": self._components.get("revenue_tracker")
-                    is not None,
-                }
+                query = payload.get("query", "")
+
+                if query == "diagnostics":
+                    review_count = 0
+                    hold_count = 0
+                    try:
+                        decisions_path = self.base_path / "logs" / "decisions.log"
+                        if decisions_path.exists():
+                            actions = {}
+                            for line in decisions_path.read_text().splitlines():
+                                if line.strip():
+                                    data = json.loads(line)
+                                    aid = data.get("action_id")
+                                    atype = data.get("action_type")
+                                    stage = data.get("stage")
+                                    if atype == "queued":
+                                        actions[aid] = stage
+                                    elif atype in (
+                                        "approve",
+                                        "edit",
+                                        "block",
+                                        "release",
+                                        "cancel",
+                                    ):
+                                        if aid in actions:
+                                            del actions[aid]
+                            for stage in actions.values():
+                                if stage == "review":
+                                    review_count += 1
+                                elif stage == "hold":
+                                    hold_count += 1
+                    except Exception:
+                        pass
+
+                    recent_logs = []
+                    op_log = self._components.get("operational_log")
+                    if op_log and hasattr(op_log, "log_path"):
+                        log_path = op_log.log_path
+                        if log_path.exists():
+                            try:
+                                lines = log_path.read_text().splitlines()
+                                recent_logs = lines[-5:]
+                            except Exception:
+                                pass
+
+                    result["status"] = "diagnostics"
+                    result["queue_size"] = review_count + hold_count
+                    result["review_queue_size"] = review_count
+                    result["hold_queue_size"] = hold_count
+                    result["recent_logs"] = recent_logs
+                else:
+                    result["components"] = {
+                        "pricing_engine": self._components.get("pricing_engine")
+                        is not None,
+                        "invoice_manager": self._components.get("invoice_manager")
+                        is not None,
+                        "payment_monitor": self._components.get("payment_monitor")
+                        is not None,
+                        "revenue_tracker": self._components.get("revenue_tracker")
+                        is not None,
+                    }
                 self._send_assistant_response(raw_message, result)
                 return result
 

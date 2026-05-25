@@ -567,7 +567,9 @@ class ContentClaw:
                 try:
                     # Attempt to create a brief from the task payload
                     if hasattr(self._brief_manager, "create_brief_from_task"):
-                        brief = self._brief_manager.create_brief_from_task(brief_data)
+                        brief = getattr(self._brief_manager, "create_brief_from_task")(
+                            brief_data
+                        )
                         result["status"] = "queued"
                         result["brief_id"] = getattr(brief, "brief_id", "pending")
                         result["message"] = "Draft generation queued from task"
