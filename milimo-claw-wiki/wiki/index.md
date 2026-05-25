@@ -146,6 +146,9 @@ Quick reference tables and diagrams.
 | [[message-matrix]] | Visual message flow matrix | ✓ |
 | [[file-structure]] | Complete project file map | ✓ |
 | [[cli-reference]] | CLI command reference | ✓ |
+| [[NemoClaw-Reference]] | NemoClaw core CLI & API reference | ✓ |
+| [[NemoClaw-x-Milimo-Integration-Map]] | Cross-reference of NemoClaw & Milimo integration points | ✓ |
+| [[NemoClaw-Blueprint-Implementation]] | Technical specification for NemoClaw blueprints & L7 network policies | ✓ |
 
 ---
 

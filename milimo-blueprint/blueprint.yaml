@@ -1,0 +1,105 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# ═══════════════════════════════════════════════════════════════════════
+#  MILIMO CLAW — NemoClaw Blueprint Manifest
+# ═══════════════════════════════════════════════════════════════════════
+# This manifest orchestrates NVIDIA OpenShell resources, declares platform
+# dependencies, registers inference profiles, and overlays security network
+# additions for the Milimo multi-agent mesh.
+
+version: "0.1.0"
+min_openshell_version: "0.0.24"
+min_openclaw_version: "2026.3.0"
+
+# Pre-defined inference profiles that the squad can toggle at runtime
+profiles:
+  - default      # NVIDIA NIM Cloud (Default)
+  - ncp          # NVIDIA Partner Cloud (Dynamic)
+  - nim-local    # Local NVIDIA NIM (Edge GPU compute)
+  - vllm         # Local vLLM (Mac Silicon / Local CPU/GPU server)
+  - routed       # Private Local Failover Router
+
+components:
+  sandbox:
+    image: "ghcr.io/nvidia/openshell-community/sandboxes/openclaw:latest"
+    name: "milimo-openclaw-sandbox"
+    # Port configuration for the inter-sandbox peer mesh gateways
+    forward_ports:
+      - 18789
+
+  inference:
+    profiles:
+      # NVIDIA Cloud hosted API (Default production endpoint)
+      default:
+        provider_type: "nvidia"
+        provider_name: "nvidia-inference"
+        endpoint: "https://integrate.api.nvidia.com/v1"
+        model: "nvidia/nemotron-3-super-120b-a12b"
+        timeout_secs: 120
+
+      # NVIDIA Partner Cloud (NCP) dynamic server profile
+      ncp:
+        provider_type: "nvidia"
+        provider_name: "nvidia-ncp"
+        endpoint: "https://ncp.api.nvidia.com/v1"
+        model: "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+        timeout_secs: 120
+
+      # Local edge NVIDIA NIM deployment (Requires local RTX GPU)
+      nim-local:
+        provider_type: "openai"
+        provider_name: "nim-local"
+        endpoint: "http://nim-service.local:8000/v1"
+        model: "nvidia/nemotron-3-super-120b-a12b"
+        credential_env: "NIM_API_KEY"
+        timeout_secs: 180
+
+      # Local vLLM deployment (Optimized for Apple Silicon / CPU inference)
+      vllm:
+        provider_type: "openai"
+        provider_name: "vllm-local"
+        endpoint: "http://localhost:8000/v1"
+        model: "nvidia/nemotron-3-nano-30b-a3b"
+        credential_env: "OPENAI_API_KEY"
+        credential_default: "dummy"
+        timeout_secs: 180
+
+      # Private local failover broker
+      routed:
+        provider_type: "openai"
+        provider_name: "failover-router"
+        endpoint: "http://localhost:4000/v1"
+        model: "nvidia-routed"
+        timeout_secs: 90
+
+  policy:
+    # Use the hardened OpenClaw baseline policy configuration
+    base: "sandboxes/openclaw/policy.yaml"
+
+    # Custom additions to layer over the baseline policy inside the sandbox
+    additions:
+      nim_service:
+        name: nim_service
+        endpoints:
+          - host: "nim-service.local"
+            port: 8000
+            protocol: rest
+      stripe_api:
+        name: stripe_api
+        endpoints:
+          - host: "api.stripe.com"
+            port: 443
+            protocol: rest
+      vercel_api:
+        name: vercel_api
+        endpoints:
+          - host: "api.vercel.com"
+            port: 443
+            protocol: rest
+      sentry_api:
+        name: sentry_api
+        endpoints:
+          - host: "api.sentry.io"
+            port: 443
+            protocol: rest
