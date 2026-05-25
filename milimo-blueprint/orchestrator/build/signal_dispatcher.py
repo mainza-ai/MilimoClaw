@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from .build_init import BuildFilesystemInit, BuildOperationalLog, BuildLogEntry
+import os
 from ..milimo_paths import mesh_dir
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,7 @@ EVENT_NAMESPACE = "build"
 FEATURE_BRIEF_SLA_SECONDS = 600
 
 # Wait time for analytics retention signals before sprint planning
-ANALYTICS_WAIT_SECONDS = 300
+ANALYTICS_WAIT_SECONDS = float(os.getenv("ANALYTICS_WAIT_SECONDS", "300"))
 
 
 @dataclass
@@ -181,6 +182,11 @@ class BuildSignalDispatcher:
             raise ValueError(
                 f"Invalid clarity_score: {clarity_score!r}. Must be 'clear' or 'low'."
             )
+
+        # Cancel SLA timer if it exists
+        timer = self._sla_timers.pop(project_id, None)
+        if timer:
+            timer.cancel()
 
         payload: dict[str, Any] = {
             "project_id": project_id,

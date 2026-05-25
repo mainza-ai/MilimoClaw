@@ -34,7 +34,7 @@ message_matrix:
     war_room: [signal, deliverable, finance_summary, overdue_alert]
     assistant: [assistant_response]
   build:
-    ops: [signal, deliverable, deploy_complete]
+    ops: [signal, deliverable, deploy_complete, feature_brief_acknowledged]
     analytics: [query, behavior_query]
     content: [summary, shipping_summary]
     war_room: [signal, deliverable, tool_proposal]

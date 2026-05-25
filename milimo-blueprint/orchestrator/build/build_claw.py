@@ -374,6 +374,7 @@ class BuildClaw:
         # Run in background thread to not block message processing
         thread = threading.Thread(
             target=self._execute_sprint_pipeline,
+            args=(message,),
             daemon=True,
             name="build-execution-pipeline",
         )
@@ -386,13 +387,16 @@ class BuildClaw:
             "message": "Sprint planning pipeline started. Use launcher_status() to monitor progress.",
         }
 
-    def _execute_sprint_pipeline(self) -> None:
+    def _execute_sprint_pipeline(self, message: dict[str, Any] | None = None) -> None:
         """
         Execute the full sprint pipeline: plan → approve → code → PR.
 
         This runs in a background thread after a feature_brief is received.
         """
         try:
+            payload = message.get("payload", {}) if message else {}
+            project_id = payload.get("project_id", "unknown")
+
             # Step 2: Generate sprint plan (fetches issues, scores complexity, queues for approval)
             logger.info("Starting sprint planning pipeline")
             if self._issue_manager:
@@ -404,6 +408,21 @@ class BuildClaw:
                 plan.plan_id,
                 len(plan.issues),
             )
+
+            # Send the feature brief acknowledgment immediately after plan is generated!
+            if self._dispatcher:
+                # Determine clarity_score from plan issues
+                clarity_score = "clear"
+                for issue in plan.issues:
+                    if issue.get("clarity_score") == "low":
+                        clarity_score = "low"
+                        break
+
+                self._dispatcher.send_feature_brief_acknowledged(
+                    project_id=project_id,
+                    estimated_start=datetime.now(timezone.utc).isoformat(),
+                    clarity_score=clarity_score,
+                )
 
             if not plan.issues:
                 logger.info("No issues in sprint plan — pipeline complete")
