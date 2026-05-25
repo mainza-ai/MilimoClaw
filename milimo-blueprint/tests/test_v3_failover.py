@@ -28,6 +28,7 @@ class TestFailoverInferenceBroker(unittest.TestCase):
             local_endpoint="http://localhost:8000/v1/models",
             latency_threshold_ms=800.0,
             cloud_model="nvidia/nemotron-3-super-120b-a12b",
+            require_operator_approval=False,
         )
         if "NEMOCLAW_MODEL" in os.environ:
             del os.environ["NEMOCLAW_MODEL"]
@@ -130,6 +131,60 @@ class TestFailoverInferenceBroker(unittest.TestCase):
                 text=True,
                 check=False,
             )
+
+    @patch("urllib.request.urlopen")
+    @patch("subprocess.run")
+    def test_manual_operator_review_flow_approved(self, mock_run, mock_urlopen) -> None:
+        """Verifies that high latency sets pending approval but does NOT fail over until approved."""
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        # Configure broker to require operator approval (default production state)
+        self.broker.require_operator_approval = True
+
+        # Force high latency by mock side-effect delay
+        with patch("time.perf_counter", side_effect=[0.0, 1.0]):  # 1000.0 ms
+            # 1. Evaluate: should set pending approval but return False (routing remains local)
+            is_failed = self.broker.evaluate_and_route()
+            self.assertFalse(is_failed)
+            self.assertTrue(self.broker.failover_pending_approval)
+            self.assertFalse(self.broker.is_failed_over)
+            self.assertNotIn("NEMOCLAW_MODEL", os.environ)
+            mock_run.assert_not_called()
+
+            # 2. Approve: should trigger actual cloud failover
+            self.broker.approve_failover()
+            self.assertTrue(self.broker.operator_approved)
+            self.assertFalse(self.broker.failover_pending_approval)
+            self.assertTrue(self.broker.is_failed_over)
+            self.assertEqual(os.environ.get("NEMOCLAW_MODEL"), self.broker.cloud_model)
+            mock_run.assert_called_once()
+
+    @patch("urllib.request.urlopen")
+    @patch("subprocess.run")
+    def test_manual_operator_review_flow_denied(self, mock_run, mock_urlopen) -> None:
+        """Verifies that high latency sets pending approval but remains local if operator denies."""
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        # Configure broker to require operator approval
+        self.broker.require_operator_approval = True
+
+        with patch("time.perf_counter", side_effect=[0.0, 1.0]):  # 1000.0 ms
+            # 1. Evaluate: sets pending approval
+            is_failed = self.broker.evaluate_and_route()
+            self.assertFalse(is_failed)
+            self.assertTrue(self.broker.failover_pending_approval)
+
+            # 2. Deny: clears pending approval, remains local
+            self.broker.deny_failover()
+            self.assertFalse(self.broker.failover_pending_approval)
+            self.assertFalse(self.broker.operator_approved)
+            self.assertFalse(self.broker.is_failed_over)
+            self.assertNotIn("NEMOCLAW_MODEL", os.environ)
+            mock_run.assert_not_called()
 
 
 class TestPrivacyRouterFailoverIntegration(unittest.TestCase):

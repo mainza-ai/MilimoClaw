@@ -77,6 +77,9 @@ class AttestationRunner:
         """
         Runs a standardized 100-cycle backtesting dataset workload through the claw's
         toolchain inside the sandbox, measuring exact resource consumption and task accuracy.
+
+        Applies a reduced scheduling priority (nice=19) to run locally without interfering
+        with standard edge operations.
         """
         sandbox = self.spawn_ephemeral_sandbox(blueprint_name)
         logger.info(
@@ -84,6 +87,22 @@ class AttestationRunner:
             cycles,
             sandbox["sandbox_name"],
         )
+
+        # Lower scheduling priority dynamically for local backtesting (Decision 2)
+        import os
+
+        original_nice = 0
+        nice_set = False
+        if hasattr(os, "nice"):
+            try:
+                original_nice = os.nice(0)
+                os.nice(19 - original_nice)
+                nice_set = True
+                logger.info(
+                    "Scheduling priority reduced dynamically: nice set to 19 (local run restriction)."
+                )
+            except Exception as e:
+                logger.debug("Failed to set scheduling priority via nice: %s", e)
 
         # Standard simulated benchmark metric results
         start_time = time.perf_counter()
@@ -115,6 +134,17 @@ class AttestationRunner:
             "token_efficiency_score": tokens_consumed / cycles,
             "timestamp": time.time(),
         }
+
+        # Restore scheduling priority if modified
+        if nice_set and hasattr(os, "nice"):
+            try:
+                # Restoring nice level (requires decreasing nice, which may raise PermissionError)
+                # We catch it gracefully as standard local users might not have raise capabilities.
+                os.nice(original_nice - 19)
+            except Exception:
+                logger.debug(
+                    "Could not restore original nice priority (expected under unprivileged execution)."
+                )
 
         logger.info(
             "Backtest complete. Blueprint: %s | Accuracy: %.2f%% | Token Efficiency: %.2f t/c",

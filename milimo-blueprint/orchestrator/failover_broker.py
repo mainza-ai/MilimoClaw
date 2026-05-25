@@ -29,11 +29,15 @@ class FailoverInferenceBroker:
         local_endpoint: str = "http://localhost:8000/v1/models",
         latency_threshold_ms: float = 800.0,
         cloud_model: str = "nvidia/nemotron-3-super-120b-a12b",
+        require_operator_approval: bool = True,
     ) -> None:
         self.local_endpoint = local_endpoint
         self.latency_threshold_ms = latency_threshold_ms
         self.cloud_model = cloud_model
+        self.require_operator_approval = require_operator_approval
         self._is_failed_over = False
+        self._failover_pending_approval = False
+        self._operator_approved = False
 
     def ping_local_backend(self) -> float:
         """
@@ -53,22 +57,39 @@ class FailoverInferenceBroker:
 
     def evaluate_and_route(self) -> bool:
         """
-        Evaluates local latency. If latency exceeds thresholds, activates cloud failover.
-        Returns True if failed over to cloud, False if running on local edge.
+        Evaluates local latency. If latency exceeds thresholds:
+        - If require_operator_approval is True, requests manual operator approval
+          and only routes once approve_failover() is called.
+        - If require_operator_approval is False, automatically activates cloud failover.
         """
         latency = self.ping_local_backend()
 
         if latency > self.latency_threshold_ms:
             if not self._is_failed_over:
-                logger.warning(
-                    "Local edge latency (%.2fms) breached threshold (%.2fms). "
-                    "Initiating cloud NIM failover.",
-                    latency,
-                    self.latency_threshold_ms,
-                )
-                self._activate_cloud_routing()
-            return True
+                if self.require_operator_approval:
+                    if not self._operator_approved:
+                        if not self._failover_pending_approval:
+                            logger.warning(
+                                "Local edge latency (%.2fms) breached threshold (%.2fms). "
+                                "Cloud failover is pending manual operator REVIEW.",
+                                latency,
+                                self.latency_threshold_ms,
+                            )
+                            self._failover_pending_approval = True
+                        return False  # Restrict routing: do not route to cloud yet
+                else:
+                    # Auto routing
+                    logger.warning(
+                        "Local edge latency (%.2fms) breached threshold (%.2fms). "
+                        "Initiating automatic cloud NIM failover.",
+                        latency,
+                        self.latency_threshold_ms,
+                    )
+                    self._activate_cloud_routing()
+            return self._is_failed_over
         else:
+            self._failover_pending_approval = False
+            self._operator_approved = False
             if self._is_failed_over:
                 logger.info(
                     "Local edge latency recovered (%.2fms). Restoring local edge routing.",
@@ -76,6 +97,35 @@ class FailoverInferenceBroker:
                 )
                 self._restore_local_routing()
             return False
+
+    def approve_failover(self) -> None:
+        """Manually approves the pending failover request, triggering cloud failover."""
+        if self._failover_pending_approval and not self._is_failed_over:
+            logger.info(
+                "Operator approved cloud failover request. Activating cloud routing."
+            )
+            self._operator_approved = True
+            self._failover_pending_approval = False
+            self._activate_cloud_routing()
+
+    def deny_failover(self) -> None:
+        """Manually denies the pending failover request."""
+        if self._failover_pending_approval:
+            logger.info(
+                "Operator denied cloud failover request. Remaining on local edge."
+            )
+            self._failover_pending_approval = False
+            self._operator_approved = False
+
+    @property
+    def failover_pending_approval(self) -> bool:
+        """Returns True if a failover is currently awaiting operator approval."""
+        return self._failover_pending_approval
+
+    @property
+    def operator_approved(self) -> bool:
+        """Returns True if the operator has approved the active failover."""
+        return self._operator_approved
 
     def _activate_cloud_routing(self) -> None:
         """Triggers the OpenShell CLI and sets environments to route to cloud."""
