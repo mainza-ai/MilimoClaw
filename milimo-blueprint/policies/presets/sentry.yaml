@@ -1,17 +1,17 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
-# Sentry access preset for Milimo Claw.
+# Sentry access preset for Milimo Claw (v3.0 ZK Proxy Standard).
 #
-# Enables Ops Claw access to the Sentry API for error tracking,
-# performance monitoring, and release management.
+# Enables Ops and Build Claws access to the Sentry API for error tracking
+# and release management under strict L7 REST boundaries.
 #
-# Apply via: nemoclaw <name> policy-add sentry
-# (requires this file in nemoclaw-blueprint/policies/presets/)
+# DSN tokens are held securely in OpenShell Gateway Store; the proxy terminates TLS
+# and injects authentication headers at L7, redacting secrets from sandbox logs.
 
 preset:
   name: sentry
-  description: "Sentry error tracking API access (issues, releases, performance)"
+  description: "Sentry telemetry ingest and error tracking API via ZK Proxy"
 
 network_policies:
   sentry:
@@ -19,10 +19,32 @@ network_policies:
     endpoints:
       - host: sentry.io
         port: 443
-        access: full
+        protocol: rest
+        enforcement: enforce
+        rules:
+          # Allow retrieving issues and error stats
+          - allow: { method: GET, path: "/api/0/issues/**" }
+          - allow: { method: GET, path: "/api/0/projects/**" }
+
+          # Allow creating releases and tracking errors
+          - allow: { method: POST, path: "/api/0/organizations/*/releases/**" }
+
+        # Deny project creation/deletion and key rotations
+        deny_rules:
+          - method: DELETE
+            path: "/api/0/projects/*/*"
+          - method: POST
+            path: "/api/0/projects/*/*/keys/**"
+
       - host: "*.ingest.sentry.io"
         port: 443
-        access: full
-      - host: "*.ingest.us.sentry.io"
-        port: 443
-        access: full
+        protocol: rest
+        enforcement: enforce
+        rules:
+          # Allow sending error store envelope requests
+          - allow: { method: POST, path: "/api/*/envelope/**" }
+          - allow: { method: POST, path: "/api/*/store/**" }
+
+    binaries:
+      - { path: /usr/local/bin/node }
+      - { path: /usr/bin/curl }

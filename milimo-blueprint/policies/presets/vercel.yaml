@@ -1,17 +1,17 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
-# Vercel access preset for Milimo Claw.
+# Vercel access preset for Milimo Claw (v3.0 ZK Proxy Standard).
 #
-# Enables Build Claw access to the Vercel API for deployment management,
-# project configuration, and domain operations.
+# Enables Build Claw access to the Vercel API for deployment management
+# and project configuration under strict L7 REST boundaries.
 #
-# Apply via: nemoclaw <name> policy-add vercel
-# (requires this file in nemoclaw-blueprint/policies/presets/)
+# Tokens are held securely in OpenShell Gateway Store; the proxy terminates TLS
+# and injects authentication headers at L7, redacting secrets from sandbox logs.
 
 preset:
   name: vercel
-  description: "Vercel deployment API access (deployments, projects, domains)"
+  description: "Vercel deployment API access via ZK Proxy"
 
 network_policies:
   vercel:
@@ -19,10 +19,27 @@ network_policies:
     endpoints:
       - host: api.vercel.com
         port: 443
-        access: full
-      - host: vercel.com
-        port: 443
-        access: full
-      - host: vercel.live
-        port: 443
-        access: full
+        protocol: rest
+        enforcement: enforce
+        rules:
+          # Allow creating, listing, and getting deployments
+          - allow: { method: GET, path: "/v13/deployments/**" }
+          - allow: { method: POST, path: "/v13/deployments" }
+
+          # Allow retrieving projects and file uploads
+          - allow: { method: GET, path: "/v9/projects/**" }
+          - allow: { method: POST, path: "/v2/files" }
+
+        # Deny project deletion and domain DNS alterations
+        deny_rules:
+          - method: DELETE
+            path: "/v9/projects/*"
+          - method: POST
+            path: "/v6/domains"
+          - method: DELETE
+            path: "/v6/domains/*"
+
+    binaries:
+      - { path: /usr/local/bin/node }
+      - { path: /usr/local/bin/vercel }
+      - { path: /usr/bin/curl }

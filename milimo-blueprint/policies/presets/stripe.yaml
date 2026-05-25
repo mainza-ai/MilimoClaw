@@ -1,18 +1,17 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
-# Stripe access preset for Milimo Claw.
+# Stripe access preset for Milimo Claw (v3.0 ZK Proxy Standard).
 #
 # Enables Finance Claw access to the Stripe API for payment processing,
-# invoice management, and balance operations. Required for the Finance
-# Claw's REVIEW→HOLD approval flow.
+# invoice management, and balance operations under strict L7 REST boundaries.
 #
-# Apply via: nemoclaw <name> policy-add stripe
-# (requires this file in nemoclaw-blueprint/policies/presets/)
+# Keys are held securely in OpenShell Gateway Store; the proxy terminates TLS
+# and injects authentication headers at L7, redacting secrets from sandbox logs.
 
 preset:
   name: stripe
-  description: "Stripe payment API access (invoices, charges, balances)"
+  description: "Stripe payment API access (invoices, charges, balances) via ZK Proxy"
 
 network_policies:
   stripe:
@@ -20,10 +19,33 @@ network_policies:
     endpoints:
       - host: api.stripe.com
         port: 443
-        access: full
-      - host: dashboard.stripe.com
-        port: 443
-        access: full
-      - host: files.stripe.com
-        port: 443
-        access: full
+        protocol: rest
+        enforcement: enforce
+        # Restrict Operations to standard CRUD for invoicing and balances only
+        rules:
+          # Allow retrieving balance transactions and logs
+          - allow: { method: GET, path: "/v1/balance" }
+          - allow: { method: GET, path: "/v1/balance_transactions/**" }
+
+          # Allow standard invoicing operations
+          - allow: { method: GET, path: "/v1/invoices/**" }
+          - allow: { method: POST, path: "/v1/invoices" }
+          - allow: { method: POST, path: "/v1/invoices/*/finalize" }
+          - allow: { method: POST, path: "/v1/invoices/*/send" }
+
+          # Allow customer account retrieval
+          - allow: { method: GET, path: "/v1/customers/**" }
+
+        # Deny high-risk financial overrides and account changes
+        deny_rules:
+          - method: DELETE
+            path: "/v1/customers/*"
+          - method: POST
+            path: "/v1/account"
+          - method: POST
+            path: "/v1/transfers"
+
+    binaries:
+      - { path: /usr/local/bin/node }
+      - { path: /usr/local/bin/npm }
+      - { path: /usr/bin/curl }

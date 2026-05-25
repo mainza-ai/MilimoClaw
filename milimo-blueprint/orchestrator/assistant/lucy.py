@@ -637,6 +637,9 @@ class LucyAssistant:
                     # 3. Dispatch diagnostic assistant_query to the stuck claw
                     self._dispatch_diagnostic_inquiry(recipient, track.track_id)
 
+                    # 4. Trigger SLA self-healing to autonomously resolve the stall
+                    self._trigger_sla_self_healing(recipient, track.track_id)
+
     def _emit_conversational_alert(self, text: str) -> None:
         """Log the alert and write to local operator interface logs."""
         logger.warning(text)
@@ -707,3 +710,44 @@ class LucyAssistant:
                 )
         except Exception as e:
             logger.error(f"[Lucy] Failed to send diagnostic query: {e}")
+
+    def _trigger_sla_self_healing(self, stalled_claw: str, track_id: str) -> None:
+        """Autonomously heals stalled claws by switching their model backend to Cloud NIM."""
+        import subprocess
+        import os
+
+        logger.warning(
+            f"⚡ [Lucy Active Supervisor] Triggering SLA Self-Healing for stalled claw '{stalled_claw}' (Track: {track_id})."
+        )
+
+        try:
+            cloud_model = "nvidia/nemotron-3-super-120b-a12b"
+            os.environ["NEMOCLAW_MODEL"] = cloud_model
+            cmd = [
+                "openshell",
+                "inference",
+                "set",
+                "--provider",
+                "nvidia-nim",
+                "--model",
+                cloud_model,
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            if result.returncode == 0:
+                logger.info(
+                    f"[Lucy] Successfully upgraded inference to Cloud NIM for stalled claw '{stalled_claw}'."
+                )
+                self._emit_conversational_alert(
+                    f"⚡ [Lucy Active Supervisor] SLA Self-Healing active: Successfully upgraded inference to high-performance Cloud NIM for '{stalled_claw}'."
+                )
+            else:
+                logger.debug(
+                    f"[Lucy] openshell CLI returned code {result.returncode} during healing: {result.stderr.strip()}"
+                )
+        except FileNotFoundError:
+            logger.warning(
+                f"[Lucy] openshell CLI not found. Defaulted to environment variable NEMOCLAW_MODEL routing for '{stalled_claw}'."
+            )
+            self._emit_conversational_alert(
+                f"⚡ [Lucy Active Supervisor] SLA Self-Healing: Applied environment variable overrides for '{stalled_claw}'."
+            )
