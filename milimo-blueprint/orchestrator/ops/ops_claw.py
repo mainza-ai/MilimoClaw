@@ -723,13 +723,14 @@ class OpsClaw:
                 "Ops Claw _handle_assistant_task: triggering pricing_query for %s",
                 project_id,
             )
-            self._dispatcher.send_pricing_query(
-                project_id=project_id,
-                scope_description=task_desc,
-                complexity_estimate="medium",
-                deadline=payload.get("deadline", "2026-05-30T00:00:00Z"),
-                client_id="client-enterprise-999",
-            )
+            if self._dispatcher:
+                self._dispatcher.send_pricing_query(
+                    project_id=project_id,
+                    scope_description=task_desc,
+                    complexity_estimate="medium",
+                    deadline=payload.get("deadline", "2026-05-30T00:00:00Z"),
+                    client_id="client-enterprise-999",
+                )
             task_type = "onboarding"
 
         result = {
