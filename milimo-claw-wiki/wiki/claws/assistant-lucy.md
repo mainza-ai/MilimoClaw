@@ -102,6 +102,22 @@ Messaging to the operator uses OpenShell channel messaging (Telegram, Discord, S
 
 ## Implementation
 
+### Stateful Active Process Supervision Framework (New!)
+
+To serve as the ultimate operational harness for the NemoClaw framework, Lucy has been equipped with a highly robust **Stateful Process Supervision Framework** that actively orchestrates and safeguards cross-claw workflows:
+
+1. **Process Milestones & Active Tracking**:
+   * Tracks operations dynamically using `ProcessMilestone` (defining step, sender, recipient, message type, and timeout) and `ActiveProcessTrack` state machines.
+   * Maps multi-agent flows (e.g., scoping pipelines from Ops $\rightarrow$ Finance, and technical sprints from Ops $\rightarrow$ Build) using predefined state templates.
+2. **Supervision Polling Loop (`supervise_active_tracks`)**:
+   * Periodically scans isolated sandbox processed directories (e.g., `/sandbox/.openclaw/milimo/claws/*/processed/`) to automatically transition completed milestones.
+   * Leverages real-time clocks to identify stalled milestones that have breached execution SLAs (default 10 minutes in production, 15 seconds in test mode).
+3. **Dual-Alert Delivery Architecture**:
+   * **Conversational Channels**: Writes descriptive warnings to `supervision.log`, which are automatically relayed to user conversational streams (Telegram/Discord/TUI TTY) via OpenShell gateways.
+   * **Solo War Room TUI Injection (`_inject_war_room_hold_alert`)**: Translates process stalls into high-priority action alerts, writing a standardized `supervision_stall` action event JSON directly to `/sandbox/.openclaw/milimo/events/` to inject an explicit operator `ActionPriority.HOLD` release into the War Room TUI dashboard.
+4. **Secure Gateway Diagnostics Inquiry**:
+   * When a claw stalls, Lucy triggers a secure `assistant_query` diagnostic probe. Worker claws (Ops, Build, Finance) actively parse `query == "diagnostics"` and return queue sizes (pending REVIEW/HOLD queues) and recent operational log snippets inside legitimate OpenShell channels without violating Landlock policies.
+
 ### Runtime Coordinator (lucy.py)
 
 The `LucyAssistant` class in `milimo-blueprint/orchestrator/assistant/lucy.py` is the runtime coordinator that manages Lucy's lifecycle:
@@ -111,21 +127,25 @@ The `LucyAssistant` class in `milimo-blueprint/orchestrator/assistant/lucy.py` i
 | Class | Purpose |
 |-------|---------|
 | `PendingQuery` | Tracks dispatched queries awaiting claw responses (with TTL) |
-| `LucyAssistant` | Main coordinator: startup, shutdown, dispatch, channel integration |
+| `ProcessMilestone` | Defines a single step in a multi-agent process flow (sender, receiver, msg_type, TTL) |
+| `ActiveProcessTrack` | Represents a stateful multi-step workflow track with historical milestones |
+| `LucyAssistant` | Main coordinator: startup, shutdown, active track supervision, dispatch, TUI injection |
 
 **Key Methods**:
 
 | Method | Purpose |
 |--------|---------|
-| `startup()` | Initialize OpenShell channel messaging, connect to mesh |
-| `shutdown()` | Graceful cleanup of all resources |
+| `startup()` | Initialize OpenShell channel messaging, connect to mesh, and boot supervision loops |
+| `shutdown()` | Graceful cleanup of all active tracks and resources |
 | `handle_inbound(message)` | Route incoming mesh messages to handlers |
+| `supervise_active_tracks()` | Scan claw processed paths, transition states, and dispatch stall alerts / diagnostics |
+| `_inject_war_room_hold_alert(track)` | Generate and write a standardized action JSON event to the TUI event dashboard queue |
 | `dispatch_query(target, query)` | Send assistant_query to a specific claw |
 | `dispatch_task(target, task)` | Send assistant_task to a specific claw |
 | `process_channel_message(text)` | Parse user input from OpenShell channel and route to appropriate claw |
 | `cleanup_expired()` | Remove expired pending queries past TTL |
 
-**Silent Response Handling**: When a claw returns an empty or None response, Lucy returns a diagnostic dict with `status`, `role`, and `message_type` fields instead of propagating silence.
+**Silent Response & Diagnostics Handling**: When a claw returns an empty or None response, Lucy returns a diagnostic dict with `status`, `role`, and `message_type` fields instead of propagating silence. In diagnostic inquiry mode, she formats and displays worker queue lengths and recent logs.
 
 ### System Prompt
 

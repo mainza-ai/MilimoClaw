@@ -17,7 +17,7 @@ This Obsidian vault is the **ultimate source of truth** for the MilimoClaw proje
 
 ## What Is MilimoClaw?
 
-MilimoClaw turns a squad of operators — each running a NemoClaw sandbox on their RTX laptop — into a coordinated AI-powered business operation.
+MilimoClaw turns a squad of operators — running NemoClaw sandboxes across Apple Silicon Macs, Linux servers, cloud VMs, or RTX systems — into a coordinated AI-powered business operation.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -54,6 +54,7 @@ MilimoClaw turns a squad of operators — each running a NemoClaw sandbox on the
 - **[[message-contracts]]** — All inter-claw communication is typed and validated
 - **[[war-room]]** — TUI for viewing all pending actions
 - **[[evolution-cycle]]** — Sunday process that generates new tools
+- **Stateful Supervision (Lucy)** — E2E active milestone tracking and dual alerting (TUI + conversation)
 
 ## Navigation Tips
 

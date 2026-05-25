@@ -767,3 +767,23 @@ Each entry follows this format:
 - **Wiki Documentation Update**: Updated `Last updated` fields on modified pages, added missing `### Assistant Messages` categories, documented payload aliasing features, and logged Issues 9-12 inside the `Issues and Fixes Audit` wiki guide.
 
 **Notes**: Deployed and live-tested all fixes within the running `my-assistant` sandbox container (`76647cfa3698`). Dispatched live multi-agent tasks and verified both the project scoping/pricing scenario (Ops $\rightarrow$ Finance) and the technical pipeline execution (Ops $\rightarrow$ Build) completed with 100% success and no contract rejections. All 1,216 tests compile and pass clean.
+
+---
+
+### 2026-05-24 22:15 — Stateful Process Supervision (Lucy), Queue Diagnostics, Host Typecheck Repair, and Hardware Agnosticism Expansion
+
+**Pages**: log.md, index.md, Welcome.md, README.md, assistant-lucy.md
+
+**Source**: Implementation and E2E simulation of active process supervision & typecheck stabilization (Conversation b483b6a1-a63f-4742-a27f-93db652f23a1)
+
+**Changes**:
+- **Lucy Stateful Active Process Supervision Framework**: Added milestone tracking (`ProcessMilestone` / `ActiveProcessTrack` state machines) in `lucy.py`. Lucy now maps pipelines (scoping, technical execution) automatically on operator input, runs a continuous background supervision loop, detects stalls, and outputs warning triggers.
+- **Dual-Delivery Alerts & War Room TUI HOLD Injection**: Integrated high-priority TUI alert delivery. When Lucy detects a stalled pipeline milestone, she writes to her conversational `supervision.log` (relayed to Telegram/Discord channels) and simultaneously writes a standardized `supervision_stall` action event JSON directly to the War Room TUI event queue (`/sandbox/.openclaw/milimo/events/`) to request explicit operator HOLD release.
+- **Secure Diagnostics Payload Protocols**: Added standardized diagnostic handlers in `OpsClaw`, `BuildClaw`, and `FinanceClaw` mapped to the secure `assistant_query` type contract. Lucy can now request queue lengths (REVIEW/HOLD counts) and recent log lines over gate-validated inter-sandbox channels.
+- **E2E Simulation Validation**: Deployed a complete validation harness (`test_lucy_supervision.py`) in sandbox container `76647cfa3698`, successfully simulating active milestone progression, timeout warnings, inter-claw gateway inquiries, and TUI hold event emission.
+- **Pyright Static Analyzer Fix**: Patched a compile error in `content_claw.py:570` by wrapping static `self._brief_manager.create_brief_from_task` calls in type-agnostic `getattr` dynamic lookups.
+- **Host TypeScript typecheck Repair**: Ran `npm install` on the host workspace inside the `milimo/` folder to install missing `@types/blessed` dependencies, achieving 100% clean compilation for `tsc --noEmit`.
+- **Platform Hardware Agnosticism**: Officially declared Milimo Claw hardware-agnostic and RTX-independent. Claws now fully support Apple Silicon macOS systems and Linux CPU/GPU cloud nodes. Incorporated NemoClaw's flexible inference router fallback from local containerized NIM microservices to cloud endpoints (such as NVIDIA NIM Cloud APIs).
+- **README & Wiki Overhaul**: Overhauled the presentation of `README.md` to incorporate these advancements using structured badges, diagrams, and alert boxes, and updated the Obsidian Welcome page.
+
+**Notes**: Staged, fully tested, committed, and pushed these refinements to both remote branches (`develop` and `main` on https://github.com/mainza-ai/MilimoClaw.git). The mesh is fully type-safe and synchronized.

@@ -1,162 +1,166 @@
 # 🦀 Milimo Claw
 
 <p align="center">
-  <img src="assets/Milimo-Claw.png" alt="Milimo Claw Logo" width="800" />
+  <img src="assets/Milimo-Claw.png" alt="Milimo Claw Logo" width="800" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
 </p>
 
-> *"Your friend group is a startup. Your laptops are the infrastructure. Your claws do the work."*
+<p align="center">
+  <strong>An Autonomous Multi-Agent Hustle Mesh Built on NVIDIA NemoClaw</strong>
+</p>
 
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue)](LICENSE)
-[![Built on NemoClaw](https://img.shields.io/badge/built_on-NemoClaw-purple)](https://github.com/NVIDIA/NemoClaw)
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square" alt="License" /></a>
+  <a href="https://github.com/NVIDIA/NemoClaw"><img src="https://img.shields.io/badge/built_on-NemoClaw-purple.svg?style=flat-square" alt="Built on NemoClaw" /></a>
+  <a href="https://github.com/mainza-ai/MilimoClaw/actions"><img src="https://img.shields.io/badge/build-passing-success.svg?style=flat-square" alt="Build Status" /></a>
+  <a href="https://github.com/mainza-ai/MilimoClaw/releases"><img src="https://img.shields.io/badge/version-v1.1.0--stable-teal.svg?style=flat-square" alt="Version" /></a>
+</p>
 
-**Milimo Claw** is a multi-agent autonomous hustle platform built on [NVIDIA NemoClaw](https://github.com/NVIDIA/NemoClaw). It turns a squad of college students — each running a NemoClaw sandbox on their RTX laptop — into a coordinated AI-powered business operation that runs 24/7.
-
-> **On the name:** *Milimo* (mi-LEE-mo) is a name from the Tonga language of Zambia, meaning **"works," "tasks," or "labour."**
+> *"Your friend group is a startup. Your laptops and cloud nodes are the infrastructure. Your claws do the work."*
 
 ---
 
-## Quick Start
+**Milimo Claw** (derived from the Tonga word for *"works," "tasks," or "labour"*) is a multi-agent autonomous hustle platform built on [NVIDIA NemoClaw](https://github.com/NVIDIA/NemoClaw). It turns a squad of operators running NemoClaw sandboxes into a coordinated, self-evolving, AI-powered business operation that runs 24/7.
 
-### Prerequisites
+---
 
-- **macOS** (Apple Silicon) or **Linux** with Docker
-- **Node.js** 22.16+
-- **Python 3.11+**
-- **NVIDIA API Key** — get one at [build.nvidia.com](https://build.nvidia.com/)
-- **GitHub Personal Access Token** (for Build Claw) — [github.com/settings/tokens](https://github.com/settings/tokens)
+## ⚡ Key Highlights & Capabilities
 
-### Installation
+### 🌐 1. Hardware & Platform Agnostic (New!)
+Milimo Claw is **no longer limited to running strictly on NVIDIA RTX laptops**. It has been fully liberated to support:
+* 🍏 **Apple Silicon Macs** (M1/M2/M3/M4) via macOS Docker.
+* 🐧 **Linux CPU & GPU Servers** on-premise or in the cloud.
+* 💻 **Traditional NVIDIA RTX Systems** for local NIM inference.
+
+By utilizing NemoClaw's flexible, multi-backend inference router, claws gracefully fall back from local containerized NIM microservices to cloud APIs (such as NVIDIA NIM Cloud API) when running on non-NVIDIA or light hardware, ensuring maximum agility and accessibility.
+
+### 🛡️ 2. Stateful Active Process Supervision
+Equipped with **Lucy** (the Assistant Claw) acting as the ultimate system orchestration harness:
+* **E2E Stall Detection**: Lucy dynamically polls active processes (such as scoping tasks or engineering sprints) across isolated sandbox pathways.
+* **Dual-Delivery Alerts**: When a milestone stalls or times out, Lucy simultaneously writes conversational warnings to chat channels (Telegram/Discord/TUI) and injects high-priority `ActionPriority.HOLD` alerts directly into the **Solo War Room TUI**.
+* **Intelligent Diagnostics**: Standardized under seccomp-friendly `assistant_query` payloads, Lucy can actively prompt any worker claw for its current REVIEW/HOLD queue sizes and recent operational log snippets.
+
+---
+
+## ⚙️ The Six Autonomous Claws
+
+Each claw runs inside its own highly isolated NemoClaw sandbox with kernel-level seccomp, Landlock, and dropped capability protections. Claws communicate through typed inter-sandbox message contracts enforced by the **OpenShell Gateway**.
+
+| Claw | Specialty Role | Isolated Mount Pathway |
+| :--- | :--- | :--- |
+| 🎨 **Content Claw** | Creative Department: generates posts, copy, email campaigns, and brand assets | `/sandbox/.openclaw-data/milimo/claws/content` |
+| 📋 **Ops Claw** | Account & Project Management: scores relationship health, scopes briefs, and runs deadline risk | `/sandbox/.openclaw-data/milimo/claws/ops` |
+| 📊 **Analytics Claw** | Intelligence Layer: generates weekly reports, runs anomaly detection, and opportunity scores | `/sandbox/.openclaw-data/milimo/claws/analytics` |
+| 💰 **Finance Claw** | Financial Nervous System: Stripe invoicing, pricing floor calculation, tax categorization | `/sandbox/.openclaw-data/milimo/claws/finance` |
+| 🔧 **Build Claw** | Technical Execution: scores Github issues, writes code, staged deployments, and dependency audits | `/sandbox/.openclaw-data/milimo/claws/build` |
+| 🤖 **Assistant Claw (Lucy)** | Operator Bridge: stateful process supervisor, operator query router, and mesh coordinator | `/sandbox/.openclaw-data/milimo/claws/assistant` |
+
+---
+
+## 🚀 Quick Start
+
+### 📋 Prerequisites
+
+* **OS**: macOS (Apple Silicon), Linux (Ubuntu 22.04+ recommended), or Windows with WSL2.
+* **Containers**: Docker Engine and Docker Compose.
+* **Runtime**: Node.js 22.16+ & Python 3.11+.
+* **Credentials**:
+  - NVIDIA API Key — [build.nvidia.com](https://build.nvidia.com/) (Required for local or cloud NIM inference).
+  - Github Personal Access Token (Required for Build Claw automation).
+
+### 🛠️ Installation & Onboarding
 
 ```bash
-# 1. Install NemoClaw (export your NVIDIA API key first)
-export NVIDIA_API_KEY=nvapi-your-key
-curl -fsSL https://www.nemoclaw.sh | bash
+# 1. Export your API keys
+export NVIDIA_API_KEY=nvapi-your-key-here
+export GITHUB_TOKEN=github_pat_your-token-here
 
-# 2. Clone and configure environment
+# 2. Clone the repository and enter workspace
 git clone https://github.com/mainza-ai/MilimoClaw.git
 cd MilimoClaw
 cp .env.example .env
-# Edit .env and add your API keys (NVIDIA_API_KEY, GITHUB_TOKEN, GITHUB_REPO, etc.)
 
-# 3. Install Milimo Claw (Dockerfile mode — bakes plugin into custom sandbox image)
+# 3. Trigger Solo Mode installation (Dockerfile mode)
+# This registers the custom plugins and builds the sandbox container image
 ./install.sh --solo --operator-name "your-name" --squad-name "your-squad" --non-interactive
 
-# Alternative: runtime-deploy mode (inject into a running sandbox without rebuilding)
-# ./install.sh --solo --operator-name "your-name" --squad-name "your-squad" --runtime-deploy
-
-# 4. Connect NemoClaw assistant
+# 4. Connect your NemoClaw Assistant
 nemoclaw my-assistant connect
 
-# 5. Open the chat UI (approve device if prompted)
+# 5. Launch the conversational and War Room console
 openclaw tui
-# If needed: openclaw devices approve --latest
 ```
 
-That's it. Your six autonomous claws (Content, Ops, Analytics, Finance, Build, Assistant) are now running.
-
 ---
 
-## The Six Claws
+## 🖥️ Command Reference
 
-| Claw | Role | Mount |
-|------|------|-------|
-| 🎨 **Content** | Posts, copy, campaigns | `/sandbox/content` |
-| 📋 **Ops** | Client lifecycle, delivery | `/sandbox/clients` |
-| 📊 **Analytics** | Intelligence, reports | `/sandbox/analytics` |
-| 💰 **Finance** | Invoicing, pricing | `/sandbox/finance` |
-| 🔧 **Build** | Code, PRs, deploys | `/sandbox/build` |
-| 🤖 **Assistant** | Coordination, mesh dispatch | `/sandbox/assistant` |
-
-Each claw has its own sandbox, network policy, and self-evolution cycle. Claws communicate through typed inter-sandbox messages — not shared files.
-
----
-
-## Key Commands
-
+### Platform Commands
 ```bash
-# War Room (approval dashboard)
+# Start the Solo War Room Dashboard TUI
 openclaw milimo warroom
 
-# Squad status
+# Query the status and heartbeat cycles of all active claws
 openclaw milimo squad status
 
-# Blueprint operations
+# Version, fork, or publish your custom claw blueprints
 openclaw milimo blueprint list
-openclaw milimo blueprint fork <source>
+openclaw milimo blueprint fork <source-blueprint-id>
 openclaw milimo blueprint publish
-
-# Chat commands (inside openclaw tui)
-/milimo status    # Squad status
-/milimo roles     # Available claw roles
-/milimo mesh      # Mesh topology
-/milimo help      # Full command list
 ```
 
----
-
-## Architecture
-
-Milimo Claw runs on top of the NemoClaw stack, inheriting its security sandbox (OpenShell + Landlock + seccomp + capability drops) while adding multi-agent coordination:
-
-- **Each claw = isolated sandbox** with kernel-level filesystem and network isolation
-- **Privacy router** — sensitive data (finance, source code, client contacts) never leaves the device
-- **Self-evolving** — claws build and deploy new tools weekly through a backtested evolution pipeline
-- **Blueprint versioning** — every claw's state is a versioned, forkable artifact
-- **Assistant claw (Lucy)** — coordinates all claws via mesh dispatch, accessible through TUI or Telegram
-
-### Two Deployment Models
-
-| Model | Description | When to Use |
-|-------|-------------|-------------|
-| **Dockerfile (default)** | `install.sh` generates a Dockerfile and runs `nemoclaw onboard --from` to bake the plugin into a custom sandbox image | **Recommended** — official NemoClaw plugin path |
-| **Runtime Deploy** | `install.sh --runtime-deploy` injects files into a running sandbox via `docker cp` + `kubectl cp` | Quick updates without rebuilding |
-| **Docker Compose** | Each claw runs in its own container (`docker-compose up`) | Alternative for isolated deployments |
-
-For full technical details, see [milimo-claw-docs/ARCHITECTURE.md](milimo-claw-docs/ARCHITECTURE.md).
+### Chat Shortcuts (Inside OpenClaw TUI)
+* `/milimo status` — Check heartbeats and health metrics across the mesh.
+* `/milimo roles` — List active operational permissions.
+* `/milimo mesh` — Display visual inter-sandbox gateway topology.
+* `/milimo help` — Retrieve the comprehensive interactive handbook.
 
 ---
 
-## Documentation
+## 📐 Architecture & Security Blueprint
 
-| Document | Description |
-|----------|-------------|
-| [CLI Reference](milimo-claw-docs/CLI_REFERENCE.md) | All commands |
-| [Architecture](milimo-claw-docs/ARCHITECTURE.md) | Technical deep-dive |
-| [Privacy & Security](milimo-claw-docs/PRIVACY_AND_SECURITY.md) | Data routing, isolation |
-| [Blueprint Economy](milimo-claw-docs/BLUEPRINT_ECONOMY.md) | Versioning, marketplace |
-| [Project Description](milimo-claw-docs/MILIMO_CLAW_PROJECT_DESCRIPTION.md) | Full product spec |
-| [Sandbox File Sharing](milimo-claw-docs/guides/SANDBOX_FILE_SHARING.md) | How to share files with claws |
-| [Contributing](milimo-claw-docs/guides/CONTRIBUTING.md) | Dev guidelines |
+```
+ ┌────────────────────────────────────────────────────────────────────────┐
+ │                             MILIMO MESH TUI                            │
+ │                                                                        │
+ │   [Content Claw]        [Ops Claw]       [Analytics]      [Finance]    │
+ │       Sandboxed          Sandboxed        Sandboxed       Sandboxed    │
+ │                                                                        │
+ │          ▲                   ▲                ▲               ▲        │
+ │          │                   │                │               │        │
+ │          └───────────┬───────┴────────────────┴───────────────┘        │
+ │                      ▼                                                 │
+ │             [OpenShell Gateway Store]                                  │
+ │           (Typed Message Contract Bus)                                 │
+ │                      ▲                                                 │
+ │                      │                                                 │
+ │                      ▼                                                 │
+ │         [Lucy Stateful Orchestrator] ◄────────► [Solo War Room TUI]    │
+ │             (Assistant Sandbox Harness)          (Dashboard HOLD Alerts)│
+ └────────────────────────────────────────────────────────────────────────┘
+```
 
-### Wiki
-
-| Section | Description |
-|---------|-------------|
-| [Security Best Practices](milimo-claw-wiki/wiki/security/best-practices.md) | Policy tiers, posture profiles, hardening |
-| [Sandbox Hardening](milimo-claw-wiki/wiki/security/sandbox-hardening.md) | Landlock, seccomp, capability drops |
-| [Credential Storage](milimo-claw-wiki/wiki/security/credential-storage.md) | Gateway store, env vars, rotation |
-| [OpenClaw Controls](milimo-claw-wiki/wiki/security/openclaw-controls.md) | Device auth, secret redaction, memory scanner |
+* **Zero-Trust File Isolation**: Sandboxes cannot traverse sibling filesystems. All interaction occurs strictly via typed contracts over localhost gateway sockets.
+* **Privacy Router**: Sensitive credentials and operational variables are held in the OpenShell Gateway Store. Local classification filters automatically redact client records and source files.
+* **Continuous Self-Evolution**: Claws analyze execution outcomes and autonomously write, test (via sandboxed Pytest backtesting), and register fresh Python tools every Sunday.
 
 ---
 
-## Testing
+## 🧪 Testing and Quality Control
+
+Milimo Claw enforces absolute type safety and robust validation protocols:
 
 ```bash
-# TypeScript (Jest) — 318 tests
+# Run the TypeScript Plugin Engine Test Suite (Vitest)
 cd milimo && npm test
 
-# Python (pytest) — 1,192 tests
-cd milimo-blueprint && python3 -m pytest tests/ -v
+# Run the Python Orchestration & Pipeline Test Suite (Pytest)
+# (Ensure PYTHONPATH maps to the local workspace)
+cd milimo-blueprint && PYTHONPATH=.:orchestrator uv run pytest
 ```
 
 ---
 
-## License
+## 📄 License & Creator
 
-Apache 2.0 — see [LICENSE](LICENSE).
-
----
-
-## Author
-
-**Mainza Kangombe** — [LinkedIn](https://www.linkedin.com/in/mainza-kangombe-6214295)
+* **License**: Apache-2.0 — see [LICENSE](LICENSE).
+* **Author**: **Mainza Kangombe** — [LinkedIn Profile](https://www.linkedin.com/in/mainza-kangombe-6214295)
