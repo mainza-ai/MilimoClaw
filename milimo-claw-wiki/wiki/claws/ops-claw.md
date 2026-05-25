@@ -6,7 +6,7 @@
 - `raw/OPS_CLAW_SPEC.md`
 - `milimo-blueprint/roles/ops-claw.yaml`
 
-**Last updated**: 2026-04-28
+**Last updated**: 2026-05-25
 
 **Tags**: #claw #ops
 
@@ -82,7 +82,7 @@ The Ops Claw is the **account manager and project manager** of MilimoClaw. It ow
 | `feature_brief_acknowledged` | Build | Confirm feature brief received |
 | `client_health_alert` | Analytics | Take action on health score |
 | `assistant_query` | Assistant | Return status and state |
-| `assistant_task` | Assistant | Execute ops-related tasks |
+| `assistant_task` | Assistant | Execute ops-related tasks (such as parsing natural language operator prompts to initiate client onboarding and dispatch a `pricing_query` to Finance) |
 
 ## Sequencing Rules
 

@@ -787,3 +787,20 @@ Each entry follows this format:
 - **README & Wiki Overhaul**: Overhauled the presentation of `README.md` to incorporate these advancements using structured badges, diagrams, and alert boxes, and updated the Obsidian Welcome page.
 
 **Notes**: Staged, fully tested, committed, and pushed these refinements to both remote branches (`develop` and `main` on https://github.com/mainza-ai/MilimoClaw.git). The mesh is fully type-safe and synchronized.
+
+---
+
+## 2026-05-25
+
+### 2026-05-25 13:00 — E2E Live Sandbox Integration Testing with Lucy & Operational Scoping Hook
+
+**Pages**: log.md, index.md, ops-claw.md, walkthrough.md
+**Source**: Implementation and E2E simulation of active multi-agent pipeline E2E testing inside isolation sandbox (Conversation b483b6a1-a63f-4742-a27f-93db652f23a1)
+**Changes**:
+- **Operational Scoping Hook in Ops Claw**: Upgraded the `_handle_assistant_task` message handler in `ops_claw.py` to move from a mock stub to an operational state. The Ops Claw now actively parses incoming natural language client briefs from Lucy, extracts project IDs, and dispatches a live `pricing_query` to the Finance Claw. Secured with `if self._dispatcher:` checks to pass Pyright static audits.
+- **E2E Live Sandbox Integration Harness**: Designed and integrated a comprehensive E2E test `test_live_hustle_mesh.py` inside the container sandbox. The test verifies message delivery through background gateway queues, polling destination processed inboxes directly (`finance` for pricing queries and `ops` for pricing responses).
+- **Restricted Failover Routing**: Successfully verified Stage 3 of the strategic roadmap, confirming that cloud inference failover remains securely restricted on local edge latency breach or connection failures until manual operator REVIEW approval is explicitly simulated and executed.
+- **Dynamic Priority Backtesting Constraints**: Successfully verified Stage 4 of the strategic roadmap, confirming that ephemeral attestation sandbox backtests run locally under dynamically restricted scheduling priorities (`nice=19`) to prevent CPU starvation on host hardware, compiling performance statistics and generating deterministic cryptographic attestation badges.
+- **Git and Remote Consolidation**: Staged, committed, and successfully pushed all strategic roadmap changes across `develop` and `main` branches to remote origin. Validated all Conventional Commit rules and Ruff linter checks.
+
+**Notes**: Deployed and fully validated E2E inside container `76647cfa3698` with background claw daemons active, achieving 100% success rate. The working tree is fully synchronized and clean.
