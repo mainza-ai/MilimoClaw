@@ -119,24 +119,24 @@ openclaw milimo blueprint publish
 ## 📐 Architecture & Security Blueprint
 
 ```
- ┌────────────────────────────────────────────────────────────────────────┐
- │                             MILIMO MESH TUI                            │
- │                                                                        │
- │   [Content Claw]        [Ops Claw]       [Analytics]      [Finance]    │
- │       Sandboxed          Sandboxed        Sandboxed       Sandboxed    │
- │                                                                        │
- │          ▲                   ▲                ▲               ▲        │
- │          │                   │                │               │        │
- │          └───────────┬───────┴────────────────┴───────────────┘        │
- │                      ▼                                                 │
- │             [OpenShell Gateway Store]                                  │
- │           (Typed Message Contract Bus)                                 │
- │                      ▲                                                 │
- │                      │                                                 │
- │                      ▼                                                 │
- │         [Lucy Stateful Orchestrator] ◄────────► [Solo War Room TUI]    │
- │             (Assistant Sandbox Harness)          (Dashboard HOLD Alerts)│
- └────────────────────────────────────────────────────────────────────────┘
+ ┌──────────────────────────────────────────────────────────────────────────────┐
+ │                                MILIMO MESH TUI                               │
+ │                                                                              │
+ │ [Content Claw]  [Ops Claw]  [Analytics]  [Finance Claw]  [Build Claw]        │
+ │    Sandboxed     Sandboxed   Sandboxed     Sandboxed      Sandboxed          │
+ │                                                                              │
+ │        ▲             ▲           ▲             ▲              ▲              │
+ │        │             │           │             │              │              │
+ │        └─────────────┼───────────┴─────────────┼──────────────┘              │
+ │                      ▼                         ▼                             │
+ │                         [OpenShell Gateway Store]                            │
+ │                       (Typed Message Contract Bus)                           │
+ │                                  ▲                                           │
+ │                                  │                                           │
+ │                                  ▼                                           │
+ │                     [Lucy Stateful Orchestrator] ◄──► [Solo War Room TUI]    │
+ │                     (Assistant Sandbox Harness)        (Dashboard HOLD Alerts)│
+ └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 * **Zero-Trust File Isolation**: Sandboxes cannot traverse sibling filesystems. All interaction occurs strictly via typed contracts over localhost gateway sockets.
