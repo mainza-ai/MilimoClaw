@@ -801,7 +801,9 @@ def handle_send_to_claw(args: dict[str, Any]) -> dict[str, Any]:
     from orchestrator.mesh import MeshCoordinator
 
     recipient_role = args.get("role", "")
-    message_type = args.get("type", "")
+    message_type = (
+        args.get("type") or args.get("message_type") or args.get("message_types") or ""
+    )
     payload = args.get("payload", {})
     squad_id = args.get("squad_id", "default")
     wait_for_result = args.get("wait_for_result", False)

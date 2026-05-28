@@ -452,7 +452,13 @@ async function cliOnboard(opts) {
                     cwd: blueprintDir,
                     timeout: 120_000,
                     stdio: ["pipe", "pipe", "pipe"],
-                    env: { ...process.env, PYTHONPATH: blueprintDir },
+                    env: {
+                        ...process.env,
+                        PYTHONPATH: [
+                            blueprintDir,
+                            path.join(blueprintDir, "orchestrator"),
+                        ].join(process.platform === "win32" ? ";" : ":"),
+                    },
                 });
                 logger.info(` ✓ Sandbox directories created for: ${activeClaws.join(", ")}`);
             }

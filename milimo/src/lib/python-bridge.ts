@@ -60,7 +60,12 @@ export function callPythonBridge<T = unknown>(
     cwd: options.blueprintDir,
     encoding: "utf-8",
     timeout: options.timeout ?? 30000,
-    env: { ...process.env, PYTHONPATH: options.blueprintDir },
+    env: {
+      ...process.env,
+      PYTHONPATH: [options.blueprintDir, join(options.blueprintDir, "orchestrator")].join(
+        process.platform === "win32" ? ";" : ":",
+      ),
+    },
   });
 
   if (result.error) {

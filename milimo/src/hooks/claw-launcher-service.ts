@@ -91,7 +91,9 @@ export function createClawLauncherService(pluginConfig: MilimoConfig): {
           cwd: blueprintDir,
           env: {
             ...process.env,
-            PYTHONPATH: blueprintDir,
+            PYTHONPATH: [blueprintDir, join(blueprintDir, "orchestrator")].join(
+              process.platform === "win32" ? ";" : ":",
+            ),
             MILIMO_SQUAD_ID: pluginConfig.squadName || "default",
             MILIMO_CLAW_ROLE: pluginConfig.clawRole || "solo",
           },

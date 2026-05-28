@@ -157,12 +157,8 @@ function getSquadSummary(pluginConfig) {
     };
 }
 function buildSquadContextText(summary) {
-    const runningClaws = summary.activeClaws
-        .filter((c) => c.status === "running")
-        .map((c) => c.role);
-    const staleClaws = summary.activeClaws
-        .filter((c) => c.status === "stale")
-        .map((c) => c.role);
+    const runningClaws = summary.activeClaws.filter((c) => c.status === "running").map((c) => c.role);
+    const staleClaws = summary.activeClaws.filter((c) => c.status === "stale").map((c) => c.role);
     const lines = [
         "<milimo-squad>",
         `You are part of Milimo squad "${summary.squadName}", role: ${summary.clawRole}.`,
