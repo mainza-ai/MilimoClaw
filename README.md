@@ -21,6 +21,10 @@
 
 **Milimo Claw** (derived from the Tonga word for *"works," "tasks," or "labour"*) is a multi-agent autonomous hustle platform built on [NVIDIA NemoClaw](https://github.com/NVIDIA/NemoClaw). It turns a squad of operators running NemoClaw sandboxes into a coordinated, self-evolving, AI-powered business operation that runs 24/7.
 
+### 💡 Solo Operator Mode
+
+For solo founders and edge developers, **Solo Mode** runs all six autonomous claws concurrently within a single sandboxed macOS, Linux, or RTX desktop environment. It delivers the full power of a multi-agent business mesh without multi-host cluster configuration overhead, making it the most popular and streamlined way to run the platform.
+
 ---
 
 ## Key Highlights & Capabilities
