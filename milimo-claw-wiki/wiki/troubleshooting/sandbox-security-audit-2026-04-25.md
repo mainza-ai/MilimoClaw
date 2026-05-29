@@ -201,7 +201,7 @@ Host Machine                         NemoClaw Sandbox
 curl -fsSL https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/uninstall.sh | bash -s -- --yes
 
 # 2. Reinstall NemoClaw fresh
-export NVIDIA_API_KEY=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
+export NVIDIA_API_KEY=nvapi-your-key-here
 curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
 
 # 3. Verify clean sandbox
