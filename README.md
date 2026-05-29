@@ -91,6 +91,10 @@ Each claw runs inside its own highly isolated NemoClaw sandbox with kernel-level
 
 ### Prerequisites
 
+* **NemoClaw**: Core sandboxing runtime (install prior to initializing Milimo Claw)
+  ```console
+  $ curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
+  ```
 * **OS**: macOS (Apple Silicon), Linux (Ubuntu 22.04+ recommended), or Windows with WSL2.
 * **Containers**: Docker Engine and Docker Compose.
 * **Runtime**: Node.js 22.16+ & Python 3.11+.
