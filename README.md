@@ -91,6 +91,23 @@ Each claw runs inside its own highly isolated NemoClaw sandbox with kernel-level
 
 ---
 
+## 📚 The Milimo Knowledge Vault (Obsidian-Powered)
+
+To coordinate and govern a high-leverage multi-agent system, you need a living, interlinked knowledge base. Inside [milimo-claw-wiki/](file:///Users/mck/Desktop/MilimoClaw/milimo-claw-wiki) lives a fully structured, **Obsidian-ready markdown vault** designed on Andrej Karpathy's LLM Wiki pattern.
+
+It serves as the **ultimate source of truth** for human operators and AI assistants alike:
+
+* **Interactive Graph Visualization**: Load the vault into [Obsidian](https://obsidian.md/) to inspect the full agent topology, message contracts, and data-flow pathways visually via the interactive Graph View.
+* **LLM-Optimized Architecture**: The vault features an AI-first structure (curated in [CLAUDE.md](file:///Users/mck/Desktop/MilimoClaw/milimo-claw-wiki/CLAUDE.md)) with strict metadata schemas, tags hierarchies, and ground-truth validation rules, allowing LLMs to absorb the complete system context in seconds.
+* **Comprehensive Knowledge Base**:
+  * 🔒 **Security & Policies**: Documents kernel-level seccomp boundaries, Landlock constraints, and the privacy router.
+  * 💬 **Coordination Matrix**: Explains the 27 typed inter-claw message contracts, sequencing rules, and approval modes.
+  * 🌱 **Self-Evolution Logs**: Tracks autonomous Sunday tool-generation outcomes, baseline calibrations, and complexity scores.
+
+*To explore the vault locally, simply open the [milimo-claw-wiki/](file:///Users/mck/Desktop/MilimoClaw/milimo-claw-wiki) directory inside Obsidian.*
+
+---
+
 ## Quick Start
 
 ### Prerequisites
