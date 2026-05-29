@@ -23,7 +23,7 @@
 
 ### 💡 Solo Operator Mode
 
-For solo founders and edge developers, **Solo Mode** runs all six autonomous claws concurrently within a single sandboxed macOS, Linux, or RTX desktop environment. It delivers the full power of a multi-agent business mesh without multi-host cluster configuration overhead, making it the most popular and streamlined way to run the platform.
+For solo founders and edge developers, **Solo Mode** runs all six autonomous claws concurrently within a single sandboxed environment (using any GPU-enabled PC for local inference, or any CPU/GPU system using cloud connections). It delivers the full power of a multi-agent business mesh without multi-host cluster configuration overhead, making it the most popular and streamlined way to run the platform.
 
 ---
 
@@ -34,7 +34,7 @@ For solo founders and edge developers, **Solo Mode** runs all six autonomous cla
 Milimo Claw supports cross-platform environments, freeing operators from specific hardware restrictions:
 * **Apple Silicon Macs** (M1/M2/M3/M4) via macOS Docker.
 * **Linux CPU & GPU Servers** on-premise or in the cloud.
-* **Traditional NVIDIA RTX Systems** for local NIM inference.
+* **NVIDIA GPU-Enabled PCs** (such as RTX or data center cards) for local NIM inference.
 
 By utilizing NemoClaw's flexible inference router, claws fall back from local containerized NIM microservices to cloud APIs (such as the NVIDIA NIM Cloud API) when running on non-NVIDIA or light hardware.
 
