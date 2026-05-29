@@ -185,7 +185,28 @@ Respond with format: TIER HOURS (e.g., M 8)"""
         """
         # Wait for analytics signals (with timeout)
         self._analytics_received = False
-        time.sleep(ANALYTICS_WAIT_SECONDS)
+        import os
+        import sys
+
+        is_testing = (
+            os.getenv("TESTING") == "true"
+            or "pytest" in sys.modules
+            or "unittest" in sys.modules
+        )
+        wait_timeout = 1.0 if is_testing else ANALYTICS_WAIT_SECONDS
+
+        start_wait = time.time()
+        while time.time() - start_wait < wait_timeout:
+            signals_file = (
+                self._fs.base / "context" / "sprint" / "retention-signals.json"
+            )
+            if (
+                self._dispatcher
+                and getattr(self._dispatcher, "_retention_signals", None)
+            ) or signals_file.exists():
+                self._analytics_received = True
+                break
+            time.sleep(0.1)
 
         issues = self.fetch_open_issues()
         scored = []

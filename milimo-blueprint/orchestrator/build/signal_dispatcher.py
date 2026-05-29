@@ -34,7 +34,10 @@ EVENT_NAMESPACE = "build"
 FEATURE_BRIEF_SLA_SECONDS = 600
 
 # Wait time for analytics retention signals before sprint planning
-ANALYTICS_WAIT_SECONDS = float(os.getenv("ANALYTICS_WAIT_SECONDS", "300"))
+if os.getenv("OPENSHELL_SANDBOX") or os.getenv("TESTING") == "true":
+    ANALYTICS_WAIT_SECONDS = float(os.getenv("ANALYTICS_WAIT_SECONDS", "1.0"))
+else:
+    ANALYTICS_WAIT_SECONDS = float(os.getenv("ANALYTICS_WAIT_SECONDS", "300"))
 
 
 @dataclass

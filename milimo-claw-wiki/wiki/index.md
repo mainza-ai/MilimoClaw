@@ -2,7 +2,7 @@
 
 **Summary**: Master table of contents for the MilimoClaw knowledge base.
 
-**Last updated**: 2026-05-25
+**Last updated**: 2026-05-28
 
 **Tags**: #index #navigation
 
@@ -16,7 +16,7 @@
 | [[#Claws]] | Individual claw documentation | 6 |
 | [[#Coordination]] | Message contracts and War Room | 5 |
 | [[#Evolution]] | Self-evolution system | 8 |
-| [[#Development]] | Conventions and testing | 3 |
+| [[#Development]] | Conventions and testing | 4 |
 | [[#Troubleshooting]] | Common issues and fixes | 4 |
 | [[#Reference]] | Quick reference tables | 4 |
 | [[#Configuration]] | Configuration files and schemas | 4 |
@@ -119,6 +119,7 @@ Development conventions and guides.
 | [[conventions]] | Code style and project conventions | ✓ |
 | [[testing]] | Test structure and coverage | ✓ |
 | [[debugging]] | Debugging guide and tools | ✓ |
+| [[sandbox-file-sharing]] | Accessing and extracting claw-generated files | ✓ |
 
 ---
 
@@ -294,6 +295,7 @@ See [[log]] for complete operation history.
 
 | Date | Change | Pages Affected |
 |------|--------|----------------|
+| 2026-05-28 | Dynamic delay optimization inside sandbox/tests, offline inference fallback mocks, E2E background execution pipeline integration, and robust host file synchronization scripting. | index.md, log.md, sandbox-sync.md |
 | 2026-05-24 | Operational stabilization audit, YAML indentation fixes for solo-founder, loop correction in launcher status, dual-namespace mock test containment, sliding window log aging timestamp correction, contract alias relaxation for assistant_response/pricing_response, and Build Claw response envelope mapping | index.md, log.md, contracts.md, message-contracts.md, issues-and-fixes.md |
 | 2026-05-12 | Full code audit fixes: Path resolution false positive `_is_sandbox`, ToolRegistry `mkdir` fallback, ContentClaw assert crash, InboxPoller race condition, Evolution minimum actions, Build Claw auth fallback | index.md, log.md, milimo_paths.py, tool_registry.py, content_claw.py, claw_launcher.py, evolution.ts |
 | 2026-05-02 | install.sh rewrite: host-based build + pre-built artifacts, --force plugin install, remove destructive plugins.allow override, gateway restart with health check loop, Dockerfile plugin verification step, venv path fix (was /sandbox/milimo-blueprint → correct /sandbox/.openclaw/milimo/milimo-blueprint), gh CLI PATH via /sandbox/.bashrc | installation-scripts.md, common-issues.md, index.md, log.md |

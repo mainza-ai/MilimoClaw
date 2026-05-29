@@ -628,7 +628,7 @@ openclaw security audit
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `NEMOCLAW_CONTEXT_WINDOW` | `131072` | Maximum context window (tokens) |
+| `NEMOCLAW_CONTEXT_WINDOW` | `65536` | Maximum context window (tokens) |
 | `NEMOCLAW_MAX_TOKENS` | `4096` | Maximum output tokens per request |
 | `NEMOCLAW_REASONING` | — | Enable reasoning mode (`true`/`false`) |
 | `NEMOCLAW_INFERENCE_INPUTS` | `text` | Accepted input types: `text` or `text,image` |

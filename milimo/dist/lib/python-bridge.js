@@ -30,10 +30,7 @@ function callPythonBridge(command, args, options) {
         timeout: options.timeout ?? 30000,
         env: {
             ...process.env,
-            PYTHONPATH: [
-                options.blueprintDir,
-                (0, node_path_1.join)(options.blueprintDir, "orchestrator"),
-            ].join(process.platform === "win32" ? ";" : ":"),
+            PYTHONPATH: [options.blueprintDir, (0, node_path_1.join)(options.blueprintDir, "orchestrator")].join(process.platform === "win32" ? ";" : ":"),
         },
     });
     if (result.error) {

@@ -201,6 +201,57 @@ ls /sandbox/.openclaw/workspace/
 
 ---
 
+## Host File Access Synchronization
+
+Because the claws run inside an isolated Docker sandbox container, files they create (such as generated source code, draft blog posts, invoices, logs, and spreadsheets) reside inside the container's overlay storage layer.
+
+To easily read, run, or edit these files on your host Mac, you have three primary access options:
+
+### 1. Live Host File Synchronization Script (Recommended)
+
+A lightweight host-side bash utility is provided in your workspace root at `scripts/pull_claw_files.sh`. This script auto-detects the running claws container and extracts files directly to the `./claws_data/` folder on your host Mac.
+
+* **To pull files for all six claws:**
+  ```bash
+  ./scripts/pull_claw_files.sh
+  ```
+* **To pull files for a specific claw role only (e.g. build claw):**
+  ```bash
+  ./scripts/pull_claw_files.sh build
+  ```
+
+* **Note:** The entire `./claws_data/` directory is registered in your host `.gitignore` so operational files and client-sensitive data are never accidentally pushed to GitHub.
+
+---
+
+### 2. VS Code "Attach to Container" Explorer (Visual & Interactive)
+
+For a fully visual and interactive experience where you can browse directories, open, read, edit, and save claw files in real-time within the container namespace, you can attach VS Code directly to the sandbox container.
+
+1. **Install Dev Containers**: Install the official **Dev Containers** extension by Microsoft in your host VS Code.
+2. **Attach to Container**:
+   * Open the Command Palette (`Cmd+Shift+P` on Mac).
+   * Select **"Dev Containers: Attach to Running Container..."**
+   * Choose the active claws container from the list (prefixed with `openshell-my-assistant`).
+3. **Explore Filesystem**: VS Code will open a new window attached directly to the sandbox container. Select **Open Folder** and navigate to `/sandbox/.openclaw/milimo/claws/` to browse and edit claw code and files visually in the sidebar tree.
+
+---
+
+### 3. Direct One-Off Terminal Extraction (Quick CLI)
+
+If you just need a single file or directory and do not want to run a script, you can execute a standard `docker cp` command from your host Mac terminal.
+
+* **Extract the generated Tetris game from the Build Claw:**
+  ```bash
+  docker cp $(docker ps --filter "name=openshell-my-assistant" --format "{{.Names}}" | head -n 1):/sandbox/.openclaw/milimo/claws/build/repo/tetris.py ./
+  ```
+* **Extract all content draft variants from the Content Claw:**
+  ```bash
+  docker cp $(docker ps --filter "name=openshell-my-assistant" --format "{{.Names}}" | head -n 1):/sandbox/.openclaw/milimo/claws/content/drafts ./claws_drafts
+  ```
+
+---
+
 ## Related Pages
 
 - [[sandbox-isolation]] — Sandbox architecture

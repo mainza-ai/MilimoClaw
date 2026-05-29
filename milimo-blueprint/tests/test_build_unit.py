@@ -2473,3 +2473,56 @@ class TestBuildClaw:
         mock_inference.complete.assert_called()
         call_kwargs = mock_inference.complete.call_args[1]
         assert "data_type" in call_kwargs
+
+    def test_handle_assistant_task_pipeline_success(self, tmp_path):
+        """test that _handle_assistant_task triggers pipeline and sends success response."""
+        mock_inference = MagicMock()
+        mock_inference.complete.return_value = (
+            "--- filepath: tetris.py ---\nprint('tetris')\n--- end ---"
+        )
+        mock_github = MagicMock()
+        mock_github.get_open_issues.return_value = []
+        mock_mesh = MagicMock()
+
+        with patch("build.build_scheduler.BuildScheduler.start"):
+            claw = BuildClaw(
+                squad_id="test-squad",
+                inference_client=mock_inference,
+                github_client=mock_github,
+                mesh_gateway=mock_mesh,
+                base_path=tmp_path,
+            )
+            claw.startup()
+
+        # Construct and send message
+        message = {
+            "message_id": "msg-123",
+            "message_type": "assistant_task",
+            "sender_role": "assistant",
+            "recipient_role": "build",
+            "payload": {
+                "task_description": "create a fully functional tetris game using pygame"
+            },
+        }
+
+        # Mock run_tests to return passing status
+        with patch.object(claw._code_gen, "run_tests", return_value=("passing", 1, 0)):
+            res = claw.handle_inbound(message)
+            assert res["status"] == "queued"
+
+            # Wait for background thread to complete execution
+            import time
+
+            time.sleep(0.5)
+
+            # Assert E2E callback was dispatched to Lucy
+            mock_mesh.send.assert_called()
+            sent_args = mock_mesh.send.call_args[0][0]
+            assert sent_args["message_type"] == "assistant_response"
+            assert sent_args["payload"]["response"]["status"] == "success"
+            assert "tetris.py" in sent_args["payload"]["response"]["files_changed"]
+
+            # Assert file was written to local workspace
+            local_file = tmp_path / "repo" / "tetris.py"
+            assert local_file.exists()
+            assert local_file.read_text() == "print('tetris')"

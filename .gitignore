@@ -125,3 +125,8 @@ milimo-claw-docs/_build/
 
 # Stripe test keys doc (if contains real test keys)
 stripe/docs/TESTING_TOOLS_KEYS.MD
+
+# =============================================================================
+# Claw Local Sync Data
+# =============================================================================
+claws_data/

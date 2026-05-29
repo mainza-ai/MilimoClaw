@@ -335,8 +335,15 @@ class BuildClaw:
             "Assistant task received: %s (deadline: %s)", task_description, deadline
         )
 
-        # For now, acknowledge receipt and queue for execution
-        # In a full implementation, this would parse the task and route to appropriate handlers
+        # Trigger background pipeline execution
+        thread = threading.Thread(
+            target=self._execute_assistant_task_pipeline,
+            args=(message,),
+            daemon=True,
+            name="build-assistant-task-pipeline",
+        )
+        thread.start()
+
         result = {
             "status": "queued",
             "role": "build",
@@ -347,6 +354,68 @@ class BuildClaw:
         }
         self._send_assistant_response(message, result)
         return result
+
+    def _execute_assistant_task_pipeline(self, message: dict) -> None:
+        """Execute assistant task in a background thread."""
+        try:
+            payload = message.get("payload", {})
+            task_description = payload.get("task_description", "")
+
+            logger.info("Executing assistant task pipeline: %s", task_description)
+
+            # Construct a virtual ComplexityScore
+            from .issue_manager import ComplexityScore
+
+            score = ComplexityScore(
+                issue_number=9999,  # Reserved virtual issue number for delegated tasks
+                issue_title=f"Assistant Task: {task_description[:60]}",
+                complexity_tier="M",
+                estimated_hours=8.0,
+                clarity_score="clear",
+            )
+
+            # Resolve the issue (reads codebase, uses AI to generate, writes locally, runs tests)
+            if self._code_gen:
+                result = self._code_gen.resolve_issue(
+                    score, issue_body=task_description
+                )
+                logger.info(
+                    "Assistant task resolution complete: %s (attempts: %d)",
+                    result.status,
+                    result.attempts,
+                )
+
+                # Report E2E result back to Lucy
+                response_payload = {
+                    "claw": "build",
+                    "task_description": task_description,
+                    "status": "success"
+                    if result.status == "ready_for_pr"
+                    else "failed",
+                    "branch": result.branch_name,
+                    "files_changed": result.files_changed,
+                    "test_result": result.test_result,
+                    "tests_passing": result.tests_passing,
+                    "tests_failing": result.tests_failing,
+                    "attempts": result.attempts,
+                    "message": f"Task resolution finished with status: {result.status}",
+                }
+                self._send_assistant_response(message, response_payload)
+            else:
+                logger.error("BuildClaw: code generator not initialized")
+
+        except Exception as e:
+            logger.error("Failed to execute assistant task pipeline: %s", e)
+            error_payload = {
+                "claw": "build",
+                "task_description": message.get("payload", {}).get(
+                    "task_description", ""
+                ),
+                "status": "error",
+                "error": str(e),
+                "message": f"Task execution failed: {e}",
+            }
+            self._send_assistant_response(message, error_payload)
 
     def handle_inbound(self, message: dict[str, Any]) -> dict[str, Any]:
         """Route inbound message to the correct handler.
