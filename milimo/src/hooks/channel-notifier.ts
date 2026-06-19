@@ -24,7 +24,6 @@
  *   notifier.sendAlert(level, text);   // General alert
  */
 
-import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { PluginLogger } from "../index.js";
@@ -98,24 +97,11 @@ function detectActiveChannels(): ChannelStatus[] {
 }
 
 /**
- * Check if NemoClaw channels are running via `nemoclaw <name> channels list`.
- * Falls back to env var detection if the CLI is unavailable.
+ * Check channel status using environment variable detection.
+ * NemoClaw injects TELEGRAM_BOT_TOKEN, DISCORD_BOT_TOKEN, etc.
+ * into the sandbox environment when channels are configured.
  */
 function probeChannelStatus(): ChannelStatus[] {
-  try {
-    const output = execFileSync("nemoclaw", ["list"], {
-      encoding: "utf-8",
-      timeout: 3000,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    // If nemoclaw is available, use env detection (channels are active
-    // when their token env vars are set in the sandbox).
-    if (output) {
-      return detectActiveChannels();
-    }
-  } catch {
-    // nemoclaw CLI not available — fall back to env detection
-  }
   return detectActiveChannels();
 }
 

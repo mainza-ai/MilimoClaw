@@ -130,8 +130,8 @@ export class DigestScheduler {
     return targetTime.getTime() - now.getTime();
   }
 
-  public getMorningBrief(): DigestBrief | null {
-    const response = callPythonBridgeSafe<{ [key: string]: unknown }>(
+  public async getMorningBrief(): Promise<DigestBrief | null> {
+    const response = await callPythonBridgeSafe<{ [key: string]: unknown }>(
       "morning_brief",
       { squad_id: this.config.squad_id },
       this.bridgeOptions,
@@ -161,8 +161,8 @@ export class DigestScheduler {
     return brief;
   }
 
-  public getEveningWrap(): DigestBrief | null {
-    const response = callPythonBridgeSafe<{ [key: string]: unknown }>(
+  public async getEveningWrap(): Promise<DigestBrief | null> {
+    const response = await callPythonBridgeSafe<{ [key: string]: unknown }>(
       "evening_wrap",
       { squad_id: this.config.squad_id },
       this.bridgeOptions,

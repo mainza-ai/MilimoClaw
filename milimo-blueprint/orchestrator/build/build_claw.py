@@ -59,9 +59,10 @@ class BuildClaw:
         self,
         squad_id: str,
         inference_client: Any,
-        github_client: Any,
+        github_client: Any | None = None,
         sentry_client: Any | None = None,
         vercel_client: Any | None = None,
+        railway_client: Any | None = None,
         mesh_gateway: Any | None = None,
         base_path: Path | None = None,
     ) -> None:
@@ -70,6 +71,7 @@ class BuildClaw:
         self._github_client = github_client
         self._sentry_client = sentry_client
         self._vercel_client = vercel_client
+        self._railway_client = railway_client
         self._mesh_gateway = mesh_gateway
         self._base_path = base_path
 

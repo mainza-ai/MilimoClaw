@@ -152,7 +152,7 @@ function cliSquadStatus(opts) {
     logger.info("");
     return Promise.resolve();
 }
-function cliSquadFinalsMode(opts) {
+async function cliSquadFinalsMode(opts) {
     const { logger } = opts;
     const state = (0, init_js_1.loadMilimoState)();
     if (!state) {
@@ -187,7 +187,7 @@ function cliSquadFinalsMode(opts) {
         return Promise.resolve();
     }
     const blueprintDir = getBlueprintDir();
-    const response = (0, python_bridge_js_1.callPythonBridgeSafe)("activate_deep_work", { resume_date: resumeDate }, { blueprintDir });
+    const response = await (0, python_bridge_js_1.callPythonBridgeSafe)("activate_deep_work", { resume_date: resumeDate }, { blueprintDir });
     if (!response.success) {
         logger.error(`Failed to activate deep work mode: ${response.error}`);
         return Promise.resolve();
@@ -245,7 +245,7 @@ function cliSquadFinalsMode(opts) {
     logger.info("");
     return Promise.resolve();
 }
-function cliSquadResume(opts) {
+async function cliSquadResume(opts) {
     const { logger } = opts;
     const state = (0, init_js_1.loadMilimoState)();
     if (!state) {
@@ -258,7 +258,7 @@ function cliSquadResume(opts) {
         return Promise.resolve();
     }
     const blueprintDir = getBlueprintDir();
-    const response = (0, python_bridge_js_1.callPythonBridgeSafe)("resume_deep_work", {}, { blueprintDir });
+    const response = await (0, python_bridge_js_1.callPythonBridgeSafe)("resume_deep_work", {}, { blueprintDir });
     if (!response.success) {
         logger.error(`Failed to resume from deep work mode: ${response.error}`);
         return Promise.resolve();

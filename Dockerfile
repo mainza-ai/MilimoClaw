@@ -97,7 +97,7 @@ RUN BASE="/sandbox/.openclaw/milimo/claws" \
 # NEMOCLAW_MODEL is set by the user during nemoclaw onboard (model selection step).
 # The fallback value mirrors NemoClaw's own default — override at build time via
 # nemoclaw onboard or --build-arg.
-ARG NEMOCLAW_MODEL=nvidia/nemotron-3-super-120b-a12b
+ARG NEMOCLAW_MODEL=
 ARG CHAT_UI_URL=http://127.0.0.1:18789
 ARG MILIMO_BUILD_ID=default
 

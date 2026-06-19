@@ -721,7 +721,12 @@ class LucyAssistant:
         )
 
         try:
-            cloud_model = "nvidia/nemotron-3-super-120b-a12b"
+            cloud_model = os.environ.get("NEMOCLAW_MODEL")
+            if not cloud_model:
+                logger.warning(
+                    "[Lucy] NEMOCLAW_MODEL not set — skipping SLA healing inference"
+                )
+                return
             os.environ["NEMOCLAW_MODEL"] = cloud_model
             cmd = [
                 "openshell",

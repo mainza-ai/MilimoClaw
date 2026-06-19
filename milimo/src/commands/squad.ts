@@ -155,7 +155,7 @@ export function cliSquadStatus(opts: SquadStatusOptions): Promise<void> {
   return Promise.resolve();
 }
 
-export function cliSquadFinalsMode(opts: FinalsModeOptions): Promise<void> {
+export async function cliSquadFinalsMode(opts: FinalsModeOptions): Promise<void> {
   const { logger } = opts;
   const state = loadMilimoState();
 
@@ -196,7 +196,7 @@ export function cliSquadFinalsMode(opts: FinalsModeOptions): Promise<void> {
   }
 
   const blueprintDir = getBlueprintDir();
-  const response = callPythonBridgeSafe<{ [key: string]: unknown }>(
+  const response = await callPythonBridgeSafe<{ [key: string]: unknown }>(
     "activate_deep_work",
     { resume_date: resumeDate },
     { blueprintDir },
@@ -278,7 +278,7 @@ export function cliSquadFinalsMode(opts: FinalsModeOptions): Promise<void> {
   return Promise.resolve();
 }
 
-export function cliSquadResume(opts: ResumeOptions): Promise<void> {
+export async function cliSquadResume(opts: ResumeOptions): Promise<void> {
   const { logger } = opts;
   const state = loadMilimoState();
 
@@ -294,7 +294,7 @@ export function cliSquadResume(opts: ResumeOptions): Promise<void> {
   }
 
   const blueprintDir = getBlueprintDir();
-  const response = callPythonBridgeSafe<{ [key: string]: unknown }>(
+  const response = await callPythonBridgeSafe<{ [key: string]: unknown }>(
     "resume_deep_work",
     {},
     { blueprintDir },

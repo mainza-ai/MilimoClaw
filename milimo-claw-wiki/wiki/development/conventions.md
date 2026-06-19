@@ -92,20 +92,26 @@ Never overwrite good data with a partial write.
 
 ---
 
-## Shell Commands (TypeScript)
+## External Commands (TypeScript)
 
-Use `child_process.spawn` with array args.
+**The Milimo plugin uses zero `child_process` calls.** All external binary execution is delegated to the persistent Python RPC server (`bridge_server.py`) which handles subprocess isolation internally.
 
 ```typescript
-// Good
-import { spawn } from 'child_process';
-spawn('git', ['commit', '-m', message]);
+// Use RPC bridge for Python operations
+import { callPythonBridge } from "../lib/python-bridge";
+const result = await callPythonBridge("command", { args }, { blueprintDir });
 
-// Bad
-exec(`git commit -m "${message}"`);  // Injection risk
+// Use native Node.js APIs for filesystem operations
+import * as fs from "node:fs";
+import * as os from "node:os";
+
+// Desktop notifications use pending-file fallback (no subprocess)
+import { OperatorNotifier } from "../warroom/notifier";
+const notifier = new OperatorNotifier();
+notifier.notify({ ... });  // Writes to pending JSON file
 ```
 
-Never template literal shell strings — injection risk.
+If you MUST execute an external command, add the handler to `bridge_server.py` which runs `subprocess.run` with array args (safe from shell injection). Never shell out from TypeScript directly.
 
 ---
 

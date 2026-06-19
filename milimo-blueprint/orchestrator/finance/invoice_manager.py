@@ -398,7 +398,7 @@ class InvoiceManager:
     def handle_stage2_hold_release(
         self,
         invoice_id: str,
-        stripe_client: StripeClient,
+        stripe_client: Any | None = None,
     ) -> Invoice:
         """
         Handle Stage 2 HOLD release.
@@ -407,14 +407,13 @@ class InvoiceManager:
 
         1. Load invoice from invoices/approved/{invoice_id}.json
         2. Verify status == "approved" — raise if not
-        3. Create Stripe invoice via Stripe API
+        3. Create Stripe invoice via Stripe API (skip if no stripe_client)
         4. Send Stripe invoice to client
         5. Update invoice: status="sent", sent_at=now, stripe_invoice_id
         6. Move file: approved/ → sent/{invoice_id}.json
-        7. Log to payment-events.log: invoice_sent
-        8. Log: action_type="invoice_sent"
 
         On Stripe API failure: keep in approved/, retry logic in payment_monitor.
+        If no stripe_client configured: mark as sent locally, log warning.
         """
         invoice = self.load_invoice(invoice_id, "approved")
 
@@ -422,6 +421,25 @@ class InvoiceManager:
             raise ValueError(
                 f"Invoice {invoice_id} is not in approved status (status: {invoice.status})"
             )
+
+        if not stripe_client:
+            logger.warning(
+                "Invoice %s approved but no Stripe client — marking sent locally",
+                invoice_id,
+            )
+            invoice.status = "sent"
+            invoice.sent_at = datetime.now(timezone.utc).isoformat()
+            invoice.stripe_invoice_id = "local_only"
+            sent_path = self.fs.get_invoice_path("sent", invoice_id)
+            sent_path.parent.mkdir(parents=True, exist_ok=True)
+            sent_path.write_text(json.dumps(invoice.to_dict(), indent=2))
+            approved_path = self.fs.get_invoice_path("approved", invoice_id)
+            if approved_path.exists():
+                approved_path.unlink()
+            logger.info(
+                "Invoice %s marked as sent locally (no payment provider)", invoice_id
+            )
+            return invoice
 
         try:
             stripe_result = stripe_client.create_invoice(

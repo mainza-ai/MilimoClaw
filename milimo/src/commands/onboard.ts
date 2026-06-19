@@ -35,6 +35,7 @@ import {
   resolveTemplatePath,
 } from "../onboard/template.js";
 import { assistantSetup } from "./assistant.js";
+import { getRpcClient } from "../lib/rpc-bridge";
 
 export interface OnboardOptions {
   squad?: string;
@@ -460,7 +461,6 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
     logger.info("");
     logger.info("Creating per-claw NemoClaw sandboxes...");
     try {
-      const { execFileSync } = await import("child_process");
       const home = process.env.HOME ?? "/tmp";
       const candidates = [
         path.join(home, ".openclaw/milimo", "blueprints", "0.1.0"),
@@ -474,21 +474,12 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
 
       if (fs.existsSync(soloInitPath)) {
         const roleArg = solo ? "solo" : clawRole;
-        execFileSync(
-          "python3",
-          ["-m", "orchestrator.solo_init", "--role", roleArg, "--template", template],
-          {
-            cwd: blueprintDir,
-            timeout: 120_000,
-            stdio: ["pipe", "pipe", "pipe"],
-            env: {
-              ...process.env,
-              PYTHONPATH: [blueprintDir, path.join(blueprintDir, "orchestrator")].join(
-                process.platform === "win32" ? ";" : ":",
-              ),
-            },
-          },
-        );
+        const rpc = getRpcClient();
+        await rpc.call("solo_init", {
+          role: roleArg,
+          template,
+          blueprintDir,
+        });
         logger.info(` ✓ Sandbox directories created for: ${activeClaws.join(", ")}`);
       } else {
         logger.warn(" solo_init.py not found — skipping sandbox auto-creation.");
@@ -518,20 +509,25 @@ export async function cliOnboard(opts: OnboardOptions): Promise<void> {
   logger.info("");
   logger.info("Clearing old session history for fresh context...");
   try {
-    const { execSync } = await import("child_process");
     const home = process.env.HOME ?? "/tmp";
-    const sessionsDir = `${home}/.openclaw/agents/main/sessions`;
-    const memoryDir = `${home}/.openclaw/workspace/memory`;
-    const memoryFile = `${home}/.openclaw/workspace/MEMORY.md`;
+    const sessionsDir = path.join(home, ".openclaw/agents/main/sessions");
+    const memoryDir = path.join(home, ".openclaw/workspace/memory");
+    const memoryFile = path.join(home, ".openclaw/workspace/MEMORY.md");
+    const bootstrapFile = path.join(home, ".openclaw/workspace/BOOTSTRAP.md");
 
-    // Clear session history
-    execSync(`rm -f "${sessionsDir}"/*.jsonl "${sessionsDir}"/sessions.json 2>/dev/null || true`);
-    // Clear daily/channel memory
-    execSync(`rm -rf "${memoryDir}"/daily "${memoryDir}"/channel 2>/dev/null || true`);
-    // Clear MEMORY.md
-    execSync(`rm -f "${memoryFile}" 2>/dev/null || true`);
-    // Remove bootstrap file so identity is configured
-    execSync(`rm -f "${home}/.openclaw/workspace/BOOTSTRAP.md" 2>/dev/null || true`);
+    if (fs.existsSync(sessionsDir)) {
+      for (const file of fs.readdirSync(sessionsDir)) {
+        if (file.endsWith(".jsonl") || file === "sessions.json") {
+          fs.rmSync(path.join(sessionsDir, file), { force: true });
+        }
+      }
+    }
+    const dailyDir = path.join(memoryDir, "daily");
+    const channelDir = path.join(memoryDir, "channel");
+    if (fs.existsSync(dailyDir)) fs.rmSync(dailyDir, { recursive: true, force: true });
+    if (fs.existsSync(channelDir)) fs.rmSync(channelDir, { recursive: true, force: true });
+    if (fs.existsSync(memoryFile)) fs.rmSync(memoryFile, { force: true });
+    if (fs.existsSync(bootstrapFile)) fs.rmSync(bootstrapFile, { force: true });
 
     logger.info(" ✓ Old sessions and memory cleared");
   } catch {

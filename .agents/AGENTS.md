@@ -789,8 +789,12 @@ Never truncate or overwrite.
 **Atomic writes** — All summary JSON files: write temp file first, then
 `Path.rename()`. Never overwrite good data with a partial write.
 
-**Shell commands (TypeScript)** — `child_process.spawn` with array args.
-Never template literal shell strings — injection risk.
+**External commands (TypeScript)** — **The plugin uses ZERO `child_process` calls.**
+All Python operations route through the persistent RPC server (`bridge_server.py` on port 19999).
+Use `callPythonBridge`/`callPythonBridgeSafe` from `lib/python-bridge.ts` for Python operations.
+Use native `node:fs`, `node:os` for filesystem and system operations.
+Desktop notifications use pending-file fallback — no subprocess.
+Channel management prints instructions for `nemoclaw <sandbox> channels <cmd>` — no delegation.
 
 **Config** — `~/.milimo/config.json` is the single source of truth.
 No separate `state.json`. All commands read from and write to one file.

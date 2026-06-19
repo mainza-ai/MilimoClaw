@@ -12,6 +12,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Protocol
 import json
+import os
 
 from .finance_init import FinanceFilesystemInit, FinanceOperationalLog, FinanceLogEntry
 from .signal_dispatcher import FinanceSignalDispatcher
@@ -234,7 +235,7 @@ class RevenueTracker:
         if revenue > 0:
             margin_pct = ((revenue - expenses) / revenue) * 100
 
-        target_margin = 30.0
+        target_margin = float(os.environ.get("MILIMO_TARGET_MARGIN", "30"))
         margin_gap = target_margin - margin_pct
 
         try:

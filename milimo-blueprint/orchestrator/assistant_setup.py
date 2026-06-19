@@ -198,7 +198,9 @@ def build_agent_config(config: AssistantConfig) -> dict:
         },
         "bridge": {
             "python_path": "milimo-blueprint/orchestrator/bridge_cli.py",
-            "timeout_seconds": 3,
+            "timeout_seconds": 30,
+            "rpc_port": 19999,
+            "rpc_endpoint": "http://127.0.0.1:19999/rpc",
             "spawn_args": ["python3", "milimo-blueprint/orchestrator/bridge_cli.py"],
         },
         "session": {

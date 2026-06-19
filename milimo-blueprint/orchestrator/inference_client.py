@@ -43,12 +43,16 @@ from typing import Any
 
 logger = logging.getLogger("milimo.inference_client")
 
-_NEMOCLAW_MODEL = os.environ.get("NEMOCLAW_MODEL", "nvidia/nemotron-3-super-120b-a12b")
+_NEMOCLAW_MODEL = os.environ.get("NEMOCLAW_MODEL")
 
 DEFAULT_FALLBACK_CHAIN = [
-    _NEMOCLAW_MODEL,
-    "meta/llama-3.3-70b-instruct",
-    "mistralai/mixtral-8x22b-instruct-v0.1",
+    m
+    for m in [
+        _NEMOCLAW_MODEL,
+        "meta/llama-3.3-70b-instruct",
+        "mistralai/mixtral-8x22b-instruct-v0.1",
+    ]
+    if m
 ]
 
 DEFAULT_API_BASE = os.environ.get(

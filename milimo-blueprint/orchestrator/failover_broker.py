@@ -28,7 +28,7 @@ class FailoverInferenceBroker:
         self,
         local_endpoint: str = "http://localhost:8000/v1/models",
         latency_threshold_ms: float = 800.0,
-        cloud_model: str = "nvidia/nemotron-3-super-120b-a12b",
+        cloud_model: str | None = None,
         require_operator_approval: bool = True,
     ) -> None:
         self.local_endpoint = local_endpoint
@@ -129,6 +129,10 @@ class FailoverInferenceBroker:
 
     def _activate_cloud_routing(self) -> None:
         """Triggers the OpenShell CLI and sets environments to route to cloud."""
+        if not self.cloud_model:
+            logger.warning("Cannot activate cloud routing — no cloud_model configured")
+            return
+
         # 1. Update the process model environment override
         os.environ["NEMOCLAW_MODEL"] = self.cloud_model
 

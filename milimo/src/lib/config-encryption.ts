@@ -16,8 +16,7 @@
 
 import { createCipheriv, createDecipheriv, createHash, randomBytes, scryptSync } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
-import { platform } from "node:os";
+import { platform, hostname } from "node:os";
 
 const ALGORITHM = "aes-256-gcm";
 const KEY_LENGTH = 32;
@@ -44,38 +43,33 @@ export function getMachineId(): string {
     if (existsSync(machineIdPath)) {
       return readFileSync(machineIdPath, "utf-8").trim();
     }
+    const dbusPath = "/var/lib/dbus/machine-id";
+    if (existsSync(dbusPath)) {
+      return readFileSync(dbusPath, "utf-8").trim();
+    }
   }
 
   if (currentPlatform === "darwin") {
-    const result = spawnSync("system_profiler", ["SPHardwareDataType"], {
-      encoding: "utf-8",
-      timeout: 5000,
-    });
-
-    if (result.status === 0) {
-      const match = result.stdout.match(/Hardware UUID:\s*([A-Fa-f0-9-]+)/);
-      if (match?.[1]) {
-        return match[1];
+    const dbusPath = "/var/lib/dbus/machine-id";
+    if (existsSync(dbusPath)) {
+      return readFileSync(dbusPath, "utf-8").trim();
+    }
+    try {
+      const ioPlatfromBytes = readFileSync(
+        "/System/Library/CoreServices/SystemVersion.plist",
+        "utf-8",
+      );
+      const uuidMatch = ioPlatfromBytes.match(/IOPlatformUUID[^<]*<string>([^<]+)<\/string>/);
+      if (uuidMatch?.[1]) {
+        return uuidMatch[1];
       }
+    } catch {
+      // fall through
     }
   }
 
-  if (currentPlatform === "win32") {
-    const result = spawnSync("wmic", ["csproduct", "get", "UUID"], {
-      encoding: "utf-8",
-      timeout: 5000,
-    });
-
-    if (result.status === 0) {
-      const lines = result.stdout.split("\n").filter((l) => l.trim());
-      if (lines.length > 1) {
-        return lines[1].trim();
-      }
-    }
-  }
-
-  const fallback = process.env.USER ?? process.env.USERNAME ?? "default";
-  return createHash("sha256").update(`milimo-${fallback}`).digest("hex");
+  const fallback = process.env.USER ?? process.env.USERNAME ?? hostname() ?? "default";
+  return createHash("sha256").update(`milimo-${hostname()}-${fallback}`).digest("hex");
 }
 
 /**

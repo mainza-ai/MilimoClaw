@@ -85,11 +85,11 @@ class EvolutionManager {
             console.log(`Failed to toggle tool: ${String(e)}`);
         }
     }
-    showCrossClawFlows() {
+    async showCrossClawFlows() {
         console.log("\n--- CROSS-CLAW EVOLUTION FLOWS ---");
         console.log("Visualizing signal routing between claws based on mesh configurations.");
         console.log("");
-        const flowState = this.getMeshFlowState();
+        const flowState = await this.getMeshFlowState();
         if (!flowState || flowState.signals.length === 0) {
             console.log(" Signal data unavailable.");
             console.log("");
@@ -115,9 +115,9 @@ class EvolutionManager {
         console.log("Signals are ingested during the OBSERVE stage to trigger new tool proposals.");
         console.log("----------------------------------\n");
     }
-    getMeshFlowState() {
+    async getMeshFlowState() {
         try {
-            const response = (0, python_bridge_js_1.callPythonBridgeSafe)("mesh_flow_state", { squad: this.squadId }, { blueprintDir: this.blueprintDir });
+            const response = await (0, python_bridge_js_1.callPythonBridgeSafe)("mesh_flow_state", { squad: this.squadId }, { blueprintDir: this.blueprintDir });
             if (response.success && response.data) {
                 return response.data;
             }
@@ -127,7 +127,7 @@ class EvolutionManager {
             return null;
         }
     }
-    getMeshFlowData() {
+    async getMeshFlowData() {
         return this.getMeshFlowState();
     }
 }

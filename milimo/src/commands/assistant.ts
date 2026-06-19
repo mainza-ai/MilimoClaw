@@ -9,10 +9,10 @@
  * start   — Starts the assistant in NemoClaw terminal
  */
 
-import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
+import { getRpcClient } from "../lib/rpc-bridge";
 
 interface AssistantConfig {
   name: string;
@@ -52,40 +52,24 @@ export async function assistantSetup(): Promise<void> {
 
   const scriptPath = resolveAssistantScript();
   const blueprintDir = dirname(dirname(scriptPath));
-  const result = spawn("python3", ["-m", "orchestrator.assistant_setup"], {
-    cwd: blueprintDir,
-    stdio: "inherit",
-    env: { ...process.env, PYTHONPATH: blueprintDir },
-  });
-
-  return new Promise((resolve, reject) => {
-    result.on("close", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`Assistant setup failed with exit code ${code}`));
-    });
-  });
+  const rpc = getRpcClient();
+  await rpc.call("assistant_setup", { blueprintDir });
 }
 
 export async function assistantVerify(): Promise<void> {
   const scriptPath = resolveAssistantScript();
-  const result = spawn("python3", [scriptPath, "--verify"], {
-    stdio: "inherit",
-  });
-
-  return new Promise((resolve, reject) => {
-    result.on("close", (code) => {
-      const assistant = getAssistantConfig();
-      if (code === 0) {
-        const name = assistant?.name ?? "your assistant";
-        console.log(`\n${name} setup is complete.`);
-        console.log("Start with: openclaw milimo assistant start");
-        resolve();
-      } else {
-        console.error("\nAssistant setup incomplete. Run: openclaw milimo assistant setup");
-        reject(new Error("Assistant setup verification failed"));
-      }
-    });
-  });
+  const blueprintDir = dirname(dirname(scriptPath));
+  const rpc = getRpcClient();
+  try {
+    await rpc.call("assistant_verify", { scriptPath, blueprintDir });
+    const assistant = getAssistantConfig();
+    const name = assistant?.name ?? "your assistant";
+    console.log(`\n${name} setup is complete.`);
+    console.log("Start with: openclaw milimo assistant start");
+  } catch {
+    console.error("\nAssistant setup incomplete. Run: openclaw milimo assistant setup");
+    throw new Error("Assistant setup verification failed");
+  }
 }
 
 export async function assistantStart(): Promise<void> {
@@ -99,15 +83,7 @@ export async function assistantStart(): Promise<void> {
   const name = assistant?.name ?? "your assistant";
   const emoji = assistant?.emoji ?? "🦀";
 
-  console.log(`Starting ${name}... ${emoji}\n`);
-
-  // Launch the interactive TUI instead of a single, required-message turn
-  const result = spawn("openclaw", ["tui", "--session", "main"], { stdio: "inherit" });
-
-  return new Promise((resolve, reject) => {
-    result.on("close", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`${name} exited with code ${code}`));
-    });
-  });
+  console.log(`${emoji} Starting ${name}...\n`);
+  console.log("Run the following command to start the interactive TUI:\n");
+  console.log("  openclaw tui --session main\n");
 }

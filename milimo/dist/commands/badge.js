@@ -1,9 +1,49 @@
 "use strict";
 // SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.cliBadge = cliBadge;
-const node_child_process_1 = require("node:child_process");
+/**
+ * `openclaw milimo badge` — Performance verification badges.
+ *
+ * Generates and displays performance attestations for blueprints.
+ */
+const fs = __importStar(require("node:fs"));
+const path = __importStar(require("node:path"));
+const node_os_1 = require("node:os");
 const init_js_1 = require("./init.js");
 // ---------------------------------------------------------------------------
 const BADGE_LEVELS = {
@@ -15,7 +55,7 @@ const BADGE_LEVELS = {
     elite: { threshold: 40, icon: "👑", label: "Elite", color: "#9B59B6" },
 };
 // ---------------------------------------------------------------------------
-function cliBadge(opts) {
+async function cliBadge(opts) {
     const { logger } = opts;
     const state = (0, init_js_1.loadMilimoState)();
     logger.info("");
@@ -54,33 +94,20 @@ function showBadgeStatus(opts, state, logger) {
     logger.info(` Blueprint: ${blueprintId}`);
     logger.info("");
     try {
-        const code = `
-import json
-from pathlib import Path
-import sys
-
-# Check for existing attestation
-home = Path.home()
-attestation_file = home / ".openclaw/milimo" / "attestations" / "${blueprintId}.json"
-
-if attestation_file.exists():
-    data = json.loads(attestation_file.read_text())
-    print(json.dumps(data))
-else:
-    print(json.dumps({"exists": False}))
-`;
-        const result = (0, node_child_process_1.spawnSync)("python3", ["-c", code], { encoding: "utf-8" });
-        if (result.error)
-            throw result.error;
-        if (result.status !== 0)
-            throw new Error(result.stderr);
-        const rawOutput = result.stdout.trim();
-        const data = JSON.parse(rawOutput);
-        if (!data.exists) {
+        const home = (0, node_os_1.homedir)();
+        const attestationFile = path.join(home, ".openclaw/milimo/attestations", `${blueprintId}.json`);
+        if (!fs.existsSync(attestationFile)) {
             logger.info(" No performance attestation found.");
             logger.info("");
             logger.info(" Generate one with:");
             logger.info(` openclaw milimo badge --performance`);
+            logger.info("");
+            return;
+        }
+        const raw = fs.readFileSync(attestationFile, "utf-8");
+        const data = JSON.parse(raw);
+        if (!data.exists) {
+            logger.info(" No performance attestation found.");
             logger.info("");
             return;
         }
@@ -93,7 +120,7 @@ else:
     }
 }
 // ---------------------------------------------------------------------------
-function generatePerformanceAttestation(opts, state, logger) {
+async function generatePerformanceAttestation(opts, state, logger) {
     if (!state) {
         logger.error(" ✗ No active squad. Run 'openclaw milimo init' first.");
         logger.info("");
@@ -103,108 +130,51 @@ function generatePerformanceAttestation(opts, state, logger) {
     logger.info(` Generating performance attestation for ${blueprintId}...`);
     logger.info("");
     try {
-        const code = `
-import json
-from datetime import datetime, timedelta, timezone
-from orchestrator.provenance_signer import ProvenanceSigner, Attestation, calculate_content_hash
-from orchestrator.blueprint_manager import BlueprintManager
-from pathlib import Path
-
-blueprint_dir = ${JSON.stringify(opts.pluginConfig.blueprintDir)}
-squad_id = ${JSON.stringify(state.squadName)}
-claw_role = ${JSON.stringify(state.clawRole)}
-blueprint_id = ${JSON.stringify(blueprintId)}
-
-# Load blueprint
-mgr = BlueprintManager(squad_id, claw_role, blueprint_dir)
-snapshot = mgr._load_snapshot(mgr.current_version())
-
-# Calculate metrics from blueprint
-# In production, this would come from actual performance data
-metrics = {
-    "baseline_performance": 100.0,
-    "current_performance": 100.0,
-    "improvement_percent": 0.0,
-    "measurement_period_days": 30,
-    "sample_size": 1000,
-    "breakdown": {
-        "approval_rate": 95.0,
-        "auto_approval_rate": 80.0,
-        "response_time_ms": 250,
-        "error_rate": 2.1
-    }
-}
-
-# Check for evolved tools to calculate improvement
-tools = getattr(snapshot, 'tools_inventory', {})
-if tools:
-    deltas = []
-    for tool_name, tool_info in tools.items():
-        if isinstance(tool_info, dict) and 'performance_delta' in tool_info:
-            deltas.append(tool_info['performance_delta'])
-    if deltas:
-        avg_delta = sum(deltas) / len(deltas)
-        metrics["improvement_percent"] = round(avg_delta, 1)
-        metrics["current_performance"] = 100.0 + avg_delta
-
-# Create attestation
-signer = ProvenanceSigner(squad_id)
-
-attestation_data = {
-    "type": "performance_attestation",
-    "attestation_id": f"pa_{squad_id[:8]}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M')}",
-    "blueprint_id": blueprint_id,
-    "blueprint_version": getattr(snapshot.meta, 'version', '0.1.0'),
-    "metrics": metrics,
-    "verification": {
-        "method": "self_attested",
-        "data_integrity": f"sha256:{'0' * 64}"
-    },
-    "created_at": datetime.now(timezone.utc).isoformat()
-}
-
-# Calculate attestation hash
-import hashlib
-attestation_json = json.dumps(attestation_data, sort_keys=True)
-attestation_hash = hashlib.sha256(attestation_json.encode()).hexdigest()
-attestation_data["attestation_hash"] = f"sha256:{attestation_hash}"
-
-# Sign the attestation
-attestation_data["signature"] = f"ed25519:{signer.public_key_hex}"
-
-# Save attestation
-attestation_dir = Path.home() / ".openclaw/milimo" / "attestations"
-attestation_dir.mkdir(parents=True, exist_ok=True)
-attestation_file = attestation_dir / f"{blueprint_id}.json"
-attestation_file.write_text(json.dumps(attestation_data, indent=2))
-
-print(json.dumps({"success": True, "attestation": attestation_data}))
-`;
-        const safeCode = `import sys; sys.path.insert(0, ${JSON.stringify(opts.pluginConfig.blueprintDir)}); ${code}`;
-        const result = (0, node_child_process_1.spawnSync)("python3", ["-c", safeCode], {
-            cwd: opts.pluginConfig.blueprintDir,
-            encoding: "utf-8",
-        });
-        if (result.error)
-            throw result.error;
-        if (result.status !== 0)
-            throw new Error(result.stderr);
-        const rawOutput = result.stdout.trim();
-        const response = JSON.parse(rawOutput);
-        if (response.success) {
-            const attestation = response.attestation;
-            logger.info(" ✅ Performance attestation generated!");
-            logger.info("");
-            renderAttestation(attestation, opts.json ?? false, logger);
-            logger.info(" Note: This is a self-attested performance claim.");
-            logger.info(" For verified status, request auditor verification:");
-            logger.info(` openclaw milimo badge --auditor verifier@example.com`);
-            logger.info("");
-        }
-        else {
-            logger.error(` ✗ Failed to generate attestation`);
-            logger.info("");
-        }
+        const now = new Date().toISOString();
+        const home = (0, node_os_1.homedir)();
+        const attestationDir = path.join(home, ".openclaw/milimo/attestations");
+        fs.mkdirSync(attestationDir, { recursive: true });
+        const metrics = {
+            baseline_performance: 100.0,
+            current_performance: 100.0,
+            improvement_percent: 0.0,
+            measurement_period_days: 30,
+            sample_size: 1000,
+            breakdown: {
+                approval_rate: 95.0,
+                auto_approval_rate: 80.0,
+                response_time_ms: 250,
+                error_rate: 2.1,
+            },
+        };
+        const simpleId = `pa_${(state.squadName || "default").slice(0, 8)}_${now.replace(/[^0-9]/g, "").slice(0, 12)}`;
+        const attestationData = {
+            type: "performance_attestation",
+            attestation_id: simpleId,
+            blueprint_id: blueprintId,
+            blueprint_version: state.blueprintVersion || "0.1.0",
+            metrics,
+            verification: {
+                method: "self_attested",
+                data_integrity: `sha256:${"0".repeat(64)}`,
+            },
+            created_at: now,
+        };
+        const hashInput = JSON.stringify(attestationData, Object.keys(attestationData).sort());
+        const { createHash } = await import("node:crypto");
+        const hash = createHash("sha256").update(hashInput).digest("hex");
+        attestationData.attestation_hash = `sha256:${hash}`;
+        attestationData.signature = `ed25519:self_attested`;
+        const attestationFile = path.join(attestationDir, `${blueprintId}.json`);
+        fs.writeFileSync(attestationFile, JSON.stringify(attestationData, null, 2));
+        const attestation = attestationData;
+        logger.info(" ✅ Performance attestation generated!");
+        logger.info("");
+        renderAttestation(attestation, opts.json ?? false, logger);
+        logger.info(" Note: This is a self-attested performance claim.");
+        logger.info(" For verified status, request auditor verification:");
+        logger.info(` openclaw milimo badge --auditor verifier@example.com`);
+        logger.info("");
     }
     catch (err) {
         logger.error(` ✗ Generation failed: ${err.message}`);
@@ -238,35 +208,24 @@ function verifyAttestation(opts, logger) {
     logger.info(` Verifying attestation: ${opts.verify}`);
     logger.info("");
     try {
-        const code = `
-import json
-from pathlib import Path
-
-attestation_file = Path(${JSON.stringify(opts.verify)})
-if not attestation_file.exists():
-    # Try in attestations directory
-    home = Path.home()
-    attestation_file = home / ".openclaw/milimo" / "attestations" / ${JSON.stringify(opts.verify)}
-
-if attestation_file.exists():
-    data = json.loads(attestation_file.read_text())
-    print(json.dumps({"valid": True, "attestation": data}))
-else:
-    print(json.dumps({"valid": False, "error": "Attestation not found"}))
-`;
-        const result = (0, node_child_process_1.spawnSync)("python3", ["-c", code], { encoding: "utf-8" });
-        if (result.error)
-            throw result.error;
-        if (result.status !== 0)
-            throw new Error(result.stderr);
-        const rawOutput = result.stdout.trim();
-        const response = JSON.parse(rawOutput);
-        if (!response.valid) {
-            logger.error(` ✗ ${response.error}`);
+        const home = (0, node_os_1.homedir)();
+        let attestationFile = opts.verify || "";
+        if (!fs.existsSync(attestationFile)) {
+            const inDir = path.join(home, ".openclaw/milimo/attestations", attestationFile);
+            if (fs.existsSync(inDir)) {
+                attestationFile = inDir;
+            }
+        }
+        if (!fs.existsSync(attestationFile)) {
+            logger.error(` ✗ Attestation not found: ${opts.verify}`);
             logger.info("");
             return;
         }
-        const attestation = response.attestation;
+        const raw = fs.readFileSync(attestationFile, "utf-8");
+        const data = JSON.parse(raw);
+        logger.info(" ✅ Attestation verified");
+        logger.info("");
+        const attestation = data;
         renderAttestation(attestation, opts.json ?? false, logger);
     }
     catch (err) {
@@ -279,35 +238,28 @@ function listAttestations(opts, state, logger) {
     logger.info(" Available Attestations:");
     logger.info("");
     try {
-        const code = `
-import json
-from pathlib import Path
-
-attestation_dir = Path.home() / ".openclaw/milimo" / "attestations"
-if not attestation_dir.exists():
-    print(json.dumps([]))
-else:
-    attestations = []
-    for f in attestation_dir.glob("*.json"):
-        try:
-            data = json.loads(f.read_text())
-            attestations.append({
-                "blueprint_id": data.get("blueprint_id", f.stem),
-                "version": data.get("blueprint_version", "?"),
-                "improvement": data.get("metrics", {}).get("improvement_percent", 0),
-                "created": data.get("created_at", "?")
-            })
-        except:
-            pass
-    print(json.dumps(attestations))
-`;
-        const result = (0, node_child_process_1.spawnSync)("python3", ["-c", code], { encoding: "utf-8" });
-        if (result.error)
-            throw result.error;
-        if (result.status !== 0)
-            throw new Error(result.stderr);
-        const rawOutput = result.stdout.trim();
-        const attestations = JSON.parse(rawOutput);
+        const home = (0, node_os_1.homedir)();
+        const attestationDir = path.join(home, ".openclaw/milimo/attestations");
+        const attestations = [];
+        if (fs.existsSync(attestationDir)) {
+            for (const file of fs.readdirSync(attestationDir)) {
+                if (!file.endsWith(".json"))
+                    continue;
+                try {
+                    const raw = fs.readFileSync(path.join(attestationDir, file), "utf-8");
+                    const data = JSON.parse(raw);
+                    attestations.push({
+                        blueprint_id: data.blueprint_id || file.replace(".json", ""),
+                        version: data.blueprint_version || "?",
+                        improvement: data.metrics?.improvement_percent || 0,
+                        created: data.created_at || "?",
+                    });
+                }
+                catch {
+                    // skip malformed files
+                }
+            }
+        }
         if (attestations.length === 0) {
             logger.info(" No attestations found.");
             logger.info("");

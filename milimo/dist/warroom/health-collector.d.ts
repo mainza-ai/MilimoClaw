@@ -22,7 +22,7 @@ export declare class HealthCollector {
     private intervalId;
     private running;
     constructor(options: HealthCollectorOptions);
-    collectAll(): ClawHealthMap;
+    collectAll(): Promise<ClawHealthMap>;
     startPolling(onUpdate: HealthUpdateHandler, onError?: HealthErrorHandler): () => void;
     stopPolling(): void;
     deriveStatus(health: ClawHealth): "active" | "idle" | "processing" | "error";
@@ -36,7 +36,7 @@ export declare class HealthCollector {
      *
      * Returns a structured summary or null if nemoclaw CLI is unavailable.
      */
-    collectNemoClawDiagnostics(): NemoClawDiagnostics | null;
+    collectNemoClawDiagnostics(): Promise<NemoClawDiagnostics | null>;
 }
 /** NemoClaw sandbox diagnostics from `nemoclaw doctor`. */
 export interface NemoClawDiagnostics {

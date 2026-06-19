@@ -107,12 +107,12 @@ export class EvolutionManager {
     }
   }
 
-  public showCrossClawFlows(): void {
+  public async showCrossClawFlows(): Promise<void> {
     console.log("\n--- CROSS-CLAW EVOLUTION FLOWS ---");
     console.log("Visualizing signal routing between claws based on mesh configurations.");
     console.log("");
 
-    const flowState = this.getMeshFlowState();
+    const flowState = await this.getMeshFlowState();
 
     if (!flowState || flowState.signals.length === 0) {
       console.log(" Signal data unavailable.");
@@ -142,9 +142,9 @@ export class EvolutionManager {
     console.log("----------------------------------\n");
   }
 
-  private getMeshFlowState(): MeshFlowState | null {
+  private async getMeshFlowState(): Promise<MeshFlowState | null> {
     try {
-      const response = callPythonBridgeSafe<MeshFlowState>(
+      const response = await callPythonBridgeSafe<MeshFlowState>(
         "mesh_flow_state",
         { squad: this.squadId },
         { blueprintDir: this.blueprintDir },
@@ -159,7 +159,7 @@ export class EvolutionManager {
     }
   }
 
-  public getMeshFlowData(): MeshFlowState | null {
+  public async getMeshFlowData(): Promise<MeshFlowState | null> {
     return this.getMeshFlowState();
   }
 }

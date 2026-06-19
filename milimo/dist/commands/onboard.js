@@ -52,6 +52,7 @@ const prompt_js_1 = require("../onboard/prompt.js");
 const validate_js_1 = require("../onboard/validate.js");
 const template_js_1 = require("../onboard/template.js");
 const assistant_js_1 = require("./assistant.js");
+const rpc_bridge_1 = require("../lib/rpc-bridge");
 function formatRoleDisplay(config) {
     if (config.clawRole === "solo") {
         const claws = config.activeClaws?.join(", ") ?? "all claws";
@@ -436,7 +437,6 @@ async function cliOnboard(opts) {
         logger.info("");
         logger.info("Creating per-claw NemoClaw sandboxes...");
         try {
-            const { execFileSync } = await import("child_process");
             const home = process.env.HOME ?? "/tmp";
             const candidates = [
                 path.join(home, ".openclaw/milimo", "blueprints", "0.1.0"),
@@ -448,14 +448,11 @@ async function cliOnboard(opts) {
             const soloInitPath = path.join(blueprintDir, "orchestrator", "solo_init.py");
             if (fs.existsSync(soloInitPath)) {
                 const roleArg = solo ? "solo" : clawRole;
-                execFileSync("python3", ["-m", "orchestrator.solo_init", "--role", roleArg, "--template", template], {
-                    cwd: blueprintDir,
-                    timeout: 120_000,
-                    stdio: ["pipe", "pipe", "pipe"],
-                    env: {
-                        ...process.env,
-                        PYTHONPATH: [blueprintDir, path.join(blueprintDir, "orchestrator")].join(process.platform === "win32" ? ";" : ":"),
-                    },
+                const rpc = (0, rpc_bridge_1.getRpcClient)();
+                await rpc.call("solo_init", {
+                    role: roleArg,
+                    template,
+                    blueprintDir,
                 });
                 logger.info(` ✓ Sandbox directories created for: ${activeClaws.join(", ")}`);
             }
@@ -488,19 +485,28 @@ async function cliOnboard(opts) {
     logger.info("");
     logger.info("Clearing old session history for fresh context...");
     try {
-        const { execSync } = await import("child_process");
         const home = process.env.HOME ?? "/tmp";
-        const sessionsDir = `${home}/.openclaw/agents/main/sessions`;
-        const memoryDir = `${home}/.openclaw/workspace/memory`;
-        const memoryFile = `${home}/.openclaw/workspace/MEMORY.md`;
-        // Clear session history
-        execSync(`rm -f "${sessionsDir}"/*.jsonl "${sessionsDir}"/sessions.json 2>/dev/null || true`);
-        // Clear daily/channel memory
-        execSync(`rm -rf "${memoryDir}"/daily "${memoryDir}"/channel 2>/dev/null || true`);
-        // Clear MEMORY.md
-        execSync(`rm -f "${memoryFile}" 2>/dev/null || true`);
-        // Remove bootstrap file so identity is configured
-        execSync(`rm -f "${home}/.openclaw/workspace/BOOTSTRAP.md" 2>/dev/null || true`);
+        const sessionsDir = path.join(home, ".openclaw/agents/main/sessions");
+        const memoryDir = path.join(home, ".openclaw/workspace/memory");
+        const memoryFile = path.join(home, ".openclaw/workspace/MEMORY.md");
+        const bootstrapFile = path.join(home, ".openclaw/workspace/BOOTSTRAP.md");
+        if (fs.existsSync(sessionsDir)) {
+            for (const file of fs.readdirSync(sessionsDir)) {
+                if (file.endsWith(".jsonl") || file === "sessions.json") {
+                    fs.rmSync(path.join(sessionsDir, file), { force: true });
+                }
+            }
+        }
+        const dailyDir = path.join(memoryDir, "daily");
+        const channelDir = path.join(memoryDir, "channel");
+        if (fs.existsSync(dailyDir))
+            fs.rmSync(dailyDir, { recursive: true, force: true });
+        if (fs.existsSync(channelDir))
+            fs.rmSync(channelDir, { recursive: true, force: true });
+        if (fs.existsSync(memoryFile))
+            fs.rmSync(memoryFile, { force: true });
+        if (fs.existsSync(bootstrapFile))
+            fs.rmSync(bootstrapFile, { force: true });
         logger.info(" ✓ Old sessions and memory cleared");
     }
     catch {

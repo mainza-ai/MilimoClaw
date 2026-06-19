@@ -4,9 +4,11 @@
 
 **Sources**:
 - `milimo-blueprint/orchestrator/bridge_cli.py`
+- `milimo-blueprint/orchestrator/bridge_server.py`
 - `milimo/src/lib/python-bridge.ts`
+- `milimo/src/lib/rpc-bridge.ts`
 
-**Last updated**: 2026-05-06
+**Last updated**: 2026-06-19
 
 **Tags**: #module #bridge #cli #typescript
 
@@ -16,30 +18,35 @@
 
 BridgeCLI provides a structured JSON interface for TypeScript to call Python functions. All output goes to stdout, debug logs to stderr.
 
-## Import Architecture
+## Communication Architecture
 
-All imports in `bridge_cli.py` use **absolute package imports**:
-
-```python
-from orchestrator.contracts import ClawMessage, ContractValidator, ValidationResult
-from orchestrator.mesh import MeshCoordinator
-from orchestrator.milimo_paths import milimo_mesh_dir
+```
+TypeScript Plugin
+  └── python-bridge.ts / bridge-tools.ts
+      └── rpc-bridge.ts (HTTP JSON-RPC client)
+          └── bridge_server.py (persistent server, port 19999)
+              └── bridge_cli.py (command handlers)
 ```
 
-This requires `PYTHONPATH` to include the blueprint root directory. The TypeScript bridge (`python-bridge.ts`) injects this automatically when spawning the process:
+The **persistent RPC server** (`bridge_server.py`) replaces the old per-call subprocess spawning. It runs continuously as a background process, eliminating process startup overhead and removing `child_process` from the plugin's security surface.
 
-```typescript
-env: { ...process.env, PYTHONPATH: options.blueprintDir }
-```
+### Server Lifecycle
 
-> **Historical note** (2026-05-06): Previous versions used a mix of bare `import milimo_paths` and relative `from .contracts import ...` imports. These failed with `ImportError` / `ModuleNotFoundError` when the script was executed directly (not as a package module). All 22 relative imports and 26 bare `milimo_paths.X` references were converted to absolute imports.
+- **Start**: Auto-started by `install.sh` via nohup + PID file
+- **Persistence**: Startup command added to `/sandbox/.bashrc` for sandbox restarts
+- **Health**: RPC server exposes `/health` endpoint on port 19999
+- **Management**: Can be managed via OpenClaw's `api.registerService()` when available
 
 ---
 
 ## Usage
 
 ```bash
+# Direct Python invocation (outside plugin)
 python3 bridge_cli.py --command evolution_status --args '{"claw": "build"}'
+
+# Via RPC server (normal path — server handles routing)
+# Handled automatically by rpc-bridge.ts in the plugin
 ```
 
 **Response format**:
@@ -125,21 +132,23 @@ python3 bridge_cli.py --command evolution_status --args '{"claw": "build"}'
 ### With TypeScript BridgeTools
 
 ```typescript
-// In bridge-tools.ts
 const response = await callPythonBridgeSafe("claw_status", {
   role: "build"
 });
+// Routes through RPC server automatically
 ```
 
-### With CLI Commands
+### With RPC Client (Direct)
 
 ```typescript
-// In milimo/src/commands/
-const result = await execFile("python3", [
-  "bridge_cli.py",
-  "--command", "evolution_status",
-  "--args", JSON.stringify({ claw: "build" })
-]);
+import { getRpcClient } from "../lib/rpc-bridge";
+
+const rpc = getRpcClient();
+const result = await rpc.call("bridge", {
+  command: "evolution_status",
+  args: { claw: "build" },
+  blueprintDir: "/sandbox/.openclaw/milimo/milimo-blueprint"
+});
 ```
 
 ---

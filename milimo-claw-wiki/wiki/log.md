@@ -12,6 +12,48 @@
 
 Each entry follows this format:
 
+---
+
+### 2026-06-19 — Complete child_process Removal + Persistent RPC Bridge
+
+**Pages**: `lib/lib-modules.md`, `lib/bridge-tools.md`, `modules/infrastructure/bridge-cli.md`, `development/conventions.md`, `milimo-claw-docs/ARCHITECTURE.md`, `milimo-claw-docs/CHANGELOG.md`
+
+**Source**: Security audit — OpenClaw 2026.5.27 blocks plugins using `child_process`
+
+**Changes**:
+- Removed ALL `child_process` invocations from the TypeScript plugin (17 files)
+- Created persistent Python RPC server (`bridge_server.py`) replacing per-call subprocess spawning
+- Created HTTP JSON-RPC client (`rpc-bridge.ts`) using native `fetch()`
+- Python operations now route through single daemon process on port 19999
+- Desktop notifications use pending-file fallback only (no `osascript`/`notify-send`)
+- Channel management uses user instructions instead of `nemoclaw` CLI delegation
+- Machine ID detection uses native `node:fs` + `node:os` instead of `system_profiler`/`wmic`
+- `install.sh` auto-starts RPC server and adds to `.bashrc` for persistence
+- Replaced `openclaw gateway restart` (corrupts config) with `pkill` so supervisor auto-restarts
+- Updated wiki docs to reflect RPC architecture
+- Updated `conventions.md` to prohibit `child_process` in TypeScript plugin code
+
+---
+
+### 2026-06-19 — Service Plugin Architecture + Provider-Agnostic Defaults
+
+**Pages**: `milimo-claw-docs/ARCHITECTURE.md`, `milimo-claw-docs/CHANGELOG.md`
+
+**Source**: Hardcoded service dependencies (GitHub, Vercel, Sentry, Stripe, NVIDIA) assumed all users wanted specific services.
+
+**Changes**:
+- Created service plugin architecture: 4 protocol interfaces + 4 stub implementations + service factory
+- Services activate by credential presence: set `GITHUB_TOKEN` to get GitHub, skip it to stub
+- Removed all NVIDIA-specific model fallbacks (`nvidia/nemotron-3-ultra-550b-a55b`) — `NEMOCLAW_MODEL` defaults to `None`, code paths handle gracefully
+- Centralized pricing defaults into `MILIMO_*` env vars (hourly rate, margin, floor/ceiling multipliers)
+- `claw_launcher.py` uses factory instead of inline `_Stub*` classes
+- Build claw: `github_client`, `sentry_client`, `vercel_client` all optional
+- Finance claw: `stripe_client` optional, local-only invoice fallback
+- `inference_client.py`, `build_init.py`, `lucy.py`, `tool_builder.py`, `failover_broker.py` — no NVIDIA defaults
+- `milimo-start.sh`, `Dockerfile`, `docker-compose.yml` — no hardcoded model defaults
+- Updated `ARCHITECTURE.md` with RPC communication diagram
+- Updated `CHANGELOG.md` with full refactoring entry
+
 ```
 ### YYYY-MM-DD HH:MM — Operation Type
 

@@ -24,10 +24,9 @@ exports.registerClawLauncherService = registerClawLauncherService;
  *           ├── start() → bridge_cli.py launch_claws
  *           └── stop()  → bridge_cli.py stop_claws
  */
-const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
-const channel_notifier_js_1 = require("./channel-notifier.js");
+const rpc_bridge_1 = require("../lib/rpc-bridge");
 // ---------------------------------------------------------------------------
 // Blueprint directory resolution
 // ---------------------------------------------------------------------------
@@ -53,7 +52,6 @@ function resolveBlueprintDir(pluginConfig) {
  * Create the claw launcher service definition for OpenClaw registration.
  */
 function createClawLauncherService(pluginConfig) {
-    let launcherProcess = null;
     let healthInterval = null;
     return {
         id: "milimo-claw-launcher",
@@ -65,53 +63,26 @@ function createClawLauncherService(pluginConfig) {
                     "Claws will need to be launched manually.");
                 return;
             }
-            logger.info("[milimo] Starting claw launcher service...");
-            // Launch the orchestrator with the "--all" flag
-            const pythonPath = (0, node_path_1.join)(blueprintDir, ".venv", "bin", "python3");
-            const pythonBin = (0, node_fs_1.existsSync)(pythonPath) ? pythonPath : "python3";
+            logger.info("[milimo] Starting claw launcher service via RPC...");
             try {
-                launcherProcess = (0, node_child_process_1.spawn)(pythonBin, [launcherScript, "--all"], {
-                    cwd: blueprintDir,
-                    env: {
-                        ...process.env,
-                        PYTHONPATH: [blueprintDir, (0, node_path_1.join)(blueprintDir, "orchestrator")].join(process.platform === "win32" ? ";" : ":"),
-                        MILIMO_SQUAD_ID: pluginConfig.squadName || "default",
-                        MILIMO_CLAW_ROLE: pluginConfig.clawRole || "solo",
-                    },
-                    stdio: ["pipe", "pipe", "pipe"],
-                    detached: false,
+                const rpc = (0, rpc_bridge_1.getRpcClient)();
+                rpc.call("start_launcher", {
+                    blueprintDir,
+                    squadId: pluginConfig.squadName || "default",
+                    clawRole: pluginConfig.clawRole || "solo",
+                }).catch((err) => {
+                    logger.warn(`[milimo] Claw launcher RPC start failed: ${err.message}`);
+                    logger.warn("[milimo] Ensure the Python RPC server is running (bridge_server.py)");
                 });
-                launcherProcess.stdout?.on("data", (data) => {
-                    const msg = data.toString().trim();
-                    if (msg)
-                        logger.debug(`[milimo-launcher] ${msg}`);
-                });
-                launcherProcess.stderr?.on("data", (data) => {
-                    const msg = data.toString().trim();
-                    // Filter harmless NemoClaw sandbox permission noise
-                    if (msg && !msg.includes("oom_score_adj")) {
-                        logger.warn(`[milimo-launcher] ${msg}`);
+                // Periodic health check — verifies RPC server is reachable
+                healthInterval = setInterval(async () => {
+                    try {
+                        const rpc = (0, rpc_bridge_1.getRpcClient)();
+                        await rpc.call("ping", {});
                     }
-                });
-                launcherProcess.on("exit", (code, signal) => {
-                    logger.info(`[milimo] Claw launcher process exited (code=${code}, signal=${signal}).`);
-                    launcherProcess = null;
-                    // Notify via channels if unexpected exit
-                    if (code !== 0 && code !== null) {
-                        const notifier = new channel_notifier_js_1.ChannelNotifier(logger, (0, channel_notifier_js_1.loadNotificationConfig)());
-                        notifier.sendAlert("critical", `Claw launcher exited unexpectedly (code=${code}). Claws may be offline.`);
-                    }
-                });
-                launcherProcess.on("error", (err) => {
-                    logger.error(`[milimo] Claw launcher failed to start: ${err.message}`);
-                    launcherProcess = null;
-                });
-                logger.info("[milimo] Claw launcher service started.");
-                // Start periodic health check
-                healthInterval = setInterval(() => {
-                    if (!launcherProcess || launcherProcess.exitCode !== null) {
-                        logger.warn("[milimo] Claw launcher process is not running. " +
-                            "Restart via: openclaw milimo squad status");
+                    catch {
+                        logger.warn("[milimo] Python RPC server not reachable. " +
+                            "Claw launcher may not be running.");
                     }
                 }, 60_000);
             }
@@ -121,37 +92,18 @@ function createClawLauncherService(pluginConfig) {
         },
         stop: async ({ logger }) => {
             logger.info("[milimo] Stopping claw launcher service...");
-            // Clear health check interval
             if (healthInterval) {
                 clearInterval(healthInterval);
                 healthInterval = null;
             }
-            // Gracefully terminate the launcher process
-            if (launcherProcess && launcherProcess.exitCode === null) {
-                try {
-                    // Send SIGTERM for graceful shutdown
-                    launcherProcess.kill("SIGTERM");
-                    // Wait up to 10 seconds for graceful exit
-                    await new Promise((resolve) => {
-                        const timeout = setTimeout(() => {
-                            if (launcherProcess && launcherProcess.exitCode === null) {
-                                logger.warn("[milimo] Claw launcher did not exit gracefully, sending SIGKILL.");
-                                launcherProcess.kill("SIGKILL");
-                            }
-                            resolve();
-                        }, 10_000);
-                        launcherProcess.on("exit", () => {
-                            clearTimeout(timeout);
-                            resolve();
-                        });
-                    });
-                }
-                catch (err) {
-                    logger.warn(`[milimo] Error stopping claw launcher: ${err instanceof Error ? err.message : String(err)}`);
-                }
+            try {
+                const rpc = (0, rpc_bridge_1.getRpcClient)();
+                await rpc.call("stop_launcher", {});
+                logger.info("[milimo] Claw launcher service stopped.");
             }
-            launcherProcess = null;
-            logger.info("[milimo] Claw launcher service stopped.");
+            catch (err) {
+                logger.warn(`[milimo] Error stopping claw launcher: ${err instanceof Error ? err.message : String(err)}`);
+            }
         },
     };
 }

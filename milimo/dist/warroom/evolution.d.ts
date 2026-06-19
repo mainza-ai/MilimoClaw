@@ -16,9 +16,9 @@ export declare class EvolutionManager {
     constructor(squadId: string, blueprintDir?: string);
     showEvolutionLog(): void;
     toggleTool(role: string, toolName: string, enable: boolean): void;
-    showCrossClawFlows(): void;
+    showCrossClawFlows(): Promise<void>;
     private getMeshFlowState;
-    getMeshFlowData(): MeshFlowState | null;
+    getMeshFlowData(): Promise<MeshFlowState | null>;
 }
 export {};
 //# sourceMappingURL=evolution.d.ts.map

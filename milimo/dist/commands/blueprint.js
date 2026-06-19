@@ -50,25 +50,15 @@ exports.cliBlueprintInfo = cliBlueprintInfo;
  */
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
-const node_child_process_1 = require("node:child_process");
 const init_js_1 = require("./init.js");
+const python_bridge_1 = require("../lib/python-bridge");
 /**
- * Helper to call Python logic safely using spawnSync.
+ * Helper to call Python logic via RPC bridge.
  */
-function callPython(blueprintDir, code) {
+async function callPython(blueprintDir, code) {
     const safeCode = `import sys; sys.path.insert(0, ${JSON.stringify(blueprintDir)}); ${code}`;
-    const result = (0, node_child_process_1.spawnSync)("python3", ["-c", safeCode], {
-        cwd: blueprintDir,
-        encoding: "utf-8",
-        timeout: 30000,
-    });
-    if (result.error) {
-        throw result.error;
-    }
-    if (result.status !== 0) {
-        throw new Error(`Python command failed: ${result.stderr}`);
-    }
-    return result.stdout.trim();
+    const result = await (0, python_bridge_1.callPython)(blueprintDir, safeCode);
+    return result;
 }
 function discoverBlueprints(blueprintDir) {
     const blueprints = [];
@@ -105,7 +95,7 @@ function discoverBlueprints(blueprintDir) {
     return blueprints;
 }
 // ── Blueprint List ────────────────────────────────────────────────────
-function cliBlueprintList(opts) {
+async function cliBlueprintList(opts) {
     const { logger, pluginConfig } = opts;
     const blueprintDir = pluginConfig.blueprintDir;
     const blueprints = discoverBlueprints(blueprintDir);
@@ -115,7 +105,7 @@ function cliBlueprintList(opts) {
     if (state) {
         try {
             const code = `from orchestrator.blueprint_manager import BlueprintManager; from orchestrator.tool_registry import ToolRegistry; reg = ToolRegistry('${state.squadName}', '${state.clawRole}'); mgr = BlueprintManager('${state.squadName}', '${state.clawRole}', '${blueprintDir}', tool_registry=reg); import json; print(json.dumps({'version': mgr.current_version(), 'tools': reg.get_inventory()}))`;
-            const result = callPython(blueprintDir, code);
+            const result = await callPython(blueprintDir, code);
             const output = JSON.parse(result);
             currentVersion = output.version;
             activeInventory = output.tools;
@@ -173,7 +163,7 @@ function cliBlueprintList(opts) {
     return Promise.resolve();
 }
 // ── Blueprint Fork ────────────────────────────────────────────────────
-function cliBlueprintFork(opts) {
+async function cliBlueprintFork(opts) {
     const { logger, pluginConfig } = opts;
     const state = (0, init_js_1.loadMilimoState)();
     const blueprintDir = pluginConfig.blueprintDir;
@@ -188,7 +178,7 @@ function cliBlueprintFork(opts) {
     logger.info("");
     try {
         const code = `from orchestrator.marketplace_manager import MarketplaceManager; mgr = MarketplaceManager(); snapshot = mgr.download('${opts.source}'); import json; print(json.dumps(snapshot.to_dict()) if snapshot else 'None')`;
-        const result = callPython(blueprintDir, code);
+        const result = await callPython(blueprintDir, code);
         if (result === "None") {
             logger.error(` ✗ Blueprint ${opts.source} not found in marketplace.`);
             return Promise.resolve();
@@ -208,7 +198,7 @@ function cliBlueprintFork(opts) {
     return Promise.resolve();
 }
 // ── Blueprint Diff ────────────────────────────────────────────────────
-function cliBlueprintDiff(opts) {
+async function cliBlueprintDiff(opts) {
     const { logger, pluginConfig } = opts;
     const state = (0, init_js_1.loadMilimoState)();
     const blueprintDir = pluginConfig.blueprintDir;
@@ -225,7 +215,7 @@ function cliBlueprintDiff(opts) {
     logger.info("");
     try {
         const code = `from orchestrator.blueprint_manager import BlueprintManager; mgr = BlueprintManager('${state.squadName}', '${state.clawRole}', '${blueprintDir}'); diff = mgr.diff('${opts.versionA}', '${opts.versionB}'); import json; print(json.dumps({'tools_added': diff.tools_added, 'tools_removed': diff.tools_removed, 'tools_modified': diff.tools_modified, 'policy_changes': diff.policy_changes, 'config_changes': diff.config_changes}))`;
-        const result = callPython(blueprintDir, code);
+        const result = await callPython(blueprintDir, code);
         const diff = JSON.parse(result);
         if (diff.tools_added.length > 0) {
             logger.info("  Tools Added:");
@@ -270,7 +260,7 @@ function cliBlueprintDiff(opts) {
     return Promise.resolve();
 }
 // ── Blueprint Publish ─────────────────────────────────────────────────
-function cliBlueprintPublish(opts) {
+async function cliBlueprintPublish(opts) {
     const { logger, pluginConfig } = opts;
     const state = (0, init_js_1.loadMilimoState)();
     const blueprintDir = pluginConfig.blueprintDir;
@@ -290,7 +280,7 @@ function cliBlueprintPublish(opts) {
     logger.info("");
     try {
         const code = `from orchestrator.blueprint_manager import BlueprintManager; from orchestrator.marketplace_manager import MarketplaceManager; mgr = BlueprintManager('${state.squadName}', '${state.clawRole}', '${blueprintDir}'); market = MarketplaceManager(); snapshot = mgr.export(); id = market.publish(snapshot, '${opts.price}', '${displayName}', '${state.squadName}'); print(id)`;
-        const result = callPython(blueprintDir, code);
+        const result = await callPython(blueprintDir, code);
         logger.info(`  ✓ Published to marketplace with ID: ${result}`);
     }
     catch (err) {
@@ -300,7 +290,7 @@ function cliBlueprintPublish(opts) {
     return Promise.resolve();
 }
 // ── Blueprint Rollback ────────────────────────────────────────────────
-function cliBlueprintRollback(opts) {
+async function cliBlueprintRollback(opts) {
     const { logger, pluginConfig } = opts;
     const state = (0, init_js_1.loadMilimoState)();
     const blueprintDir = pluginConfig.blueprintDir;
@@ -320,7 +310,7 @@ function cliBlueprintRollback(opts) {
     logger.info("");
     try {
         const code = `from orchestrator.blueprint_manager import BlueprintManager; mgr = BlueprintManager('${state.squadName}', '${state.clawRole}', '${blueprintDir}'); print(mgr.rollback('${opts.to}', '${opts.reason || ""}'))`;
-        const result = callPython(blueprintDir, code);
+        const result = await callPython(blueprintDir, code);
         if (result === "True") {
             // Sync local state
             state.blueprintVersion = opts.to;
@@ -338,7 +328,7 @@ function cliBlueprintRollback(opts) {
     return Promise.resolve();
 }
 // ── Blueprint Search ─────────────────────────────────────────────────
-function cliBlueprintSearch(opts) {
+async function cliBlueprintSearch(opts) {
     const { logger, pluginConfig } = opts;
     const blueprintDir = pluginConfig.blueprintDir;
     logger.info("");
@@ -350,7 +340,7 @@ function cliBlueprintSearch(opts) {
     logger.info("");
     try {
         const code = `from orchestrator.marketplace_manager import MarketplaceManager; mgr = MarketplaceManager(); results = mgr.search('${opts.query || ""}', '${opts.category || ""}'); import json; print(json.dumps(results))`;
-        const result = callPython(blueprintDir, code);
+        const result = await callPython(blueprintDir, code);
         const listings = JSON.parse(result);
         if (listings.length === 0) {
             logger.info("  No blueprints found matching your criteria.");
@@ -371,7 +361,7 @@ function cliBlueprintSearch(opts) {
     return Promise.resolve();
 }
 // ── Blueprint Merge ──────────────────────────────────────────────────
-function cliBlueprintMerge(opts) {
+async function cliBlueprintMerge(opts) {
     const { logger, pluginConfig } = opts;
     const state = (0, init_js_1.loadMilimoState)();
     const blueprintDir = pluginConfig.blueprintDir;
@@ -384,7 +374,7 @@ function cliBlueprintMerge(opts) {
     logger.info("");
     try {
         const code = `from orchestrator.blueprint_manager import BlueprintManager; from orchestrator.blueprint_merger import BlueprintMerger; from orchestrator.marketplace_manager import MarketplaceManager; mgr = BlueprintManager('${state.squadName}', '${state.clawRole}', '${blueprintDir}'); market = MarketplaceManager(); base = mgr._load_snapshot(mgr.current_version()); incoming_snap = market.download('${opts.incoming}') or mgr._load_snapshot('${opts.incoming}'); merged = BlueprintMerger.merge(base, incoming_snap); mgr.bump_version('merged with ${opts.incoming}'); import json; snapshot_file = mgr._versions_dir / f'v{mgr.current_version()}.json'; merged.meta.version = mgr.current_version(); with snapshot_file.open("w") as f: json.dump(merged.to_dict(), f, indent=2, default=str); print(mgr.current_version())`;
-        const result = callPython(blueprintDir, code);
+        const result = await callPython(blueprintDir, code);
         logger.info(`  ✓ Successfully merged. New version: v${result}`);
     }
     catch (err) {
@@ -394,7 +384,7 @@ function cliBlueprintMerge(opts) {
     return Promise.resolve();
 }
 // ── Blueprint Info ───────────────────────────────────────────────────
-function cliBlueprintInfo(opts) {
+async function cliBlueprintInfo(opts) {
     const { logger, pluginConfig } = opts;
     const blueprintDir = pluginConfig.blueprintDir;
     logger.info("");
@@ -402,7 +392,7 @@ function cliBlueprintInfo(opts) {
     logger.info("");
     try {
         const code = `from orchestrator.marketplace_manager import MarketplaceManager; mgr = MarketplaceManager(); info = mgr.get_listing('${opts.blueprintId}'); import json; print(json.dumps(info) if info else 'None')`;
-        const result = callPython(blueprintDir, code);
+        const result = await callPython(blueprintDir, code);
         if (result === "None") {
             logger.error(` ✗ Blueprint ${opts.blueprintId} not found.`);
             return Promise.resolve();

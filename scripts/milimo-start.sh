@@ -32,7 +32,9 @@ if os.path.exists(config_path):
 
 existing_model = cfg.get('agents', {}).get('defaults', {}).get('model', {}).get('primary')
 if not existing_model:
-    cfg.setdefault('agents', {}).setdefault('defaults', {}).setdefault('model', {})['primary'] = os.environ.get('NEMOCLAW_MODEL', 'nvidia/nemotron-3-super-120b-a12b')
+    env_model = os.environ.get('NEMOCLAW_MODEL')
+    if env_model:
+        cfg.setdefault('agents', {}).setdefault('defaults', {}).setdefault('model', {})['primary'] = f'inference/{env_model}'
 
 chat_ui_url = os.environ.get('CHAT_UI_URL', 'http://127.0.0.1:18789')
 parsed = urlparse(chat_ui_url)
@@ -182,9 +184,7 @@ if [ -f "$LAUNCHER_PID_FILE" ]; then
 fi
 
 openclaw doctor --fix >/dev/null 2>&1 || true
-if [ -z "${NEMOCLAW_MODEL:-}" ]; then
-  openclaw models set "nvidia/nemotron-3-super-120b-a12b" >/dev/null 2>&1 || true
-else
+if [ -n "${NEMOCLAW_MODEL:-}" ]; then
   openclaw models set "${NEMOCLAW_MODEL}" >/dev/null 2>&1 || true
 fi
 write_auth_profile

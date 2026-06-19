@@ -462,6 +462,13 @@ RUN mkdir -p /sandbox/.openclaw/milimo/blueprints \
     && rm -rf /sandbox/.milimo 2>/dev/null || true \
     && ln -sfn /sandbox/.openclaw/milimo /sandbox/.milimo
 
+# Create startup script for Python RPC server
+RUN mkdir -p /sandbox/.openclaw/milimo/bin && \
+    printf '#!/bin/bash\nnohup python3 -m orchestrator.bridge_server --port ${MILIMO_RPC_PORT:-19999} > /sandbox/.openclaw/milimo/rpc-server.log 2>&1 &\n' > /sandbox/.openclaw/milimo/bin/start-rpc-server.sh && \
+    chmod +x /sandbox/.openclaw/milimo/bin/start-rpc-server.sh && \
+    /sandbox/.openclaw/milimo/bin/start-rpc-server.sh && \
+    echo "RPC server startup script created and started"
+
 WORKDIR /opt/nemoclaw
 DOCKERFILE_EOF
 
@@ -585,11 +592,31 @@ deploy_to_sandbox() {
   if [ -n "$inferred_model" ]; then
     info "Detected model from nemoclaw list: $inferred_model"
     sandbox_exec_root "$gateway" '
+	# Set NEMOCLAW_MODEL env var for runtime fallback
 	if ! grep -q "NEMOCLAW_MODEL=" /etc/environment 2>/dev/null; then
 		echo "NEMOCLAW_MODEL='"'$inferred_model'"'" >> /etc/environment
 		echo "NEMOCLAW_MODEL injected into /etc/environment"
 	else
 		echo "NEMOCLAW_MODEL already present in /etc/environment — preserving"
+	fi
+
+	# Update the OpenClaw agent config so TUI uses the correct model
+	# openclaw.json stores the agent-facing model under agents.defaults.model.primary
+	# with an "inference/" prefix (e.g. "inference/nvidia/nemotron-3-ultra-550b-a55b")
+	OPENCLAW_JSON="/sandbox/.openclaw/openclaw.json"
+	if [ -f "$OPENCLAW_JSON" ]; then
+		PREFIXED_MODEL="inference/'"$inferred_model"'"
+		python3 -c "
+import json
+cfg = json.load(open('"'"'$OPENCLAW_JSON'"'"'))
+old = cfg.get('"'"'agents'"'"', {}).get('"'"'defaults'"'"', {}).get('"'"'model'"'"', {}).get('"'"'primary'"'"', '""'")
+if old != "'"'"$PREFIXED_MODEL"'"'":
+    cfg.setdefault('"'"'agents'"'"', {}).setdefault('"'"'defaults'"'"', {})['"'"'model'"'"'] = {'"'"'primary'"'"': '"'"'$PREFIXED_MODEL'"'"'}
+    json.dump(cfg, open('"'"'$OPENCLAW_JSON'"'"', '"'"'w'"'"'), indent=2)
+    print(f'Updated agent model: {old} → '"'$PREFIXED_MODEL'")
+else:
+    print(f'Agent model already correct: {old}')
+"
 	fi
 	'
   else
@@ -1085,21 +1112,10 @@ rm -f /tmp/fix_channel_config.py
   # ---- Step 10: Restart gateway with health check ----
   log_step "Restarting OpenClaw gateway"
 
-  # Try graceful gateway restart first; fall back to pkill
-  local restart_output
-  restart_output=$(sandbox_exec "$gateway" '
-    openclaw gateway restart 2>&1 && echo "RESTART_OK" || echo "RESTART_FAILED"
-  ' 2>/dev/null || echo "RESTART_CMD_FAILED")
-
-  if echo "$restart_output" | grep -q "RESTART_OK"; then
-    info "Gateway restart command accepted"
-  elif echo "$restart_output" | grep -q "RESTART_FAILED"; then
-    warn "Gateway restart command returned non-zero — sending pkill signal"
-    sandbox_exec "$gateway" 'pkill -f "openclaw.*gateway" 2>/dev/null || pkill openclaw 2>/dev/null || true; echo "pkill sent"'
-  else
-    info "Gateway restart command unavailable — sending pkill signal"
-    sandbox_exec "$gateway" 'pkill -f "openclaw.*gateway" 2>/dev/null || pkill openclaw 2>/dev/null || true; echo "pkill sent"'
-  fi
+  # Use pkill to restart gateway — "openclaw gateway restart" corrupts the
+  # gateway config on OpenClaw 2026.5.27+ by stripping gateway.mode.
+  # The sandbox supervisor will auto-restart the gateway process.
+  sandbox_exec "$gateway" 'pkill -f "openclaw.*gateway" 2>/dev/null || pkill openclaw 2>/dev/null || true; echo "pkill sent"'
 
   # Wait for gateway to come back up with a health check loop (max 30s)
   info "Waiting for gateway to be ready (max 30s)..."
@@ -1121,6 +1137,66 @@ rm -f /tmp/fix_channel_config.py
   else
     warn "Gateway may still be starting — some plugins may not be active yet"
     warn "Check status with: openclaw doctor"
+  fi
+
+  # ---- Step 11: Start Python RPC server (bridge_server.py) ----
+  log_step "Starting Python RPC server"
+
+  sandbox_exec "$gateway" '
+    RPC_PORT="${MILIMO_RPC_PORT:-19999}"
+    PID_FILE="/sandbox/.openclaw/milimo/rpc-server.pid"
+    mkdir -p "$(dirname "$PID_FILE")" 2>/dev/null
+
+    # Check if already running
+    if [ -f "$PID_FILE" ]; then
+      OLD_PID=$(cat "$PID_FILE" 2>/dev/null)
+      if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+        echo "RPC server already running (PID $OLD_PID)"
+        exit 0
+      fi
+      rm -f "$PID_FILE"
+    fi
+
+    # Start RPC server in background
+    BLUEPRINT_DIR="/sandbox/.openclaw/milimo/milimo-blueprint"
+    if [ ! -d "$BLUEPRINT_DIR" ]; then
+      BLUEPRINT_DIR="/sandbox/.milimo/milimo-blueprint"
+    fi
+
+    nohup python3 -m orchestrator.bridge_server --port "$RPC_PORT" \
+      > /sandbox/.openclaw/milimo/rpc-server.log 2>&1 &
+
+    RPC_PID=$!
+    echo "$RPC_PID" > "$PID_FILE"
+
+    # Wait for server to be ready
+    for i in $(seq 1 10); do
+      if curl -sf http://127.0.0.1:"$RPC_PORT"/health >/dev/null 2>&1; then
+        echo "RPC server ready (PID $RPC_PID)"
+        exit 0
+      fi
+      sleep 1
+    done
+    echo "WARNING: RPC server may not be ready yet (PID $RPC_PID)"
+  '
+
+  # Add RPC server startup to .bashrc so it survives sandbox restart
+  sandbox_exec_root "$gateway" '
+    STARTUP_LINE="nohup python3 -m orchestrator.bridge_server --port ${MILIMO_RPC_PORT:-19999} > /sandbox/.openclaw/milimo/rpc-server.log 2>&1 &"
+    if ! grep -q "orchestrator.bridge_server" /sandbox/.bashrc 2>/dev/null; then
+      echo "$STARTUP_LINE" >> /sandbox/.bashrc
+      echo "RPC server startup added to .bashrc"
+    else
+      echo "RPC server startup already in .bashrc"
+    fi
+  '
+
+  # Verify RPC server is responsive
+  if sandbox_exec "$gateway" 'curl -sf http://127.0.0.1:'"${MILIMO_RPC_PORT:-19999}"'/health >/dev/null 2>&1'; then
+    ok "Python RPC server running on port ${MILIMO_RPC_PORT:-19999}"
+  else
+    warn "Python RPC server may not be running — check logs: /sandbox/.openclaw/milimo/rpc-server.log"
+    warn "Start manually: python3 -m orchestrator.bridge_server --port ${MILIMO_RPC_PORT:-19999}"
   fi
 }
 

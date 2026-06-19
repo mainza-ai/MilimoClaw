@@ -26,7 +26,6 @@ exports.loadNotificationConfig = loadNotificationConfig;
  *   notifier.sendHoldAlert(message);   // Finance HOLD escalation
  *   notifier.sendAlert(level, text);   // General alert
  */
-const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 const DEFAULT_CONFIG = {
@@ -65,25 +64,11 @@ function detectActiveChannels() {
     return channels;
 }
 /**
- * Check if NemoClaw channels are running via `nemoclaw <name> channels list`.
- * Falls back to env var detection if the CLI is unavailable.
+ * Check channel status using environment variable detection.
+ * NemoClaw injects TELEGRAM_BOT_TOKEN, DISCORD_BOT_TOKEN, etc.
+ * into the sandbox environment when channels are configured.
  */
 function probeChannelStatus() {
-    try {
-        const output = (0, node_child_process_1.execFileSync)("nemoclaw", ["list"], {
-            encoding: "utf-8",
-            timeout: 3000,
-            stdio: ["pipe", "pipe", "pipe"],
-        });
-        // If nemoclaw is available, use env detection (channels are active
-        // when their token env vars are set in the sandbox).
-        if (output) {
-            return detectActiveChannels();
-        }
-    }
-    catch {
-        // nemoclaw CLI not available — fall back to env detection
-    }
     return detectActiveChannels();
 }
 // ---------------------------------------------------------------------------

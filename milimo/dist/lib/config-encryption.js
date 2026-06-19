@@ -23,7 +23,6 @@ exports.decryptConfig = decryptConfig;
  */
 const node_crypto_1 = require("node:crypto");
 const node_fs_1 = require("node:fs");
-const node_child_process_1 = require("node:child_process");
 const node_os_1 = require("node:os");
 const ALGORITHM = "aes-256-gcm";
 const KEY_LENGTH = 32;
@@ -41,33 +40,29 @@ function getMachineId() {
         if ((0, node_fs_1.existsSync)(machineIdPath)) {
             return (0, node_fs_1.readFileSync)(machineIdPath, "utf-8").trim();
         }
+        const dbusPath = "/var/lib/dbus/machine-id";
+        if ((0, node_fs_1.existsSync)(dbusPath)) {
+            return (0, node_fs_1.readFileSync)(dbusPath, "utf-8").trim();
+        }
     }
     if (currentPlatform === "darwin") {
-        const result = (0, node_child_process_1.spawnSync)("system_profiler", ["SPHardwareDataType"], {
-            encoding: "utf-8",
-            timeout: 5000,
-        });
-        if (result.status === 0) {
-            const match = result.stdout.match(/Hardware UUID:\s*([A-Fa-f0-9-]+)/);
-            if (match?.[1]) {
-                return match[1];
+        const dbusPath = "/var/lib/dbus/machine-id";
+        if ((0, node_fs_1.existsSync)(dbusPath)) {
+            return (0, node_fs_1.readFileSync)(dbusPath, "utf-8").trim();
+        }
+        try {
+            const ioPlatfromBytes = (0, node_fs_1.readFileSync)("/System/Library/CoreServices/SystemVersion.plist", "utf-8");
+            const uuidMatch = ioPlatfromBytes.match(/IOPlatformUUID[^<]*<string>([^<]+)<\/string>/);
+            if (uuidMatch?.[1]) {
+                return uuidMatch[1];
             }
         }
-    }
-    if (currentPlatform === "win32") {
-        const result = (0, node_child_process_1.spawnSync)("wmic", ["csproduct", "get", "UUID"], {
-            encoding: "utf-8",
-            timeout: 5000,
-        });
-        if (result.status === 0) {
-            const lines = result.stdout.split("\n").filter((l) => l.trim());
-            if (lines.length > 1) {
-                return lines[1].trim();
-            }
+        catch {
+            // fall through
         }
     }
-    const fallback = process.env.USER ?? process.env.USERNAME ?? "default";
-    return (0, node_crypto_1.createHash)("sha256").update(`milimo-${fallback}`).digest("hex");
+    const fallback = process.env.USER ?? process.env.USERNAME ?? (0, node_os_1.hostname)() ?? "default";
+    return (0, node_crypto_1.createHash)("sha256").update(`milimo-${(0, node_os_1.hostname)()}-${fallback}`).digest("hex");
 }
 /**
  * Derive an encryption key from machine ID.

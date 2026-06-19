@@ -10,9 +10,9 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { spawnSync } from "node:child_process";
 import type { PluginLogger, MilimoConfig } from "../index.js";
 import { loadMilimoState } from "./init.js";
+import { callPython as callPythonRpc } from "../lib/python-bridge";
 
 // ---------------------------------------------------------------------------
 
@@ -53,17 +53,15 @@ interface ChainResult {
 
 // ---------------------------------------------------------------------------
 
-function callPythonVerify(blueprintDir: string, code: string): string {
+async function callPythonVerify(blueprintDir: string, code: string): Promise<string> {
   const safeCode = `import sys; sys.path.insert(0, ${JSON.stringify(blueprintDir)}); ${code}`;
-  const result = spawnSync("python3", ["-c", safeCode], { cwd: blueprintDir, encoding: "utf-8" });
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(result.stderr);
-  return result.stdout.trim();
+  const result = await callPythonRpc(blueprintDir, safeCode);
+  return result;
 }
 
 // ---------------------------------------------------------------------------
 
-export function cliVerify(opts: VerifyOptions): Promise<void> {
+export async function cliVerify(opts: VerifyOptions): Promise<void> {
   const { logger, pluginConfig } = opts;
   const state = loadMilimoState();
   const blueprintDir = pluginConfig.blueprintDir;
@@ -122,7 +120,7 @@ else:
     print(json.dumps(result_dict))
 `;
 
-    const result = callPythonVerify(blueprintDir, code);
+    const result = await callPythonVerify(blueprintDir, code);
     const verifyResult = JSON.parse(result) as VerificationResult & {
       content_valid: boolean;
       content_expected_hash: string;
@@ -144,7 +142,7 @@ else:
 
 // ---------------------------------------------------------------------------
 
-function verifyChain(
+async function verifyChain(
   opts: VerifyOptions,
   blueprintDir: string,
   blueprintId: string,
@@ -182,7 +180,7 @@ else:
     print(json.dumps(result.to_dict()))
 `;
 
-    const result = callPythonVerify(blueprintDir, code);
+    const result = await callPythonVerify(blueprintDir, code);
     const chainResult = JSON.parse(result) as ChainResult;
 
     if (opts.json) {
@@ -308,7 +306,7 @@ interface KeygenOptions {
   pluginConfig: MilimoConfig;
 }
 
-export function cliProvenanceKeygen(opts: KeygenOptions): Promise<void> {
+export async function cliProvenanceKeygen(opts: KeygenOptions): Promise<void> {
   const { logger } = opts;
 
   logger.info("");
@@ -349,13 +347,7 @@ print(json.dumps({
 `;
 
     const safeCode = `import sys; sys.path.insert(0, ${JSON.stringify(opts.pluginConfig.blueprintDir)}); ${code}`;
-    const result = spawnSync("python3", ["-c", safeCode], {
-      cwd: opts.pluginConfig.blueprintDir,
-      encoding: "utf-8",
-    });
-    if (result.error) throw result.error;
-    if (result.status !== 0) throw new Error(result.stderr);
-    const keygenResult = result.stdout.trim();
+    const keygenResult = await callPythonRpc(opts.pluginConfig.blueprintDir, safeCode);
 
     const keyInfo = JSON.parse(keygenResult) as {
       success: boolean;

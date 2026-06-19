@@ -41,7 +41,7 @@ services:
       - NVIDIA_API_KEY=${NVIDIA_API_KEY}
       - BUILD_CLAW_NVIDIA_API_KEY=${BUILD_CLAW_NVIDIA_API_KEY:-}
       - NVIDIA_API_BASE=${NVIDIA_API_BASE:-https://integrate.api.nvidia.com/v1}
-      - NEMOCLAW_MODEL=${NEMOCLAW_MODEL:-nvidia/nemotron-3-super-120b-a12b}
+      - NEMOCLAW_MODEL=${NEMOCLAW_MODEL:-}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - GH_TOKEN=${GITHUB_TOKEN}
       - GITHUB_REPO=${GITHUB_REPO}
@@ -83,7 +83,7 @@ services:
     environment:
       - NVIDIA_API_KEY=${NVIDIA_API_KEY}
       - NVIDIA_API_BASE=${NVIDIA_API_BASE:-https://integrate.api.nvidia.com/v1}
-      - NEMOCLAW_MODEL=${NEMOCLAW_MODEL:-nvidia/nemotron-3-super-120b-a12b}
+      - NEMOCLAW_MODEL=${NEMOCLAW_MODEL:-}
       - SQUAD_ID=${SQUAD_ID:-zulu}
       - PYTHONUNBUFFERED=1
     volumes:
@@ -116,7 +116,7 @@ services:
     environment:
       - NVIDIA_API_KEY=${NVIDIA_API_KEY}
       - NVIDIA_API_BASE=${NVIDIA_API_BASE:-https://integrate.api.nvidia.com/v1}
-      - NEMOCLAW_MODEL=${NEMOCLAW_MODEL:-nvidia/nemotron-3-super-120b-a12b}
+      - NEMOCLAW_MODEL=${NEMOCLAW_MODEL:-}
       - SQUAD_ID=${SQUAD_ID:-zulu}
       - PYTHONUNBUFFERED=1
     volumes:
@@ -151,7 +151,7 @@ services:
     environment:
       - NVIDIA_API_KEY=${NVIDIA_API_KEY}
       - NVIDIA_API_BASE=${NVIDIA_API_BASE:-https://integrate.api.nvidia.com/v1}
-      - NEMOCLAW_MODEL=${NEMOCLAW_MODEL:-nvidia/nemotron-3-super-120b-a12b}
+      - NEMOCLAW_MODEL=${NEMOCLAW_MODEL:-}
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
       - YOUTUBE_CHANNEL_ID=${YOUTUBE_CHANNEL_ID}
       - GA_PROPERTY_ID=${GA_PROPERTY_ID}
@@ -188,7 +188,7 @@ services:
     environment:
       - NVIDIA_API_KEY=${NVIDIA_API_KEY}
       - NVIDIA_API_BASE=${NVIDIA_API_BASE:-https://integrate.api.nvidia.com/v1}
-      - NEMOCLAW_MODEL=${NEMOCLAW_MODEL:-nvidia/nemotron-3-super-120b-a12b}
+      - NEMOCLAW_MODEL=${NEMOCLAW_MODEL:-}
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
       - STRIPE_CURRENCY=${STRIPE_CURRENCY:-usd}
@@ -224,7 +224,7 @@ services:
     environment:
       - NVIDIA_API_KEY=${NVIDIA_API_KEY}
       - NVIDIA_API_BASE=${NVIDIA_API_BASE:-https://integrate.api.nvidia.com/v1}
-      - NEMOCLAW_MODEL=${NEMOCLAW_MODEL:-nvidia/nemotron-3-super-120b-a12b}
+      - NEMOCLAW_MODEL=${NEMOCLAW_MODEL:-}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_ID=${TELEGRAM_ID}
       - SQUAD_ID=${SQUAD_ID:-zulu}

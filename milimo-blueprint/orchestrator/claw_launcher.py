@@ -1013,11 +1013,15 @@ class ClawLauncher:
         return status
 
     def _start_build_claw(self) -> tuple:
-        """Start the Build claw with real clients when available."""
+        """Start the Build claw with factory-created clients."""
         from orchestrator.build.build_claw import BuildClaw
         from orchestrator.build.build_init import BASE
         from orchestrator.inference_client import NvidiaInferenceClient
-        from orchestrator.github_client import GitHubClient
+        from orchestrator.service_factory import (
+            create_github_client,
+            create_vercel_client,
+            create_sentry_client,
+        )
 
         inference_client = NvidiaInferenceClient(
             api_key=os.environ.get("NVIDIA_API_KEY")
@@ -1025,171 +1029,9 @@ class ClawLauncher:
             api_base=os.environ.get("NVIDIA_API_BASE"),
         )
 
-        # Try NemoClaw credential store if GitHub token not in environment
-        if not os.environ.get("GITHUB_TOKEN") and not os.environ.get("GH_TOKEN"):
-            try:
-                import subprocess
-
-                cred_result = subprocess.run(
-                    ["nemoclaw", "credentials", "get", "GITHUB_TOKEN"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                )
-                if cred_result.returncode == 0 and cred_result.stdout.strip():
-                    os.environ["GITHUB_TOKEN"] = cred_result.stdout.strip()
-                    logger.info(
-                        "ClawLauncher: loaded GITHUB_TOKEN from NemoClaw credential store"
-                    )
-            except Exception:
-                pass
-
-        try:
-            github_client = GitHubClient(repo=os.environ.get("GITHUB_REPO"))
-        except RuntimeError as exc:
-            logger.warning(
-                "ClawLauncher: GitHubClient unavailable (%s) — build running without GitHub",
-                exc,
-            )
-            github_client = None
-
-        # Initialize real Vercel client if token available
-        vercel_client = None
-        vercel_token = os.environ.get("VERCEL_TOKEN") or os.environ.get(
-            "VERCEL_API_TOKEN"
-        )
-        if vercel_token:
-            try:
-                from orchestrator.build.vercel_client import VercelClient
-
-                vercel_client = VercelClient(
-                    api_token=vercel_token,
-                    team_id=os.environ.get("VERCEL_TEAM_ID"),
-                    project_id=os.environ.get("VERCEL_PROJECT_ID"),
-                )
-                if vercel_client.health_check():
-                    logger.info("ClawLauncher: VercelClient connected successfully")
-                else:
-                    logger.warning(
-                        "ClawLauncher: VercelClient health check failed, using stub"
-                    )
-                    vercel_client = None
-            except ImportError as e:
-                logger.warning("ClawLauncher: VercelClient import failed: %s", e)
-            except Exception as e:
-                logger.warning("ClawLauncher: VercelClient init failed: %s", e)
-
-        # Initialize real Sentry client if token available
-        sentry_client = None
-        sentry_token = os.environ.get("SENTRY_AUTH_TOKEN")
-        if sentry_token:
-            try:
-                from orchestrator.build.sentry_client import SentryClient
-
-                sentry_client = SentryClient(
-                    auth_token=sentry_token,
-                    org_slug=os.environ.get("SENTRY_ORG_SLUG"),
-                    project_slug=os.environ.get("SENTRY_PROJECT_SLUG"),
-                )
-                if sentry_client.health_check():
-                    logger.info("ClawLauncher: SentryClient connected successfully")
-                else:
-                    logger.warning(
-                        "ClawLauncher: SentryClient health check failed, using stub"
-                    )
-                    sentry_client = None
-            except ImportError as e:
-                logger.warning("ClawLauncher: SentryClient import failed: %s", e)
-            except Exception as e:
-                logger.warning("ClawLauncher: SentryClient init failed: %s", e)
-
-        # Use stub clients if real ones not available
-        if vercel_client is None:
-
-            class _StubVercelClient:
-                def health_check(self):
-                    return False
-
-                def trigger_deployment(self, *a, **kw):
-                    return {"id": None, "status": "skipped", "url": None}
-
-                def get_deployment_status(self, *a, **kw):
-                    return "skipped"
-
-                def get_deployment_url(self, *a, **kw):
-                    return ""
-
-                def wait_for_deployment(self, *a, **kw):
-                    return "skipped"
-
-                def rollback(self, *a, **kw):
-                    return {}
-
-                def list_deployments(self, *a, **kw):
-                    return []
-
-            vercel_client = _StubVercelClient()
-            logger.debug("ClawLauncher: using stub VercelClient")
-
-        if github_client is None:
-
-            class _StubGitHubClient:
-                def get_open_issues(self, limit=50):
-                    return []
-
-                def create_issue(self, *a, **kw):
-                    return None
-
-                def create_branch(self, *a, **kw):
-                    return False
-
-                def commit_file(self, *a, **kw):
-                    return False
-
-                def create_pull_request(self, *a, **kw):
-                    return (None, None)
-
-                def merge_pull_request(self, *a, **kw):
-                    return False
-
-                def list_prs(self, *a, **kw):
-                    return []
-
-            github_client = _StubGitHubClient()
-            logger.debug("ClawLauncher: using stub GitHubClient")
-
-        if sentry_client is None:
-
-            class _StubSentryClient:
-                def health_check(self):
-                    return False
-
-                def get_recent_errors(self, *a, **kw):
-                    return []
-
-                def list_events(self, *a, **kw):
-                    return []
-
-                def get_event(self, *a, **kw):
-                    return {}
-
-                def create_release(self, *a, **kw):
-                    return {}
-
-                def upload_sourcemap(self, *a, **kw):
-                    return {}
-
-                def deploy_release(self, *a, **kw):
-                    return {}
-
-                def list_projects(self, *a, **kw):
-                    return []
-
-                def get_release_stats(self, *a, **kw):
-                    return {}
-
-            sentry_client = _StubSentryClient()
-            logger.debug("ClawLauncher: using stub SentryClient")
+        github_client = create_github_client()
+        vercel_client = create_vercel_client()
+        sentry_client = create_sentry_client()
 
         claw = BuildClaw(
             squad_id=SQUAD_ID,
@@ -1201,9 +1043,6 @@ class ClawLauncher:
             base_path=BASE,
         )
         claw.startup()
-        logger.info(
-            "ClawLauncher: BuildClaw using RealMeshGateway via DictMeshGatewayAdapter"
-        )
 
         heartbeat = HeartbeatEmitter("build", self.heartbeat_interval)
         heartbeat.start()
@@ -1291,18 +1130,14 @@ class ClawLauncher:
 
             elif role == "finance":
                 from orchestrator.finance.finance_claw import FinanceClaw
-                from orchestrator.finance.stripe_client import StripeClient
                 from orchestrator.inference_client import NvidiaInferenceClient
+                from orchestrator.service_factory import create_stripe_client
 
                 inference = NvidiaInferenceClient(
                     api_key=os.environ.get("NVIDIA_API_KEY"),
                     api_base=os.environ.get("NVIDIA_API_BASE"),
                 )
-                stripe = StripeClient(
-                    api_key=os.environ.get("STRIPE_SECRET_KEY"),
-                    webhook_secret=os.environ.get("STRIPE_WEBHOOK_SECRET"),
-                    currency=os.environ.get("STRIPE_CURRENCY", "usd"),
-                )
+                stripe = create_stripe_client()
 
                 claw = FinanceClaw(
                     squad_id=SQUAD_ID,

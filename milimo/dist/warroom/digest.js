@@ -69,8 +69,8 @@ class DigestScheduler {
         }
         return targetTime.getTime() - now.getTime();
     }
-    getMorningBrief() {
-        const response = (0, python_bridge_1.callPythonBridgeSafe)("morning_brief", { squad_id: this.config.squad_id }, this.bridgeOptions);
+    async getMorningBrief() {
+        const response = await (0, python_bridge_1.callPythonBridgeSafe)("morning_brief", { squad_id: this.config.squad_id }, this.bridgeOptions);
         if (!response.success || !response.data) {
             const error = new Error(response.error ?? "Morning brief failed");
             this.onError?.(error);
@@ -91,8 +91,8 @@ class DigestScheduler {
         this.onUpdate?.(brief);
         return brief;
     }
-    getEveningWrap() {
-        const response = (0, python_bridge_1.callPythonBridgeSafe)("evening_wrap", { squad_id: this.config.squad_id }, this.bridgeOptions);
+    async getEveningWrap() {
+        const response = await (0, python_bridge_1.callPythonBridgeSafe)("evening_wrap", { squad_id: this.config.squad_id }, this.bridgeOptions);
         if (!response.success || !response.data) {
             const error = new Error(response.error ?? "Evening wrap failed");
             this.onError?.(error);

@@ -14,61 +14,38 @@
  *   config   — View/update notification preferences
  */
 
-import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import { ChannelNotifier, loadNotificationConfig } from "../hooks/channel-notifier.js";
 import type { PluginLogger } from "../index.js";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /**
- * Resolve the active sandbox name from NemoClaw state.
+ * Resolve the active sandbox name from NemoClaw state file.
  */
 function getSandboxName(): string {
   try {
-    const output = execFileSync("nemoclaw", ["list"], {
-      encoding: "utf-8",
-      timeout: 5000,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    // Parse first sandbox name from output
-    const lines = output.trim().split("\n");
-    for (const line of lines) {
-      const cols = line.trim().split(/\s+/);
-      if (cols[0] && !cols[0].startsWith("NAME") && !cols[0].startsWith("-")) {
-        return cols[0];
-      }
-    }
+    const sandboxesPath = join(homedir(), ".nemoclaw/sandboxes.json");
+    if (!existsSync(sandboxesPath)) return "openclaw";
+    const data = JSON.parse(readFileSync(sandboxesPath, "utf-8"));
+    if (data.defaultSandbox) return data.defaultSandbox;
+    if (data.sandboxes?.[0]?.name) return data.sandboxes[0].name;
+    return "openclaw";
   } catch {
-    // Fall through
+    return "openclaw";
   }
-  return "openclaw";
 }
 
 /**
- * Delegate to a NemoClaw channels subcommand.
+ * Print instructions for the user to run NemoClaw channel commands directly.
  */
-function delegateToNemoClaw(subcommand: string, args: string[] = []): void {
+function printChannelInstructions(subcommand: string, args: string[] = []): void {
   const sandboxName = getSandboxName();
-  const fullArgs = [sandboxName, "channels", subcommand, ...args];
-
-  console.log(`Delegating to: nemoclaw ${fullArgs.join(" ")}\n`);
-
-  const result = spawnSync("nemoclaw", fullArgs, {
-    stdio: "inherit",
-    timeout: 30000,
-  });
-
-  if (result.error) {
-    console.error(`Failed to run nemoclaw channels ${subcommand}:`, result.error.message);
-    console.error("Is NemoClaw installed? Run: nemoclaw --version");
-    process.exit(1);
-  }
-
-  if (result.status !== 0) {
-    process.exit(result.status ?? 1);
-  }
+  const fullCmd = `nemoclaw ${sandboxName} channels ${subcommand} ${args.join(" ")}`.trim();
+  console.log(`\n  To manage channels, run the NemoClaw command directly:\n`);
+  console.log(`    ${fullCmd}\n`);
+  console.log(`  Or use the interactive channel setup:\n`);
+  console.log(`    nemoclaw ${sandboxName} channels add telegram\n`);
 }
 
 // ---------------------------------------------------------------------------
@@ -79,35 +56,35 @@ function delegateToNemoClaw(subcommand: string, args: string[] = []): void {
  * List available channels via NemoClaw native command.
  */
 export function cliChannelsList(): void {
-  delegateToNemoClaw("list");
+  printChannelInstructions("list");
 }
 
 /**
  * Add a channel via NemoClaw native command.
  */
 export function cliChannelsAdd(channelType: string): void {
-  delegateToNemoClaw("add", [channelType]);
+  printChannelInstructions("add", [channelType]);
 }
 
 /**
  * Remove a channel via NemoClaw native command.
  */
 export function cliChannelsRemove(channelType: string): void {
-  delegateToNemoClaw("remove", [channelType]);
+  printChannelInstructions("remove", [channelType]);
 }
 
 /**
  * Start channel bridges via NemoClaw native command.
  */
 export function cliChannelsStart(): void {
-  delegateToNemoClaw("start");
+  printChannelInstructions("start");
 }
 
 /**
  * Stop channel bridges via NemoClaw native command.
  */
 export function cliChannelsStop(): void {
-  delegateToNemoClaw("stop");
+  printChannelInstructions("stop");
 }
 
 /**

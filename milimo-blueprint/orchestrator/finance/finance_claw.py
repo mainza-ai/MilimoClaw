@@ -99,8 +99,8 @@ class FinanceClaw:
         self,
         squad_id: str,
         inference_client: Any,
-        stripe_client: StripeClient,
-        gateway: MeshGateway,
+        stripe_client: Any | None = None,
+        gateway: MeshGateway | None = None,
         base_path: Path | None = None,
     ):
         self.squad_id = squad_id

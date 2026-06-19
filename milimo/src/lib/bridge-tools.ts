@@ -187,7 +187,10 @@ export class BridgeTools {
   /**
    * Get detailed status of a specific claw.
    */
-  clawStatus(args: { role: string; squad_id?: string }): BridgeResponse<ClawStatusResult> {
+  async clawStatus(args: {
+    role: string;
+    squad_id?: string;
+  }): Promise<BridgeResponse<ClawStatusResult>> {
     return callPythonBridgeSafe("claw_status", args, this.options);
   }
 
@@ -195,98 +198,98 @@ export class BridgeTools {
    * Send a typed message from the assistant to a specific claw via the mesh.
    * Use "assistant_query" for read-only questions and "assistant_task" for action requests.
    */
-  sendToClaw(args: {
+  async sendToClaw(args: {
     role: string;
     type: "assistant_query" | "assistant_task";
     payload: Record<string, unknown>;
     squad_id?: string;
-  }): BridgeResponse<SendToClawResult> {
+  }): Promise<BridgeResponse<SendToClawResult>> {
     return callPythonBridgeSafe("send_to_claw", args, this.options);
   }
 
   /**
    * Get live mesh topology, pending message counts, and delivery stats.
    */
-  meshFlowState(args?: { squad?: string }): BridgeResponse<MeshFlowStateResult> {
+  async meshFlowState(args?: { squad?: string }): Promise<BridgeResponse<MeshFlowStateResult>> {
     return callPythonBridgeSafe("mesh_flow_state", args ?? {}, this.options);
   }
 
   /**
    * List active client projects from the Ops claw sandbox.
    */
-  opsActiveProjects(): BridgeResponse<OpsProjectsResult> {
+  async opsActiveProjects(): Promise<BridgeResponse<OpsProjectsResult>> {
     return callPythonBridgeSafe("ops_active_projects", {}, this.options);
   }
 
   /**
    * List pending content drafts from the Content claw sandbox.
    */
-  contentPendingDrafts(): BridgeResponse<ContentDraftsResult> {
+  async contentPendingDrafts(): Promise<BridgeResponse<ContentDraftsResult>> {
     return callPythonBridgeSafe("content_pending_drafts", {}, this.options);
   }
 
   /**
    * List open PRs from the Build claw using the gh CLI.
    */
-  buildOpenPrs(): BridgeResponse<BuildPrsResult> {
+  async buildOpenPrs(): Promise<BridgeResponse<BuildPrsResult>> {
     return callPythonBridgeSafe("build_open_prs", {}, this.options);
   }
 
   /**
    * Summarize the latest intelligence report from the Analytics claw.
    */
-  analyticsLatestReportSummary(): BridgeResponse<AnalyticsReportResult> {
+  async analyticsLatestReportSummary(): Promise<BridgeResponse<AnalyticsReportResult>> {
     return callPythonBridgeSafe("analytics_latest_report_summary", {}, this.options);
   }
 
   /**
    * Trigger sprint plan generation by writing to the Build claw's sprint context.
    */
-  generateSprintPlan(args?: {
+  async generateSprintPlan(args?: {
     instructions?: string;
     backlog_source?: string;
-  }): BridgeResponse<SprintPlanResult> {
+  }): Promise<BridgeResponse<SprintPlanResult>> {
     return callPythonBridgeSafe("generate_sprint_plan", args ?? {}, this.options);
   }
 
   /**
    * Trigger opportunity scoring by writing to the Analytics claw's context.
    */
-  runOpportunityScoring(args?: {
+  async runOpportunityScoring(args?: {
     criteria?: string[];
     scope?: string;
-  }): BridgeResponse<OpportunityScoringResult> {
+  }): Promise<BridgeResponse<OpportunityScoringResult>> {
     return callPythonBridgeSafe("run_opportunity_scoring", args ?? {}, this.options);
   }
 
   /**
    * Generate a weekly report by aggregating data from all claws.
    */
-  generateWeeklyReport(args?: {
+  async generateWeeklyReport(args?: {
     squad_id?: string;
     week_start?: string;
-  }): BridgeResponse<WeeklyReportResult> {
+  }): Promise<BridgeResponse<WeeklyReportResult>> {
     return callPythonBridgeSafe("generate_weekly_report", args ?? {}, this.options);
   }
 
   /**
    * Check deadlines across all claws.
    */
-  checkAllDeadlines(): BridgeResponse<DeadlineCheckResult> {
+  async checkAllDeadlines(): Promise<BridgeResponse<DeadlineCheckResult>> {
     return callPythonBridgeSafe("check_all_deadlines", {}, this.options);
   }
 
   /**
    * Run a dependency audit on the Build claw's repo.
    */
-  runDependencyAudit(): BridgeResponse<DependencyAuditResult> {
+  async runDependencyAudit(): Promise<BridgeResponse<DependencyAuditResult>> {
     return callPythonBridgeSafe("run_dependency_audit", {}, this.options);
   }
 
   /**
    * Discover what tools each claw currently has deployed.
    */
-  discoverTools(args?: { squad_id?: string }): BridgeResponse<DiscoverToolsResult> {
+  async discoverTools(args?: { squad_id?: string }): Promise<BridgeResponse<DiscoverToolsResult>> {
     return callPythonBridgeSafe("discover_tools", args ?? {}, this.options);
   }
 

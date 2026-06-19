@@ -1,8 +1,3 @@
-/**
- * `openclaw milimo badge` — Performance verification badges.
- *
- * Generates and displays performance attestations for blueprints.
- */
 import type { PluginLogger, MilimoConfig } from "../index.js";
 interface BadgeOptions {
     blueprint?: string;

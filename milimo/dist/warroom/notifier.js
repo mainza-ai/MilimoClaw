@@ -12,7 +12,6 @@ exports.createNotifier = createNotifier;
  * - Linux: notify-send (no new deps)
  * - Fallback: write to ~/.openclaw/milimo/notifications/pending.json
  */
-const node_child_process_1 = require("node:child_process");
 const node_path_1 = require("node:path");
 const node_os_1 = require("node:os");
 const node_fs_1 = require("node:fs");
@@ -63,44 +62,11 @@ class OperatorNotifier {
                 return { delivered: true, method: "pending_file" };
         }
     }
-    notifyMacOS(title, message, _payload) {
-        const script = `display notification "${this.escapeAppleScript(message)}" with title "${this.escapeAppleScript(title)}"`;
-        try {
-            const result = (0, node_child_process_1.spawnSync)("osascript", ["-e", script], {
-                encoding: "utf-8",
-                timeout: 5000,
-            });
-            if (result.status === 0) {
-                return { delivered: true, method: "osascript" };
-            }
-            return this.notifyPendingFile(_payload);
-        }
-        catch (error) {
-            return {
-                delivered: false,
-                method: "osascript",
-                error: error.message,
-            };
-        }
+    notifyMacOS(_title, _message, payload) {
+        return this.notifyPendingFile(payload);
     }
-    notifyLinux(title, message, _payload) {
-        try {
-            const result = (0, node_child_process_1.spawnSync)("notify-send", [title, message], {
-                encoding: "utf-8",
-                timeout: 5000,
-            });
-            if (result.status === 0) {
-                return { delivered: true, method: "notify-send" };
-            }
-            return this.notifyPendingFile(_payload);
-        }
-        catch (error) {
-            return {
-                delivered: false,
-                method: "notify-send",
-                error: error.message,
-            };
-        }
+    notifyLinux(_title, _message, payload) {
+        return this.notifyPendingFile(payload);
     }
     notifyPendingFile(payload) {
         try {

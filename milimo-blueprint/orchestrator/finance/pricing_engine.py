@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Protocol
 import json
+import os
 
 from .finance_init import (
     FinanceFilesystemInit,
@@ -53,10 +54,10 @@ class PricingEstimate:
 
 
 COMPLEXITY_TO_HOURS = {
-    "low": 8,
-    "medium": 20,
-    "high": 40,
-    "complex": 80,
+    "low": int(os.environ.get("MILIMO_HOURS_LOW", "8")),
+    "medium": int(os.environ.get("MILIMO_HOURS_MEDIUM", "20")),
+    "high": int(os.environ.get("MILIMO_HOURS_HIGH", "40")),
+    "complex": int(os.environ.get("MILIMO_HOURS_COMPLEX", "80")),
 }
 
 RESPONSE_TIMEOUT_SECONDS = 540
@@ -201,9 +202,11 @@ class PricingEngine:
         """
         rules_path = self.fs.base / "pricing" / "rules.json"
         defaults = {
-            "default_hourly_rate": 100,
-            "floor_multiplier": 0.8,
-            "ceiling_multiplier": 1.5,
+            "default_hourly_rate": float(os.environ.get("MILIMO_HOURLY_RATE", "100")),
+            "floor_multiplier": float(os.environ.get("MILIMO_FLOOR_MULTIPLIER", "0.8")),
+            "ceiling_multiplier": float(
+                os.environ.get("MILIMO_CEILING_MULTIPLIER", "1.5")
+            ),
             "scope_weights": {},
             "last_updated": None,
         }

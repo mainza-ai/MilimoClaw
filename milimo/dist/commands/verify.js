@@ -45,20 +45,16 @@ exports.cliProvenanceKeygen = cliProvenanceKeygen;
  */
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
-const node_child_process_1 = require("node:child_process");
 const init_js_1 = require("./init.js");
+const python_bridge_1 = require("../lib/python-bridge");
 // ---------------------------------------------------------------------------
-function callPythonVerify(blueprintDir, code) {
+async function callPythonVerify(blueprintDir, code) {
     const safeCode = `import sys; sys.path.insert(0, ${JSON.stringify(blueprintDir)}); ${code}`;
-    const result = (0, node_child_process_1.spawnSync)("python3", ["-c", safeCode], { cwd: blueprintDir, encoding: "utf-8" });
-    if (result.error)
-        throw result.error;
-    if (result.status !== 0)
-        throw new Error(result.stderr);
-    return result.stdout.trim();
+    const result = await (0, python_bridge_1.callPython)(blueprintDir, safeCode);
+    return result;
 }
 // ---------------------------------------------------------------------------
-function cliVerify(opts) {
+async function cliVerify(opts) {
     const { logger, pluginConfig } = opts;
     const state = (0, init_js_1.loadMilimoState)();
     const blueprintDir = pluginConfig.blueprintDir;
@@ -110,7 +106,7 @@ else:
 
     print(json.dumps(result_dict))
 `;
-        const result = callPythonVerify(blueprintDir, code);
+        const result = await callPythonVerify(blueprintDir, code);
         const verifyResult = JSON.parse(result);
         if (opts.json) {
             logger.info(JSON.stringify(verifyResult, null, 2));
@@ -125,7 +121,7 @@ else:
     return Promise.resolve();
 }
 // ---------------------------------------------------------------------------
-function verifyChain(opts, blueprintDir, blueprintId, logger) {
+async function verifyChain(opts, blueprintDir, blueprintId, logger) {
     logger.info("  Validating provenance chain...");
     logger.info("");
     try {
@@ -156,7 +152,7 @@ else:
     result = validator.validate_chain(attestations)
     print(json.dumps(result.to_dict()))
 `;
-        const result = callPythonVerify(blueprintDir, code);
+        const result = await callPythonVerify(blueprintDir, code);
         const chainResult = JSON.parse(result);
         if (opts.json) {
             logger.info(JSON.stringify(chainResult, null, 2));
@@ -247,7 +243,7 @@ function renderChainResult(result, logger) {
         logger.info("");
     }
 }
-function cliProvenanceKeygen(opts) {
+async function cliProvenanceKeygen(opts) {
     const { logger } = opts;
     logger.info("");
     logger.info("  ┌─────────────────────────────────────────────────────┐");
@@ -282,15 +278,7 @@ print(json.dumps({
 }))
 `;
         const safeCode = `import sys; sys.path.insert(0, ${JSON.stringify(opts.pluginConfig.blueprintDir)}); ${code}`;
-        const result = (0, node_child_process_1.spawnSync)("python3", ["-c", safeCode], {
-            cwd: opts.pluginConfig.blueprintDir,
-            encoding: "utf-8",
-        });
-        if (result.error)
-            throw result.error;
-        if (result.status !== 0)
-            throw new Error(result.stderr);
-        const keygenResult = result.stdout.trim();
+        const keygenResult = await (0, python_bridge_1.callPython)(opts.pluginConfig.blueprintDir, safeCode);
         const keyInfo = JSON.parse(keygenResult);
         logger.info(`  ✅ Key pair generated`);
         logger.info(`    Key file: ${keyInfo.key_file}`);

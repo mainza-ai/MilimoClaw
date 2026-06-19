@@ -19,6 +19,7 @@ import { registerMilimoRuntimeContext } from "./hooks/runtime-context.js";
 import { registerClawLauncherService } from "./hooks/claw-launcher-service.js";
 import { loadOnboardConfig, type MilimoOnboardConfig } from "./onboard/config.js";
 import { formatRoleDisplay } from "./commands/onboard.js";
+import { getRpcClient } from "./lib/rpc-bridge";
 
 // ---------------------------------------------------------------------------
 // OpenClaw Plugin SDK compatible types (mirrors openclaw/plugin-sdk)
@@ -228,4 +229,17 @@ export default function register(api: OpenClawPluginApi): void {
       api.logger.info("");
     }
   }
+
+  // 7. Check Python RPC server availability
+  const rpc = getRpcClient();
+  rpc.ping().then((alive) => {
+    if (alive) {
+      api.logger.debug("[milimo] Python RPC server connected.");
+    } else {
+      api.logger.warn(
+        "[milimo] Python RPC server not reachable on 127.0.0.1:19999. " +
+          "Start it with: python3 -m orchestrator.bridge_server",
+      );
+    }
+  });
 }

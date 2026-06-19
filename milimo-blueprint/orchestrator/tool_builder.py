@@ -549,9 +549,7 @@ class ToolBuilder:
 
         # Check for NIM endpoint configuration
         nim_endpoint = os.environ.get("NIM_ENDPOINT", "http://localhost:8000")
-        nim_model = os.environ.get(
-            "NEMOCLAW_MODEL", "nvidia/nemotron-3-super-120b-a12b"
-        )
+        nim_model = os.environ.get("NEMOCLAW_MODEL")
 
         # Check if NIM is available
         try:
@@ -634,9 +632,7 @@ class ToolBuilder:
             request_file = gateway_dir / f"request_{proposal.tool_name}.json"
             request_data = {
                 "type": "inference_request",
-                "model": os.environ.get(
-                    "NEMOCLAW_MODEL", "nvidia/nemotron-3-super-120b-a12b"
-                ),
+                "model": os.environ.get("NEMOCLAW_MODEL") or "",
                 "prompt": prompt,
                 "parameters": {
                     "temperature": 0.3,

@@ -8,8 +8,8 @@
  * Polls at 3000ms interval for TUI updates.
  */
 
-import { spawnSync } from "node:child_process";
 import { callPythonBridgeSafe, type BridgeCommandOptions } from "../lib/python-bridge";
+import { getRpcClient } from "../lib/rpc-bridge";
 
 export interface ClawHealth {
   role: string;
@@ -45,8 +45,8 @@ export class HealthCollector {
     this.pollInterval = options.pollInterval ?? 3000;
   }
 
-  public collectAll(): ClawHealthMap {
-    const response = callPythonBridgeSafe<ClawHealthMap>(
+  public async collectAll(): Promise<ClawHealthMap> {
+    const response = await callPythonBridgeSafe<ClawHealthMap>(
       "collect_health",
       { squad_id: this.squadId },
       this.bridgeOptions,
@@ -66,22 +66,18 @@ export class HealthCollector {
 
     this.running = true;
 
-    try {
-      onUpdate(this.collectAll());
-    } catch (error: unknown) {
-      if (onError) {
-        onError(error as Error);
-      }
-    }
+    this.collectAll()
+      .then(onUpdate)
+      .catch((error) => {
+        if (onError) onError(error as Error);
+      });
 
     this.intervalId = setInterval(() => {
-      try {
-        onUpdate(this.collectAll());
-      } catch (error: unknown) {
-        if (onError) {
-          onError(error as Error);
-        }
-      }
+      this.collectAll()
+        .then(onUpdate)
+        .catch((error) => {
+          if (onError) onError(error as Error);
+        });
     }, this.pollInterval);
 
     return () => this.stopPolling();
@@ -135,25 +131,16 @@ export class HealthCollector {
    *
    * Returns a structured summary or null if nemoclaw CLI is unavailable.
    */
-  public collectNemoClawDiagnostics(): NemoClawDiagnostics | null {
+  public async collectNemoClawDiagnostics(): Promise<NemoClawDiagnostics | null> {
     try {
-      const result = spawnSync("nemoclaw", ["doctor"], {
-        encoding: "utf-8",
-        timeout: 10000,
-        stdio: ["pipe", "pipe", "pipe"],
+      const rpc = getRpcClient();
+      const result = await rpc.call<{ stdout: string }>("python_module", {
+        moduleName: "orchestrator.bridge_cli",
+        args: ["--command", "doctor", "--args", "{}"],
+        blueprintDir: this.bridgeOptions.blueprintDir,
       });
 
-      if (result.error || result.status !== 0) {
-        return {
-          available: false,
-          checks: [],
-          summary: "nemoclaw doctor not available",
-          collectedAt: new Date().toISOString(),
-        };
-      }
-
-      // Parse the doctor output into structured checks
-      const lines = (result.stdout || "").split("\n").filter((l: string) => l.trim());
+      const lines = (result.stdout || "").split("\n").filter((l) => l.trim());
       const checks: DiagnosticCheck[] = [];
 
       for (const line of lines) {

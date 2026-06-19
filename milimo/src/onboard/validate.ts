@@ -1,15 +1,7 @@
-// SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
-// SPDX-License-Identifier: Apache-2.0
-
-/**
- * Template Validation
- *
- * Validates template configuration by calling Python validation modules.
- */
-
-import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { randomBytes } from "node:crypto";
+import { parse as parseYaml } from "yaml";
 
 export interface TemplateValidationResult {
   valid: boolean;
@@ -31,37 +23,46 @@ export function validateTemplateFile(templatePath: string): TemplateValidationRe
     return { valid: false, errors: [`Template file not found: ${templatePath}`] };
   }
 
-  const blueprintDir = findBlueprintDir(templatePath);
-  if (!blueprintDir) {
-    return { valid: false, errors: ["Could not find blueprint directory"] };
-  }
-
   try {
-    const pythonScript = `
-import json
-import sys
-sys.path.insert(0, '${blueprintDir}')
-from orchestrator.solo_init import load_solo_founder_template, TemplateValidationError
+    const raw = fs.readFileSync(templatePath, "utf-8");
+    const config = parseYaml(raw) as Record<string, unknown>;
 
-try:
-    config = load_solo_founder_template('${templatePath}')
-    print(json.dumps({"valid": True, "config": config}))
-except TemplateValidationError as e:
-    print(json.dumps({"valid": False, "errors": [str(e)]}))
-except Exception as e:
-    print(json.dumps({"valid": False, "errors": [f"Unexpected error: {e}"]}))
-`;
+    if (!config || typeof config !== "object") {
+      return { valid: false, errors: ["Template file is empty or invalid"] };
+    }
 
-    const output = execFileSync("python3", ["-c", pythonScript], {
-      encoding: "utf-8",
-      timeout: 30000,
-    });
+    const errors: string[] = [];
 
-    const result = JSON.parse(output) as TemplateValidationResult;
-    return result;
+    // Validate required top-level fields
+    const template = config.template as Record<string, unknown> | undefined;
+    if (!template || typeof template !== "object") {
+      errors.push("Missing 'template' section");
+    } else {
+      const requiredFields = [
+        "name",
+        "display_name",
+        "category",
+        "description",
+        "squad_size",
+        "claws_active",
+      ];
+      for (const field of requiredFields) {
+        if (!(field in template)) {
+          errors.push(`Missing template field: ${field}`);
+        }
+      }
+    }
+
+    if (errors.length > 0) {
+      return { valid: false, errors };
+    }
+
+    return { valid: true, errors: [], config };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { valid: false, errors: [`Validation failed: ${message}`] };
+    return {
+      valid: false,
+      errors: [`Validation failed: ${err instanceof Error ? err.message : String(err)}`],
+    };
   }
 }
 
@@ -141,8 +142,6 @@ export function validateOperatorName(name: string): { valid: boolean; error?: st
 
   return { valid: true };
 }
-
-import { randomBytes } from "node:crypto";
 
 export function generateMeshSecret(): string {
   const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";

@@ -27,80 +27,80 @@ class BridgeTools {
     /**
      * Get detailed status of a specific claw.
      */
-    clawStatus(args) {
+    async clawStatus(args) {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("claw_status", args, this.options);
     }
     /**
      * Send a typed message from the assistant to a specific claw via the mesh.
      * Use "assistant_query" for read-only questions and "assistant_task" for action requests.
      */
-    sendToClaw(args) {
+    async sendToClaw(args) {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("send_to_claw", args, this.options);
     }
     /**
      * Get live mesh topology, pending message counts, and delivery stats.
      */
-    meshFlowState(args) {
+    async meshFlowState(args) {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("mesh_flow_state", args ?? {}, this.options);
     }
     /**
      * List active client projects from the Ops claw sandbox.
      */
-    opsActiveProjects() {
+    async opsActiveProjects() {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("ops_active_projects", {}, this.options);
     }
     /**
      * List pending content drafts from the Content claw sandbox.
      */
-    contentPendingDrafts() {
+    async contentPendingDrafts() {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("content_pending_drafts", {}, this.options);
     }
     /**
      * List open PRs from the Build claw using the gh CLI.
      */
-    buildOpenPrs() {
+    async buildOpenPrs() {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("build_open_prs", {}, this.options);
     }
     /**
      * Summarize the latest intelligence report from the Analytics claw.
      */
-    analyticsLatestReportSummary() {
+    async analyticsLatestReportSummary() {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("analytics_latest_report_summary", {}, this.options);
     }
     /**
      * Trigger sprint plan generation by writing to the Build claw's sprint context.
      */
-    generateSprintPlan(args) {
+    async generateSprintPlan(args) {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("generate_sprint_plan", args ?? {}, this.options);
     }
     /**
      * Trigger opportunity scoring by writing to the Analytics claw's context.
      */
-    runOpportunityScoring(args) {
+    async runOpportunityScoring(args) {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("run_opportunity_scoring", args ?? {}, this.options);
     }
     /**
      * Generate a weekly report by aggregating data from all claws.
      */
-    generateWeeklyReport(args) {
+    async generateWeeklyReport(args) {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("generate_weekly_report", args ?? {}, this.options);
     }
     /**
      * Check deadlines across all claws.
      */
-    checkAllDeadlines() {
+    async checkAllDeadlines() {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("check_all_deadlines", {}, this.options);
     }
     /**
      * Run a dependency audit on the Build claw's repo.
      */
-    runDependencyAudit() {
+    async runDependencyAudit() {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("run_dependency_audit", {}, this.options);
     }
     /**
      * Discover what tools each claw currently has deployed.
      */
-    discoverTools(args) {
+    async discoverTools(args) {
         return (0, python_bridge_js_1.callPythonBridgeSafe)("discover_tools", args ?? {}, this.options);
     }
     /**

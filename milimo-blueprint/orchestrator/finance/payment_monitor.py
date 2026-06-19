@@ -80,12 +80,12 @@ class PaymentMonitor:
     def __init__(
         self,
         fs: FinanceFilesystemInit,
-        stripe_client: StripeClient,
-        dispatcher: FinanceSignalDispatcher,
-        revenue_tracker: Any,
-        approval_handler: Any,
-        operational_log: FinanceOperationalLog,
-        payment_events_log: PaymentEventsLog,
+        stripe_client: Any | None = None,
+        dispatcher: FinanceSignalDispatcher | None = None,
+        revenue_tracker: Any = None,
+        approval_handler: Any = None,
+        operational_log: FinanceOperationalLog | None = None,
+        payment_events_log: PaymentEventsLog | None = None,
     ):
         self.fs = fs
         self.stripe_client = stripe_client
@@ -145,6 +145,18 @@ class PaymentMonitor:
                 amount_due=invoice.total,
                 due_date=invoice.due_date,
                 days_overdue=0,
+            )
+
+        if not self.stripe_client:
+            return PaymentStatus(
+                invoice_id=invoice_id,
+                client_id="",
+                total=0,
+                status="unknown",
+                amount_paid=0,
+                amount_due=0,
+                days_overdue=0,
+                days_until_due=0,
             )
 
         try:
@@ -431,6 +443,12 @@ class PaymentMonitor:
 
     def _attempt_stripe_send(self, invoice: Invoice) -> Invoice:
         """Attempt to send invoice via Stripe."""
+        if not self.stripe_client:
+            logger.warning(
+                "Cannot send invoice %s — no Stripe client configured",
+                invoice.invoice_id,
+            )
+            return invoice
         stripe_result = self.stripe_client.create_invoice(
             customer_id=invoice.client_id,
             amount=invoice.total,

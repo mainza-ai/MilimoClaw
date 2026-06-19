@@ -10,7 +10,6 @@
  * - Fallback: write to ~/.openclaw/milimo/notifications/pending.json
  */
 
-import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
@@ -89,55 +88,19 @@ export class OperatorNotifier {
   }
 
   private notifyMacOS(
-    title: string,
-    message: string,
-    _payload: NotificationPayload,
+    _title: string,
+    _message: string,
+    payload: NotificationPayload,
   ): NotificationResult {
-    const script = `display notification "${this.escapeAppleScript(message)}" with title "${this.escapeAppleScript(title)}"`;
-
-    try {
-      const result = spawnSync("osascript", ["-e", script], {
-        encoding: "utf-8",
-        timeout: 5000,
-      });
-
-      if (result.status === 0) {
-        return { delivered: true, method: "osascript" };
-      }
-
-      return this.notifyPendingFile(_payload);
-    } catch (error) {
-      return {
-        delivered: false,
-        method: "osascript",
-        error: (error as Error).message,
-      };
-    }
+    return this.notifyPendingFile(payload);
   }
 
   private notifyLinux(
-    title: string,
-    message: string,
-    _payload: NotificationPayload,
+    _title: string,
+    _message: string,
+    payload: NotificationPayload,
   ): NotificationResult {
-    try {
-      const result = spawnSync("notify-send", [title, message], {
-        encoding: "utf-8",
-        timeout: 5000,
-      });
-
-      if (result.status === 0) {
-        return { delivered: true, method: "notify-send" };
-      }
-
-      return this.notifyPendingFile(_payload);
-    } catch (error) {
-      return {
-        delivered: false,
-        method: "notify-send",
-        error: (error as Error).message,
-      };
-    }
+    return this.notifyPendingFile(payload);
   }
 
   private notifyPendingFile(payload: NotificationPayload): NotificationResult {

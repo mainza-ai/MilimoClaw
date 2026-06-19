@@ -21,54 +21,39 @@ exports.cliChannelsTest = cliChannelsTest;
  *   test     — Send a test notification through active channels
  *   config   — View/update notification preferences
  */
-const node_child_process_1 = require("node:child_process");
+const node_fs_1 = require("node:fs");
+const node_path_1 = require("node:path");
+const node_os_1 = require("node:os");
 const channel_notifier_js_1 = require("../hooks/channel-notifier.js");
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 /**
- * Resolve the active sandbox name from NemoClaw state.
+ * Resolve the active sandbox name from NemoClaw state file.
  */
 function getSandboxName() {
     try {
-        const output = (0, node_child_process_1.execFileSync)("nemoclaw", ["list"], {
-            encoding: "utf-8",
-            timeout: 5000,
-            stdio: ["pipe", "pipe", "pipe"],
-        });
-        // Parse first sandbox name from output
-        const lines = output.trim().split("\n");
-        for (const line of lines) {
-            const cols = line.trim().split(/\s+/);
-            if (cols[0] && !cols[0].startsWith("NAME") && !cols[0].startsWith("-")) {
-                return cols[0];
-            }
-        }
+        const sandboxesPath = (0, node_path_1.join)((0, node_os_1.homedir)(), ".nemoclaw/sandboxes.json");
+        if (!(0, node_fs_1.existsSync)(sandboxesPath))
+            return "openclaw";
+        const data = JSON.parse((0, node_fs_1.readFileSync)(sandboxesPath, "utf-8"));
+        if (data.defaultSandbox)
+            return data.defaultSandbox;
+        if (data.sandboxes?.[0]?.name)
+            return data.sandboxes[0].name;
+        return "openclaw";
     }
     catch {
-        // Fall through
+        return "openclaw";
     }
-    return "openclaw";
 }
 /**
- * Delegate to a NemoClaw channels subcommand.
+ * Print instructions for the user to run NemoClaw channel commands directly.
  */
-function delegateToNemoClaw(subcommand, args = []) {
+function printChannelInstructions(subcommand, args = []) {
     const sandboxName = getSandboxName();
-    const fullArgs = [sandboxName, "channels", subcommand, ...args];
-    console.log(`Delegating to: nemoclaw ${fullArgs.join(" ")}\n`);
-    const result = (0, node_child_process_1.spawnSync)("nemoclaw", fullArgs, {
-        stdio: "inherit",
-        timeout: 30000,
-    });
-    if (result.error) {
-        console.error(`Failed to run nemoclaw channels ${subcommand}:`, result.error.message);
-        console.error("Is NemoClaw installed? Run: nemoclaw --version");
-        process.exit(1);
-    }
-    if (result.status !== 0) {
-        process.exit(result.status ?? 1);
-    }
+    const fullCmd = `nemoclaw ${sandboxName} channels ${subcommand} ${args.join(" ")}`.trim();
+    console.log(`\n  To manage channels, run the NemoClaw command directly:\n`);
+    console.log(`    ${fullCmd}\n`);
+    console.log(`  Or use the interactive channel setup:\n`);
+    console.log(`    nemoclaw ${sandboxName} channels add telegram\n`);
 }
 // ---------------------------------------------------------------------------
 // CLI command handlers
@@ -77,31 +62,31 @@ function delegateToNemoClaw(subcommand, args = []) {
  * List available channels via NemoClaw native command.
  */
 function cliChannelsList() {
-    delegateToNemoClaw("list");
+    printChannelInstructions("list");
 }
 /**
  * Add a channel via NemoClaw native command.
  */
 function cliChannelsAdd(channelType) {
-    delegateToNemoClaw("add", [channelType]);
+    printChannelInstructions("add", [channelType]);
 }
 /**
  * Remove a channel via NemoClaw native command.
  */
 function cliChannelsRemove(channelType) {
-    delegateToNemoClaw("remove", [channelType]);
+    printChannelInstructions("remove", [channelType]);
 }
 /**
  * Start channel bridges via NemoClaw native command.
  */
 function cliChannelsStart() {
-    delegateToNemoClaw("start");
+    printChannelInstructions("start");
 }
 /**
  * Stop channel bridges via NemoClaw native command.
  */
 function cliChannelsStop() {
-    delegateToNemoClaw("stop");
+    printChannelInstructions("stop");
 }
 /**
  * Show Milimo notification status.

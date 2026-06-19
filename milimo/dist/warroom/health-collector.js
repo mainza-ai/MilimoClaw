@@ -9,8 +9,8 @@ exports.HealthCollector = void 0;
  * Collects real-time health data from all squad claws.
  * Polls at 3000ms interval for TUI updates.
  */
-const node_child_process_1 = require("node:child_process");
 const python_bridge_1 = require("../lib/python-bridge");
+const rpc_bridge_1 = require("../lib/rpc-bridge");
 class HealthCollector {
     squadId;
     bridgeOptions;
@@ -22,8 +22,8 @@ class HealthCollector {
         this.bridgeOptions = { blueprintDir: options.blueprintDir };
         this.pollInterval = options.pollInterval ?? 3000;
     }
-    collectAll() {
-        const response = (0, python_bridge_1.callPythonBridgeSafe)("collect_health", { squad_id: this.squadId }, this.bridgeOptions);
+    async collectAll() {
+        const response = await (0, python_bridge_1.callPythonBridgeSafe)("collect_health", { squad_id: this.squadId }, this.bridgeOptions);
         if (!response.success || !response.data) {
             throw new Error(response.error ?? "Health collection failed");
         }
@@ -34,23 +34,15 @@ class HealthCollector {
             return () => this.stopPolling();
         }
         this.running = true;
-        try {
-            onUpdate(this.collectAll());
-        }
-        catch (error) {
-            if (onError) {
+        this.collectAll().then(onUpdate).catch((error) => {
+            if (onError)
                 onError(error);
-            }
-        }
+        });
         this.intervalId = setInterval(() => {
-            try {
-                onUpdate(this.collectAll());
-            }
-            catch (error) {
-                if (onError) {
+            this.collectAll().then(onUpdate).catch((error) => {
+                if (onError)
                     onError(error);
-                }
-            }
+            });
         }, this.pollInterval);
         return () => this.stopPolling();
     }
@@ -96,22 +88,14 @@ class HealthCollector {
      *
      * Returns a structured summary or null if nemoclaw CLI is unavailable.
      */
-    collectNemoClawDiagnostics() {
+    async collectNemoClawDiagnostics() {
         try {
-            const result = (0, node_child_process_1.spawnSync)("nemoclaw", ["doctor"], {
-                encoding: "utf-8",
-                timeout: 10000,
-                stdio: ["pipe", "pipe", "pipe"],
+            const rpc = (0, rpc_bridge_1.getRpcClient)();
+            const result = await rpc.call("python_module", {
+                moduleName: "orchestrator.bridge_cli",
+                args: ["--command", "doctor", "--args", "{}"],
+                blueprintDir: this.bridgeOptions.blueprintDir,
             });
-            if (result.error || result.status !== 0) {
-                return {
-                    available: false,
-                    checks: [],
-                    summary: "nemoclaw doctor not available",
-                    collectedAt: new Date().toISOString(),
-                };
-            }
-            // Parse the doctor output into structured checks
             const lines = (result.stdout || "").split("\n").filter((l) => l.trim());
             const checks = [];
             for (const line of lines) {

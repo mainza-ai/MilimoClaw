@@ -9,6 +9,18 @@
 
 Milimo Claw is a distributed multi-agent system where all claws run inside a single NemoClaw sandbox. Per-claw isolation is enforced by Landlock filesystem paths, application-level egress policies, and the Python orchestrator. The system has nine architectural layers:
 
+### TypeScript ↔ Python Communication (RPC Bridge)
+
+All Python communication uses a **persistent JSON-RPC server** (`bridge_server.py`) instead of per-call subprocess spawning. The TypeScript plugin uses `fetch()` to send JSON-RPC 2.0 requests to `127.0.0.1:19999`. This eliminates `child_process` from the plugin's security surface — OpenClaw's plugin scanner no longer blocks the plugin, and `--dangerously-force-unsafe-install` is no longer needed.
+
+```
+TypeScript Plugin (no child_process)
+  └── python-bridge.ts / bridge-tools.ts
+      └── rpc-bridge.ts (HTTP fetch, port 19999)
+          └── bridge_server.py (persistent Python daemon)
+              └── bridge_cli.py (command handlers)
+```
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │ OPERATOR LAYER                                                  │
@@ -132,17 +144,43 @@ When `NEMOCLAW_MODEL` env var is present (indicating sandbox proxy), the followi
 
 Outside sandbox mode, these remain fatal if missing.
 
-### Stub Client Fallback
+### Service Plugin Architecture
 
-The claw launcher creates **stub clients** when real services are unavailable (missing CLI tools, no auth tokens):
+External services are activated by credential presence via a **service factory pattern**. Each service has an abstract protocol, a real implementation, and a stub. The factory selects real vs stub based on whether credentials are configured.
 
-| Stub Client | Replaces | Behavior |
+```
+service_factory.py
+  ├── create_github_client()    → GitHubClient or StubGitHubClient    (GITHUB_TOKEN + GITHUB_REPO)
+  ├── create_vercel_client()    → VercelClient or StubVercelClient    (VERCEL_TOKEN)
+  ├── create_sentry_client()    → SentryClient or StubSentryClient    (SENTRY_AUTH_TOKEN)
+  └── create_stripe_client()    → StripeClient or StubStripeClient    (STRIPE_SECRET_KEY)
+```
+
+Each protocol defines only the methods actually used by claw modules:
+
+| Protocol | File | Methods | Stub Behavior |
+|---|---|---|---|
+| `GitHubClientProtocol` | `protocols/github_protocol.py` | `get_open_issues`, `create_issue`, `create_branch`, `commit_file`, `create_pull_request`, `merge_pull_request`, `get_dependabot_alerts`, `get_code_scanning_alerts` | Returns `[]` or `0`, logs |
+| `DeployClientProtocol` | `protocols/deploy_protocol.py` | `trigger_deployment`, `get_deployment_status` | Returns `""` or `"unknown"`, logs |
+| `MonitoringClientProtocol` | `protocols/monitoring_protocol.py` | `get_recent_errors` | Returns `[]`, logs |
+| `PaymentsClientProtocol` | `protocols/payments_protocol.py` | `create_invoice`, `send_invoice`, `get_invoice` | Returns stub invoice, logs |
+
+A claw runs **with or without any external service** — unconfigured services produce log warnings and no-ops rather than crashes. Active services are logged on startup.
+
+### Pricing Configuration
+
+Pricing defaults are read from `MILIMO_*` environment variables (or sensible defaults):
+
+| Variable | Default | Controls |
 |---|---|---|
-| `GitHubClient` | Real GitHub API | Returns empty results, logs warnings |
-| `VercelClient` | Real Vercel API | Returns empty results, logs warnings |
-| `SentryClient` | Real Sentry API | Returns empty results, logs warnings |
-
-Claws degrade gracefully instead of crashing when external services are unavailable.
+| `MILIMO_HOURLY_RATE` | 100 | Default hourly rate |
+| `MILIMO_FLOOR_MULTIPLIER` | 0.8 | Price floor multiplier |
+| `MILIMO_CEILING_MULTIPLIER` | 1.5 | Price ceiling multiplier |
+| `MILIMO_TARGET_MARGIN` | 30 | Target profit margin % |
+| `MILIMO_HOURS_LOW` | 8 | Low complexity hours |
+| `MILIMO_HOURS_MEDIUM` | 20 | Medium complexity hours |
+| `MILIMO_HOURS_HIGH` | 40 | High complexity hours |
+| `MILIMO_HOURS_COMPLEX` | 80 | Complex hours |
 
 ---
 
