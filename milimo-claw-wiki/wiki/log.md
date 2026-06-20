@@ -889,3 +889,24 @@ Each entry follows this format:
 - **Gateway & Daemon Hot-Reload**: Verified that the OpenClaw gateway successfully parsed, validated, hot-reloaded, and restarted under the new Native settings, and successfully re-attached the unprivileged claws daemon launcher in the active sandbox container.
 
 **Notes**: Deployed and fully validated E2E inside container sandbox `openshell-my-assistant-a3c270c5...` with background claw daemons active, achieving 100% success rate on both Pygame Tetris generation and native gateway recovery. All 1,216 tests pass perfectly.
+
+---
+
+### 2026-06-19 — Provider-Agnostic Model Resolution + Gateway Config Bootstrap
+
+**Pages**: `modules/infrastructure/inference-client.md`, `architecture/claw-launcher.md`
+
+**Source**: Hardcoded NVIDIA model defaults (nvidia/nemotron-3-super-120b-a12b) were re-introduced during inference troubleshooting; user flagged this as regression from commit 65b603a
+
+**Changes**:
+- Removed all hardcoded model name defaults from `inference_client.py` and `build_init.py` (both host and sandbox copies)
+- Added `_read_model_from_gateway_config()` and `_read_base_url_from_gateway_config()` in `inference_client.py` as last-resort fallbacks that read from `/sandbox/.openclaw/openclaw.json` at runtime
+- Created `claw_launcher_bootstrap.py` — a wrapper that reads active model + base URL from gateway config, sets env vars (`NEMOCLAW_MODEL`, `NEMOCLAW_INFERENCE_BASE_URL`, `NVIDIA_API_BASE`), then delegates to the real launcher
+- Created `/sandbox/.openclaw/env/model_bootstrap_shell.py` — standalone env exporter for shell use (`eval "$(python3 ...)"`)
+- `inference_client.py` now propagates resolved model to `os.environ` at import time so `_is_sandbox_mode()` and launcher env checks work correctly
+- Model resolution chain (no hardcoded values):
+  - `NEMOCLAW_MODEL` env var → `openclaw.json` config → `None` (graceful)
+  - Fallback chains filter `None` with `if m` comprehension
+- `build_init.py` uses `os.environ.get("NEMOCLAW_MODEL") or ""` — no default
+
+**Notes**: The model is now always resolved from the gateway config, making it provider-agnostic. Change the model in `openclaw.json` and both the gateway and the blueprints pick it up automatically. Start claws with `claw_launcher_bootstrap.py --all --daemon` to automatically bootstrap env vars.

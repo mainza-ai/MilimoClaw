@@ -369,14 +369,17 @@ The Build Claw uses semantic categories to route inference calls to optimal mode
 
 ### Inference Fallback Chain (OmO Pattern)
 
-All inference calls use exponential backoff across a fallback chain:
+All inference calls use exponential backoff across a fallback chain. The primary model slot is resolved from the gateway config at runtime — no hardcoded model name:
 
 ```python
+# Primary resolved from env var → gateway config → None (gracefully excluded)
+# Non-primary fallbacks are provider-agnostic placeholders
 INFERENCE_FALLBACK_CHAIN = [
-    "primary_model",
+    os.environ.get("NEMOCLAW_MODEL") or _read_from_gateway_config(),
     "claude-sonnet-4-6",
     "gemini-3.1-pro",
 ]
+# None entries are filtered out: [m for m in chain if m]
 ```
 
 ---

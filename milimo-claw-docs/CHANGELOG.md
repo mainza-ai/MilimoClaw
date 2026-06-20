@@ -71,6 +71,22 @@ After:  Service factory (create_github_client, create_stripe_client, etc.)
 | `MILIMO_HOURS_HIGH` | 40 | High-complexity hours |
 | `MILIMO_HOURS_COMPLEX` | 80 | Very complex hours |
 
+### Additional: Gateway Config Bootstrap + Config File Fallback
+
+The provider-agnostic defaults from the host-side commit were missing from the sandbox deployment. When troubleshooting a 403 inference error, hardcoded model names were temporarily re-introduced to the sandbox copy. This was reverted and replaced with a more robust dynamic resolution:
+
+1. **Gateway config reader** (`inference_client.py`): Added `_read_model_from_gateway_config()` and `_read_base_url_from_gateway_config()` — reads active model/base URL from `/sandbox/.openclaw/openclaw.json` at import time as last-resort fallback
+2. **Claw launcher bootstrapper** (`claw_launcher_bootstrap.py`): Wrapper script that reads gateway config, exports env vars (`NEMOCLAW_MODEL`, `NEMOCLAW_INFERENCE_BASE_URL`, `NVIDIA_API_BASE`), then launches the real launcher. Provider-agnostic — no hardcoded model names.
+3. **Env propagation**: `inference_client.py` sets `os.environ["NEMOCLAW_MODEL"]` at import time so sandbox mode detection and launcher env checks work correctly
+4. **Sandbox bootstrap scripts**: `/sandbox/.openclaw/env/model_bootstrap_shell.py` and `model_bootstrap.py` for shell use
+
+**Resolution chain (no hardcoded values)**:
+```
+Model:  NEMOCLAW_MODEL env var → openclaw.json config → None (graceful)
+Base:   NEMOCLAW_INFERENCE_BASE_URL env var → NVIDIA_API_BASE → openclaw.json → ultimate fallback URL
+Sandbox: os.environ["NEMOCLAW_MODEL"] set at import or openclaw.json exists
+```
+
 ### Verification
 
 ```

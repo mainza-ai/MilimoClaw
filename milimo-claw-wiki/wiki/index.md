@@ -12,7 +12,7 @@
 
 | Section | Description | Pages |
 |---------|-------------|-------|
-| [[#Architecture]] | System design and isolation model | 11 |
+| [[#Architecture]] | System design and isolation model | 12 |
 | [[#Claws]] | Individual claw documentation | 6 |
 | [[#Coordination]] | Message contracts and War Room | 5 |
 | [[#Evolution]] | Self-evolution system | 8 |
@@ -43,7 +43,8 @@ System architecture and design documentation.
 | [[privacy-router]] | Inference routing and data sensitivity | ✓ |
 | [[workspace-files]] | Workspace file persistence and rebuild behavior | ✓ |
 | [[tool-generation]] | Core evolution system (tools, proposals, registry) | ✓ |
-| [[claw-launcher]] | Claw startup and process supervision | ✓ |
+| [[claw-launcher]] | Claw startup, process supervision, bootstrapper | ✓ |
+| [[inference-client]] | Model-agnostic inference client, fallback chain, category routing | ✓ |
 | [[assistant-system]] | Conversational assistant configuration | ✓ |
 | [[workspace-files]] | Agent workspace persistence and semantics | ✓ |
 

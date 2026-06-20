@@ -2,9 +2,11 @@
 
 **Summary**: Production-grade claw process supervisor with health monitoring, auto-restart, and daemon mode.
 
-**Sources**: `milimo-blueprint/orchestrator/claw_launcher.py`
+**Sources**:
+- `milimo-blueprint/orchestrator/claw_launcher.py`
+- `milimo-blueprint/orchestrator/claw_launcher_bootstrap.py`
 
-**Last updated**: 2026-04-23
+**Last updated**: 2026-06-19
 
 **Tags**: #architecture #startup
 
@@ -12,7 +14,7 @@
 
 ## Purpose
 
-Manages claw process lifecycle: startup, health monitoring, auto-restart, and graceful shutdown.
+Manages claw process lifecycle: startup, health monitoring, auto-restart, and graceful shutdown. Uses a bootstrapper wrapper to inject runtime configuration before the launcher starts.
 
 ## Location
 
@@ -45,10 +47,33 @@ class ClawLauncher:
 
 ---
 
+## Bootstrapper
+
+Before the launcher can start, [[inference-client]] needs `NEMOCLAW_MODEL` and `NEMOCLAW_INFERENCE_BASE_URL` set. These are resolved from the OpenClaw gateway config (`openclaw.json`) by a bootstrapper wrapper:
+
+**File**: `orchestrator/claw_launcher_bootstrap.py`
+
+The bootstrapper:
+1. Reads `/sandbox/.openclaw/openclaw.json`
+2. Extracts the active model from `models.providers.<any>.models[0].name/.id` or `agents.defaults.model.primary`
+3. Extracts the inference base URL from `models.providers.<any>.baseUrl`
+4. Sets `NEMOCLAW_MODEL`, `NEMOCLAW_INFERENCE_BASE_URL`, and `NVIDIA_API_BASE` env vars
+5. Delegates to the real `claw_launcher.py`
+
+**Start command**:
+```bash
+python3 orchestrator/claw_launcher_bootstrap.py --all --daemon
+```
+
+No hardcoded model names or provider IDs — the resolver is provider-agnostic.
+
+---
+
 ## Startup Sequence
 
 ```
-1. Validate environment (required env vars)
+0. Bootstrap env vars from gateway config (bootstrapper)
+1. Validate environment (required env vars, skip in sandbox mode)
 2. Create mesh directories (heartbeats, inbox, outbox)
 3. Start HTTP health endpoint
 4. For each claw role:
@@ -173,14 +198,14 @@ Default port: 8081 (content). Each claw gets its own: content=8081, ops=8082, an
 ## CLI Usage
 
 ```bash
-# Start all claws
-python3 claw_launcher.py --all
+# Start all claws (with bootstrapper — preferred)
+python3 claw_launcher_bootstrap.py --all --daemon
+
+# Start all claws (direct — requires env vars already set)
+python3 claw_launcher.py --all --daemon
 
 # Start specific claw
 python3 claw_launcher.py --role build
-
-# Run as daemon
-python3 claw_launcher.py --all --daemon
 
 # Check status
 python3 claw_launcher.py --status

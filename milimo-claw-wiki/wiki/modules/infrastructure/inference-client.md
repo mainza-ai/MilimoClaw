@@ -1,21 +1,45 @@
 # Inference Client
 
-**Summary**: NVIDIA NIM API client with fallback chain and category-based model routing.
+**Summary**: OpenAI-compatible inference client with fallback chain, category-based model routing, and provider-agnostic model resolution.
 
 **Sources**:
 - `milimo-blueprint/orchestrator/inference_client.py`
 
-**Last updated**: 2026-04-29
+**Last updated**: 2026-06-19
 
-**Tags**: #module #inference #ai #nvidia
+**Tags**: #module #inference #ai
 
 ---
 
 ## Overview
 
-InferenceClient wraps the NVIDIA NIM API (OpenAI-compatible) for all inference needs. Implements fallback chain and category-based model/temperature selection.
+The inference client wraps an OpenAI-compatible API for all inference needs across all claws. It implements a fallback chain, category-based model/temperature selection, and cost tracking.
 
-**Official default model** (NemoClaw v0.0.29): `nvidia/nemotron-3-super-120b-a12b` via NVIDIA Endpoints at `integrate.api.nvidia.com/v1`, routed through `inference.local` proxy inside the sandbox.
+**Key design principle**: No hardcoded model names or providers. The active model is resolved dynamically from the gateway config at runtime.
+
+---
+
+## Model Resolution Chain
+
+The active model is resolved through this priority chain (no hardcoded defaults):
+
+```
+1. NEMOCLAW_MODEL env var (set by bootstrapper from gateway config)
+2. openclaw.json → models.providers.<any>.models[0].name/.id
+3. openclaw.json → agents.defaults.model.primary
+4. None (graceful — calls will use fallback chain)
+```
+
+The inference base URL resolves through:
+
+```
+1. NEMOCLAW_INFERENCE_BASE_URL env var
+2. NVIDIA_API_BASE env var
+3. openclaw.json → models.providers.<any>.baseUrl
+4. https://integrate.api.nvidia.com/v1 (ultimate fallback)
+```
+
+The resolution happens at module import time in [[bootstrapper|claw-launcher-bootstrapper]], which reads the gateway config, exports env vars, then launches the claw process. This ensures the model always matches what the gateway is configured to serve, regardless of provider or model name.
 
 ---
 
@@ -35,23 +59,25 @@ class NvidiaInferenceClient:
 ```
 
 **Environment Variables**:
-- `NVIDIA_API_KEY` — API key for NVIDIA NIM (official NemoClaw env var)
-- `NVIDIA_API_BASE` — Base URL override (MilimoClaw extension; official NemoClaw routes via `inference.local` proxy and `NEMOCLAW_INFERENCE_API_OVERRIDE` for cross-provider switching)
-- `NEMOCLAW_MODEL` — Primary inference model (set during `nemoclaw onboard`, required)
-- `INFERENCE_FALLBACK` — Comma-separated fallback models
+- `NVIDIA_API_KEY` — API key (injected by sandbox gateway proxy in sandbox mode)
+- `NVIDIA_API_BASE` — Base URL override
+- `NEMOCLAW_MODEL` — Primary inference model (resolved from gateway config)
+- `NEMOCLAW_INFERENCE_BASE_URL` — Proxy-routed inference endpoint (resolved from gateway config)
+- `INFERENCE_FALLBACK` — Comma-separated fallback model list (optional override)
 
 ---
 
 ## Fallback Chain
 
-Default fallback order (model from `NEMOCLAW_MODEL` env var, set during `nemoclaw onboard`):
-1. `NEMOCLAW_MODEL`
-2. `meta/llama-3.3-70b-instruct` — MilimoClaw addition (not in official NemoClaw model catalog)
-3. `mistralai/mixtral-8x22b-instruct-v0.1` — MilimoClaw addition (not in official NemoClaw model catalog)
+Default fallback order (primary model from env/config, listed non-primary fallbacks are provider-agnostic placeholders):
 
-> **Note:** The official NemoClaw v0.0.29 model catalog includes only `nvidia/`-prefixed NVIDIA Endpoint models, plus OpenAI, Anthropic, and Google Gemini providers. The `meta/` and `mistralai/` fallbacks are MilimoClaw extensions that require the corresponding models to be available on the configured inference endpoint.
+1. `NEMOCLAW_MODEL` — Resolved from gateway config or env var
+2. `meta/llama-3.3-70b-instruct` — Generic fallback
+3. `mistralai/mixtral-8x22b-instruct-v0.1` — Generic fallback
 
-On failure, automatically tries next model in chain.
+> **Note:** The primary model slot (`NEMOCLAW_MODEL`) has no hardcoded default. If unset and unreadable from the gateway config, it is excluded from the chain entirely (`if m` filter in the chain comprehension). The listed fallbacks are generic model IDs that may or may not be available on the configured endpoint.
+
+On failure, automatically tries next model in chain with exponential backoff (2^attempt seconds).
 
 ---
 

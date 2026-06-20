@@ -43,7 +43,55 @@ from typing import Any
 
 logger = logging.getLogger("milimo.inference_client")
 
-_NEMOCLAW_MODEL = os.environ.get("NEMOCLAW_MODEL")
+_GATEWAY_CONFIG_PATH = "/sandbox/.openclaw/openclaw.json"
+
+
+def _read_model_from_gateway_config() -> str | None:
+    """Read active model from the gateway config file as last-resort fallback.
+
+    Checks models.providers.<provider>.models[0].name/.id, then
+    agents.defaults.model.primary.
+    """
+    try:
+        with open(_GATEWAY_CONFIG_PATH) as f:
+            cfg = json.load(f)
+        models_providers = cfg.get("models", {}).get("providers", {})
+        for prov in models_providers.values():
+            for m in prov.get("models", []):
+                name = m.get("name") or m.get("id")
+                if name:
+                    return name
+        agent_primary = (
+            cfg.get("agents", {})
+            .get("defaults", {})
+            .get("model", {})
+            .get("primary")
+        )
+        if agent_primary:
+            return agent_primary
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        pass
+    return None
+
+
+def _read_base_url_from_gateway_config() -> str | None:
+    """Read inference base URL from the gateway config file."""
+    try:
+        with open(_GATEWAY_CONFIG_PATH) as f:
+            cfg = json.load(f)
+        models_providers = cfg.get("models", {}).get("providers", {})
+        for prov in models_providers.values():
+            base = prov.get("baseUrl")
+            if base:
+                return base.rstrip("/")
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        pass
+    return None
+
+
+_NEMOCLAW_MODEL = os.environ.get("NEMOCLAW_MODEL") or _read_model_from_gateway_config()
+if _NEMOCLAW_MODEL and not os.environ.get("NEMOCLAW_MODEL"):
+    os.environ["NEMOCLAW_MODEL"] = _NEMOCLAW_MODEL
 
 DEFAULT_FALLBACK_CHAIN = [
     m
@@ -55,9 +103,17 @@ DEFAULT_FALLBACK_CHAIN = [
     if m
 ]
 
-DEFAULT_API_BASE = os.environ.get(
-    "NVIDIA_API_BASE", "https://integrate.api.nvidia.com/v1"
+DEFAULT_API_BASE = (
+    os.environ.get("NEMOCLAW_INFERENCE_BASE_URL")
+    or os.environ.get("NVIDIA_API_BASE")
+    or _read_base_url_from_gateway_config()
+    or "https://integrate.api.nvidia.com/v1"
 )
+# Propagate to env so downstream code (like claw_launcher) sees it
+if not os.environ.get("NEMOCLAW_INFERENCE_BASE_URL") and DEFAULT_API_BASE:
+    os.environ.setdefault("NEMOCLAW_INFERENCE_BASE_URL", DEFAULT_API_BASE)
+if not os.environ.get("NVIDIA_API_BASE") and DEFAULT_API_BASE:
+    os.environ.setdefault("NVIDIA_API_BASE", DEFAULT_API_BASE)
 
 CATEGORY_MODELS: dict[str, dict[str, Any]] = {
     "source_code_generation": {"model": _NEMOCLAW_MODEL, "temperature": 0.1},
@@ -123,7 +179,7 @@ def _resolve_api_base() -> str:
 
 def _is_sandbox_mode() -> bool:
     """Return True when running inside a NemoClaw sandbox."""
-    return bool(os.environ.get("NEMOCLAW_MODEL"))
+    return bool(_NEMOCLAW_MODEL or os.path.exists(_GATEWAY_CONFIG_PATH))
 
 
 class NvidiaInferenceClient:
