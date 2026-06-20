@@ -132,6 +132,7 @@ class GitHubClient:
         json_body: dict[str, Any] | None = None,
     ) -> Any:
         """Fallback HTTP via stdlib urllib."""
+        import urllib.error
         import urllib.request
 
         url = f"{GITHUB_API_BASE}{path}"
