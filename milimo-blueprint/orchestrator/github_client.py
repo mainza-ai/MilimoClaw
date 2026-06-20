@@ -51,7 +51,9 @@ class GitHubClient:
         timeout: int = DEFAULT_TIMEOUT,
     ) -> None:
         self.repo = repo or os.environ.get("GITHUB_REPO", "")
-        self.token = token or os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN", "")
+        self.token = (
+            token or os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN", "")
+        )
         self.timeout = timeout
 
         if not self.token:
@@ -104,7 +106,11 @@ class GitHubClient:
                     except Exception:
                         detail = resp.text[:200]
                     logger.warning(
-                        "GitHub API %s %s: %s — %s", method, path, resp.status_code, detail
+                        "GitHub API %s %s: %s — %s",
+                        method,
+                        path,
+                        resp.status_code,
+                        detail,
                     )
                     return None
                 text = resp.text
@@ -112,7 +118,9 @@ class GitHubClient:
         except Exception as exc:
             logger.warning(
                 "GitHub API %s %s unavailable (sandbox proxy blocked): %s",
-                method, path, exc,
+                method,
+                path,
+                exc,
             )
             return None
 
@@ -130,6 +138,7 @@ class GitHubClient:
         data = json.dumps(json_body).encode("utf-8") if json_body else None
         if params:
             import urllib.parse
+
             url += "?" + urllib.parse.urlencode(params)
 
         req = urllib.request.Request(
@@ -149,7 +158,9 @@ class GitHubClient:
         except Exception as exc:
             logger.warning(
                 "GitHub API %s %s unavailable (sandbox proxy blocked): %s",
-                method, path, exc,
+                method,
+                path,
+                exc,
             )
             return None
 
@@ -249,12 +260,16 @@ class GitHubClient:
         """Create a new branch from the specified base branch."""
         result = subprocess.run(
             ["git", "checkout", "-b", branch_name, f"origin/{base_branch}"],
-            capture_output=True, text=True, timeout=self.timeout,
+            capture_output=True,
+            text=True,
+            timeout=self.timeout,
         )
         if result.returncode != 0:
             result = subprocess.run(
                 ["git", "branch", branch_name],
-                capture_output=True, text=True, timeout=self.timeout,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
             )
             if result.returncode != 0:
                 raise RuntimeError(
@@ -265,7 +280,9 @@ class GitHubClient:
         """Delete a branch locally and remotely."""
         subprocess.run(
             ["git", "branch", "-D", branch_name],
-            capture_output=True, text=True, timeout=self.timeout,
+            capture_output=True,
+            text=True,
+            timeout=self.timeout,
         )
         self._request(
             "DELETE",
@@ -387,7 +404,9 @@ class GitHubClient:
             "GET",
             self._repo_path(f"/pulls/{pr_number}/files"),
         )
-        return [{"filename": f.get("filename")} for f in (result or []) if f.get("filename")]
+        return [
+            {"filename": f.get("filename")} for f in (result or []) if f.get("filename")
+        ]
 
     def merge_pull_request(
         self,
@@ -434,9 +453,7 @@ class GitHubClient:
     def get_dependabot_alerts(self) -> list[dict[str, Any]]:
         """Fetch Dependabot security alerts via the API."""
         try:
-            return self._request(
-                "GET", self._repo_path("/dependabot/alerts")
-            ) or []
+            return self._request("GET", self._repo_path("/dependabot/alerts")) or []
         except RuntimeError as exc:
             logger.warning("Failed to fetch Dependabot alerts: %s", exc)
             return []
@@ -444,9 +461,7 @@ class GitHubClient:
     def get_code_scanning_alerts(self) -> list[dict[str, Any]]:
         """Fetch CodeQL scanning alerts via the API."""
         try:
-            return self._request(
-                "GET", self._repo_path("/code-scanning/alerts")
-            ) or []
+            return self._request("GET", self._repo_path("/code-scanning/alerts")) or []
         except RuntimeError as exc:
             logger.warning("Failed to fetch CodeQL alerts: %s", exc)
             return []
@@ -454,9 +469,10 @@ class GitHubClient:
     def run_dependency_graph(self) -> dict[str, Any]:
         """Get repository dependency graph summary."""
         try:
-            return self._request(
-                "GET", self._repo_path("/dependency-graph/snapshots")
-            ) or {}
+            return (
+                self._request("GET", self._repo_path("/dependency-graph/snapshots"))
+                or {}
+            )
         except RuntimeError as exc:
             logger.warning("Failed to fetch dependency graph: %s", exc)
             return {}

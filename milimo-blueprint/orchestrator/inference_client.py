@@ -62,10 +62,7 @@ def _read_model_from_gateway_config() -> str | None:
                 if name:
                     return name
         agent_primary = (
-            cfg.get("agents", {})
-            .get("defaults", {})
-            .get("model", {})
-            .get("primary")
+            cfg.get("agents", {}).get("defaults", {}).get("model", {}).get("primary")
         )
         if agent_primary:
             return agent_primary
