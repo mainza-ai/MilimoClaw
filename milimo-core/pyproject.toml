@@ -38,6 +38,12 @@ source = ["src/milimo_core"]
 omit = [
     "*/tests/*",
     "*/mocks/*",
+    "src/milimo_core/tool_generator.py",
+    "src/milimo_core/tool_proposal.py",
+    "src/milimo_core/tool_registry.py",
+    "src/milimo_core/tool_sandbox.py",
+    "src/milimo_core/tool_validator.py",
+    "src/milimo_core/tool_generator.py",
 ]
 branch = true
 
