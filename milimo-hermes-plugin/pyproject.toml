@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+[project]
+name = "milimo-hermes-plugin"
+version = "0.2.0"
+description = "Hermes profile plugin for MilimoClaw"
+requires-python = ">=3.11"
+dependencies = [
+    "milimo-core",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+package = false
+managed = true
