@@ -235,7 +235,8 @@ export NEMOCLAW_SANDBOX_NAME=milimo-hermes
 | D3 | `uv` workspace | ✅ Done |
 | E1 | ADRs | ✅ Done |
 | E2 | README decision tree | ✅ Done |
-| E3 | CLAUDE.md updates | 📋 Planned |
+| E3 | CLAUDE.md terminology | ✅ Done |
+| E4 | GitHub Actions CI + v0.2.0 tag | ✅ **Complete** |
 
 ---
 

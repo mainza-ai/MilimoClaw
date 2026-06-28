@@ -345,7 +345,7 @@ docs/adr/
 ## Next Steps (Immediate)
 
 1. **E4**: ✅ **v0.2.0 tagged**
-2. **GitHub Actions CI**: Add Hermes pipeline (smoke test with `NEMOCLAW_POLICY_TIER=restricted`)
+2. **GitHub Actions CI**: ✅ **Hermes CI workflow added** (`.github/workflows/hermes-ci.yml`)
 3. **PyPI publish**: `milimo-core` package post-v0.2.0
 
 ---
