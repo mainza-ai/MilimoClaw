@@ -22,6 +22,14 @@ test = [
     "faker>=20.0",
 ]
 
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["milimo_core*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
@@ -61,7 +69,3 @@ pythonVersion = "3.11"
 
 [tool.ruff.lint]
 ignore = ["E402"]
-
-[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
