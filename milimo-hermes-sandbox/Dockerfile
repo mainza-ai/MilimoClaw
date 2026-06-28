@@ -17,7 +17,7 @@
 # - OpenShell L7 proxy for credential injection
 # - Default network policies (Restricted tier)
 # - Dashboard assets at /opt/hermes/ui-tui
-FROM ghcr.io/nvidia/nemoclaw/hermes-sandbox-base:latest
+FROM ghcr.io/nvidia/nemoclaw/hermes-sandbox-base:v0.3.0
 
 # --- Build-time Configuration ---
 # These ARGs can be overridden at build time
