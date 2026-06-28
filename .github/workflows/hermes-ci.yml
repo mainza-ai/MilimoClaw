@@ -1,0 +1,168 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+name: Hermes CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  hermes-integration:
+    name: Hermes Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install milimo-core (editable)
+        run: |
+          cd milimo-core
+          uv pip install -e .[test]
+
+      - name: Install milimo-hermes-plugin (editable)
+        run: |
+          cd milimo-hermes-plugin
+          uv pip install -e .
+
+      - name: Run Hermes Integration Tests
+        run: |
+          cd milimo-hermes-plugin
+          python -m pytest tests/integration/ -v
+        env:
+          NEMOCLAW_POLICY_TIER: restricted
+          NEMOCLAW_NON_INTERACTIVE: 1
+          NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE: 1
+          NEMOCLAW_SANDBOX_NAME: milimo-hermes-ci
+
+      - name: Run milimo-core Unit Tests
+        run: |
+          cd milimo-core
+          python -m pytest tests/unit/ -v
+        env:
+          NEMOCLAW_POLICY_TIER: restricted
+          NEMOCLAW_NON_INTERACTIVE: 1
+
+      - name: Run milimo-core Coverage Gate
+        run: |
+          cd milimo-core
+          python -m pytest tests/ --cov=milimo_core --cov-fail-under=80 -q
+        env:
+          NEMOCLAW_POLICY_TIER: restricted
+          NEMOCLAW_NON_INTERACTIVE: 1
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: milimo-core-coverage
+          path: milimo-core/coverage/
+          retention-days: 30
+
+  hermes-smoke:
+    name: Hermes Smoke Test (Onboarding)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: hermes-integration
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Hermes Sandbox
+        run: |
+          cd milimo-hermes-sandbox
+          docker build -t milimo-hermes:ci .
+
+      - name: Run Non-Interactive Onboarding
+        run: |
+          cd milimo-hermes-sandbox
+          docker run --rm \
+            -e NEMOCLAW_NON_INTERACTIVE=1 \
+            -e NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1 \
+            -e NEMOCLAW_POLICY_TIER=restricted \
+            -e NEMOCLAW_SANDBOX_NAME=milimo-hermes-ci \
+            -e NVIDIA_API_KEY=${{ secrets.NVIDIA_API_KEY }} \
+            milimo-hermes:ci \
+            ./install-hermes.sh --non-interactive --auth-mode api_key
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+        timeout-minutes: 45
+
+      - name: Verify Dashboard Endpoint
+        run: |
+          cd milimo-hermes-sandbox
+          docker run --rm \
+            -e NEMOCLAW_NON_INTERACTIVE=1 \
+            -e NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1 \
+            -e NEMOCLAW_POLICY_TIER=restricted \
+            -e NEMOCLAW_SANDBOX_NAME=milimo-hermes-ci \
+            -e NVIDIA_API_KEY=${{ secrets.NVIDIA_API_KEY }} \
+            -p 8642:8642 \
+            -d milimo-hermes:ci \
+            ./install-hermes.sh --non-interactive --auth-mode api_key &
+          sleep 10
+          curl -sf http://localhost:8642/health || exit 1
+          curl -sf http://localhost:8642/warroom || exit 1
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+        timeout-minutes: 10
+
+  blueprint-integration:
+    name: Blueprint Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install milimo-core (editable)
+        run: |
+          cd milimo-core
+          uv pip install -e .[test]
+
+      - name: Install milimo-blueprint (editable)
+        run: |
+          cd milimo-blueprint
+          uv pip install -e .
+
+      - name: Run Blueprint Tests
+        run: |
+          cd milimo-blueprint
+          PYTHONPATH=orchestrator python -m pytest tests/ -v --tb=short
+        env:
+          NEMOCLAW_POLICY_TIER: restricted
+          NEMOCLAW_NON_INTERACTIVE: 1
