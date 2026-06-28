@@ -21,6 +21,34 @@
 
 **Milimo Claw** (derived from the Tonga word for *"works," "tasks," or "labour"*) is a multi-agent autonomous hustle platform built on [NVIDIA NemoClaw](https://github.com/NVIDIA/NemoClaw). It turns a squad of operators running NemoClaw sandboxes into a coordinated, self-evolving, AI-powered business operation that runs 24/7.
 
+### 🎯 Choose Your Profile
+
+MilimoClaw runs on **NemoClaw** with two profiles:
+
+| Profile | Interface | Best For | Inference |
+|---------|-----------|----------|-----------|
+| **OpenClaw** (default) | TUI + Bridge Server | Solo operators, local development | NVIDIA NIM / Local |
+| **Hermes** | Web Dashboard (port 18789) + OpenAI-compatible API (port 8642) | Teams, headless CI/CD, managed tool gateways | Native `delegate_task` + `cronjob` |
+
+**Decision tree**:
+```
+Need web search / browser automation / image gen / audio?
+  → Yes: Use Hermes profile + Nous Portal OAuth at onboarding (--auth-mode nous_oauth)
+  → No:  Use OpenClaw profile (standard API key)
+
+Need durable scheduled jobs (cronjob) that survive restarts?
+  → Yes: Use Hermes profile (native cronjob)
+  → No:  OpenClaw (threading.Timer works for solo)
+
+Running in CI/CD or headless server?
+  → Yes: Hermes profile (non-interactive onboarding, OpenAI-compatible API)
+  → No:  OpenClaw profile (TUI-first)
+
+Want zero-config solo setup?
+  → Yes: OpenClaw (`./install.sh --solo`)
+  → No:  Hermes (Docker + dashboard)
+```
+
 ### 💡 Solo Operator Mode
 
 For solo founders and edge developers, **Solo Mode** runs all six autonomous claws concurrently within a single sandboxed environment (using any GPU-enabled PC for local inference, or any CPU/GPU system using cloud connections). It delivers the full power of a multi-agent business mesh without multi-host cluster configuration overhead, making it the most popular and streamlined way to run the platform.
@@ -37,6 +65,31 @@ Milimo Claw supports cross-platform environments, freeing operators from specifi
 * **NVIDIA GPU-Enabled PCs** (such as RTX or data center cards) for local NIM inference.
 
 By utilizing NemoClaw's flexible inference router, claws fall back from local containerized NIM microservices to cloud APIs (such as the NVIDIA NIM Cloud API) when running on non-NVIDIA or light hardware.
+
+### Dual-Profile Architecture (New in v0.2.0)
+
+Milimo Claw now runs on **two NemoClaw profiles** sharing a single `milimo-core` library:
+
+| Profile | Interface | Parallelism | Scheduling | Use Case |
+|---------|-----------|-------------|------------|----------|
+| **OpenClaw** (default) | TUI + Bridge Server | `sessions_spawn` (depth ≤ 2) | Python `threading.Timer` | Terminal-native operators, existing OpenClaw users |
+| **Hermes** | Web Dashboard (port 18789) + OpenAI-compatible API (port 8642) | Native `delegate_task` (no depth limit) | Native `cronjob` (durable) | Web-based operators, CI/CD, managed tool gateways |
+
+**Quick decision tree**:
+
+```
+Do you want web search / browser automation inside Hermes?
+  → Yes: Use Nous Portal OAuth at onboarding (--auth-mode nous_oauth)
+  → No:  API-key mode is sufficient
+
+Are you on a headless remote host?
+  → Yes: Set CHAT_UI_URL before onboarding, or use SSH port forwarding
+  → No (local machine): Dashboard at http://127.0.0.1:18789/
+
+Do you want a web dashboard UI?
+  → Yes: nemohermes (Hermes profile)
+  → No:  nemoclaw (OpenClaw profile, default)
+```
 
 ### Stateful Process Supervision
 

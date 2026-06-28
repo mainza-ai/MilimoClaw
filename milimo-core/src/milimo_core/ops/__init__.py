@@ -14,6 +14,7 @@ from .scope_monitor import ScopeMonitor
 from .incident_analyzer import IncidentAnalyzer
 from .runbook_executor import RunbookExecutor
 from .webhook_server import OpsWebhookServer
+from .approval_handler import OpsApprovalHandler, OpsApprovalAction
 
 __all__ = [
     "OpsClaw",
@@ -30,4 +31,6 @@ __all__ = [
     "IncidentAnalyzer",
     "RunbookExecutor",
     "OpsWebhookServer",
+    "OpsApprovalHandler",
+    "OpsApprovalAction",
 ]

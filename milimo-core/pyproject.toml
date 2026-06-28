@@ -4,7 +4,6 @@ version = "0.1.0"
 description = "Shared orchestrator library for MilimoClaw (OpenClaw + Hermes profiles)"
 requires-python = ">=3.11"
 dependencies = [
-    "pytest>=7.0",
     "pyyaml>=6.0",
     "requests>=2.28",
     "stripe>=5.0",
@@ -13,6 +12,39 @@ dependencies = [
     "cryptography>=41.0",
     "httpx>=0.24",
 ]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-cov>=4.0",
+    "pytest-mock>=3.10",
+    "faker>=20.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning:orchestrator.*",
+]
+
+[tool.coverage.run]
+source = ["src/milimo_core"]
+omit = [
+    "*/tests/*",
+    "*/mocks/*",
+]
+branch = true
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+precision = 2
 
 [tool.pyright]
 include = ["src/milimo_core", "tests"]

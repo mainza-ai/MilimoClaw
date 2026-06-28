@@ -2,7 +2,7 @@
 
 **Summary**: Append-only record of all wiki operations.
 
-**Last updated**: 2026-05-24
+**Last updated**: 2026-06-28
 
 **Tags**: #log #meta
 
@@ -11,6 +11,265 @@
 ## Log Format
 
 Each entry follows this format:
+
+---
+
+### 2026-06-28 — Phase D1/D2 Complete: Hermes Integration Tests + Coverage Gate (v0.2.0 Ready)
+
+**Pages**: `README.md`, `milimo-claw-wiki/CLAUDE.md`, `wiki/index.md`, `wiki/architecture/hermes-profile.md`, `wiki/implementation-plan.md`, `milimo-hermes-plugin/tests/integration/*`
+
+**Source**: All 58 Hermes integration tests pass; `milimo-core` coverage gate achieved (≥80% all modules)
+
+**Changes**:
+- **Phase D1 Complete** — Hermes test pyramid:
+  - 58 integration tests passing: 18 delegation, 20 scheduler, 20 tools
+  - Fixed: `CostGuardConfig` kwargs, `asyncio.run()` in sync handlers, `EvolutionSchedulerConfig` fields, warroom veto response
+- **Phase D2 Complete** — Coverage gate achieved (all new modules ≥80%):
+  - `cost_guard`: 98.90%, `evolution_scheduler`: 88.89%, `hermes_credential_adapter`: 100%
+  - `approval_handler`: 99.15%, `notifications`: 96.26%, `ssrf_validator`: 90.85%
+  - `milimo_paths`: 83.08%, `protocols/*`: 100%
+- **Phase E2 Complete** — README dual-profile decision tree added
+- **Phase E3 Complete** — CLAUDE.md terminology updated: "claw handlers" (not "skills")
+- **Docs updated**: hermes-profile.md Phase Status, implementation-plan.md Phase D, index.md date
+
+**Total test suite**: 1,557 tests pass (265 core + 58 Hermes integration + 1,234 blueprint)
+
+---
+
+### 2026-06-27 — MilimoClaw × Hermes Dual-Track Implementation Plan (Phase A Complete, v0.1.0)
+
+**Pages**: `implementation-plan.md`, `milimo-core/CHANGELOG.md`, `docs/adr/001-subagent-isolation.md` through `005-delegation-asymmetry.md`, `milimo-hermes-plugin/*`, `milimo-blueprint/milimo-compatibility.json`, `milimo-blueprint/policies/milimo-mcp.yaml`, `milimo-hermes-sandbox/*`
+
+**Source**: Dual-track Hermes integration — preserve OpenClaw, add web dashboard + OpenAI-compatible API via shared `milimo-core`
+
+**Changes**:
+- **Phase A Complete** — All critical blockers implemented and tagged v0.1.0:
+  - **A0**: `DelegationAdapter` ABC in `milimo_core.protocols.delegation` with `ClawTask`/`ClawResult` types and per-claw `CLAW_TOOLSETS`/`CLAW_CONTEXTS`
+  - **A1**: Core Hermes tools: `milimo_status`, `milimo_warroom`, `milimo_approve`, `milimo_veto`, `delegate_task` (all use shared types from A0)
+  - **A2**: `HermesCredentialAdapter` — GitHub via `gh auth token`; Stripe/Vercel/Sentry/NVIDIA via OpenShell L7 proxy placeholders
+  - **A3**: `HermesDelegateAdapter` — Implements `DelegationAdapter` using native `delegate_task`; `DELEGATION_MAX_CONCURRENT_CHILDREN=6`
+  - **Bonus**: Scheduling protocol (`SchedulerInterface` ABC) + `HermesCronScheduler` (native `cronjob`, durable)
+  - **Bonus**: War Room HTML at `/warroom` — htmx, zero build step, auto-refreshes
+  - **Bonus**: `milimo-compatibility.json` — delegation, cron, warroom, cost_guard, auth config
+  - **Bonus**: `MockDelegationAdapter` in `milimo_core.tests.mocks` for cross-profile unit testing
+  - **All 5 ADRs created**: 001 (subagent isolation), 002 (warroom), 003 (packaging), 004 (sandbox naming), 005 (delegation asymmetry)
+  - **1217 tests pass** via backward-compat shims in `milimo-blueprint/orchestrator/`
+- **Key doc-grounded corrections from Hermes docs**:
+  - Plugin is image-resident (Dockerfile `--from`), NOT hot-loadable via `hermes plugin install`
+  - Network policy is binary-scoped: must allow `/opt/hermes/.venv/bin/python` per host
+  - `nemohermes` is an alias, not separate binary; use `NEMOCLAW_AGENT=hermes` env vars
+  - GitHub not in baseline policy; must apply `github` preset at onboarding
+  - Default sandbox name `milimo-hermes` avoids collision with existing `hermes` sandbox
+  - `CHAT_UI_URL` must be set at build time for headless deployments
+  - Nous Portal OAuth enables managed tool gateways; API key is default
+  - Model Router deferred; use `delegation.model_overrides` per claw instead
+- **v0.1.0 tagged** — First version with all extension point protocols (`DelegationAdapter`, `SchedulerInterface`) and credential adapter
+
+---
+
+### 2026-06-28 — Phase C1 Complete: SSRF Validation for Egress Hosts
+
+**Pages**: `milimo-core/src/milimo_core/ssrf_validator.py`, `milimo-blueprint/policies/milimo-mcp.yaml`, `wiki/architecture/hermes-profile.md`, `wiki/implementation-plan.md`
+
+**Source**: Phase C1 implementation — SSRF validation against NemoClaw's SSRF policy
+
+**Changes**:
+- **SSRF Validator** (`milimo-core/src/milimo_core/ssrf_validator.py`):
+  - New: `SSRFValidator` class validating endpoints against NemoClaw's SSRF policy
+  - Blocks private networks (RFC 1918, RFC 3927, RFC 4193, loopback, multicast)
+  - Blocks cloud metadata services (169.254.169.254, fd00:ec2::254)
+  - Blocks RFC 2544 benchmark range (198.18.0.0/15)
+  - Validates DNS resolution to public IPs only
+  - CLI with options: `--allow-private`, `--allow-rfc2544`, `--skip-dns`, `--allow-local-nim`, `--fail-on-warning`, `--output`
+  - Exports: `SSRFValidator`, `SSRFPolicy`, `SSRFValidationResult`, `SSRFValidationReport`
+
+- **Policy Validation** (`milimo-blueprint/policies/milimo-mcp.yaml`):
+  - All 17 endpoints validated (15 required + 2 optional)
+  - Required endpoints: GitHub, npm, PyPI, Stripe, Vercel, Sentry, Twitter/X, LinkedIn, TikTok, NVIDIA NIM, ipapi.co, ip-api.com
+  - Optional endpoints: ncp.api.nvidia.com, nim-service.local (allowed with `--allow-local-nim`)
+  - Explicit deny rules for SSH, MySQL, PostgreSQL, metadata service
+
+- **Integration**:
+  - Exported from `milimo_core` package
+  - Can be run in CI: `python -m milimo_core.ssrf_validator --policy milimo-blueprint/policies/milimo-mcp.yaml --allow-local-nim`
+  - Output JSON report with `--output report.json`
+
+- **Verification**:
+  - All 17 endpoints pass validation (with `--allow-local-nim` for local inference)
+  - All 1217 tests in `milimo-blueprint` still pass
+
+---
+
+### 2026-06-28 — Phase C2 Complete: Slack/Telegram Push in War Room
+
+**Pages**: `milimo-core/src/milimo_core/notifications.py`, `milimo-hermes-plugin/milimo_hermes_plugin/tools.py`, `milimo-hermes-plugin/milimo_hermes_plugin/__init__.py`, `wiki/architecture/hermes-profile.md`, `wiki/implementation-plan.md`
+
+**Source**: Phase C2 implementation — Slack/Telegram push for War Room alerts
+
+**Changes**:
+- **Notifications Module** (`milimo-core/src/milimo_core/notifications.py`):
+  - New: `WarRoomNotifier`, `SlackNotifier`, `TelegramNotifier`
+  - `WarRoomNotifier.notify_hold_alert()` — Sends HOLD queue alerts with urgency flags
+  - `WarRoomNotifier.notify_cost_guard()` — Token usage (60% warning, 80% alert, 95% critical)
+  - `WarRoomNotifier.notify_analytics_summary()` — Weekly analytics reports
+  - Slack: webhook + Bot API, `SLACK_ALLOWED_CHANNELS` baked at build
+  - Telegram: Bot API, `TELEGRAM_ALLOWED_IDS` runtime
+  - Exports: `WarRoomNotifier`, `SlackConfig`, `TelegramConfig`, `NotificationPayload`, `init_warroom_notifier`, `get_warroom_notifier`
+
+- **War Room Tool Integration** (`milimo-hermes-plugin/milimo_hermes_plugin/tools.py`):
+  - `milimo_warroom` actions `hold_queue`/`cost_guard`/`approve`/`veto` trigger notifications
+
+- **Plugin Init** (`milimo-hermes-plugin/milimo_hermes_plugin/__init__.py`):
+  - Initializes `WarRoomNotifier` on load
+
+- **Verification**: All 1217 tests pass; HOLD/cost guard notifications trigger correctly
+
+---
+
+### 2026-06-28 — Phase C3 Complete: Install Script --auth-mode Flag
+
+**Pages**: `milimo-hermes-sandbox/install-hermes.sh`, `wiki/architecture/hermes-profile.md`, `wiki/implementation-plan.md`
+
+**Source**: Phase C3 implementation — Install script `--auth-mode [api_key|nous_oauth]` flag
+
+**Changes**:
+- **Install Script** (`milimo-hermes-sandbox/install-hermes.sh`):
+  - New `--auth-mode MODE` flag (default: `api_key`, options: `api_key`, `nous_oauth`)
+  - Deprecated `--nous-oauth` flag with migration warning
+  - New env var `NEMOCLAW_AUTH_MODE` for non-interactive mode
+  - Deprecated `NEMOCLAW_NOUS_OAUTH` still supported with migration path
+  - Interactive prompt for auth mode selection (1=api_key, 2=nous_oauth)
+  - Nous OAuth description: "Enables managed tool gateways: web search, browser automation, image generation, audio processing, managed code execution"
+
+- **Configuration**:
+  - `--auth-mode api_key` → Standard NVIDIA inference (default)
+  - `--auth-mode nous_oauth` → Nous Portal OAuth, adds `--auth nous` to onboarding
+  - `NEMOCLAW_AUTH_MODE=api_key|nous_oauth` for CI/CD
+
+- **Verification**:
+  - Script syntax validated
+  - `--help` shows new options
+  - `--auth-mode nous_oauth` works correctly
+  - `--nous-oauth` deprecated flag shows warning and works
+  - `NEMOCLAW_AUTH_MODE=nous_oauth` env var works
+  - `NEMOCLAW_NOUS_OAUTH=1` deprecated env var works
+  - Default `api_key` mode when no auth mode specified
+  - Slack channels (`SLACK_ALLOWED_CHANNELS`) baked at build time
+  - CHAT_UI_URL loaded from env in non-interactive mode
+
+---
+
+### 2026-06-28 — Phase C1 Complete: SSRF Validation for Egress Hosts
+
+**Pages**: `milimo-core/src/milimo_core/ssrf_validator.py`, `wiki/architecture/hermes-profile.md`, `wiki/implementation-plan.md`
+
+**Source**: Phase C1 implementation — SSRF validation against NemoClaw's ssrf.ts policy
+
+**Changes**:
+- **SSRF Validator** (`milimo-core/src/milimo_core/ssrf_validator.py`):
+  - New: `SSRFValidator` class with `SSRFPolicy` configuration
+  - Validates against private networks (RFC 1918: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16; RFC 3927: 169.254.0.0/16; RFC 4193: fc00::/7)
+  - Blocks loopback (127.0.0.0/8, ::1), link-local, multicast, metadata services (169.254.169.254)
+  - Blocks RFC 2544 benchmark range (198.18.0.0/15)
+  - Validates DNS resolution to public IPs only
+  - Handles optional endpoints (ncp.api.nvidia.com, nim-service.local)
+  - CLI: `python -m milimo_core.ssrf_validator --policy milimo-blueprint/policies/milimo-mcp.yaml --allow-local-nim`
+  - JSON output for CI integration with `--output` flag
+  - Flags: `--allow-private`, `--allow-rfc2544`, `--skip-dns`, `--allow-local-nim`, `--verbose`, `--fail-on-warning`
+
+- **Validation Results**:
+  - All 17 endpoints in milimo-mcp.yaml validated successfully
+  - Public hosts: api.github.com, github.com, registry.npmjs.org, pypi.org, files.pythonhosted.org, api.stripe.com, api.vercel.com, api.sentry.io, api.twitter.com, api.x.com, api.linkedin.com, api.tiktok.com, integrate.api.nvidia.com, ipapi.co, ip-api.com
+  - Optional: ncp.api.nvidia.com (warning on DNS fail), nim-service.local (allowed with --allow-local-nim)
+  - Explicit deny rules for metadata service (169.254.169.254) and private ports (22, 3306, 5432)
+
+- **Verification**:
+  - All 1217 tests in milimo-blueprint still pass
+  - CLI validation passes with --allow-local-nim flag
+  - JSON output works for CI integration
+
+---
+
+### 2026-06-28 — Phase B2 Complete: War Room Tool Integration
+
+**Pages**: `milimo-hermes-plugin/milimo_hermes_plugin/tools.py`, `milimo-core/src/milimo_core/ops/approval_handler.py`, `milimo-core/src/milimo_core/cost_guard.py`, `wiki/architecture/hermes-profile.md`, `wiki/implementation-plan.md`
+
+**Source**: Phase B2 implementation — War Room tools integrated with real systems
+
+**Changes**:
+- **War Room tool integration** (`milimo-hermes-plugin/milimo_hermes_plugin/tools.py`):
+  - `milimo_status`: Now queries actual claw status via `claw_launcher.status()`
+  - `milimo_warroom`: Full War Room operations:
+    - `status` → detailed claw status from launcher
+    - `hold_queue` → Reads HOLD/REVIEW queues from `OpsApprovalHandler`
+    - `cost_guard` → Returns token usage from `CostGuard`
+    - `approve`/`veto` → Uses `OpsApprovalHandler` with delegation support
+  - `milimo_approve`: Approves HOLD items and optionally delegates to claw via `HermesDelegateAdapter`
+  - `milimo_veto`: Rejects HOLD items via `OpsApprovalHandler`
+
+- **Approval Handler** (`milimo-core/src/milimo_core/ops/approval_handler.py`):
+  - Already existing: `OpsApprovalHandler` with REVIEW/HOLD/AUTO modes
+  - Exports added: `OpsApprovalHandler`, `OpsApprovalAction` from `milimo_core.ops`
+  - Persistent JSON file storage for HOLD/REVIEW queues
+  - Decision logging to `decisions.log`
+
+- **Cost Guard** (`milimo-core/src/milimo_core/cost_guard.py`):
+  - New: `CostGuard` class tracking inference tokens via `MetricsCollector`
+  - Daily limit: 50,000 tokens (configurable)
+  - Alert threshold: 80% (configurable)
+  - Warning threshold: 60% (configurable)
+  - Per-claw breakdown and overall status
+  - `check_limit()` method to block execution when limit exceeded
+
+- **Plugin Integration** (`milimo-hermes-plugin/milimo_hermes_plugin/__init__.py`):
+  - Initializes approval handler and cost guard
+  - Global setter functions in `tools.py` for dependency injection
+
+- **Verification**:
+  - All 1217 tests in `milimo-blueprint` still pass
+  - HOLD queue operations work end-to-end (queue, list, approve, veto)
+  - Cost guard returns correct token usage structure
+  - Delegation on approve works via `HermesDelegateAdapter`
+
+---
+
+### 2026-06-28 — Phase B1 Complete: EvolutionScheduler + HermesCronScheduler
+
+**Pages**: `milimo-core/src/milimo_core/evolution_scheduler.py`, `milimo-hermes-plugin/milimo_hermes_plugin/hermes_scheduler.py`, `wiki/architecture/hermes-profile.md`, `wiki/implementation-plan.md`
+
+**Source**: Phase B1 implementation — Evolution Scheduler using SchedulerInterface with native cronjob
+
+**Changes**:
+- **EvolutionScheduler** (`milimo-core/src/milimo_core/evolution_scheduler.py`):
+  - Implements `SchedulerInterface` from `milimo_core.protocols.scheduling`
+  - Uses existing `EvolutionCycle` logic for 5-stage weekly evolution pipeline:
+    1. OBSERVE — Read operation log for past 7 days
+    2. IDENTIFY — Detect recurring patterns
+    3. PROPOSE — Generate tool proposal for strongest pattern
+    4. BUILD — Generate tool code and backtest in sandbox
+    5. DEPLOY — Activate, version blueprint, notify War Room
+  - Additional handlers:
+    - `tool_backtest`: Backtests deployed evolved tools every 6 hours
+    - `hold_queue_review`: Reviews HOLD queue items every 4 hours
+  - Synchronous wrappers for Hermes cronjob handlers:
+    - `run_evolution_cycle_handler()` — Called by Hermes cronjob
+    - `run_tool_backtest_handler()` — Called by Hermes cronjob
+    - `run_hold_queue_review_handler()` — Called by Hermes cronjob
+
+- **HermesCronScheduler** (`milimo-hermes-plugin/milimo_hermes_plugin/hermes_scheduler.py`):
+  - Updated to use `EvolutionScheduler` from `milimo-core`
+  - Registers three core cron jobs from `milimo-compatibility.json`:
+    - `evolution_cycle` — `0 2 * * 0` (Sunday 2AM)
+    - `tool_backtest` — `0 */6 * * *` (every 6 hours)
+    - `hold_queue_review` — `0 */4 * * *` (every 4 hours)
+  - Provides `get_cron_config()` for Hermes native cronjob integration
+  - All three jobs use durable native `cronjob` (survives sandbox restarts)
+
+- **Verification**:
+  - All 1217 tests in `milimo-blueprint` still pass
+  - EvolutionScheduler correctly registers all 6 claws
+  - Manual trigger works: `scheduler.trigger_evolution_now(dry_run=True)`
+  - Synchronous handlers execute without errors
 
 ---
 

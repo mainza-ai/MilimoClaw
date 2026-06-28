@@ -17,7 +17,7 @@ from typing import Any
 
 from milimo_core.build import BuildClaw, BuildFilesystemInit
 from milimo_core.content import ContentClaw, ContentGenerator
-from milimo_core.ops import OpsClaw, IntakeManager
+from milimo_core.ops import OpsClaw, IntakeManager, OpsApprovalHandler
 from milimo_core.analytics import AnalyticsClaw, SignalProcessor
 from milimo_core.finance import FinanceClaw, PricingEngine
 from milimo_core.assistant import LucyAssistant, PendingQuery
@@ -35,9 +35,12 @@ from milimo_core.tool_generator import ToolGenerator
 from milimo_core.tool_validator import ToolValidator
 from milimo_core.tool_sandbox import ToolSandbox
 from milimo_core.protocols.delegation import DelegationAdapter, ClawTask, ClawResult
+from milimo_core import WarRoomNotifier, init_warroom_notifier
+from milimo_core.cost_guard import get_cost_guard
 from milimo_core.hermes_credential_adapter import HermesCredentialAdapter
+from milimo_core.milimo_paths import CLAWS_DIR
 from .delegation import HermesDelegateAdapter
-from .tools import register_core_tools
+from .tools import register_core_tools, set_claw_launcher, set_approval_handler, set_cost_guard
 
 
 # Global registry for instantiated claws
@@ -51,16 +54,35 @@ def on_load(config: dict[str, Any] | None = None) -> None:
     global _privacy_router, _inference_client
 
     config = config or {}
-    privacy_level = config.get("privacy_level", "hybrid")
-    model = config.get("claude_model", "claude-3-5-sonnet")
 
-    # Initialize privacy router based on config
-    _privacy_router = PrivacyRouter(privacy_level=privacy_level)
+    # Initialize privacy router with default policy
+    from milimo_core.privacy_router import PrivacyPolicy, InferenceBackend, PrivacyRouter
+    default_policy = PrivacyPolicy(
+        policy_version="1.0",
+        default_backend=InferenceBackend.LOCAL_NIM,
+        routes=[],
+        role_overrides={},
+    )
+    _privacy_router = PrivacyRouter(default_policy)
 
     # Initialize inference client
-    _inference_client = NvidiaInferenceClient(model=model)
+    _inference_client = NvidiaInferenceClient()
 
-    print(f"[milimo-hermes] Plugin loaded with privacy_level={privacy_level}, model={model}")
+    # Initialize approval handler for War Room
+    fs_base = CLAWS_DIR / "ops"
+    approval_handler = OpsApprovalHandler(fs_base=fs_base)
+    set_approval_handler(approval_handler)
+
+    # Initialize cost guard
+    cost_guard = get_cost_guard()
+    set_cost_guard(cost_guard)
+
+    # Initialize War Room notifier (Slack/Telegram)
+    warroom_notifier = init_warroom_notifier()
+    from .tools import set_warroom_notifier
+    set_warroom_notifier(warroom_notifier)
+
+    print(f"[milimo-hermes] Plugin loaded")
 
 
 def on_unload() -> None:

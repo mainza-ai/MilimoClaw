@@ -5,7 +5,7 @@
 Core Tools for Milimo Hermes Plugin.
 
 Registers the following tools:
-- milimo_status: Get status of all 6 claws
+- milimo_status: Get status of all 6 Milimo claws
 - milimo_warroom: War Room dashboard - HOLD queue, claw status, cost guard
 - milimo_approve: Approve a pending item in HOLD queue
 - milimo_veto: Veto/reject a pending item in HOLD queue
@@ -15,6 +15,44 @@ Registers the following tools:
 from typing import Any
 
 from milimo_core.protocols.delegation import ClawTask, ClawResult
+from milimo_core.ops.approval_handler import OpsApprovalHandler, OpsApprovalAction
+from milimo_core.cost_guard import get_cost_guard
+from milimo_core.milimo_paths import CLAWS_DIR
+from milimo_core import WarRoomNotifier, get_warroom_notifier, init_warroom_notifier, NotificationPayload
+
+
+# Global references initialized by plugin
+_claw_launcher = None
+_approval_handler: OpsApprovalHandler | None = None
+_cost_guard = None
+_warroom_notifier = None
+
+
+def set_claw_launcher(launcher: Any) -> None:
+    """Set the claw launcher instance for status queries."""
+    global _claw_launcher
+    _claw_launcher = launcher
+
+
+def set_approval_handler(handler: OpsApprovalHandler) -> None:
+    """Set the approval handler for HOLD/REVIEW queue operations."""
+    global _approval_handler
+    _approval_handler = handler
+
+
+def set_cost_guard(cg: Any) -> None:
+    """Set the cost guard instance."""
+    global _cost_guard
+    _cost_guard = cg
+
+
+def set_warroom_notifier(notifier: WarRoomNotifier | None = None) -> None:
+    """Set or initialize the War Room notifier."""
+    global _warroom_notifier
+    if notifier:
+        _warroom_notifier = notifier
+    else:
+        _warroom_notifier = init_warroom_notifier()
 
 
 # Tool schemas using shared types from milimo-core
@@ -122,15 +160,29 @@ DELEGATE_TASK_SCHEMA = {
 # Tool handlers
 
 async def handle_milimo_status(ctx: Any, detailed: bool = False) -> dict:
-    """Get status of all 6 claws."""
-    # Query each claw for status
-    # This would integrate with actual claw instances
-    claws = ["build", "content", "ops", "analytics", "finance", "assistant"]
-    return {
-        "status": "operational",
-        "claws": {claw: {"status": "ready", "last_activity": None} for claw in claws},
-        "detailed": detailed
-    }
+    """Get status of all 6 claws from the claw launcher."""
+    if _claw_launcher is None:
+        # Fallback to basic status
+        claws = ["build", "content", "ops", "analytics", "finance", "assistant"]
+        return {
+            "status": "operational",
+            "claws": {claw: {"status": "ready", "last_activity": None} for claw in claws},
+            "detailed": detailed
+        }
+
+    try:
+        status = _claw_launcher.status()
+        if not detailed:
+            # Simplified status
+            return {
+                "status": "operational" if status.get("running") else "stopped",
+                "claws": status.get("claws", {}),
+                "launcher_pid": status.get("launcher_pid"),
+                "timestamp": status.get("timestamp"),
+            }
+        return status
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
 
 async def handle_milimo_warroom(ctx: Any, action: str, item_id: str = None,
@@ -138,33 +190,154 @@ async def handle_milimo_warroom(ctx: Any, action: str, item_id: str = None,
     """War Room operations."""
     if action == "status":
         return await handle_milimo_status(ctx, detailed=True)
+
     elif action == "hold_queue":
-        return {"hold_queue": [], "message": "HOLD queue empty"}
+        if _approval_handler is None:
+            return {"hold_queue": [], "review_queue": [], "message": "Approval handler not initialized"}
+
+        hold_items = _approval_handler.get_hold_queue()
+        review_items = _approval_handler.get_review_queue()
+
+        # Check for urgency flags and notify
+        if _warroom_notifier:
+            for item in hold_items:
+                if item.urgency_flag:
+                    _warroom_notifier.notify_hold_alert(
+                        action_id=item.action_id,
+                        action_type=item.action_type,
+                        entity_id=item.entity_id,
+                        claw_role="ops",  # Ops handles approvals
+                        urgency=item.urgency_flag,
+                    )
+
+        return {
+            "hold_queue": [item.to_dict() for item in hold_items],
+            "review_queue": [item.to_dict() for item in review_items],
+            "total_hold": len(hold_items),
+            "total_review": len(review_items),
+        }
+
     elif action == "cost_guard":
-        return {"daily_tokens_used": 0, "daily_limit": 50000, "remaining": 50000}
+        cg = _cost_guard or get_cost_guard()
+        usage = cg.get_detailed_usage()
+
+        # Check if we should notify
+        if _warroom_notifier:
+            summary = usage.get("summary", {})
+            if summary.get("alert_triggered"):
+                _warroom_notifier.notify_cost_guard(
+                    tokens_used=summary.get("total_tokens", 0),
+                    limit=summary.get("daily_limit", 50000),
+                    percentage=summary.get("percent_used", 0),
+                    status="alert",
+                )
+            elif summary.get("warning_triggered"):
+                _warroom_notifier.notify_cost_guard(
+                    tokens_used=summary.get("total_tokens", 0),
+                    limit=summary.get("daily_limit", 50000),
+                    percentage=summary.get("percent_used", 0),
+                    status="warning",
+                )
+
+        return usage
+
     elif action in ("approve", "veto"):
         if not item_id:
             return {"error": f"item_id required for {action}"}
-        return {"action": action, "item_id": item_id, "status": "completed"}
+
+        if _approval_handler is None:
+            return {"error": "Approval handler not initialized"}
+
+        if action == "approve":
+            result = _approval_handler.handle_approve(item_id, lambda: None)
+            status = "approved" if result else "failed"
+
+            # Notify on approve
+            if _warroom_notifier and result:
+                action_data = _approval_handler.get_action(item_id)
+                if action_data:
+                    _warroom_notifier.notify_hold_alert(
+                        action_id=item_id,
+                        action_type=action_data.action_type,
+                        entity_id=action_data.entity_id,
+                        claw_role="ops",
+                        urgency=None,
+                    )
+
+            return {"action": "approve", "item_id": item_id, "status": status}
+
+        else:  # veto
+            result = _approval_handler.handle_block(item_id, reason or "No reason provided")
+            status = "rejected" if result else "failed"
+
+            # Notify on veto
+            if _warroom_notifier and result:
+                action_data = _approval_handler.get_action(item_id)
+                if action_data:
+                    _warroom_notifier.slack.send(NotificationPayload(
+                        title="HOLD Item Vetoed",
+                        message=f"Action `{item_id}` ({action_data.action_type}) was vetoed.",
+                        level="warning",
+                        metadata={"Action ID": item_id, "Reason": reason or "No reason provided"},
+                    ))
+
+            return {"action": "veto", "item_id": item_id, "status": status}
+
     return {"error": f"Unknown action: {action}"}
 
 
 async def handle_milimo_approve(ctx: Any, item_id: str, reason: str = None,
                                 delegate_to_claw: str = None, delegation_goal: str = None) -> dict:
     """Approve a pending item, optionally delegating to a claw."""
-    result = {"action": "approve", "item_id": item_id, "status": "approved"}
+    if _approval_handler is None:
+        return {"error": "Approval handler not initialized"}
 
+    # Approve the item
+    result = _approval_handler.handle_approve(item_id, lambda: None)
+    if not result:
+        return {"action": "approve", "item_id": item_id, "status": "failed", "error": "Item not found or approval failed"}
+
+    response = {"action": "approve", "item_id": item_id, "status": "approved"}
+
+    # Optionally delegate to a claw
     if delegate_to_claw and delegation_goal:
-        # This would use the delegation adapter
-        result["delegated_to"] = delegate_to_claw
-        result["delegation_goal"] = delegation_goal
+        from .delegation import HermesDelegateAdapter
+        adapter = HermesDelegateAdapter()
+        task = ClawTask(
+            claw=delegate_to_claw,
+            goal=delegation_goal,
+            context=f"Approved from War Room: {reason or 'No reason provided'}",
+            priority=1
+        )
+        try:
+            results = await adapter.delegate([task])
+            if results:
+                response["delegated_to"] = delegate_to_claw
+                response["delegation_goal"] = delegation_goal
+                response["delegation_result"] = {
+                    "claw": results[0].claw,
+                    "output": results[0].output,
+                    "success": results[0].success,
+                    "error": results[0].error
+                }
+        except Exception as e:
+            response["delegation_error"] = str(e)
 
-    return result
+    return response
 
 
 async def handle_milimo_veto(ctx: Any, item_id: str, reason: str) -> dict:
     """Veto/reject a pending item."""
-    return {"action": "veto", "item_id": item_id, "reason": reason, "status": "rejected"}
+    if _approval_handler is None:
+        return {"error": "Approval handler not initialized"}
+
+    result = _approval_handler.handle_block(item_id, reason)
+    return {
+        "action": "veto",
+        "item_id": item_id,
+        "reason": reason,
+        "status": "rejected" if result else "failed"
+    }
 
 
 async def handle_delegate_task(ctx: Any, tasks: list[dict]) -> list[dict]:
@@ -241,6 +414,9 @@ __all__ = [
     "handle_milimo_approve",
     "handle_milimo_veto",
     "handle_delegate_task",
+    "set_claw_launcher",
+    "set_approval_handler",
+    "set_cost_guard",
     "MILIMO_STATUS_SCHEMA",
     "MILIMO_WARROOM_SCHEMA",
     "MILIMO_APPROVE_SCHEMA",

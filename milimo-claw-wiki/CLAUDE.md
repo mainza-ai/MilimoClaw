@@ -426,12 +426,14 @@ When asked to lint or audit the wiki:
 | Term | Meaning | Wiki Page |
 |------|---------|-----------|
 | **Claw** | An autonomous agent in the mesh | [[content-claw]], etc. |
+| **Claw Handler** | The main entry point for a claw's logic (replaces "skills") | [[content-claw]], etc. |
 | **Mesh** | The inter-claw communication network | [[mesh-coordinator]] |
 | **Sandbox** | Isolated execution environment for each claw | [[sandbox-isolation]] |
 | **War Room** | TUI for viewing all pending actions | [[war-room]] |
 | **Brief** | Project requirements sent to a claw | [[message-contracts]] |
 | **Evolution Cycle** | Sunday process that generates new tools | [[evolution-cycle]] |
 | **Privacy Router** | Routes inference calls based on data sensitivity | [[privacy-router]] |
+| **Profile** | NemoClaw agent profile (OpenClaw vs Hermes) | [[hermes-profile]] |
 
 ### Message Contract Notation
 

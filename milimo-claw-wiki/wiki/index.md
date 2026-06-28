@@ -2,7 +2,7 @@
 
 **Summary**: Master table of contents for the MilimoClaw knowledge base.
 
-**Last updated**: 2026-05-28
+**Last updated**: 2026-06-28
 
 **Tags**: #index #navigation
 
@@ -12,7 +12,7 @@
 
 | Section | Description | Pages |
 |---------|-------------|-------|
-| [[#Architecture]] | System design and isolation model | 12 |
+| [[#Architecture]] | System design and isolation model | 14 |
 | [[#Claws]] | Individual claw documentation | 6 |
 | [[#Coordination]] | Message contracts and War Room | 5 |
 | [[#Evolution]] | Self-evolution system | 8 |
@@ -35,6 +35,9 @@ System architecture and design documentation.
 
 | Page | Description | Status |
 |------|-------------|--------|
+| [[hermes-integration-report]] | Full gap analysis & corrected integration plan | ✓ |
+| [[implementation-plan]] | Complete Phase A–E implementation plan | ✓ |
+| [[hermes-profile]] | Hermes profile architecture & components | ✓ |
 | [[system-overview]] | Nine-layer architecture overview | ✓ |
 | [[sandbox-isolation]] | Landlock, process limits, capability drop, and filesystem isolation | ✓ |
 | [[inter-claw-communication]] | Typed message contracts and routing | ✓ |
@@ -151,6 +154,7 @@ Quick reference tables and diagrams.
 | [[NemoClaw-Reference]] | NemoClaw core CLI & API reference | ✓ |
 | [[NemoClaw-x-Milimo-Integration-Map]] | Cross-reference of NemoClaw & Milimo integration points | ✓ |
 | [[NemoClaw-Blueprint-Implementation]] | Technical specification for NemoClaw blueprints & L7 network policies | ✓ |
+| [[implementation-plan]] | Dual-track Hermes integration plan | ✓ |
 
 ---
 
@@ -265,8 +269,8 @@ Installation and service management scripts.
 
 | Metric | Value |
 |--------|-------|
-| Total pages | 150+ |
-| Architecture pages | 11 |
+| Total pages | 152+ |
+| Architecture pages | 12 |
 | Claw pages | 6 |
 | Module pages | 75+ |
 | Coordination pages | 5 |

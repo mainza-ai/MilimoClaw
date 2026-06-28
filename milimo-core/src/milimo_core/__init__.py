@@ -76,7 +76,24 @@ from .provenance_signer import (
 from .tool_generator import ToolGenerator, ToolSpec
 from .tool_validator import ToolValidator
 from .tool_sandbox import ToolSandbox
-from .hermes_credential_adapter import HermesCredentialAdapter
+from .evolution_scheduler import (
+    EvolutionScheduler,
+    EvolutionSchedulerConfig,
+    run_evolution_cycle_sync,
+    run_tool_backtest_sync,
+    run_hold_queue_review_sync,
+)
+from .ssrf_validator import SSRFValidator, SSRFPolicy, SSRFValidationResult, SSRFValidationReport
+from .notifications import (
+    SlackConfig,
+    TelegramConfig,
+    NotificationPayload,
+    SlackNotifier,
+    TelegramNotifier,
+    WarRoomNotifier,
+    get_warroom_notifier,
+    init_warroom_notifier,
+)
 
 __version__ = "0.1.0"
 
@@ -129,4 +146,27 @@ __all__ = [
     "SchedulerInterface",
     # Credentials
     "HermesCredentialAdapter",
+    # Evolution Scheduler
+    "EvolutionScheduler",
+    "EvolutionSchedulerConfig",
+    "run_evolution_cycle_sync",
+    "run_tool_backtest_sync",
+    "run_hold_queue_review_sync",
+    # Cost Guard
+    "CostGuard",
+    "CostGuardConfig",
+    "get_cost_guard",
+    # SSRF Validator
+    "SSRFValidator",
+    "SSRFPolicy",
+    "ValidationReport",
+    # Notifications
+    "SlackConfig",
+    "TelegramConfig",
+    "NotificationPayload",
+    "SlackNotifier",
+    "TelegramNotifier",
+    "WarRoomNotifier",
+    "get_warroom_notifier",
+    "init_warroom_notifier",
 ]
