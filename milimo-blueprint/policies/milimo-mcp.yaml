@@ -1,0 +1,235 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# ═══════════════════════════════════════════════════════════════════════
+#  MILIMO CLAW — Hermes Network Policy Preset (milimo-mcp.yaml)
+# ═══════════════════════════════════════════════════════════════════════
+# Binary-scoped network policy preset for Milimo's 6 claws on Hermes profile.
+#
+# CRITICAL: Hermes network policies are binary-scoped — you must specify the
+# binary that opens the connection, not just the hostname. For Python-based
+# Hermes plugins, this is /opt/hermes/.venv/bin/python.
+#
+# Apply at onboarding:
+#   nemohermes onboard --name milimo-hermes --policy-preset milimo-mcp
+#
+# Or set as default in Dockerfile:
+#   ENV NEMOCLAW_POLICY_PRESETS=restricted,milimo-mcp
+
+name: "milimo-mcp"
+description: "MilimoClaw Hermes network policy - binary-scoped egress for all 6 claws"
+version: "0.1.0"
+extends: ["restricted"]
+
+# Hostname + binary allowlist
+endpoints:
+  # Build Claw - GitHub, npm, PyPI, npm registry
+  - host: "api.github.com"
+    port: 443
+    protocol: "https"
+    methods: ["GET", "POST", "PATCH", "DELETE"]
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "build"
+      purpose: "GitHub API - repos, PRs, issues, webhooks"
+
+  - host: "github.com"
+    port: 443
+    protocol: "https"
+    methods: ["GET", "POST"]
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "build"
+      purpose: "GitHub web - OAuth, git operations"
+
+  - host: "registry.npmjs.org"
+    port: 443
+    protocol: "https"
+    methods: ["GET", "POST"]
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "build"
+      purpose: "npm registry - package publishing, dependency audit"
+
+  - host: "pypi.org"
+    port: 443
+    protocol: "https"
+    methods: ["GET", "POST"]
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "build"
+      purpose: "PyPI - package publishing, dependency audit"
+
+  - host: "files.pythonhosted.org"
+    port: 443
+    protocol: "https"
+    methods: ["GET"]
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "build"
+      purpose: "PyPI file downloads"
+
+  # Finance Claw - Stripe
+  - host: "api.stripe.com"
+    port: 443
+    protocol: "https"
+    methods: ["GET", "POST", "DELETE"]
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "finance"
+      purpose: "Stripe API - invoices, payments, customers, webhooks"
+
+  # Build Claw - Vercel deployments
+  - host: "api.vercel.com"
+    port: 443
+    protocol: "https"
+    methods: ["GET", "POST", "PATCH", "DELETE"]
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "build"
+      purpose: "Vercel API - deployments, projects, logs"
+
+  # Ops/Build Claw - Sentry error monitoring
+  - host: "api.sentry.io"
+    port: 443
+    protocol: "https"
+    methods: ["GET", "POST"]
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "ops,build"
+      purpose: "Sentry API - issues, releases, stats"
+
+  # Content Claw - Social media platforms
+  - host: "api.twitter.com"
+    port: 443
+    protocol: "https"
+    methods: ["GET", "POST"]
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "content"
+      purpose: "Twitter/X API - tweets, media, analytics"
+
+  - host: "api.x.com"
+    port: 443
+    protocol: "https"
+    methods: ["GET", "POST"]
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "content"
+      purpose: "X API v2 - tweets, media, analytics"
+
+  - host: "api.linkedin.com"
+    port: 443
+    protocol: "https"
+    methods: ["GET", "POST"]
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "content"
+      purpose: "LinkedIn API - posts, analytics"
+
+  - host: "api.tiktok.com"
+    port: 443
+    protocol: "https"
+    methods: ["GET", "POST"]
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "content"
+      purpose: "TikTok API - video upload, analytics"
+
+  # Inference - NVIDIA NIM Cloud
+  - host: "integrate.api.nvidia.com"
+    port: 443
+    protocol: "https"
+    methods: ["POST"]
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "all"
+      purpose: "NVIDIA NIM Cloud inference endpoint"
+
+  # Ops/Analytics - IP geolocation
+  - host: "ipapi.co"
+    port: 443
+    protocol: "https"
+    methods: ["GET"]
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "ops,analytics"
+      purpose: "IP geolocation for client detection"
+
+  - host: "ip-api.com"
+    port: 80
+    protocol: "http"
+    methods: ["GET"]
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "ops,analytics"
+      purpose: "IP geolocation fallback"
+
+  # Optional: NCP (NVIDIA Partner Cloud)
+  - host: "ncp.api.nvidia.com"
+    port: 443
+    protocol: "https"
+    methods: ["POST"]
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "all"
+      purpose: "NCP inference endpoint"
+    optional: true
+
+  # Optional: Local NIM service
+  - host: "nim-service.local"
+    port: 8000
+    protocol: "http"
+    methods: ["POST"]
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "all"
+      purpose: "Local NIM inference"
+    optional: true
+
+# Explicit deny rules (for defense in depth)
+deny:
+  - host: "*"
+    port: 22
+    protocol: "tcp"
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    reason: "No SSH from sandbox"
+
+  - host: "*"
+    port: 3306
+    protocol: "tcp"
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    reason: "No direct MySQL"
+
+  - host: "*"
+    port: 5432
+    protocol: "tcp"
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    reason: "No direct PostgreSQL"
+
+  - host: "169.254.169.254"
+    port: 80
+    protocol: "http"
+    binaries:
+      - "/opt/hermes/.venv/bin/python"
+    reason: "Block AWS/GCP/Azure metadata service"

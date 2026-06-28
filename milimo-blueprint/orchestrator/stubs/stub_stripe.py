@@ -1,22 +1,18 @@
-import logging
-from typing import Any
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
-from orchestrator.protocols.payments_protocol import PaymentsClientProtocol
+"""
+Backward-compatibility shim for stub_stripe.
 
-logger = logging.getLogger("milimo.stubs.stripe")
+DEPRECATED: Import from milimo_core.stubs.stub_stripe directly.
+"""
 
+import warnings
 
-class StubStripeClient(PaymentsClientProtocol):
-    def create_invoice(self, data: dict[str, Any]) -> dict[str, Any]:
-        logger.info(
-            f"[stub] Stripe not configured — would create invoice: {data.get('description', 'N/A')}"
-        )
-        return {"id": "stub_invoice", "status": "stub", "amount_due": 0}
+warnings.warn(
+    "orchestrator.stubs.stub_stripe is deprecated; use milimo_core.stubs.stub_stripe instead",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-    def send_invoice(self, invoice_id: str) -> bool:
-        logger.info(f"[stub] Stripe not configured — would send invoice {invoice_id}")
-        return True
-
-    def get_invoice(self, invoice_id: str) -> dict[str, Any] | None:
-        logger.info(f"[stub] Stripe not configured — cannot fetch invoice {invoice_id}")
-        return None
+from milimo_core.stubs.stub_stripe import *  # noqa: F403,F401

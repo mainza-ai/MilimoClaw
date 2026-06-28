@@ -1,50 +1,18 @@
-from __future__ import annotations
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
-from abc import ABC, abstractmethod
-from typing import Any
+"""
+Backward-compatibility shim for github_protocol.
 
+DEPRECATED: Import from milimo_core.protocols.github_protocol directly.
+"""
 
-class GitHubClientProtocol(ABC):
-    @abstractmethod
-    def get_open_issues(self, limit: int = 50) -> list[dict[str, Any]]: ...
+import warnings
 
-    @abstractmethod
-    def get_issue(self, issue_number: int) -> dict[str, Any]: ...
+warnings.warn(
+    "orchestrator.protocols.github_protocol is deprecated; use milimo_core.protocols.github_protocol instead",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-    @abstractmethod
-    def create_issue(
-        self, title: str, body: str, labels: list[str] | None = None
-    ) -> int: ...
-
-    @abstractmethod
-    def create_branch(self, branch_name: str, base_branch: str = "main") -> None: ...
-
-    @abstractmethod
-    def commit_file(
-        self,
-        branch_name: str,
-        file_path: str,
-        content: str,
-        commit_message: str,
-    ) -> None: ...
-
-    @abstractmethod
-    def create_pull_request(
-        self,
-        title: str,
-        body: str,
-        head_branch: str,
-        base_branch: str = "main",
-    ) -> tuple[int, str]: ...
-
-    @abstractmethod
-    def get_open_pull_requests(self) -> list[dict[str, Any]]: ...
-
-    @abstractmethod
-    def merge_pull_request(self, pr_number: int) -> None: ...
-
-    @abstractmethod
-    def get_dependabot_alerts(self) -> list[dict[str, Any]]: ...
-
-    @abstractmethod
-    def get_code_scanning_alerts(self) -> list[dict[str, Any]]: ...
+from milimo_core.protocols.github_protocol import *  # noqa: F403,F401

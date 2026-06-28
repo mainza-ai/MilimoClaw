@@ -75,7 +75,7 @@ Detailed documentation for each code module:
 
 **[[finance-claw|Finance]]**: finance-init • pricing-engine • invoice-manager • payment-monitor • revenue-tracker • [[payment-risk-scorer]] • [[expense-tracker]] • [[stripe-client]]
 
-**[[build-claw|Build]]**: build-init • issue-manager • code-generator • pr-manager • deploy-manager • error-monitor
+**[[build-claw|Build]]**: build-init • issue-manager • code-generator • pr-manager • deploy-manager • error-monitor • github-client
 
 **[[assistant-lucy|Assistant]]**: [[lucy]] (PendingQuery • LucyAssistant)
 

@@ -1,0 +1,42 @@
+name: milimo-hermes-plugin
+version: "0.1.0"
+description: MilimoClaw Hermes plugin - provides 6 claw skills for Hermes profile
+author: Mainza Kangombe
+license: Apache-2.0
+
+entry_point: milimo_hermes_plugin:register
+
+dependencies:
+  - milimo-core>=0.1.0
+
+hooks:
+  on_load:
+    - milimo_hermes_plugin:on_load
+  on_unload:
+    - milimo_hermes_plugin:on_unload
+
+config_schema:
+  type: object
+  properties:
+    claude_model:
+      type: string
+      default: "claude-3-5-sonnet"
+    privacy_level:
+      type: string
+      enum: ["local_only", "hybrid", "cloud_allowed"]
+      default: "hybrid"
+    sandbox_enabled:
+      type: boolean
+      default: true
+    auto_evolution:
+      type: boolean
+      default: true
+  required: []
+
+skills:
+  - build_claw
+  - content_claw
+  - ops_claw
+  - analytics_claw
+  - finance_claw
+  - assistant_claw

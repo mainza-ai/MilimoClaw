@@ -1,0 +1,132 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""
+Milimo Core - Shared orchestrator library for MilimoClaw.
+
+This package contains the shared business logic for all six claws:
+- Build Claw
+- Content Claw
+- Ops Claw
+- Analytics Claw
+- Finance Claw
+- Assistant Claw
+
+Plus shared infrastructure:
+- Contracts & message validation
+- Privacy router & inference routing
+- Provenance signing
+- Tool generation, validation, sandboxing
+- Service factory for external integrations
+"""
+
+from .contracts import (
+    ClawMessage,
+    ContractValidator,
+    ValidationResult,
+    VALID_MESSAGE_TYPES,
+    VALID_SENDERS,
+    VALID_RECIPIENTS,
+    VALID_ROLES,
+    ASSISTANT_ROLE,
+)
+
+from .privacy_router import (
+    PrivacyRouter,
+    InferenceBackend,
+    RoutingDecision,
+    RoutingRule,
+    RoleOverride,
+    PrivacyPolicy,
+)
+
+from .inference_client import (
+    NvidiaInferenceClient,
+    InferenceUsage,
+    InferenceResponse,
+)
+
+from .protocols import (
+    GitHubClientProtocol,
+    DeployClientProtocol,
+    MonitoringClientProtocol,
+    PaymentsClientProtocol,
+    ClawTask,
+    ClawResult,
+    DelegationAdapter,
+    ScheduledJob,
+    SchedulerInterface,
+)
+
+from .service_factory import (
+    create_github_client,
+    create_vercel_client,
+    create_sentry_client,
+    create_stripe_client,
+)
+
+from .provenance_signer import (
+    ProvenanceSigner,
+    Attestation,
+    generate_key_pair,
+    save_key_pair,
+    load_key_pair,
+)
+
+from .tool_generator import ToolGenerator, ToolSpec
+from .tool_validator import ToolValidator
+from .tool_sandbox import ToolSandbox
+from .hermes_credential_adapter import HermesCredentialAdapter
+
+__version__ = "0.1.0"
+
+__all__ = [
+    # Contracts
+    "ClawMessage",
+    "ContractValidator",
+    "ValidationResult",
+    "VALID_MESSAGE_TYPES",
+    "VALID_SENDERS",
+    "VALID_RECIPIENTS",
+    "VALID_ROLES",
+    "ASSISTANT_ROLE",
+    # Privacy
+    "PrivacyRouter",
+    "InferenceBackend",
+    "RoutingDecision",
+    "RoutingRule",
+    "RoleOverride",
+    "PrivacyPolicy",
+    # Inference
+    "NvidiaInferenceClient",
+    "InferenceUsage",
+    "InferenceResponse",
+    # Services
+    "GitHubClientProtocol",
+    "DeployClientProtocol",
+    "MonitoringClientProtocol",
+    "PaymentsClientProtocol",
+    "create_github_client",
+    "create_vercel_client",
+    "create_sentry_client",
+    "create_stripe_client",
+    # Provenance
+    "ProvenanceSigner",
+    "Attestation",
+    "generate_key_pair",
+    "save_key_pair",
+    "load_key_pair",
+    # Tools
+    "ToolGenerator",
+    "ToolSpec",
+    "ToolValidator",
+    "ToolSandbox",
+    # Protocols
+    "ClawTask",
+    "ClawResult",
+    "DelegationAdapter",
+    "ScheduledJob",
+    "SchedulerInterface",
+    # Credentials
+    "HermesCredentialAdapter",
+]

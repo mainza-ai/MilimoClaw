@@ -1,12 +1,18 @@
-import logging
-from typing import Any
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
-from orchestrator.protocols.monitoring_protocol import MonitoringClientProtocol
+"""
+Backward-compatibility shim for stub_sentry.
 
-logger = logging.getLogger("milimo.stubs.sentry")
+DEPRECATED: Import from milimo_core.stubs.stub_sentry directly.
+"""
 
+import warnings
 
-class StubSentryClient(MonitoringClientProtocol):
-    def get_recent_errors(self, since_hours: int = 24) -> list[dict[str, Any]]:
-        logger.info("[stub] Sentry not configured — returning empty error list")
-        return []
+warnings.warn(
+    "orchestrator.stubs.stub_sentry is deprecated; use milimo_core.stubs.stub_sentry instead",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+from milimo_core.stubs.stub_sentry import *  # noqa: F403,F401

@@ -1,16 +1,18 @@
-import logging
-from typing import Any
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
-from orchestrator.protocols.deploy_protocol import DeployClientProtocol
+"""
+Backward-compatibility shim for stub_vercel.
 
-logger = logging.getLogger("milimo.stubs.vercel")
+DEPRECATED: Import from milimo_core.stubs.stub_vercel directly.
+"""
 
+import warnings
 
-class StubVercelClient(DeployClientProtocol):
-    def trigger_deployment(self, options: dict[str, Any] | None = None) -> str:
-        logger.info("[stub] Vercel not configured — deployment skipped")
-        return ""
+warnings.warn(
+    "orchestrator.stubs.stub_vercel is deprecated; use milimo_core.stubs.stub_vercel instead",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-    def get_deployment_status(self, deployment_id: str | None = None) -> str:
-        logger.info("[stub] Vercel not configured — returning 'unknown'")
-        return "unknown"
+from milimo_core.stubs.stub_vercel import *  # noqa: F403,F401

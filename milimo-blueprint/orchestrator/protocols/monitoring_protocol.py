@@ -1,9 +1,18 @@
-from __future__ import annotations
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
-from abc import ABC, abstractmethod
-from typing import Any
+"""
+Backward-compatibility shim for monitoring_protocol.
 
+DEPRECATED: Import from milimo_core.protocols.monitoring_protocol directly.
+"""
 
-class MonitoringClientProtocol(ABC):
-    @abstractmethod
-    def get_recent_errors(self, since_hours: int = 24) -> list[dict[str, Any]]: ...
+import warnings
+
+warnings.warn(
+    "orchestrator.protocols.monitoring_protocol is deprecated; use milimo_core.protocols.monitoring_protocol instead",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+from milimo_core.protocols.monitoring_protocol import *  # noqa: F403,F401

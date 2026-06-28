@@ -2,44 +2,17 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Finance Claw — Main Package
+Backward-compatibility shim for finance claw modules.
 
-The financial operations claw of the Milimo Claw mesh.
-Handles pricing, invoicing (2-stage approval), Stripe monitoring,
-revenue tracking, and expense categorization.
+DEPRECATED: Import from milimo_core.finance directly.
 """
 
-from .finance_claw import FinanceClaw
-from .finance_init import (
-    FinanceFilesystemInit,
-    FinanceOperationalLog,
-    PaymentEventsLog,
-    FinanceLogEntry,
-)
-from .finance_scheduler import FinanceScheduler
-from .signal_dispatcher import FinanceSignalDispatcher
-from .pricing_engine import PricingEngine
-from .invoice_manager import InvoiceManager, Invoice
-from .approval_handler import FinanceApprovalHandler
-from .payment_risk_scorer import PaymentRiskScorer
-from .payment_monitor import PaymentMonitor
-from .revenue_tracker import RevenueTracker
-from .expense_tracker import ExpenseTracker
+import warnings
 
-__all__ = [
-    "FinanceClaw",
-    "FinanceFilesystemInit",
-    "FinanceOperationalLog",
-    "PaymentEventsLog",
-    "FinanceLogEntry",
-    "FinanceScheduler",
-    "FinanceSignalDispatcher",
-    "PricingEngine",
-    "InvoiceManager",
-    "Invoice",
-    "FinanceApprovalHandler",
-    "PaymentRiskScorer",
-    "PaymentMonitor",
-    "RevenueTracker",
-    "ExpenseTracker",
-]
+warnings.warn(
+    "orchestrator.finance is deprecated; use milimo_core.finance instead",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+from milimo_core.finance import *  # noqa: F403,F401

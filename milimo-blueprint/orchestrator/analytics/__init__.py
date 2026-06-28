@@ -2,64 +2,17 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Milimo Claw — Analytics Claw Package
+Backward-compatibility shim for analytics claw modules.
 
-The intelligence layer of the Milimo Claw squad. Receives data signals
-from all other claws, synthesizes them into actionable intelligence,
-and publishes weekly reports consumed by the entire mesh.
+DEPRECATED: Import from milimo_core.analytics directly.
 """
 
-from .analytics_init import (
-    AnalyticsFilesystemInit,
-    AnalyticsLogEntry,
-    AnalyticsOperationalLog,
-    InitResult,
-    ValidationResult,
-    BASE,
-    REQUIRED_DIRS,
-    REQUIRED_FILES,
-)
-from .analytics_claw import AnalyticsClaw
-from .analytics_scheduler import AnalyticsScheduler
-from .anomaly_detector import AnomalyDetector, DetectedAnomaly
-from .baseline_manager import (
-    BaselineManager,
-    ContentBaseline,
-    RevenueBaseline,
-    DeliveryBaseline,
-)
-from .forward_projector import ForwardProjector, ForwardProjection
-from .opportunity_scorer import OpportunityScorer, ScoredOpportunity
-from .query_handler import QueryHandler, QueryResponse
-from .report_generator import ReportGenerator, WeeklyReport
-from .signal_dispatcher import SignalDispatcher
-from .signal_processor import SignalProcessor
+import warnings
 
-__all__ = [
-    "AnalyticsFilesystemInit",
-    "AnalyticsLogEntry",
-    "AnalyticsOperationalLog",
-    "InitResult",
-    "ValidationResult",
-    "BASE",
-    "REQUIRED_DIRS",
-    "REQUIRED_FILES",
-    "AnalyticsClaw",
-    "AnalyticsScheduler",
-    "AnomalyDetector",
-    "DetectedAnomaly",
-    "BaselineManager",
-    "ContentBaseline",
-    "RevenueBaseline",
-    "DeliveryBaseline",
-    "ForwardProjector",
-    "ForwardProjection",
-    "OpportunityScorer",
-    "ScoredOpportunity",
-    "QueryHandler",
-    "QueryResponse",
-    "ReportGenerator",
-    "WeeklyReport",
-    "SignalDispatcher",
-    "SignalProcessor",
-]
+warnings.warn(
+    "orchestrator.analytics is deprecated; use milimo_core.analytics instead",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+from milimo_core.analytics import *  # noqa: F403,F401

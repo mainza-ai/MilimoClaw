@@ -21,3 +21,10 @@ docs = [
 [tool.uv]
 package = false
 managed = true
+
+[tool.uv.workspace]
+members = [
+    "milimo-core",
+    "milimo-blueprint",
+    "milimo-hermes-plugin",
+]

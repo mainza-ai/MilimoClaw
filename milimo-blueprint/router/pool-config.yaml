@@ -1,0 +1,133 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# ═══════════════════════════════════════════════════════════════════════
+#  MILIMO CLAW — Model Router Pool Configuration
+# ═══════════════════════════════════════════════════════════════════════
+# Defines the model pool for the PrefillRouter. Each model has a cost/quality
+# profile and is selected based on per-claw tolerance settings.
+#
+# Router: llm-router/checkpoints/prefill_router_qwen08b.pt
+# Tolerance: 0.0 = highest accuracy (always best model)
+#            0.4 = cost-optimized (cheaper models when quality sufficient)
+
+pool:
+  # Highest accuracy models (tolerance 0.0)
+  - name: "nemotron-3-ultra"
+    provider: "nvidia"
+    endpoint: "https://integrate.api.nvidia.com/v1"
+    model: "nvidia/nemotron-3-ultra-550b-a55b"
+    cost_per_1k_tokens: 0.008
+    quality_score: 1.0
+    max_tokens: 8192
+    capabilities: ["reasoning", "coding", "analysis", "finance", "ops"]
+
+  - name: "nemotron-3-ultra-ncp"
+    provider: "nvidia"
+    endpoint: "https://ncp.api.nvidia.com/v1"
+    model: "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+    cost_per_1k_tokens: 0.012
+    quality_score: 0.98
+    max_tokens: 4096
+    capabilities: ["reasoning", "coding", "analysis", "finance", "ops"]
+
+  # Balanced models (tolerance 0.15-0.25)
+  - name: "nemotron-3-ultra-local"
+    provider: "openai"
+    endpoint: "http://nim-service.local:8000/v1"
+    model: "nvidia/nemotron-3-ultra-550b-a55b"
+    cost_per_1k_tokens: 0.0
+    quality_score: 0.95
+    max_tokens: 8192
+    capabilities: ["reasoning", "coding", "analysis", "finance", "ops"]
+    requires_gpu: true
+
+  - name: "nemotron-3-nano"
+    provider: "nvidia"
+    endpoint: "https://integrate.api.nvidia.com/v1"
+    model: "nvidia/nemotron-3-nano-30b-a3b"
+    cost_per_1k_tokens: 0.001
+    quality_score: 0.75
+    max_tokens: 4096
+    capabilities: ["coding", "summarization", "content", "analytics"]
+
+  - name: "nemotron-3-nano-local"
+    provider: "openai"
+    endpoint: "http://localhost:8000/v1"
+    model: "nvidia/nemotron-3-nano-30b-a3b"
+    cost_per_1k_tokens: 0.0
+    quality_score: 0.73
+    max_tokens: 4096
+    capabilities: ["coding", "summarization", "content", "analytics"]
+    requires_gpu: true
+
+  # Cost-optimized models (tolerance 0.3-0.4)
+  - name: "llama-3.1-8b"
+    provider: "openai"
+    endpoint: "http://localhost:8000/v1"
+    model: "meta-llama/llama-3.1-8b-instruct"
+    cost_per_1k_tokens: 0.0
+    quality_score: 0.65
+    max_tokens: 8192
+    capabilities: ["content", "summarization", "basic_qa"]
+    requires_gpu: true
+
+  - name: "mistral-7b"
+    provider: "openai"
+    endpoint: "http://localhost:8000/v1"
+    model: "mistralai/Mistral-7B-Instruct-v0.3"
+    cost_per_1k_tokens: 0.0
+    quality_score: 0.62
+    max_tokens: 8192
+    capabilities: ["content", "summarization", "basic_qa"]
+    requires_gpu: true
+
+# Per-claw tolerance configuration
+claw_tolerances:
+  # Finance/Ops approval flows: always highest accuracy
+  finance:
+    default: 0.0
+    approval: 0.0
+    invoicing: 0.05
+    reporting: 0.15
+
+  ops:
+    default: 0.0
+    incident: 0.0
+    approval: 0.0
+    monitoring: 0.15
+
+  # Content generation: cost-optimized
+  content:
+    default: 0.30
+    generation: 0.35
+    scheduling: 0.15
+    publishing: 0.10
+
+  # Analytics summarization: moderate tolerance
+  analytics:
+    default: 0.15
+    anomaly_detection: 0.10
+    reporting: 0.20
+    forecasting: 0.15
+
+  # Build: balanced
+  build:
+    default: 0.10
+    code_gen: 0.05
+    deployment: 0.0
+    docs: 0.25
+
+  # Assistant: balanced for conversation
+  assistant:
+    default: 0.15
+    routing: 0.05
+    conversation: 0.20
+
+# Router configuration
+router:
+  checkpoint: "llm-router/checkpoints/prefill_router_qwen08b.pt"
+  prefill_length: 256
+  device: "auto"  # cuda, mps, cpu
+  fallback_model: "nemotron-3-ultra"
+  health_check_interval_secs: 300

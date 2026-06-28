@@ -1,15 +1,18 @@
-from __future__ import annotations
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
-from abc import ABC, abstractmethod
-from typing import Any
+"""
+Backward-compatibility shim for payments_protocol.
 
+DEPRECATED: Import from milimo_core.protocols.payments_protocol directly.
+"""
 
-class PaymentsClientProtocol(ABC):
-    @abstractmethod
-    def create_invoice(self, data: dict[str, Any]) -> dict[str, Any]: ...
+import warnings
 
-    @abstractmethod
-    def send_invoice(self, invoice_id: str) -> bool: ...
+warnings.warn(
+    "orchestrator.protocols.payments_protocol is deprecated; use milimo_core.protocols.payments_protocol instead",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-    @abstractmethod
-    def get_invoice(self, invoice_id: str) -> dict[str, Any] | None: ...
+from milimo_core.protocols.payments_protocol import *  # noqa: F403,F401

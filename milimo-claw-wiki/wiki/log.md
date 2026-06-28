@@ -910,3 +910,22 @@ Each entry follows this format:
 - `build_init.py` uses `os.environ.get("NEMOCLAW_MODEL") or ""` — no default
 
 **Notes**: The model is now always resolved from the gateway config, making it provider-agnostic. Change the model in `openclaw.json` and both the gateway and the blueprints pick it up automatically. Start claws with `claw_launcher_bootstrap.py --all --daemon` to automatically bootstrap env vars.
+
+---
+
+### 2026-06-20 — GitHub Client Rewrite + Wiki Update
+
+**Pages**: `modules/build/github-client.md`
+
+**Source**: `gh` CLI was installable but the sandbox proxy blocked all CONNECT tunnels to external HTTPS endpoints (by design). The `gh` binary could not reach `api.github.com` even with valid credentials.
+
+**Changes**:
+- Rewrote `GitHubClient` from `gh` CLI subprocess calls to direct GitHub REST API via `httpx`/`urllib` — same HTTP stack as the [[inference-client]].
+- All 19 GitHub operations now use the REST API directly: issue CRUD, PR lifecycle, file commits via Contents API, dependabot/code-scanning/dependency-graph endpoints, repo info, rate limit.
+- Removed `_ensure_gh_available()` constructor check — the client no longer validates `gh` binary availability at instantiation.
+- Graceful proxy degradation: when the OpenShell proxy blocks the CONNECT tunnel, `_request()` catches the `OSError`, logs a warning, and returns empty defaults (`[]`, `{}`, `""`, `0`). No exceptions bubble up to consumers.
+- Uninstalled `gh` CLI v2.95.0 from the sandbox (installed via brew earlier in troubleshooting).
+- Removed `gh` auth check from `claw_launcher_bootstrap.py`.
+- Removed `/sandbox/.openclaw/env/github.sh` env file.
+
+**Notes**: The `StubGitHubClient` fallback path (when `GITHUB_TOKEN`/`GITHUB_REPO` are unset) is unchanged. Even with valid tokens, if the proxy blocks API access, the real client behaves identically to the stub — safe logs and empty returns. This aligns with the NemoClaw sandbox security model: work within the proxy's allowed policies, do not attempt to bypass.
