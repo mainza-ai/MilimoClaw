@@ -28,3 +28,8 @@ members = [
     "milimo-blueprint",
     "milimo-hermes-plugin",
 ]
+
+[tool.uv.sources]
+milimo-core = { workspace = true }
+milimo-blueprint = { workspace = true }
+milimo-hermes-plugin = { workspace = true }
