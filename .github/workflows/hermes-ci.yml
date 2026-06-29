@@ -44,6 +44,10 @@ jobs:
           pip install -e milimo-blueprint
           pip install -e milimo-hermes-plugin
 
+      - name: Install uv test dependencies
+        run: |
+          uv pip install pytest-cov pytest-asyncio pytest-mock faker
+
       - name: Run milimo-core unit tests
         run: |
           uv run pytest milimo-core/tests/ --cov=milimo_core --cov-config=milimo-core/pyproject.toml --cov-fail-under=80
