@@ -8,7 +8,7 @@
 - `milimo-core/CHANGELOG.md`
 - Phase A completion commit (v0.1.0)
 
-**Last updated**: 2026-06-27
+**Last updated**: 2026-06-29
 
 **Tags**: #architecture #implementation #hermes #dual-track #plan
 
@@ -347,6 +347,50 @@ docs/adr/
 1. **E4**: ✅ **v0.2.0 tagged**
 2. **GitHub Actions CI**: ✅ **Hermes CI workflow added** (`.github/workflows/hermes-ci.yml`)
 3. **PyPI publish**: ⏸️ **Deferred** — `milimo-core` package publish post-v0.2.0 (manual step when ready)
+
+---
+
+## Phase E5: Hermes Base Image Fix (2026-06-29) — COMPLETE
+
+### Problem
+The Hermes CI smoke test was failing because `milimo-hermes-sandbox/Dockerfile` used `ghcr.io/nousresearch/hermes-agent:latest` as the base image, which is a **private image** returning 403 Forbidden.
+
+### Root Cause
+The original Dockerfile attempted to extend the NousResearch upstream image directly, but this image is not publicly available on GHCR. The correct pattern (used by NemoHermes onboarding) is to extend NVIDIA's public `ghcr.io/nvidia/nemoclaw/hermes-sandbox-base` image, which pre-bakes Hermes from GitHub releases.
+
+### Fix Applied
+1. **Updated base image** in `milimo-hermes-sandbox/Dockerfile`:
+   - From: `ghcr.io/nousresearch/hermes-agent:latest` (private, 403)
+   - To: `ghcr.io/nvidia/nemoclaw/hermes-sandbox-base@sha256:8dad3b989a9ed1e601743310b97be21be5f59f89f7913a47d04f3ec3c40b8ce6` (public)
+
+2. **Rewrote Dockerfile** to follow NemoHermes pattern:
+   - Install milimo-core and plugin via `uv pip` (base image provides uv globally)
+   - Generate Hermes `config.yaml` and `.env` at build time via `generate-config.ts`
+   - Install plugin to standard Hermes location `/sandbox/.hermes/plugins/milimo-hermes`
+   - Set up blueprint at `/sandbox/.nemoclaw/blueprints/0.1.0/`
+   - Proper permissions and config hash pinning per NemoHermes
+
+3. **Refactored `install-hermes.sh`** to use `nemohermes onboard` correctly with build args
+
+4. **Fixed CI workflow** (`.github/workflows/hermes-ci.yml`):
+   - Pulls public NVIDIA base image (no fallback needed)
+   - Uses correct build arg `BASE_IMAGE`
+   - Smoke test validates correct paths
+
+5. **Added config generation** files:
+   - `milimo-hermes-sandbox/generate-config.ts` — adapted from NemoHermes
+   - `milimo-hermes-sandbox/config/yaml.ts` — minimal YAML serializer
+
+### Verification
+- ✅ CI pipeline passes: `hermes-integration` (55s) + `hermes-smoke` (2m4s)
+- ✅ Base image pulls successfully from public GHCR
+- ✅ Docker build completes with uv pip installs
+- ✅ Smoke test validates:
+  - Milimo install stamp at `/opt/hermes/.milimo_install`
+  - Plugin at `/sandbox/.hermes/plugins/milimo-hermes`
+  - `milimo_core` importable in Hermes venv
+  - `milimo_hermes_plugin` importable
+  - War Room assets at `/opt/hermes/warroom`
 
 ---
 

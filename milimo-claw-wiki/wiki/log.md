@@ -37,6 +37,42 @@ Each entry follows this format:
 
 ---
 
+### 2026-06-29 — Phase E5 Complete: Hermes Base Image Fix + CI Pipeline Pass
+
+**Pages**: `milimo-hermes-sandbox/Dockerfile`, `milimo-hermes-sandbox/install-hermes.sh`, `.github/workflows/hermes-ci.yml`, `milimo-hermes-sandbox/generate-config.ts`, `milimo-hermes-sandbox/config/yaml.ts`, `milimo-hermes-sandbox/.hermes-base-digest`, `wiki/architecture/hermes-profile.md`, `wiki/implementation-plan.md`, `wiki/log.md`
+
+**Source**: CI smoke test failure due to private base image (403 Forbidden from ghcr.io/nousresearch/hermes-agent)
+
+**Changes**:
+- **Fixed Base Image** — Switched from private `ghcr.io/nousresearch/hermes-agent:latest` (403) to public NVIDIA base `ghcr.io/nvidia/nemoclaw/hermes-sandbox-base@sha256:8dad3b989a9ed1e601743310b97be21be5f59f89f7913a47d04f3ec3c40b8ce6`
+- **Rewrote Dockerfile** to follow NemoHermes pattern:
+  - Uses `uv pip` (base image provides uv globally) for milimo-core + plugin installs
+  - Generates Hermes `config.yaml` + `.env` at build time via `generate-config.ts`
+  - Installs plugin to standard Hermes location `/sandbox/.hermes/plugins/milimo-hermes`
+  - Sets up blueprint at `/sandbox/.nemoclaw/blueprints/0.1.0/`
+  - Proper permissions + config hash pinning per NemoHermes
+- **Refactored `install-hermes.sh`** — Uses `nemohermes onboard` with build args correctly
+- **Fixed CI workflow** (`.github/workflows/hermes-ci.yml`):
+  - Pulls public NVIDIA base image (no fallback needed)
+  - Uses correct build arg `BASE_IMAGE`
+  - Smoke test validates correct paths
+- **Added config generation**:
+  - `milimo-hermes-sandbox/generate-config.ts` — adapted from NemoHermes
+  - `milimo-hermes-sandbox/config/yaml.ts` — minimal YAML serializer
+
+**Verification**:
+- ✅ CI pipeline passes: `hermes-integration` (55s) + `hermes-smoke` (2m4s)
+- ✅ Base image pulls successfully from public GHCR
+- ✅ Docker build completes with uv pip installs
+- ✅ Smoke test validates:
+  - Milimo install stamp at `/opt/hermes/.milimo_install`
+  - Plugin at `/sandbox/.hermes/plugins/milimo-hermes`
+  - `milimo_core` importable in Hermes venv
+  - `milimo_hermes_plugin` importable
+  - War Room assets at `/opt/hermes/warroom`
+
+---
+
 ### 2026-06-28 — Phase D1/D2 Complete: Hermes Integration Tests + Coverage Gate (v0.2.0 Ready)
 
 **Pages**: `README.md`, `milimo-claw-wiki/CLAUDE.md`, `wiki/index.md`, `wiki/architecture/hermes-profile.md`, `wiki/implementation-plan.md`, `milimo-hermes-plugin/tests/integration/*`

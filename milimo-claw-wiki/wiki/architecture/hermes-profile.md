@@ -9,7 +9,7 @@
 - `milimo-hermes-sandbox/`
 - `docs/adr/001-subagent-isolation.md` through `005-delegation-asymmetry.md`
 
-**Last updated**: 2026-06-27
+**Last updated**: 2026-06-29
 
 **Tags**: #architecture #hermes #profile #dual-track
 
@@ -172,8 +172,13 @@ Binary-scoped egress — each rule specifies:
 Hosts: GitHub, npm, PyPI, Stripe, Vercel, Sentry, Twitter/X, LinkedIn, TikTok, NVIDIA, IP geolocation
 
 ### Dockerfile (`milimo-hermes-sandbox/Dockerfile`)
-- Base: `ghcr.io/nvidia/nemoclaw/hermes-sandbox-base:latest`
-- COPY plugin, milimo-core, warroom HTML
+- Base: `ghcr.io/nvidia/nemoclaw/hermes-sandbox-base@sha256:8dad3b989a9ed1e601743310b97be21be5f59f89f7913a47d04f3ec3c40b8ce6` (NVIDIA public base image, pre-bakes Hermes from GitHub releases)
+- COPY milimo-core, plugin, warroom HTML, blueprint
+- Installs milimo-core and plugin into Hermes venv via `uv pip`
+- Generates Hermes `config.yaml` and `.env` at build time via `generate-config.ts`
+- Installs plugin to standard Hermes location `/sandbox/.hermes/plugins/milimo-hermes`
+- Sets up blueprint at `/sandbox/.nemoclaw/blueprints/0.1.0/`
+- Bakes `MILIMO_PROFILE=hermes`, `MILIMO_PLUGIN_DIR=/sandbox/.hermes/plugins/milimo-hermes`
 - Preserves NemoClaw Hermes plugin at `/sandbox/.hermes/plugins/nemoclaw`
 - `ENV NEMOCLAW_SANDBOX_NAME=milimo-hermes`
 - `ENV NEMOCLAW_POLICY_PRESETS=restricted,github`
@@ -237,6 +242,7 @@ export NEMOCLAW_SANDBOX_NAME=milimo-hermes
 | E2 | README decision tree | ✅ Done |
 | E3 | CLAUDE.md terminology | ✅ Done |
 | E4 | GitHub Actions CI + v0.2.0 tag | ✅ **Complete** |
+| E5 | Fix Hermes base image (public NVIDIA GHCR) + CI smoke test | ✅ **Complete** (2026-06-29) |
 
 ---
 
@@ -258,3 +264,5 @@ export NEMOCLAW_SANDBOX_NAME=milimo-hermes
 - `milimo-core/CHANGELOG.md` — v0.1.0 scope and deferred items
 - `milimo-hermes-plugin/` — Plugin source code
 - `milimo-hermes-sandbox/` — Dockerfile and install script
+- `docs/adr/002-warroom-hermes.md` — War Room Hermes ADR
+- `milimo-claw-docs/reports/hermes-integration-investigation-2026-06-29.md` — Deep dive investigation of Hermes integration
