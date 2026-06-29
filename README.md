@@ -12,7 +12,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square" alt="License" /></a>
   <a href="https://github.com/NVIDIA/NemoClaw"><img src="https://img.shields.io/badge/built_on-NemoClaw-purple.svg?style=flat-square" alt="Built on NemoClaw" /></a>
   <a href="https://github.com/mainza-ai/MilimoClaw/actions"><img src="https://img.shields.io/badge/build-passing-success.svg?style=flat-square" alt="Build Status" /></a>
-  <a href="https://github.com/mainza-ai/MilimoClaw/releases"><img src="https://img.shields.io/badge/version-v2.0.0--stable-teal.svg?style=flat-square" alt="Version" /></a>
+  <a href="https://github.com/mainza-ai/MilimoClaw/releases"><img src="https://img.shields.io/badge/version-v0.2.0-teal.svg?style=flat-square" alt="Version" /></a>
 </p>
 
 > *"Your friend group is a startup. Your laptops and cloud nodes are the infrastructure. Your claws do the work."*
@@ -193,9 +193,9 @@ $ nemoclaw my-assistant connect
 $ openclaw tui
 ```
 
-#### Option B: Hermes Profile
+#### Option B: Hermes Profile (Web Dashboard + OpenAI-compatible API)
 
-To run the Hermes profile installation and onboard the sandbox, execute:
+To run the Hermes profile with web dashboard (port 18789) and OpenAI-compatible API (port 8642):
 
 ```console
 $ export NVIDIA_API_KEY=nvapi-your-key-here
@@ -203,11 +203,26 @@ $ export GITHUB_TOKEN=github_pat_your-token-here
 $ git clone https://github.com/mainza-ai/MilimoClaw.git
 $ cd MilimoClaw
 $ cp .env.example .env
-# Run the automated Hermes onboarding script
-$ ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
-# Or onboard manually using the Dockerfile directly
-$ nemohermes onboard --name milimo-hermes --from ./milimo-hermes-sandbox/Dockerfile
+
+# Automated non-interactive install (CI/CD ready)
+$ ./milimo-hermes-sandbox/install-hermes.sh --non-interactive --chat-ui-url http://localhost:18789
+
+# Or interactive install (prompts for auth mode, Slack channels, etc.)
+$ ./milimo-hermes-sandbox/install-hermes.sh
+
+# Or manually onboard using the Dockerfile
+$ nemohermes onboard --name milimo-hermes --from ./milimo-hermes-sandbox/Dockerfile --policy-tier restricted --policy-preset github --policy-preset milimo-mcp
 ```
+
+**Result:**
+- Web Dashboard: `http://localhost:18789/`
+- OpenAI-compatible API: `http://localhost:8642/v1`
+- War Room: `http://localhost:8642/warroom`
+
+**Auth Modes:**
+- `api_key` (default): Standard NVIDIA inference
+- `nous_oauth`: Nous Portal OAuth — enables managed tool gateways (web search, browser automation, image generation, audio processing, managed code execution)
+  - Use `--auth-mode nous_oauth` or `export NEMOCLAW_AUTH_MODE=nous_oauth`
 
 ---
 
@@ -261,6 +276,25 @@ Type these commands directly inside the TUI conversation stream:
 * **Zero-Trust File Isolation**: Sandboxes cannot traverse sibling filesystems. All interaction occurs strictly via typed contracts over localhost gateway sockets.
 * **Privacy Router**: Sensitive credentials and operational variables are held in the OpenShell Gateway Store. Local classification filters automatically redact client records and source files.
 * **Continuous Self-Evolution**: Claws analyze execution outcomes and autonomously write, test (via sandboxed Pytest backtesting), and register fresh Python tools every Sunday.
+
+---
+
+## CI/CD Pipeline Status
+
+MilimoClaw uses GitHub Actions for continuous integration:
+
+| Workflow | Status |
+|----------|--------|
+| **Hermes CI** (`hermes-ci.yml`) | ✅ Passing — `hermes-integration` (unit + integration + coverage gate) + `hermes-smoke` (Docker build + endpoint verification) |
+| **Integration Tests** | 58 Hermes tests + 265 core tests + 1,234 blueprint tests = **1,557 total** |
+| **Coverage Gate** | ✅ All `milimo-core` modules ≥80% |
+
+The Hermes CI pipeline validates:
+- Docker build using NVIDIA's public `ghcr.io/nvidia/nemoclaw/hermes-sandbox-base` image (fixed from private `ghcr.io/nousresearch/hermes-agent` 403 error)
+- Config generation at build time (`generate-config.ts`)
+- Plugin installation at `/sandbox/.hermes/plugins/milimo-hermes`
+- Blueprint setup at `/sandbox/.nemoclaw/blueprints/0.1.0/`
+- Health endpoints (`/opt/hermes/.milimo_install`, `milimo_core` importable, War Room assets)
 
 ---
 
