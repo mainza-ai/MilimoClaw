@@ -104,8 +104,21 @@ jobs:
             # Fall back to pinned digest in .hermes-base-digest if it exists
             if [ -f milimo-hermes-sandbox/.hermes-base-digest ]; then
               DIGEST=$(cat milimo-hermes-sandbox/.hermes-base-digest)
-              echo "image=${DIGEST}" >> "$GITHUB_OUTPUT"
-              echo "source=pinned-fallback" >> "$GITHUB_OUTPUT"
+              # Validate digest format - must be a proper sha256 digest
+              if [[ "${DIGEST}" =~ ^ghcr\.io/nousresearch/hermes-agent@sha256:[a-f0-9]{64}$ ]]; then
+                echo "image=${DIGEST}" >> "$GITHUB_OUTPUT"
+                echo "source=pinned-fallback" >> "$GITHUB_OUTPUT"
+              else
+                echo "ERROR: .hermes-base-digest contains invalid format (placeholder or corrupted)."
+                echo "Current content: ${DIGEST}"
+                echo ""
+                echo "To fix: someone with NousResearch GHCR access must run:"
+                echo "  docker login ghcr.io -u <username> --password-stdin <token>"
+                echo "  docker pull ghcr.io/nousresearch/hermes-agent:latest"
+                echo "  docker inspect ghcr.io/nousresearch/hermes-agent:latest --format '{{index .RepoDigests 0}}' > milimo-hermes-sandbox/.hermes-base-digest"
+                echo "  git add milimo-hermes-sandbox/.hermes-base-digest && git commit -m 'chore: update Hermes base image digest'"
+                exit 1
+              fi
             else
               echo "ERROR: Could not pull Hermes base image and no pinned fallback found."
               echo "Run: docker pull ghcr.io/nousresearch/hermes-agent:latest"
