@@ -302,7 +302,7 @@ async def handle_milimo_approve(ctx: Any, item_id: str, reason: str = None,
     # Optionally delegate to a claw
     if delegate_to_claw and delegation_goal:
         from .delegation import HermesDelegateAdapter
-        adapter = HermesDelegateAdapter()
+        adapter = HermesDelegateAdapter(ctx)
         task = ClawTask(
             claw=delegate_to_claw,
             goal=delegation_goal,
@@ -356,7 +356,7 @@ async def handle_delegate_task(ctx: Any, tasks: list[dict]) -> list[dict]:
     """
     from .delegation import HermesDelegateAdapter
 
-    adapter = HermesDelegateAdapter()
+    adapter = HermesDelegateAdapter(ctx)
     claw_tasks = [ClawTask(**t) for t in tasks]
     results = await adapter.delegate(claw_tasks)
 

@@ -25,6 +25,9 @@ class HermesDelegateAdapter(DelegationAdapter):
     - delegation.model: per-claw model overrides (cheaper for Content/Analytics)
     """
 
+    def __init__(self, ctx: Any = None):
+        self._ctx = ctx
+
     async def delegate(self, tasks: list[ClawTask]) -> list[ClawResult]:
         """
         Execute claw tasks in parallel via native delegate_task.
@@ -72,22 +75,44 @@ class HermesDelegateAdapter(DelegationAdapter):
         Invoke native Hermes delegate_task tool.
 
         This method is called by the Hermes tool invocation layer when the
-        `delegate_task` tool is invoked. The actual implementation depends on
-        how Hermes exposes its native tools to plugins.
-
-        Expected delegate_task signature (from Hermes docs):
-        delegate_task(tasks: list[{"goal": str, "toolsets": list[str], "context": str}]) -> list[Any]
+        `delegate_task` tool is invoked.
         """
-        # This is a placeholder — the actual invocation happens through
-        # Hermes' tool system. The plugin registers the delegate_task tool
-        # which Hermes executes natively.
-        #
-        # For testing, we can mock this. In production, Hermes calls this
-        # when the tool is invoked.
-        raise NotImplementedError(
-            "HermesDelegateAdapter._invoke_delegate_task must be implemented "
-            "via Hermes tool registration. See tools.py for tool registration."
-        )
+        if not self._ctx:
+            raise NotImplementedError(
+                "HermesDelegateAdapter._invoke_delegate_task requires context (ctx) to execute."
+            )
+
+        try:
+            from tools.registry import registry
+            original_delegate_task = registry._tools.get("delegate_task") if registry else None
+            original_handler = original_delegate_task.handler if original_delegate_task else None
+        except ImportError:
+            original_handler = None
+
+        if original_handler:
+            import inspect
+            sig = inspect.signature(original_handler)
+            kwargs = {}
+            if "context" in sig.parameters:
+                kwargs["context"] = self._ctx
+            elif "ctx" in sig.parameters:
+                kwargs["ctx"] = self._ctx
+
+            args = {"tasks": tasks}
+            if inspect.iscoroutinefunction(original_handler):
+                result_str = await original_handler(args, **kwargs)
+            else:
+                result_str = original_handler(args, **kwargs)
+        else:
+            result_str = await self._ctx.dispatch_tool("delegate_task", {"tasks": tasks})
+
+        import json
+        if isinstance(result_str, str):
+            try:
+                return json.loads(result_str)
+            except json.JSONDecodeError:
+                return [result_str]
+        return result_str
 
 
 __all__ = ["HermesDelegateAdapter"]

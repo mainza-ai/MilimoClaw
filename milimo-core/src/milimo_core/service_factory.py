@@ -9,7 +9,7 @@ from milimo_core.stubs.stub_stripe import StubStripeClient
 logger = logging.getLogger("milimo.service_factory")
 
 
-def create_github_client():
+def create_github_client(config=None):
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     repo = os.environ.get("GITHUB_REPO")
     if token and repo:
@@ -21,7 +21,7 @@ def create_github_client():
     return StubGitHubClient()
 
 
-def create_vercel_client():
+def create_vercel_client(config=None):
     token = os.environ.get("VERCEL_TOKEN")
     project_id = os.environ.get("VERCEL_PROJECT_ID")
     if token and project_id:
@@ -39,7 +39,7 @@ def create_vercel_client():
     return StubVercelClient()
 
 
-def create_sentry_client():
+def create_sentry_client(config=None):
     token = os.environ.get("SENTRY_AUTH_TOKEN")
     org = os.environ.get("SENTRY_ORG_SLUG")
     project = os.environ.get("SENTRY_PROJECT_SLUG")
@@ -56,7 +56,7 @@ def create_sentry_client():
     return StubSentryClient()
 
 
-def create_stripe_client():
+def create_stripe_client(config=None):
     api_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY")
     if api_key:
         from orchestrator.finance.stripe_client import StripeClient
@@ -67,7 +67,7 @@ def create_stripe_client():
     return StubStripeClient()
 
 
-def create_railway_client():
+def create_railway_client(config=None):
     logger.info("Railway client: stub (not implemented)")
     from orchestrator.stubs.stub_vercel import StubVercelClient
 

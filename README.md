@@ -178,7 +178,9 @@ It serves as the **ultimate source of truth** for human operators and AI assista
 
 ### Installation & Onboarding
 
-To run the installation, execute the following commands in your host terminal:
+#### Option A: OpenClaw Profile (Default)
+
+To run the standard OpenClaw installation, execute:
 
 ```console
 $ export NVIDIA_API_KEY=nvapi-your-key-here
@@ -189,6 +191,22 @@ $ cp .env.example .env
 $ ./install.sh --solo --operator-name "your-name" --squad-name "your-squad" --non-interactive
 $ nemoclaw my-assistant connect
 $ openclaw tui
+```
+
+#### Option B: Hermes Profile
+
+To run the Hermes profile installation and onboard the sandbox, execute:
+
+```console
+$ export NVIDIA_API_KEY=nvapi-your-key-here
+$ export GITHUB_TOKEN=github_pat_your-token-here
+$ git clone https://github.com/mainza-ai/MilimoClaw.git
+$ cd MilimoClaw
+$ cp .env.example .env
+# Run the automated Hermes onboarding script
+$ ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
+# Or onboard manually using the Dockerfile directly
+$ nemohermes onboard --name milimo-hermes --from ./milimo-hermes-sandbox/Dockerfile
 ```
 
 ---
@@ -251,7 +269,16 @@ Type these commands directly inside the TUI conversation stream:
 Milimo Claw enforces absolute type safety and robust validation protocols:
 
 ```console
+# Test standard javascript packages
 $ cd milimo && npm test
+
+# Test core Python library
+$ .venv/bin/pytest milimo-core/tests/
+
+# Test Hermes plugin
+$ .venv/bin/pytest milimo-hermes-plugin/tests/
+
+# Test blueprint orchestrator
 $ cd milimo-blueprint && PYTHONPATH=.:orchestrator uv run pytest
 ```
 

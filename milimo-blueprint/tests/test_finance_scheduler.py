@@ -267,7 +267,7 @@ class TestFinanceScheduler:
 
                 return MockDate()
 
-        import finance.finance_scheduler as fs_module
+        import milimo_core.finance.finance_scheduler as fs_module
 
         original = fs_module.datetime
         fs_module.datetime = MockDatetime

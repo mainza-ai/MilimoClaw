@@ -32,7 +32,7 @@ ENV CHAT_UI_URL=${CHAT_UI_URL}
 
 # --- Install Milimo Hermes Plugin ---
 # Copy plugin source to sandbox
-COPY ../milimo-hermes-plugin/ /opt/milimo-hermes-plugin/
+COPY milimo-hermes-plugin/ /opt/milimo-hermes-plugin/
 
 # Install plugin into Hermes venv
 RUN mkdir -p /sandbox/.hermes/plugins/milimo-hermes \
@@ -47,12 +47,12 @@ RUN mkdir -p /sandbox/.hermes/plugins/milimo-hermes \
 
 # --- Install Milimo Core as Local Package ---
 # Alternative to PyPI install - copy and install milimo-core locally
-COPY ../milimo-core/ /opt/milimo-core/
+COPY milimo-core/ /opt/milimo-core/
 RUN /opt/hermes/.venv/bin/python -m pip install --no-cache-dir /opt/milimo-core/
 
 # --- Install War Room HTML ---
 # Serve standalone War Room at /warroom endpoint
-COPY ../milimo-hermes-plugin/warroom/ /opt/hermes/warroom/
+COPY milimo-hermes-plugin/warroom/ /opt/hermes/warroom/
 
 # --- Set Default Sandbox Name ---
 # Prevents collision with default 'hermes' sandbox
