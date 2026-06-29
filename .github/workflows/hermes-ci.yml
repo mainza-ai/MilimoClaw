@@ -39,16 +39,20 @@ jobs:
         run: |
           pip install pytest pytest-cov pytest-asyncio pytest-mock faker pyyaml requests stripe sentry-sdk websocket-client cryptography httpx
 
+      - name: Install milimo-core
+        run: pip install -e milimo-core
+
       - name: Run milimo-core unit tests
         run: |
           cd milimo-core && python -m pytest tests/ --cov=milimo_core --cov-config=pyproject.toml --cov-fail-under=80
 
       - name: Run Hermes plugin integration tests
         run: |
-          PYTHONPATH=/home/runner/work/MilimoClaw/MilimoClaw/milimo-core/src python -m pytest milimo-hermes-plugin/tests/integration/ -v
+          python -m pytest milimo-hermes-plugin/tests/integration/ -v
 
       - name: Run blueprint tests
         run: |
+          pip install -e milimo-blueprint
           cd milimo-blueprint && PYTHONPATH=/home/runner/work/MilimoClaw/MilimoClaw/milimo-core/src:/home/runner/work/MilimoClaw/MilimoClaw/milimo-blueprint/orchestrator python -m pytest tests/ -v -k "not test_is_quarter_start"
 
   hermes-smoke:
