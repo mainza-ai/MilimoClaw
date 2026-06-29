@@ -19,5 +19,5 @@ where = ["."]
 include = ["milimo_hermes_plugin*"]
 
 [tool.uv]
-package = false
+package = true
 managed = true
