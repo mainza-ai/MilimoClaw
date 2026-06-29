@@ -5,7 +5,7 @@
 # ═══════════════════════════════════════════════════════════════════════
 #  MilimoClaw Hermes Profile Install Script
 # ═══════════════════════════════════════════════════════════════════════
-# Installs and onboards the Milimo Hermes profile with dual-track support.
+# Installs and onboards the Milimo Hermes profile using NemoHermes.
 #
 # Usage:
 #   ./install-hermes.sh [options]
@@ -303,7 +303,7 @@ prompt_auth_mode() {
   fi
 
   if [[ "$NON_INTERACTIVE" == "true" ]]; then
-    return 0
+    return  return 0
   fi
 
   echo ""
@@ -351,13 +351,17 @@ prompt_model_router() {
   fi
 }
 
-build_docker_args() {
+build_onboard_args() {
   local args=()
 
-  args+=(--build-arg "NEMOCLAW_HERMES_DASHBOARD_TUI=1")
-
+  # Build args that get passed to the Dockerfile at build time
   if [[ -n "$SLACK_CHANNELS" ]]; then
-    args+=(--build-arg "SLACK_ALLOWED_CHANNELS=$SLACK_CHANNELS")
+    # Convert comma-separated to JSON array, then base64
+    local slack_json
+    slack_json=$(echo "$SLACK_CHANNELS" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$"; ""))')
+    local slack_b64
+    slack_b64=$(echo -n "$slack_json" | base64 -w0)
+    args+=(--build-arg "NEMOCLAW_SLACK_CONFIG_B64=$slack_b64")
   fi
 
   if [[ -n "$CHAT_UI_URL" ]]; then
@@ -417,17 +421,7 @@ main() {
   log_info "  CHAT_UI_URL: ${CHAT_UI_URL:-none}"
   echo ""
 
-  # Build the custom sandbox image
-  log_info "Building Milimo Hermes sandbox image..."
-
-  local docker_args
-  docker_args=$(build_docker_args)
-
-  run_command "docker build $docker_args -t milimo-hermes-sandbox:latest -f milimo-hermes-sandbox/Dockerfile ."
-
-  log_success "Sandbox image built successfully"
-
-  # Prepare onboarding command
+  # Prepare onboarding command - uses nemohermes onboard with our custom Dockerfile
   local onboard_cmd="nemohermes onboard"
   onboard_cmd+=" --name $SANDBOX_NAME"
   onboard_cmd+=" --from ./milimo-hermes-sandbox/Dockerfile"
@@ -450,6 +444,13 @@ main() {
     onboard_cmd+=" --non-interactive"
     export NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1
     export NEMOCLAW_NON_INTERACTIVE=1
+  fi
+
+  # Add build args for Dockerfile
+  local docker_build_args
+  docker_build_args=$(build_onboard_args)
+  if [[ -n "$docker_build_args" ]]; then
+    onboard_cmd+=" $docker_build_args"
   fi
 
   if [[ "$DRY_RUN" == "true" ]]; then

@@ -92,39 +92,18 @@ jobs:
           restore-keys: |
             hermes-base-${{ runner.os }}-
 
-      - name: Resolve Hermes base image
+- name: Resolve Hermes base image
         id: resolve-base
         run: |
-          BASE_IMAGE="ghcr.io/nousresearch/hermes-agent:latest"
+          BASE_IMAGE="ghcr.io/nvidia/nemoclaw/hermes-sandbox-base:latest"
           if docker pull "${BASE_IMAGE}" 2>/dev/null; then
             DIGEST=$(docker inspect "${BASE_IMAGE}" --format '{{index .RepoDigests 0}}')
             echo "image=${DIGEST}" >> "$GITHUB_OUTPUT"
             echo "source=pulled" >> "$GITHUB_OUTPUT"
           else
-            # Fall back to pinned digest in .hermes-base-digest if it exists
-            if [ -f milimo-hermes-sandbox/.hermes-base-digest ]; then
-              DIGEST=$(cat milimo-hermes-sandbox/.hermes-base-digest)
-              # Validate digest format - must be a proper sha256 digest
-              if [[ "${DIGEST}" =~ ^ghcr\.io/nousresearch/hermes-agent@sha256:[a-f0-9]{64}$ ]]; then
-                echo "image=${DIGEST}" >> "$GITHUB_OUTPUT"
-                echo "source=pinned-fallback" >> "$GITHUB_OUTPUT"
-              else
-                echo "ERROR: .hermes-base-digest contains invalid format (placeholder or corrupted)."
-                echo "Current content: ${DIGEST}"
-                echo ""
-                echo "To fix: someone with NousResearch GHCR access must run:"
-                echo "  docker login ghcr.io -u <username> --password-stdin <token>"
-                echo "  docker pull ghcr.io/nousresearch/hermes-agent:latest"
-                echo "  docker inspect ghcr.io/nousresearch/hermes-agent:latest --format '{{index .RepoDigests 0}}' > milimo-hermes-sandbox/.hermes-base-digest"
-                echo "  git add milimo-hermes-sandbox/.hermes-base-digest && git commit -m 'chore: update Hermes base image digest'"
-                exit 1
-              fi
-            else
-              echo "ERROR: Could not pull Hermes base image and no pinned fallback found."
-              echo "Run: docker pull ghcr.io/nousresearch/hermes-agent:latest"
-              echo "Then: docker inspect ... --format '{{index .RepoDigests 0}}' > milimo-hermes-sandbox/.hermes-base-digest"
-              exit 1
-            fi
+            echo "ERROR: Could not pull NVIDIA Hermes sandbox base image."
+            echo "This is a public image - check network connectivity."
+            exit 1
           fi
 
       - name: Log base image source
@@ -132,7 +111,7 @@ jobs:
           echo "Base image: ${{ steps.resolve-base.outputs.image }}"
           echo "Source: ${{ steps.resolve-base.outputs.source }}"
 
-      - name: Build Milimo Hermes sandbox image
+- name: Build Milimo Hermes sandbox image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -141,7 +120,7 @@ jobs:
           load: true
           tags: milimo-hermes-sandbox:ci
           build-args: |
-            HERMES_BASE_IMAGE=${{ steps.resolve-base.outputs.image }}
+            BASE_IMAGE=${{ steps.resolve-base.outputs.image }}
             HERMES_GIT_SHA=${{ github.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
@@ -174,9 +153,9 @@ jobs:
             test -f /opt/hermes/.milimo_install \
             && echo "✓ Milimo install stamp present"
 
-          # Verify plugin directory exists
+# Verify plugin directory exists
           docker exec milimo-hermes-smoke \
-            test -d /opt/data/.hermes/plugins/milimo-hermes \
+            test -d /sandbox/.hermes/plugins/milimo-hermes \
             && echo "✓ Plugin directory present"
 
           # Verify milimo-core importable in Hermes venv
