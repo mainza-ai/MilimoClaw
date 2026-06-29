@@ -24,14 +24,28 @@ FROM ${BASE_IMAGE}
 # The venv at /opt/hermes/.venv is owned by root — we install as root.
 USER root
 
+# Verify Hermes venv location and use correct pip
+RUN set -eu; \
+    if [ -x /opt/hermes/.venv/bin/pip ]; then \
+        HERMES_PIP="/opt/hermes/.venv/bin/pip"; \
+    elif [ -x /opt/hermes/.venv/bin/pip3 ]; then \
+        HERMES_PIP="/opt/hermes/.venv/bin/pip3"; \
+    elif command -v uv >/dev/null 2>&1; then \
+        HERMES_PIP="uv pip"; \
+    else \
+        echo "ERROR: No pip found in Hermes venv" >&2; \
+        exit 1; \
+    fi; \
+    echo "Using pip: $HERMES_PIP"
+
 # Copy milimo-core first (changes less often → better layer caching)
 COPY --chmod=a+rX,go-w milimo-core/ /opt/milimo-core/
-RUN /opt/hermes/.venv/bin/pip install --no-cache-dir -e /opt/milimo-core/
+RUN $HERMES_PIP install --no-cache-dir -e /opt/milimo-core/
 
 # Copy the Hermes plugin
 COPY --chmod=a+rX,go-w milimo-hermes-plugin/ /opt/milimo-hermes-plugin/
-RUN /opt/hermes/.venv/bin/pip install --no-cache-dir -r /opt/milimo-hermes-plugin/requirements.txt \
-    && /opt/hermes/.venv/bin/pip install --no-cache-dir --no-deps -e /opt/milimo-hermes-plugin/
+RUN $HERMES_PIP install --no-cache-dir -r /opt/milimo-hermes-plugin/requirements.txt \
+    && $HERMES_PIP install --no-cache-dir --no-deps -e /opt/milimo-hermes-plugin/
 
 # Install plugin into Hermes plugin directory (standard Hermes location)
 RUN mkdir -p /sandbox/.hermes/plugins/milimo-hermes \
