@@ -44,7 +44,7 @@ jobs:
 
       - name: Run milimo-core unit tests
         run: |
-          uv run pytest milimo-core/tests/ --cov=milimo_core --cov-fail-under=80
+          uv run pytest milimo-core/tests/ --cov=milimo_core --cov-config=milimo-core/pyproject.toml --cov-fail-under=80
 
       - name: Run Hermes plugin integration tests
         run: |
