@@ -38,9 +38,11 @@ jobs:
       - name: Install uv
         run: pip install uv
 
-      - name: Install dependencies
+      - name: Install workspace packages
         run: |
-          uv sync --all-packages --all-extras
+          pip install -e milimo-core
+          pip install -e milimo-blueprint
+          pip install -e milimo-hermes-plugin
 
       - name: Run milimo-core unit tests
         run: |
