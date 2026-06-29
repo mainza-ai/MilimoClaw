@@ -48,11 +48,11 @@ jobs:
 
       - name: Run Hermes plugin integration tests
         run: |
-          uv run pytest milimo-hermes-plugin/tests/integration/ -v
+          PYTHONPATH=milimo-core/src:milimo-hermes-plugin uv run pytest milimo-hermes-plugin/tests/integration/ -v
 
       - name: Run blueprint tests
         run: |
-          cd milimo-blueprint && PYTHONPATH=.:orchestrator uv run pytest tests/ -v -k "not test_is_quarter_start"
+          cd milimo-blueprint && PYTHONPATH=.:orchestrator:../milimo-core/src uv run pytest tests/ -v -k "not test_is_quarter_start"
 
   hermes-smoke:
     name: Hermes Smoke Test (Docker)
