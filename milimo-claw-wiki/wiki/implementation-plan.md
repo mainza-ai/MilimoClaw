@@ -346,7 +346,7 @@ docs/adr/
 
 1. **E4**: ✅ **v0.2.0 tagged**
 2. **GitHub Actions CI**: ✅ **Hermes CI workflow added** (`.github/workflows/hermes-ci.yml`)
-3. **PyPI publish**: `milimo-core` package post-v0.2.0
+3. **PyPI publish**: ⏸️ **Deferred** — `milimo-core` package publish post-v0.2.0 (manual step when ready)
 
 ---
 
