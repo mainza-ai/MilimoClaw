@@ -68,7 +68,7 @@ jobs:
       - name: Run Python tests
         run: |
           cd milimo-blueprint
-          PYTHONPATH=orchestrator python -m pytest tests/ -v
+          PYTHONPATH=orchestrator:../milimo-core/src python -m pytest tests/ -v
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
