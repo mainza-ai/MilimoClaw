@@ -92,7 +92,7 @@ jobs:
           restore-keys: |
             hermes-base-${{ runner.os }}-
 
-- name: Resolve Hermes base image
+      - name: Resolve Hermes base image
         id: resolve-base
         run: |
           BASE_IMAGE="ghcr.io/nvidia/nemoclaw/hermes-sandbox-base:latest"
@@ -111,7 +111,7 @@ jobs:
           echo "Base image: ${{ steps.resolve-base.outputs.image }}"
           echo "Source: ${{ steps.resolve-base.outputs.source }}"
 
-- name: Build Milimo Hermes sandbox image
+      - name: Build Milimo Hermes sandbox image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -153,7 +153,7 @@ jobs:
             test -f /opt/hermes/.milimo_install \
             && echo "✓ Milimo install stamp present"
 
-# Verify plugin directory exists
+          # Verify plugin directory exists
           docker exec milimo-hermes-smoke \
             test -d /sandbox/.hermes/plugins/milimo-hermes \
             && echo "✓ Plugin directory present"
