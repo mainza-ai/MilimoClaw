@@ -7,8 +7,11 @@
 # Core dependency - shared orchestrator library
 milimo-core>=0.1.0
 
-# Hermes plugin runtime (provided by NemoClaw Hermes sandbox)
-# nemoclaw-hermes-sdk is pre-installed in the base image
+# Hermes Agent runtime (provided by upstream NousResearch/hermes-agent image)
+# The base image at ghcr.io/nousresearch/hermes-agent includes:
+#   - hermes-agent Python package with CLI, gateway, and plugin APIs
+#   - All provider packages baked in (anthropic, bedrock, azure-identity, hindsight, matrix)
+#   - s6-overlay supervision, uv/venv, node 22 LTS, Playwright
 
 # Optional: For development/testing outside sandbox
 # nemoclaw-hermes-sdk @ git+https://github.com/NVIDIA/nemoclaw.git#subdirectory=hermes/sdk

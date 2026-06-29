@@ -1,0 +1,14 @@
+# Pinned fallback digest for ghcr.io/nousresearch/hermes-agent
+# Used by CI when docker pull fails (rate limits, outages, auth issues).
+#
+# THIS IS A PLACEHOLDER - MUST BE UPDATED BEFORE CI WILL SUCCEED.
+#
+# To update: you need access to NousResearch GHCR packages.
+#   docker login ghcr.io -u <username> --password-stdin <token>
+#   docker pull ghcr.io/nousresearch/hermes-agent:latest
+#   docker inspect ghcr.io/nousresearch/hermes-agent:latest \
+#     --format '{{index .RepoDigests 0}}' > milimo-hermes-sandbox/.hermes-base-digest
+#
+# Example format: ghcr.io/nousresearch/hermes-agent@sha256:abc123...
+
+ghcr.io/nousresearch/hermes-agent@sha256:PLACEHOLDER_UPDATE_BY_NousResearch_OR_ON_FIRST_SUCCESSFUL_CI_RUN
