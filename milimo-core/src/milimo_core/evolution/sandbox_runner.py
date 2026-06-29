@@ -278,12 +278,14 @@ with open("{data_file}", "r") as f:
 # Tool code
 tool_code = """{escaped_code}"""
 
-# Execute tool code in restricted namespace
+# Execute tool code in a single namespace. Using separate globals/locals
+# here would break module-level imports referenced inside apply(): the
+# function's __globals__ is the globals dict, so an import bound in locals
+# would be invisible and raise NameError at call time.
 exec_globals = {{}}
-exec_locals = {{}}
 
 try:
-    exec(tool_code, exec_globals, exec_locals)
+    exec(tool_code, exec_globals)
 except Exception as e:
     result = {{
         "tool_name": "",
@@ -298,7 +300,7 @@ except Exception as e:
     sys.exit(0)
 
 # Get the apply function
-apply_func = exec_locals.get("apply") or exec_globals.get("apply")
+apply_func = exec_globals.get("apply")
 
 if apply_func is None:
     result = {{
