@@ -9,3 +9,5 @@ __pycache__
 !**/dist/
 !milimo/src/
 !milimo/src/**/*.ts
+!milimo-hermes-sandbox/*.ts
+!milimo-hermes-sandbox/config/**/*.ts
