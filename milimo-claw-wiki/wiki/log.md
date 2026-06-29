@@ -14,6 +14,29 @@ Each entry follows this format:
 
 ---
 
+### 2026-06-28 — Phase D1/D2/E2/E3 Complete + CI Pipeline + v0.2.0 Tag
+
+**Pages**: `wiki/implementation-plan.md`, `wiki/architecture/hermes-profile.md`, `.github/workflows/hermes-ci.yml`, `README.md`, `milimo-claw-wiki/CLAUDE.md`
+
+**Source**: All immediate next steps complete; v0.2.0 tagged; CI pipeline operational
+
+**Changes**:
+- **Phase E4 Complete** — v0.2.0 tagged and pushed (GitHub tags: v0.1.0, v0.2.0)
+- **GitHub Actions CI Operational** — `.github/workflows/hermes-ci.yml` with 3 jobs:
+  - `hermes-integration`: unit + integration + coverage gate
+  - `hermes-smoke`: Docker build + non-interactive onboarding + endpoint verification
+  - `blueprint-integration`: full blueprint test suite
+- **Documentation Updated**:
+  - README dual-profile decision tree (E2)
+  - CLAUDE.md "claw handlers" terminology (E3)
+  - Wiki implementation-plan & hermes-profile marked complete
+- **Workspace Fixes**: pyproject.toml for all 3 members, pyrightconfig.json for blueprint, SPDX headers on shims
+- **Test Suite**: 1,557 passing (265 core + 58 Hermes + 1,234 blueprint; 1 pre-existing failure)
+
+**Next**: PyPI publish `milimo-core` deferred until ready
+
+---
+
 ### 2026-06-28 — Phase D1/D2 Complete: Hermes Integration Tests + Coverage Gate (v0.2.0 Ready)
 
 **Pages**: `README.md`, `milimo-claw-wiki/CLAUDE.md`, `wiki/index.md`, `wiki/architecture/hermes-profile.md`, `wiki/implementation-plan.md`, `milimo-hermes-plugin/tests/integration/*`
