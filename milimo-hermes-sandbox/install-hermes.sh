@@ -303,7 +303,7 @@ prompt_auth_mode() {
   fi
 
   if [[ "$NON_INTERACTIVE" == "true" ]]; then
-    return  return 0
+    return 0
   fi
 
   echo ""
