@@ -38,24 +38,23 @@ jobs:
       - name: Install uv
         run: pip install uv
 
-      - name: Install workspace packages
-        run: |
-          pip install -e milimo-core
-          pip install -e milimo-blueprint
-          pip install -e milimo-hermes-plugin
-          pip install pytest-cov pytest-asyncio pytest-mock faker
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Sync workspace packages
+        run: uv sync --all-packages --all-extras
 
       - name: Run milimo-core unit tests
         run: |
-          pytest milimo-core/tests/ --cov=milimo_core --cov-config=milimo-core/pyproject.toml --cov-fail-under=80
+          uv run pytest milimo-core/tests/ --cov=milimo_core --cov-config=milimo-core/pyproject.toml --cov-fail-under=80
 
       - name: Run Hermes plugin integration tests
         run: |
-          pytest milimo-hermes-plugin/tests/integration/ -v
+          uv run pytest milimo-hermes-plugin/tests/integration/ -v
 
       - name: Run blueprint tests
         run: |
-          cd milimo-blueprint && pytest tests/ -v -k "not test_is_quarter_start"
+          cd milimo-blueprint && uv run pytest tests/ -v -k "not test_is_quarter_start"
 
   hermes-smoke:
     name: Hermes Smoke Test (Docker)
