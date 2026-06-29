@@ -35,22 +35,13 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
-      - name: Install uv
-        run: pip install uv
-
-      - name: Install workspace packages (editable)
+      - name: Install test dependencies
         run: |
-          pip install -e milimo-core
-          pip install -e milimo-blueprint
-          pip install -e milimo-hermes-plugin
-
-      - name: Verify milimo-core installation
-        run: |
-          python -c "import milimo_core.build; print('milimo_core.build OK')"
+          pip install pytest pytest-cov pytest-asyncio pytest-mock faker pyyaml requests stripe sentry-sdk websocket-client cryptography httpx
 
       - name: Run milimo-core unit tests
         run: |
-          python -m pytest milimo-core/tests/ --cov=milimo_core --cov-config=milimo-core/pyproject.toml --cov-fail-under=80
+          cd milimo-core && python -m pytest tests/ --cov=milimo_core --cov-config=pyproject.toml --cov-fail-under=80
 
       - name: Run Hermes plugin integration tests
         run: |
