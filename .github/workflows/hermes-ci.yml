@@ -78,7 +78,7 @@ jobs:
 
       - name: Build Hermes sandbox image
         run: |
-          docker build -t milimo-hermes:smoke-test ./milimo-hermes-sandbox
+          docker build -t milimo-hermes:smoke-test -f milimo-hermes-sandbox/Dockerfile .
 
       - name: Run smoke test container
         run: |

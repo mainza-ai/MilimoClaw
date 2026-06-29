@@ -1,6 +1,12 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+const mockSpawnSyncRef = vi.fn();
+
+vi.mock("node:child_process", () => ({
+  spawnSync: mockSpawnSyncRef,
+}));
+
 vi.mock("node:fs", () => ({
   existsSync: vi.fn(),
   readdirSync: vi.fn(),
@@ -10,12 +16,15 @@ vi.mock("node:fs", () => ({
   unlinkSync: vi.fn(),
 }));
 
-vi.mock("node:path", () => ({
-  join: vi.fn((...args: string[]) => args.join("/")),
+vi.mock("../lib/python-bridge", () => ({
+  callPython: vi.fn((blueprintDir: string, code: string) => {
+    const result = mockSpawnSyncRef("python3", ["-c", code], { encoding: "utf-8" });
+    return result?.stdout;
+  }),
 }));
 
-vi.mock("node:child_process", () => ({
-  spawnSync: vi.fn(),
+vi.mock("node:path", () => ({
+  join: vi.fn((...args: string[]) => args.join("/")),
 }));
 
 vi.mock("../commands/init", () => ({
@@ -24,7 +33,7 @@ vi.mock("../commands/init", () => ({
 }));
 
 const mockedFs = (await import("node:fs")) as any;
-const mockedSpawnSync = (await import("node:child_process")).spawnSync as vi.Mock;
+const mockedSpawnSync = mockSpawnSyncRef;
 const mockedInit = await import("../commands/init");
 
 import {

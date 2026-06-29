@@ -97,10 +97,10 @@ describe("HealthCollector", () => {
   });
 
   describe("collectAll()", () => {
-    it("calls bridge with collect_health command", () => {
+    it("calls bridge with collect_health command", async () => {
       const collector = new HealthCollector(defaultOptions);
 
-      collector.collectAll();
+      await collector.collectAll();
 
       expect(mockedBridge.callPythonBridgeSafe).toHaveBeenCalledWith(
         "collect_health",
@@ -109,10 +109,10 @@ describe("HealthCollector", () => {
       );
     });
 
-    it("returns ClawHealthMap keyed by role", () => {
+    it("returns ClawHealthMap keyed by role", async () => {
       const collector = new HealthCollector(defaultOptions);
 
-      const health = collector.collectAll();
+      const health = await collector.collectAll();
 
       expect(health.content).toBeDefined();
       expect(health.ops).toBeDefined();
@@ -121,10 +121,10 @@ describe("HealthCollector", () => {
       expect(health.build).toBeDefined();
     });
 
-    it("includes all required health fields", () => {
+    it("includes all required health fields", async () => {
       const collector = new HealthCollector(defaultOptions);
 
-      const health = collector.collectAll();
+      const health = await collector.collectAll();
 
       expect(health.content.role).toBe("content");
       expect(health.content.status).toBeDefined();
@@ -154,7 +154,7 @@ describe("HealthCollector", () => {
 
       collector.startPolling(onUpdate);
 
-      await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(onUpdate).toHaveBeenCalled();
 
@@ -336,10 +336,10 @@ describe("HealthCollector", () => {
   });
 
   describe("sparkline format", () => {
-    it("returns 7 integers for sparkline", () => {
+    it("returns 7 integers for sparkline", async () => {
       const collector = new HealthCollector(defaultOptions);
 
-      const health = collector.collectAll();
+      const health = await collector.collectAll();
 
       expect(health.content.sparkline).toHaveLength(7);
       for (const val of health.content.sparkline) {
@@ -349,7 +349,7 @@ describe("HealthCollector", () => {
   });
 
   describe("error resilience", () => {
-    it("throws on bridge failure", () => {
+    it("throws on bridge failure", async () => {
       mockedBridge.callPythonBridgeSafe.mockReturnValueOnce({
         success: false,
         error: "Connection refused",
@@ -357,7 +357,7 @@ describe("HealthCollector", () => {
 
       const collector = new HealthCollector(defaultOptions);
 
-      expect(() => collector.collectAll()).toThrow("Connection refused");
+      await expect(collector.collectAll()).rejects.toThrow("Connection refused");
     });
   });
 });

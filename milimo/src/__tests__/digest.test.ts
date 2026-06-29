@@ -150,13 +150,13 @@ describe("DigestScheduler", () => {
   });
 
   describe("getMorningBrief()", () => {
-    it("calls python bridge with morning_brief command", () => {
+    it("calls python bridge with morning_brief command", async () => {
       const scheduler = new DigestScheduler({
         config: defaultConfig,
         blueprintDir: "/tmp/test",
       });
 
-      scheduler.getMorningBrief();
+      await scheduler.getMorningBrief();
 
       expect(mockBridge.callPythonBridgeSafe).toHaveBeenCalledWith(
         "morning_brief",
@@ -165,13 +165,13 @@ describe("DigestScheduler", () => {
       );
     });
 
-    it("returns DigestBrief with morning data", () => {
+    it("returns DigestBrief with morning data", async () => {
       const scheduler = new DigestScheduler({
         config: defaultConfig,
         blueprintDir: "/tmp/test",
       });
 
-      const brief = scheduler.getMorningBrief();
+      const brief = await scheduler.getMorningBrief();
 
       expect(brief).not.toBeNull();
       expect(brief?.type).toBe("morning");
@@ -179,7 +179,7 @@ describe("DigestScheduler", () => {
       expect(brief?.queue_summary).toEqual({ hold: 1, review: 2, auto: 1 });
     });
 
-    it("calls onUpdate callback on success", () => {
+    it("calls onUpdate callback on success", async () => {
       const onUpdate = vi.fn();
       const scheduler = new DigestScheduler({
         config: defaultConfig,
@@ -187,18 +187,18 @@ describe("DigestScheduler", () => {
         onUpdate,
       });
 
-      scheduler.getMorningBrief();
+      await scheduler.getMorningBrief();
 
       expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ type: "morning" }));
     });
 
-    it("includes generated_at timestamp", () => {
+    it("includes generated_at timestamp", async () => {
       const scheduler = new DigestScheduler({
         config: defaultConfig,
         blueprintDir: "/tmp/test",
       });
 
-      const brief = scheduler.getMorningBrief();
+      const brief = await scheduler.getMorningBrief();
 
       expect(brief?.generated_at).toBeDefined();
       expect(new Date(brief?.generated_at ?? "").toISOString()).toBe(brief?.generated_at);
@@ -206,13 +206,13 @@ describe("DigestScheduler", () => {
   });
 
   describe("getEveningWrap()", () => {
-    it("calls python bridge with evening_wrap command", () => {
+    it("calls python bridge with evening_wrap command", async () => {
       const scheduler = new DigestScheduler({
         config: defaultConfig,
         blueprintDir: "/tmp/test",
       });
 
-      scheduler.getEveningWrap();
+      await scheduler.getEveningWrap();
 
       expect(mockBridge.callPythonBridgeSafe).toHaveBeenCalledWith(
         "evening_wrap",
@@ -221,13 +221,13 @@ describe("DigestScheduler", () => {
       );
     });
 
-    it("returns DigestBrief with evening data", () => {
+    it("returns DigestBrief with evening data", async () => {
       const scheduler = new DigestScheduler({
         config: defaultConfig,
         blueprintDir: "/tmp/test",
       });
 
-      const brief = scheduler.getEveningWrap();
+      const brief = await scheduler.getEveningWrap();
 
       expect(brief).not.toBeNull();
       expect(brief?.type).toBe("evening");
@@ -236,7 +236,7 @@ describe("DigestScheduler", () => {
       expect(brief?.remaining_pending).toBe(3);
     });
 
-    it("calls onUpdate callback on success", () => {
+    it("calls onUpdate callback on success", async () => {
       const onUpdate = vi.fn();
       const scheduler = new DigestScheduler({
         config: defaultConfig,
@@ -244,7 +244,7 @@ describe("DigestScheduler", () => {
         onUpdate,
       });
 
-      scheduler.getEveningWrap();
+      await scheduler.getEveningWrap();
 
       expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ type: "evening" }));
     });

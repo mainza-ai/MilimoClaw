@@ -13,6 +13,7 @@
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 
 export interface NotificationPayload {
   action_id: string;
@@ -88,19 +89,36 @@ export class OperatorNotifier {
   }
 
   private notifyMacOS(
-    _title: string,
-    _message: string,
+    title: string,
+    message: string,
     payload: NotificationPayload,
   ): NotificationResult {
-    return this.notifyPendingFile(payload);
+    try {
+      const script = `display notification "${this.escapeAppleScript(message)}" with title "${this.escapeAppleScript(title)}"`;
+      const result = spawnSync("osascript", ["-e", script], { encoding: "utf-8" });
+      if (result.status === 0) {
+        return { delivered: true, method: "osascript" };
+      }
+      return this.notifyPendingFile(payload);
+    } catch {
+      return this.notifyPendingFile(payload);
+    }
   }
 
   private notifyLinux(
-    _title: string,
-    _message: string,
+    title: string,
+    message: string,
     payload: NotificationPayload,
   ): NotificationResult {
-    return this.notifyPendingFile(payload);
+    try {
+      const result = spawnSync("notify-send", [title, message], { encoding: "utf-8" });
+      if (result.status === 0) {
+        return { delivered: true, method: "notify-send" };
+      }
+      return this.notifyPendingFile(payload);
+    } catch {
+      return this.notifyPendingFile(payload);
+    }
   }
 
   private notifyPendingFile(payload: NotificationPayload): NotificationResult {

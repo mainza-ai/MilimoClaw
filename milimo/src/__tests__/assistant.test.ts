@@ -1,14 +1,23 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-const mockReadFileSync = vi.fn();
+import { vi } from "vitest";
 
-vi.mock("node:child_process", () => ({
-  spawn: vi.fn(),
+const mockReadFileSync = vi.fn();
+const mockExistsSync = vi.fn();
+const mockConsoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
+vi.spyOn(console, "error").mockImplementation(() => {});
+
+// Mock the RPC bridge
+const mockRpcCall = vi.fn();
+vi.mock("../lib/rpc-bridge", () => ({
+  getRpcClient: vi.fn(() => ({
+    call: mockRpcCall,
+  })),
 }));
 
 vi.mock("node:fs", () => ({
-  existsSync: vi.fn(),
+  existsSync: (...args: unknown[]) => mockExistsSync(...args),
   readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
 }));
 
@@ -21,8 +30,6 @@ vi.mock("node:os", () => ({
   homedir: vi.fn(() => "/home/test"),
 }));
 
-import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
 import {
   getAssistantConfig,
   assistantSetup,
@@ -30,145 +37,90 @@ import {
   assistantStart,
 } from "../commands/assistant";
 
-const mockedSpawn = spawn as vi.MockedFunction<typeof spawn>;
-const mockedExistsSync = existsSync as vi.MockedFunction<typeof existsSync>;
-
 describe("assistant commands", () => {
-  let mockProcess: { on: vi.Mock; stdout?: { on: vi.Mock }; stderr?: { on: vi.Mock } };
-
   beforeEach(() => {
-    vi.restoreAllMocks();
-    mockProcess = {
-      on: vi.fn(),
-    };
-    mockedSpawn.mockReturnValue(mockProcess as unknown as ReturnType<typeof spawn>);
+    vi.clearAllMocks();
     mockReadFileSync.mockReset();
-    mockedExistsSync.mockReset();
+    mockExistsSync.mockReset();
   });
 
   describe("getAssistantConfig", () => {
     it("returns null when config file does not exist", () => {
-      mockedExistsSync.mockReturnValue(false);
-
+      mockExistsSync.mockReturnValue(false);
       const result = getAssistantConfig();
-
       expect(result).toBeNull();
     });
 
     it("returns config when assistant name is set", () => {
-      mockedExistsSync.mockReturnValue(true);
+      mockExistsSync.mockReturnValue(true);
       mockReadFileSync.mockReturnValue(
         JSON.stringify({
           assistant: { name: "Nova", emoji: "🦅" },
         }),
       );
-
       const result = getAssistantConfig();
-
-      expect(result).not.toBeNull();
-      expect(result?.name).toBe("Nova");
-      expect(result?.emoji).toBe("🦅");
+      expect(result).toEqual({ name: "Nova", emoji: "🦅" });
     });
 
     it("returns null when assistant name is missing", () => {
-      mockedExistsSync.mockReturnValue(true);
-      mockReadFileSync.mockReturnValue(
-        JSON.stringify({
-          assistant: {},
-        }),
-      );
-
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(JSON.stringify({ assistant: {} }));
       const result = getAssistantConfig();
-
       expect(result).toBeNull();
     });
 
     it("uses default emoji when not set", () => {
-      mockedExistsSync.mockReturnValue(true);
+      mockExistsSync.mockReturnValue(true);
       mockReadFileSync.mockReturnValue(JSON.stringify({ assistant: { name: "Rex" } }));
-
       const result = getAssistantConfig();
-
       expect(result?.emoji).toBe("🦀");
     });
   });
 
   describe("assistantSetup", () => {
-    it("spawns python3 with resolved script path", async () => {
-      mockedExistsSync.mockReturnValue(false);
+    it("calls rpc assistant_setup with blueprintDir", async () => {
+      mockExistsSync.mockReturnValue(false);
+      mockRpcCall.mockResolvedValue({});
 
-      const setupPromise = assistantSetup();
+      await assistantSetup();
 
-      const closeCallback = mockProcess.on.mock.calls.find(
-        (call: unknown[]) => call[0] === "close",
-      )?.[1] as (code: number) => void;
-      closeCallback?.(0);
-
-      await setupPromise;
-
-      expect(mockedSpawn).toHaveBeenCalledWith("python3", ["-m", "orchestrator.assistant_setup"], {
-        cwd: "/home/test/.openclaw/milimo/blueprints/0.1.0",
-        stdio: "inherit",
-        env: expect.objectContaining({
-          PYTHONPATH: "/home/test/.openclaw/milimo/blueprints/0.1.0",
-        }),
+      expect(mockRpcCall).toHaveBeenCalledWith("assistant_setup", {
+        blueprintDir: "/home/test/.openclaw/milimo/blueprints/0.1.0",
       });
     });
 
-    it("rejects on non-zero exit code", async () => {
-      mockedExistsSync.mockReturnValue(false);
+    it("rejects on rpc failure", async () => {
+      mockExistsSync.mockReturnValue(false);
+      mockRpcCall.mockRejectedValue(new Error("RPC failed"));
 
-      const setupPromise = assistantSetup();
-
-      const closeCallback = mockProcess.on.mock.calls.find(
-        (call: unknown[]) => call[0] === "close",
-      )?.[1] as (code: number) => void;
-      closeCallback?.(1);
-
-      await expect(setupPromise).rejects.toThrow("Assistant setup failed with exit code 1");
+      await expect(assistantSetup()).rejects.toThrow("RPC failed");
     });
   });
 
   describe("assistantVerify", () => {
-    it("spawns python3 with resolved script path and --verify flag", async () => {
-      mockedExistsSync.mockReturnValue(false);
+    it("calls rpc assistant_verify and prints completion message", async () => {
+      mockExistsSync.mockReturnValue(false);
+      mockRpcCall.mockResolvedValue({});
 
-      const verifyPromise = assistantVerify();
+      await assistantVerify();
 
-      const closeCallback = mockProcess.on.mock.calls.find(
-        (call: unknown[]) => call[0] === "close",
-      )?.[1] as (code: number) => void;
-      closeCallback?.(0);
-
-      await verifyPromise;
-
-      expect(mockedSpawn).toHaveBeenCalledWith(
-        "python3",
-        [
-          "/home/test/.openclaw/milimo/blueprints/0.1.0/orchestrator/assistant_setup.py",
-          "--verify",
-        ],
-        { stdio: "inherit" },
-      );
+      expect(mockRpcCall).toHaveBeenCalledWith("assistant_verify", {
+        scriptPath: "/home/test/.openclaw/milimo/blueprints/0.1.0/orchestrator/assistant_setup.py",
+        blueprintDir: "/home/test/.openclaw/milimo/blueprints/0.1.0",
+      });
     });
 
     it("rejects when verification fails", async () => {
-      mockedExistsSync.mockReturnValue(false);
+      mockExistsSync.mockReturnValue(false);
+      mockRpcCall.mockRejectedValue(new Error("Verification failed"));
 
-      const verifyPromise = assistantVerify();
-
-      const closeCallback = mockProcess.on.mock.calls.find(
-        (call: unknown[]) => call[0] === "close",
-      )?.[1] as (code: number) => void;
-      closeCallback?.(1);
-
-      await expect(verifyPromise).rejects.toThrow("Assistant setup verification failed");
+      await expect(assistantVerify()).rejects.toThrow("Assistant setup verification failed");
     });
   });
 
   describe("assistantStart", () => {
     it("exits when agent config does not exist", async () => {
-      mockedExistsSync.mockReturnValue(false);
+      mockExistsSync.mockReturnValue(false);
 
       const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
         throw new Error("process.exit");
@@ -180,60 +132,37 @@ describe("assistant commands", () => {
       mockExit.mockRestore();
     });
 
-    it("spawns openclaw with correct agent path", async () => {
-      mockedExistsSync.mockReturnValue(true);
-      mockReadFileSync.mockReturnValue(
-        JSON.stringify({
-          assistant: { name: "Nova", emoji: "🦅" },
-        }),
-      );
-
-      const startPromise = assistantStart();
-
-      const closeCallback = mockProcess.on.mock.calls.find(
-        (call: unknown[]) => call[0] === "close",
-      )?.[1] as (code: number) => void;
-      closeCallback?.(0);
-
-      await startPromise;
-
-      expect(mockedSpawn).toHaveBeenCalledWith("openclaw", ["tui", "--session", "main"], {
-        stdio: "inherit",
+    it("prints instruction message when config exists", async () => {
+      mockExistsSync.mockImplementation((p: string) => {
+        if (p.includes("config.yaml") || p.includes("config.json")) return true;
+        return false;
       });
-    });
-
-    it("rejects on non-zero exit code", async () => {
-      mockedExistsSync.mockReturnValue(true);
       mockReadFileSync.mockReturnValue(
         JSON.stringify({
           assistant: { name: "Nova", emoji: "🦅" },
         }),
       );
 
-      const startPromise = assistantStart();
+      await assistantStart();
 
-      const closeCallback = mockProcess.on.mock.calls.find(
-        (call: unknown[]) => call[0] === "close",
-      )?.[1] as (code: number) => void;
-      closeCallback?.(1);
-
-      await expect(startPromise).rejects.toThrow("Nova exited with code 1");
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining("Starting Nova"));
+      expect(mockConsoleLog).toHaveBeenCalledWith(
+        expect.stringContaining("openclaw tui --session main"),
+      );
     });
 
     it("uses default name when assistant config missing", async () => {
-      mockedExistsSync.mockReturnValue(true);
+      mockExistsSync.mockImplementation((p: string) => {
+        if (p.includes("config.yaml") || p.includes("config.json")) return true;
+        return false;
+      });
       mockReadFileSync.mockReturnValue(JSON.stringify({}));
 
-      const startPromise = assistantStart();
+      await assistantStart();
 
-      const closeCallback = mockProcess.on.mock.calls.find(
-        (call: unknown[]) => call[0] === "close",
-      )?.[1] as (code: number) => void;
-      closeCallback?.(0);
-
-      await startPromise;
-
-      expect(mockedSpawn).toHaveBeenCalled();
+      expect(mockConsoleLog).toHaveBeenCalledWith(
+        expect.stringContaining("Starting your assistant"),
+      );
     });
   });
 });
