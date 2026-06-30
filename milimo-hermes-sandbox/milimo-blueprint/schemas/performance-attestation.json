@@ -1,0 +1,128 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://milimoclaw.com/schemas/performance-attestation.json",
+  "title": "Performance Attestation",
+  "description": "Signed performance claims for a blueprint",
+  "type": "object",
+  "required": ["type", "blueprint_id", "blueprint_version", "metrics", "verification", "attestation_hash", "signature"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "const": "performance_attestation",
+      "description": "Attestation type identifier"
+    },
+    "attestation_id": {
+      "type": "string",
+      "pattern": "^pa_[a-zA-Z0-9]{16,32}$",
+      "description": "Unique attestation identifier"
+    },
+    "blueprint_id": {
+      "type": "string",
+      "description": "Blueprint being attested"
+    },
+    "blueprint_version": {
+      "type": "string",
+      "pattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Blueprint version"
+    },
+    "metrics": {
+      "type": "object",
+      "required": ["baseline_performance", "current_performance", "improvement_percent", "measurement_period_days", "sample_size"],
+      "properties": {
+        "baseline_performance": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Baseline performance score (100 = baseline)"
+        },
+        "current_performance": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Current performance score"
+        },
+        "improvement_percent": {
+          "type": "number",
+          "description": "Percentage improvement over baseline"
+        },
+        "measurement_period_days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365,
+          "description": "Days of data used for measurement"
+        },
+        "sample_size": {
+          "type": "integer",
+          "minimum": 100,
+          "description": "Number of operations measured"
+        },
+        "confidence_interval": {
+          "type": "object",
+          "properties": {
+            "lower": { "type": "number" },
+            "upper": { "type": "number" },
+            "confidence_level": { "type": "number", "default": 0.95 }
+          }
+        },
+        "breakdown": {
+          "type": "object",
+          "properties": {
+            "approval_rate": { "type": "number", "minimum": 0, "maximum": 100 },
+            "auto_approval_rate": { "type": "number", "minimum": 0, "maximum": 100 },
+            "response_time_ms": { "type": "number", "minimum": 0 },
+            "error_rate": { "type": "number", "minimum": 0, "maximum": 100 },
+            "tool_usage": {
+              "type": "object",
+              "additionalProperties": { "type": "integer" }
+            }
+          }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "required": ["method", "data_integrity"],
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": ["backtest", "live_measurement", "auditor_verified", "self_attested"],
+          "description": "How metrics were verified"
+        },
+        "auditor": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "public_key": { "type": "string" },
+            "accreditation": { "type": "string" },
+            "verification_date": { "type": "string", "format": "date-time" }
+          }
+        },
+        "data_integrity": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "description": "Hash of metrics data"
+        },
+        "auditor_signature": {
+          "type": "string",
+          "description": "Optional auditor signature"
+        }
+      }
+    },
+    "attestation_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "Hash of this attestation"
+    },
+    "signature": {
+      "type": "string",
+      "description": "Ed25519 signature of attestation"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this attestation expires"
+    }
+  }
+}

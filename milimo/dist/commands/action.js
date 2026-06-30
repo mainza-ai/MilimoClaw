@@ -14,6 +14,7 @@ exports.listPendingActions = listPendingActions;
  * Work without opening TUI. Read pending queue from file,
  * update decision, trigger downstream execution.
  */
+/* eslint-disable @typescript-eslint/await-thenable */
 const node_path_1 = require("node:path");
 const node_os_1 = require("node:os");
 const node_fs_1 = require("node:fs");

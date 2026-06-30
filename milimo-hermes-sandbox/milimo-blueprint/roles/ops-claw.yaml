@@ -1,0 +1,152 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# ═══════════════════════════════════════════════════════════════════════
+#  OPS CLAW — Role Blueprint
+# ═══════════════════════════════════════════════════════════════════════
+# Primary responsibility: The full client lifecycle — intake, scoping,
+# brief management, scheduling, deliverable tracking, follow-up,
+# conflict escalation, and offboarding. The squad's account manager,
+# project manager, and client communications director, running 24/7.
+
+schema_version: "0.1.0"
+
+role: ops
+display_name: "Ops Claw"
+description: >
+  The full client lifecycle — intake, scoping, delivery, follow-up.
+  The Ops Claw is the squad's account manager, project manager,
+  and client communications director, running 24/7.
+
+icon: "📋"
+
+# ── Filesystem ─────────────────────────────────────────────────────────
+filesystem_mount:
+  primary: "/sandbox/.openclaw-data/milimo/claws/ops"
+  mode: read_write
+  contents:
+    - full client records
+    - contact details
+    - project histories
+    - communication logs
+    - contract terms
+  cross_mounts: []
+  # NOTE: This is the squad's most sensitive data store.
+  # Accessible only to the Ops Claw and approved read-queries
+  # from the Finance Claw (billing context only).
+
+# ── Network Egress ─────────────────────────────────────────────────────
+egress_policy: ops-sandbox
+egress_summary:
+  allowed:
+    - Email APIs (approved client communication channels)
+    - Platform messaging APIs
+    - Scheduling tools
+    - Project management APIs
+    - Contract platforms
+  blocked:
+    - Social publishing platforms
+    - Financial systems (payment processors)
+    - Code repositories
+    - Analytics data feeds
+
+# ── Inference Routing ──────────────────────────────────────────────────
+inference_routing:
+  rules:
+    - data_type: client_communications
+      description: "Client-facing messages, emails, proposals"
+      backend: cloud
+      rationale: "Client sees this — quality is the priority"
+
+    - data_type: internal_summaries
+      description: "Internal project summaries and briefs"
+      backend: local-nim
+      rationale: "Business context is sensitive"
+
+    - data_type: contract_review
+      description: "Contract review and risk flagging"
+      backend: local-nim
+      rationale: "Legal-adjacent content never touches cloud"
+
+    - data_type: scheduling
+      description: "Scheduling optimization"
+      backend: cloud
+      rationale: "Non-sensitive computation"
+
+  default_backend: local-nim
+
+# ── Inter-Claw Policy ─────────────────────────────────────────────────
+inter_claw_policy:
+  inbound:
+    - from: content
+      message_types:
+        - type: deliverable
+          description: "Completed creative draft for client delivery"
+
+    - from: finance
+      message_types:
+        - type: response
+          description: "Pricing estimates in response to query"
+        - type: signal
+          description: "Invoice triggers, rate alerts, overdue warnings"
+
+    - from: analytics
+      message_types:
+        - type: signal
+          description: "Client health signals and retention alerts"
+
+    - from: build
+      message_types:
+        - type: signal
+          description: "Deployment completion signal"
+        - type: deliverable
+          description: "Feature release ready for client notification"
+
+  outbound:
+    - to: content
+      message_types:
+        - type: brief
+          description: "Creative brief for new client project"
+        - type: signal
+          description: "Deadline or scope change notification"
+
+    - to: finance
+      message_types:
+        - type: query
+          description: "Pricing floor query before proposal"
+        - type: signal
+          description: "Project completion signal to trigger invoicing"
+
+    - to: build
+      message_types:
+        - type: brief
+          description: "Feature brief for approved client request"
+
+    - to: war_room
+      message_types:
+        - type: signal
+          description: "Deadline conflict, scope change, or new inquiry escalation"
+        - type: deliverable
+          description: "Client communication queued for approval"
+
+# ── Approval Thresholds ────────────────────────────────────────────────
+approval_thresholds:
+  client_auto_response: auto
+  intake_questionnaire: review
+  client_proposal: review
+  scope_change_order: review
+  new_client_onboarding: review
+  contract_modification: hold
+  client_offboarding: hold
+  invoice_over_500: veto
+
+# ── Self-Evolution Seed ────────────────────────────────────────────────
+evolution_signals:
+  primary: "Client response patterns and project completion rates"
+  initial_tools:
+    - name: client_triage_scorer
+      target_week: 3
+      description: "Rates incoming inquiries on budget signal, scope clarity, and niche fit"
+    - name: brief_quality_checker
+      target_week: 6
+      description: "Flags incomplete or ambiguous client briefs before work begins"

@@ -28,7 +28,7 @@ MilimoClaw runs on **NemoClaw** with two profiles:
 | Profile | Interface | Best For | Inference |
 |---------|-----------|----------|-----------|
 | **OpenClaw** (default) | TUI + Bridge Server | Solo operators, local development | NVIDIA NIM / Local |
-| **Hermes** | Web Dashboard (port 18789) + OpenAI-compatible API (port 8642) | Teams, headless CI/CD, managed tool gateways | Native `delegate_task` + `cronjob` |
+|| **Hermes** | Web Dashboard (port 18790) + OpenAI-compatible API (port 8642) | Teams, headless CI/CD, managed tool gateways | Native `delegate_task` + `cronjob` |
 
 **Decision tree**:
 ```
@@ -73,7 +73,7 @@ Milimo Claw now runs on **two NemoClaw profiles** sharing a single `milimo-core`
 | Profile | Interface | Parallelism | Scheduling | Use Case |
 |---------|-----------|-------------|------------|----------|
 | **OpenClaw** (default) | TUI + Bridge Server | `sessions_spawn` (depth ≤ 2) | Python `threading.Timer` | Terminal-native operators, existing OpenClaw users |
-| **Hermes** | Web Dashboard (port 18789) + OpenAI-compatible API (port 8642) | Native `delegate_task` (no depth limit) | Native `cronjob` (durable) | Web-based operators, CI/CD, managed tool gateways |
+|| **Hermes** | Web Dashboard (port 18790) + OpenAI-compatible API (port 8642) | Native `delegate_task` (no depth limit) | Native `cronjob` (durable) | Web-based operators, CI/CD, managed tool gateways |
 
 **Quick decision tree**:
 
@@ -84,7 +84,7 @@ Do you want web search / browser automation inside Hermes?
 
 Are you on a headless remote host?
   → Yes: Set CHAT_UI_URL before onboarding, or use SSH port forwarding
-  → No (local machine): Dashboard at http://127.0.0.1:18789/
+  → No (local machine): Dashboard at http://127.0.0.1:18790/
 
 Do you want a web dashboard UI?
   → Yes: nemohermes (Hermes profile)
@@ -195,7 +195,7 @@ $ openclaw tui
 
 #### Option B: Hermes Profile (Web Dashboard + OpenAI-compatible API)
 
-To run the Hermes profile with web dashboard (port 18789) and OpenAI-compatible API (port 8642):
+To run the Hermes profile with web dashboard (port 18790) and OpenAI-compatible API (port 8642):
 
 ```console
 $ export NVIDIA_API_KEY=nvapi-your-key-here
@@ -208,20 +208,63 @@ $ cp .env.example .env
 export NVIDIA_API_KEY=nvapi-your-key
 export NEMOCLAW_NON_INTERACTIVE=1
 export NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1
-export CHAT_UI_URL=http://localhost:18789
+export CHAT_UI_URL=http://localhost:18790
 ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
 
 # Or interactive install (prompts for auth mode, Slack channels, etc.)
 $ ./milimo-hermes-sandbox/install-hermes.sh
 
 # Or manually onboard using the Dockerfile
-$ nemohermes onboard --name milimo-hermes --from ./milimo-hermes-sandbox/Dockerfile --policy-tier restricted --policy-preset github --policy-preset milimo-mcp
+$ nemohermes onboard --name milimo-hermes --from ./milimo-hermes-sandbox/Dockerfile
 ```
 
 **Result:**
-- Web Dashboard: `http://localhost:18789/`
+- Web Dashboard: `http://localhost:18790/`
 - OpenAI-compatible API: `http://localhost:8642/v1`
-- War Room: `http://localhost:8642/warroom`
+
+> Note: Hermes dashboard uses port `18790`. Use `CHAT_UI_URL` for remote access and non-interactive CI deployments.
+
+### Day-to-Day Operations
+
+Once the Hermes sandbox is running, use these commands:
+
+#### Start a Chat Session
+```console
+# Open an interactive SSH session and chat with Hermes:
+nemohermes milimo-hermes connect
+
+# Inside the sandbox, type 'hermes' to start chatting.
+```
+
+#### Check Gateway Status
+```console
+nemohermes milimo-hermes status
+```
+
+#### View War Room
+The War Room is a static HTML dashboard at `/opt/hermes/warroom/warroom.html` inside the sandbox:
+```console
+# Serve it locally via the sandbox's Python HTTP server:
+nemohermes milimo-hermes exec -- python3 -m http.server 8080 --directory /opt/hermes/warroom
+# Then open http://localhost:8080/warroom.html in your browser.
+```
+
+Alternatively, for a quick text summary from inside the sandbox:
+```console
+nemohermes milimo-hermes connect
+# Then inside: cat /opt/hermes/warroom/warroom.html
+```
+
+#### Check Sandbox Logs
+```console
+nemohermes milimo-hermes logs -n 50
+```
+
+#### Run Commands Inside Sandbox
+```console
+nemohermes milimo-hermes exec -- hermes gateway status
+nemohermes milimo-hermes exec -- hermes skills list
+```
 
 **Auth Modes:**
 - `api_key` (default): Standard NVIDIA inference

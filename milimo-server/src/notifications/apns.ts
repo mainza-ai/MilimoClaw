@@ -13,20 +13,22 @@ interface APNsConfig {
   production: boolean;
 }
 
+interface APSPayload {
+  alert?: {
+    title: string;
+    body: string;
+  };
+  badge?: number;
+  sound?: string | { critical: number; name: string; volume: number };
+  "content-available"?: number;
+  "mutable-content"?: number;
+  category?: string;
+  "thread-id"?: string;
+}
+
 interface APNsNotification {
   deviceToken: string;
-  aps: {
-    alert: {
-      title: string;
-      body: string;
-    };
-    badge?: number;
-    sound?: string | { critical: number; name: string; volume: number };
-    "content-available"?: number;
-    "mutable-content"?: number;
-    category?: string;
-    "thread-id"?: string;
-  };
+  aps: APSPayload;
   data?: Record<string, string>;
 }
 
@@ -117,7 +119,7 @@ class APNsService {
       data?: Record<string, string>;
     } = {}
   ): Omit<APNsNotification, "deviceToken"> {
-    const aps: APNsNotification["aps"] = {
+    const aps: APSPayload = {
       alert: { title, body },
     };
 

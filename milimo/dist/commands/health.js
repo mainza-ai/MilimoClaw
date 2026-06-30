@@ -28,20 +28,19 @@ function getStatusColor(status) {
 function getStatusIcon(status) {
     return STATUS_ICONS[status] || "\u{26AA}";
 }
-function formatLatency(ms) {
-    if (ms === Infinity)
-        return "\u221E";
-    if (ms < 1000)
-        return `${Math.round(ms)}ms`;
-    return `${(ms / 1000).toFixed(1)}s`;
-}
-function formatThroughput(perMin) {
-    return `${Math.round(perMin)}/min`;
-}
-function formatScore(score) {
-    const bar = "\u2588".repeat(Math.floor(score / 10)) + "\u2591".repeat(10 - Math.floor(score / 10));
-    return `${bar} ${score.toFixed(1)}`;
-}
+// function formatLatency(ms: number): string {
+//   if (ms === Infinity) return "\u221E";
+//   if (ms < 1000) return `${Math.round(ms)}ms`;
+//   return `${(ms / 1000).toFixed(1)}s`;
+// }
+// function formatThroughput(perMin: number): string {
+//   return `${Math.round(perMin)}/min`;
+// }
+// function formatScore(score: number): string {
+//   const bar =
+//     "\u2588".repeat(Math.floor(score / 10)) + "\u2591".repeat(10 - Math.floor(score / 10));
+//   return `${bar} ${score.toFixed(1)}`;
+// }
 async function getHealthData(squadId) {
     const healthPath = (0, node_path_1.join)((0, node_os_1.homedir)(), ".milimo", "health", "health.json");
     if (!(0, node_fs_1.existsSync)(healthPath)) {
@@ -68,6 +67,7 @@ function printClawHealth(claw) {
     const color = getStatusColor(claw.status);
     const reset = "\x1b[0m";
     console.log(` ${icon} ${color}${claw.role.padEnd(12)}${reset} ${claw.score.toFixed(1).padStart(5)} ${claw.status.padEnd(10)} ${claw.region || "unknown"}`);
+    void reset;
 }
 function printDetailedHealth(health) {
     const reset = "\x1b[0m";
@@ -89,10 +89,11 @@ function printDetailedHealth(health) {
         console.log("\u2500".repeat(60));
         for (const alert of health.alerts) {
             const color = alert.level === "critical" ? "\x1b[31m" : "\x1b[33m";
-            console.log(` ${color}[${alert.level.toUpperCase()}]\x1b[0m ${alert.role}: ${alert.message}`);
+            console.log(` ${color}[${alert.level.toUpperCase()}]${reset} ${alert.role}: ${alert.message}`);
         }
     }
     console.log("");
+    void reset;
 }
 function printCompactHealth(health) {
     const icon = getStatusIcon(health.overall_status);
@@ -103,6 +104,7 @@ function printCompactHealth(health) {
         const clawIcon = getStatusIcon(claw.status);
         console.log(` ${clawIcon} ${claw.role}: ${claw.score.toFixed(1)}`);
     }
+    void reset;
 }
 function printWatch(health) {
     console.log("\x1b[2J\x1b[H");
@@ -111,8 +113,7 @@ function printWatch(health) {
 }
 async function healthCommand(options) {
     const squadId = options.squad || process.env.MILIMO_SQUAD || "default";
-    const blueprintDir = process.env.MILIMO_BLUEPRINT_DIR ||
-        (0, node_path_1.join)((0, node_os_1.homedir)(), ".milimo", "blueprints", squadId);
+    const blueprintDir = process.env.MILIMO_BLUEPRINT_DIR || (0, node_path_1.join)((0, node_os_1.homedir)(), ".milimo", "blueprints", squadId);
     if (options.collect) {
         try {
             await collectHealth(blueprintDir, squadId);
@@ -134,9 +135,10 @@ async function healthCommand(options) {
             catch (error) {
                 console.error("Update failed:", error);
             }
-            setTimeout(updateLoop, interval);
+            // Use void to suppress floating promise warning
+            void setTimeout(() => void updateLoop(), interval);
         };
-        updateLoop();
+        void updateLoop();
     }
     else {
         const health = await getHealthData(squadId);

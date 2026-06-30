@@ -1,0 +1,187 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# ═══════════════════════════════════════════════════════════════════════
+# ASSISTANT CLAW — Role Blueprint
+# ═══════════════════════════════════════════════════════════════════════
+# Primary responsibility: Cross-claw coordination and operator bridge.
+# The Assistant Claw (Lucy) is the conversational layer that connects
+# the human operator to the rest of the squad via Telegram. It dispatches
+# queries and tasks to other claws, collects responses, and relays
+# consolidated answers back to the operator.
+
+schema_version: "0.1.0"
+
+role: assistant
+display_name: "Assistant Claw"
+description: >
+  Cross-claw coordination and operator bridge. Dispatches queries
+  and tasks to other claws, collects responses, relays consolidated
+  answers to the operator via Telegram. The only claw with a Telegram
+  channel — all operator conversations flow through here.
+
+icon: "👽"
+
+# ── Filesystem ─────────────────────────────────────────────────────────
+filesystem_mount:
+  primary: "/sandbox/.openclaw-data/milimo/claws/assistant"
+  mode: read_write
+  contents:
+  - assistant coordination state
+  - pending query tracking
+  - response aggregation cache
+  - Telegram bridge session data
+cross_mounts:
+  - path: "/sandbox/.openclaw-data/milimo/claws/analytics/reports"
+    mode: read_only
+    description: "Weekly intelligence reports from Analytics Claw"
+  - path: "/sandbox/.openclaw-data/milimo/claws/content"
+    mode: read_only
+    description: "Read-only access to content drafts for operator queries"
+  - path: "/sandbox/.openclaw-data/milimo/claws/ops"
+    mode: read_only
+    description: "Read-only access to client records for operator queries"
+  - path: "/sandbox/.openclaw-data/milimo/claws/finance"
+    mode: read_only
+    description: "Read-only access to revenue summaries (totals only)"
+  - path: "/sandbox/.openclaw-data/milimo/claws/build"
+    mode: read_only
+    description: "Read-only access to build status and deploy history"
+
+# ── Network Egress ─────────────────────────────────────────────────────
+egress_policy: assistant-sandbox
+egress_summary:
+  allowed:
+  - Telegram Bot API (operator bridge)
+  - NVIDIA Cloud inference endpoints (NEMOCLAW_MODEL)
+  blocked:
+  - Payment processors (no direct Stripe access)
+  - Social platform APIs (no publishing)
+  - Code repositories (no direct GitHub access)
+  - Client communication channels (no direct email/calendar)
+
+# ── Inference Routing ──────────────────────────────────────────────────
+inference_routing:
+  rules:
+  - data_type: operator_conversations
+    description: "Operator chat via Telegram"
+    backend: cloud
+    rationale: "Conversational quality is paramount for operator experience"
+
+  - data_type: cross_claw_queries
+    description: "Query formulation and response synthesis"
+    backend: cloud
+    rationale: "Needs strong reasoning to formulate and consolidate claw responses"
+
+  - data_type: internal_summaries
+    description: "Internal coordination summaries and status reports"
+    backend: cloud
+    rationale: "Non-sensitive operational summaries"
+
+  - data_type: client_records_access
+    description: "Reading client records for operator queries"
+    backend: cloud
+    rationale: "Client data is sensitive — locked route, never external"
+    locked: true
+
+  - data_type: financial_data_access
+    description: "Reading financial summaries for operator queries"
+    backend: cloud
+    rationale: "Financial data is sensitive — locked route, never external"
+    locked: true
+
+  - data_type: source_code_access
+    description: "Reading build status for operator queries"
+    backend: cloud
+    rationale: "Source code is IP — locked route, never external"
+    locked: true
+
+  default_backend: cloud
+
+# ── Inter-Claw Policy ─────────────────────────────────────────────────
+inter_claw_policy:
+  inbound:
+  - from: content
+    message_types:
+    - type: assistant_response
+      description: "Response to status query or task result"
+
+  - from: ops
+    message_types:
+    - type: assistant_response
+      description: "Response to status query or task result"
+
+  - from: analytics
+    message_types:
+    - type: assistant_response
+      description: "Response to status query or data request"
+
+  - from: finance
+    message_types:
+    - type: assistant_response
+      description: "Response to pricing or revenue query"
+
+  - from: build
+    message_types:
+    - type: assistant_response
+      description: "Response to deploy status or PR query"
+
+  outbound:
+  - to: content
+    message_types:
+    - type: assistant_query
+      description: "Read-only status request"
+    - type: assistant_task
+      description: "Task assignment (requires operator approval)"
+
+  - to: ops
+    message_types:
+    - type: assistant_query
+      description: "Read-only status request"
+    - type: assistant_task
+      description: "Task assignment (requires operator approval)"
+
+  - to: analytics
+    message_types:
+    - type: assistant_query
+      description: "Data or performance request"
+    - type: assistant_task
+      description: "Task assignment (requires operator approval)"
+
+  - to: finance
+    message_types:
+    - type: assistant_query
+      description: "Pricing or revenue query"
+    - type: assistant_task
+      description: "Task assignment (requires operator approval)"
+
+  - to: build
+    message_types:
+    - type: assistant_query
+      description: "Build or deploy status query"
+    - type: assistant_task
+      description: "Task assignment (requires operator approval)"
+
+  - to: war_room
+    message_types:
+    - type: assistant_response
+      description: "Claw responses forwarded for operator visibility"
+
+# ── Approval Thresholds ────────────────────────────────────────────────
+approval_thresholds:
+  cross_claw_query: auto
+  cross_claw_task: review
+  operator_message: auto
+  telegram_bridge_action: auto
+  sandbox_write: auto
+
+# ── Self-Evolution Seed ────────────────────────────────────────────────
+evolution_signals:
+  primary: "Operator query patterns and cross-claw task outcomes"
+  initial_tools:
+  - name: query_router
+    target_week: 2
+    description: "Routes operator queries to the optimal claw based on question type"
+  - name: response_synthesizer
+    target_week: 4
+    description: "Consolidates multi-claw responses into a single coherent answer"

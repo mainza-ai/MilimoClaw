@@ -98,7 +98,7 @@ function register(api) {
     }
     // 7. Check Python RPC server availability
     const rpc = (0, rpc_bridge_1.getRpcClient)();
-    rpc.ping().then((alive) => {
+    void rpc.ping().then((alive) => {
         if (alive) {
             api.logger.debug("[milimo] Python RPC server connected.");
         }

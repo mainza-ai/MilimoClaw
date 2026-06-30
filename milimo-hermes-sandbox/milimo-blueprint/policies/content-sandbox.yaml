@@ -1,0 +1,191 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Content Claw Sandbox Policy
+# Extends the base OpenClaw sandbox policy with Content-specific
+# filesystem and network constraints.
+#
+# Mount: /sandbox/.openclaw-data/milimo/claws/content (read-write)
+# Cross: /sandbox/.openclaw-data/milimo/claws/analytics/reports (read-only)
+
+version: 1
+
+filesystem_policy:
+  include_workdir: true
+  read_only:
+  - /usr
+  - /lib
+  - /proc
+  - /dev/urandom
+  - /app
+  - /etc
+  - /var/log
+  - /sandbox/.openclaw-data/milimo/claws/analytics/reports
+  read_write:
+  - /sandbox/.openclaw-data/milimo/claws/content
+  - /tmp
+  - /dev/null
+
+landlock:
+  compatibility: best_effort
+
+process:
+  run_as_user: sandbox
+  run_as_group: sandbox
+
+network_policies:
+  # ── Inference (mandatory base) ──────────────────────────────────────
+  nvidia:
+    name: nvidia
+    endpoints:
+      - host: integrate.api.nvidia.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: "*", path: "/**" }
+    binaries:
+      - { path: /usr/local/bin/openclaw }
+      - { path: /usr/bin/python3 }
+
+  # ── Social Publishing APIs ──────────────────────────────────────────
+  instagram_api:
+    name: instagram_api
+    endpoints:
+      - host: graph.instagram.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: POST, path: "/**/media" }
+          - allow: { method: POST, path: "/**/media_publish" }
+          - allow: { method: GET, path: "/**/insights" }
+    binaries:
+      - { path: /usr/bin/python3 }
+
+  twitter_api:
+    name: twitter_api
+    endpoints:
+      - host: api.twitter.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: POST, path: "/2/tweets" }
+          - allow: { method: GET, path: "/2/tweets/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+
+  linkedin_api:
+    name: linkedin_api
+    endpoints:
+      - host: api.linkedin.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: POST, path: "/v2/ugcPosts" }
+          - allow: { method: GET, path: "/v2/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+
+  tiktok_api:
+    name: tiktok_api
+    endpoints:
+      - host: open.tiktokapis.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: POST, path: "/v2/post/publish/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+
+  # ── Stock Assets & SEO ──────────────────────────────────────────────
+  unsplash_api:
+    name: unsplash_api
+    endpoints:
+      - host: api.unsplash.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+
+  pexels_api:
+    name: pexels_api
+    endpoints:
+      - host: api.pexels.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+
+  # ── Facebook Publishing API ────────────────────────────────────────
+  facebook_api:
+    name: facebook_api
+    endpoints:
+      - host: graph.facebook.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: POST, path: "/**/feed" }
+          - allow: { method: POST, path: "/**/photos" }
+          - allow: { method: GET, path: "/**/insights" }
+    binaries:
+      - { path: /usr/bin/python3 }
+
+  # ── Trend & Research APIs (read-only) ───────────────────────────────
+  google_trends_api:
+    name: google_trends_api
+    endpoints:
+      - host: trends.google.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+
+  buzzsumo_api:
+    name: buzzsumo_api
+    endpoints:
+      - host: api.buzzsumo.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+
+  # ── Optional: Buffer Scheduling API ─────────────────────────────────
+  # Uncomment to enable Buffer integration for scheduled publishing
+  # buffer_api:
+  #   name: buffer_api
+  #   endpoints:
+  #   - host: api.buffer.com
+  #     port: 443
+  #     protocol: rest
+  #     enforcement: enforce
+  #     tls: terminate
+  #   rules:
+  #   - allow: { method: POST, path: "/1/updates/**" }
+  #   - allow: { method: GET, path: "/1/**" }

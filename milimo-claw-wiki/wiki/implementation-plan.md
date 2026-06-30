@@ -21,7 +21,7 @@ MilimoClaw runs six autonomous claws (Build, Content, Ops, Analytics, Finance, A
 | Profile | Interface | Inference | Status |
 |---------|-----------|-----------|--------|
 | **OpenClaw** | TUI + Bridge Server | NVIDIA NIM / Local | ✅ Production |
-| **Hermes** | Web Dashboard (port 18789) + OpenAI-compatible API (port 8642) | Native `delegate_task` + `cronjob` | 🚧 Phase A complete, Phase B in progress |
+|| **Hermes** | Web Dashboard (port 18790) + OpenAI-compatible API (port 8642) | Native `delegate_task` + `cronjob` | 🚧 Phase A complete, Phase B in progress |
 
 **Core principle**: OpenClaw stays unchanged. Hermes is additive via shared `milimo-core` library.
 
@@ -245,7 +245,7 @@ Do you want web search / browser automation inside Hermes?
 
 Are you on a headless remote host?
   → Yes: Set CHAT_UI_URL before onboarding, or use SSH port forwarding
-  → No (local machine): Dashboard at http://127.0.0.1:18789/
+  → No (local machine): Dashboard at http://127.0.0.1:18790/
 
 Do you want a web dashboard UI?
   → Yes: nemohermes (Hermes profile)

@@ -1,0 +1,30 @@
+name: "AI Micro-SaaS"
+category: "Tech Startups (AI Era)"
+description: "Build + Ops + Analytics + Finance. A full commercial product squad shipping Vercel/Railway apps."
+
+active_claws:
+  - build
+  - ops
+  - analytics
+  - finance
+
+shared_policies:
+  approval_thresholds:
+    production_deploy: REVIEW
+    invoice_generation: REVIEW
+    architecture_decision: REVIEW
+    support_reply: AUTO
+    performance_report: AUTO
+
+  mesh_rules:
+    allow_finance_routes: true
+    allow_analytics_insights: true
+    allow_build_routes: true
+
+  escalations:
+    - trigger: "security_vulnerability_detected"
+      action: "VETO"
+      message: "Build claw detected security flaw. Halting all deploys until patched."
+    - trigger: "api_cost_anomaly"
+      action: "HOLD"
+      message: "Cost per user exceeded margin threshold. Review required."

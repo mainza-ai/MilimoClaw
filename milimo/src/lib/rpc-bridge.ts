@@ -1,7 +1,10 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import type { BridgeCommandOptions, PythonBridgeOptions } from "./python-bridge";
 
 const RPC_PORT = 19999;
-const RPC_BASE_URL = `http://127.0.0.1:${RPC_PORT}/rpc`;
+// const RPC_BASE_URL = `http://127.0.0.1:${RPC_PORT}/rpc`;
 
 interface RpcError {
   message: string;
@@ -85,7 +88,7 @@ export class RpcBridgeClient {
     return this.call<T>("python_eval", { code });
   }
 
-  async pythonEvalSafe<T = unknown>(
+  async pythonEvalSafe(
     code: string,
     options?: PythonBridgeOptions,
   ): Promise<{ success: boolean; stdout?: string; error?: string }> {

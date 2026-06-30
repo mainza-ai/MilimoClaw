@@ -35,7 +35,7 @@ components:
     image: "ghcr.io/nvidia/openshell-community/sandboxes/openclaw:latest"
     name: "milimo-openclaw-sandbox"
     forward_ports:
-      - 18789
+      - 18790
 
   inference:
     profiles:

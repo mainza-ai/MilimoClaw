@@ -11,7 +11,7 @@ export declare class RpcBridgeClient {
         error?: string;
     }>;
     pythonEval<T = unknown>(code: string, _options?: PythonBridgeOptions): Promise<T>;
-    pythonEvalSafe<T = unknown>(code: string, options?: PythonBridgeOptions): Promise<{
+    pythonEvalSafe(code: string, options?: PythonBridgeOptions): Promise<{
         success: boolean;
         stdout?: string;
         error?: string;

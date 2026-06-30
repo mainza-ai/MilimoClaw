@@ -34,12 +34,16 @@ class HealthCollector {
             return () => this.stopPolling();
         }
         this.running = true;
-        this.collectAll().then(onUpdate).catch((error) => {
+        this.collectAll()
+            .then(onUpdate)
+            .catch((error) => {
             if (onError)
                 onError(error);
         });
         this.intervalId = setInterval(() => {
-            this.collectAll().then(onUpdate).catch((error) => {
+            this.collectAll()
+                .then(onUpdate)
+                .catch((error) => {
                 if (onError)
                     onError(error);
             });

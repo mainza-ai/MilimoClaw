@@ -135,7 +135,7 @@ Commands:
         break;
 
       case "flows":
-        this.evolution.showCrossClawFlows();
+        void this.evolution.showCrossClawFlows();
         break;
 
       case "exit":

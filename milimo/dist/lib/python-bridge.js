@@ -8,7 +8,7 @@ exports.callPythonModule = callPythonModule;
 exports.callPythonFile = callPythonFile;
 exports.callPythonWithInput = callPythonWithInput;
 const rpc_bridge_1 = require("./rpc-bridge");
-const BRIDGE_CLI_PATH = "orchestrator/bridge_cli.py";
+// const BRIDGE_CLI_PATH = "orchestrator/bridge_cli.py";
 function rpc() {
     return (0, rpc_bridge_1.getRpcClient)();
 }

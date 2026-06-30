@@ -188,8 +188,8 @@ describe("bridge integration", () => {
   });
 
   describe("activate_deep_work", () => {
-    it("calls bridge with correct parameters", () => {
-      callPythonBridgeSafe(
+    it("calls bridge with correct parameters", async () => {
+      await callPythonBridgeSafe(
         "activate_deep_work",
         { resume_date: "2026-04-01" },
         { blueprintDir: "/tmp" },
@@ -229,8 +229,8 @@ describe("bridge integration", () => {
   });
 
   describe("resume_deep_work", () => {
-    it("calls bridge to resume operations", () => {
-      callPythonBridgeSafe("resume_deep_work", {}, { blueprintDir: "/tmp" });
+    it("calls bridge to resume operations", async () => {
+      await callPythonBridgeSafe("resume_deep_work", {}, { blueprintDir: "/tmp" });
 
       expect(callPythonBridgeSafe).toHaveBeenCalledWith(
         "resume_deep_work",

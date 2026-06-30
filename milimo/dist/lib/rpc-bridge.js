@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.RpcBridgeClient = void 0;
 exports.getRpcClient = getRpcClient;
 const RPC_PORT = 19999;
-const RPC_BASE_URL = `http://127.0.0.1:${RPC_PORT}/rpc`;
 let _clientInstance = null;
 class RpcBridgeClient {
     baseUrl;

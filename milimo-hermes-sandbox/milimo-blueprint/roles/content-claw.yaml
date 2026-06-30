@@ -1,0 +1,141 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# ═══════════════════════════════════════════════════════════════════════
+#  CONTENT CLAW — Role Blueprint
+# ═══════════════════════════════════════════════════════════════════════
+# Primary responsibility: All creative output — social posts, long-form
+# copy, email campaigns, pitch decks, proposals, content calendars,
+# creative briefs, and brand voice documentation.
+
+schema_version: "0.1.0"
+
+role: content
+display_name: "Content Claw"
+description: >
+  All creative output — posts, copy, campaigns, brand voice.
+  The Content Claw is the squad's creative engine, generating
+  platform-calibrated content that matches the squad's evolved
+  style parameters.
+
+icon: "🎨"
+
+# ── Filesystem ─────────────────────────────────────────────────────────
+filesystem_mount:
+  primary: "/sandbox/.openclaw-data/milimo/claws/content"
+  mode: read_write
+  contents:
+  - approved brand assets
+  - style guides
+  - past approved posts
+  - client creative briefs (fed from Ops via inter-claw message)
+cross_mounts:
+  - path: "/sandbox/.openclaw-data/milimo/claws/analytics/reports"
+    mode: read_only
+    description: "Weekly intelligence reports from Analytics Claw"
+
+# ── Network Egress ─────────────────────────────────────────────────────
+egress_policy: content-sandbox
+egress_summary:
+  allowed:
+    - Social platform APIs (scheduled publishing only — no DM reading)
+    - Stock asset libraries
+    - SEO trend APIs
+    - Squad's public-facing website
+  blocked:
+    - Payment processors
+    - Internal comms channels
+    - Client contact databases
+    - Code repositories
+
+  # ── Inference Routing ──────────────────────────────────────────────────
+  inference_routing:
+    rules:
+    - data_type: public_drafts
+      description: "Client-facing content drafts"
+      backend: cloud
+      rationale: "Peak quality for anything a client or audience will see"
+
+    - data_type: internal_drafts
+      description: "Internal ideation and brainstorming"
+      backend: cloud
+      rationale: "Private creative process stays on device"
+
+    - data_type: trend_research
+      description: "Trend analysis and competitive research"
+      backend: cloud
+      rationale: "Public data, speed and quality preferred"
+
+    - data_type: analytics_report_synthesis
+      description: "Synthesizing Analytics Claw reports into content insights"
+      backend: cloud
+      rationale: "Operational data is proprietary — never cloud"
+      locked: true
+
+    - data_type: voice_adapter_calibration
+      description: "Client voice profile training and application"
+      backend: cloud
+      rationale: "Trained on client data — never cloud"
+      locked: true
+
+    - data_type: ab_variant_generation
+      description: "A/B test variant generation for final drafts"
+      backend: cloud
+      rationale: "Final client-facing variants — quality matters"
+
+    default_backend: local-nim
+
+# ── Inter-Claw Policy ─────────────────────────────────────────────────
+inter_claw_policy:
+  inbound:
+    - from: ops
+      message_types:
+        - type: brief
+          description: "Creative brief for new client project"
+        - type: signal
+          description: "Deadline or scope change notification"
+
+    - from: analytics
+      message_types:
+        - type: response
+          description: "Performance data in response to query"
+        - type: summary
+          description: "Weekly intelligence report"
+
+  outbound:
+    - to: ops
+      message_types:
+        - type: deliverable
+          description: "Completed draft ready for client delivery"
+
+    - to: analytics
+      message_types:
+        - type: query
+          description: "Request for performance data or top patterns"
+
+    - to: war_room
+      message_types:
+        - type: deliverable
+          description: "Draft queued for squad approval before publishing"
+
+# ── Approval Thresholds ────────────────────────────────────────────────
+approval_thresholds:
+  internal_draft: auto
+  social_post_draft: review
+  client_proposal: review
+  email_campaign: review
+  brand_voice_change: hold
+  platform_credential_update: veto
+
+# ── Self-Evolution Seed ────────────────────────────────────────────────
+# Initial evolution parameters — the claw's first evolution cycle will
+# build tools from these signals.
+evolution_signals:
+  primary: "Squad approval decisions and post engagement data"
+  initial_tools:
+    - name: style_descriptor
+      target_week: 2
+      description: "Characterizes the squad's brand voice from approved post history"
+    - name: tone_classifier
+      target_week: 4
+      description: "Auto-categorizes drafts: hype, educational, soft sell, community, humor"

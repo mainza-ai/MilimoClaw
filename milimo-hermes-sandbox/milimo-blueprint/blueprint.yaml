@@ -1,0 +1,312 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# ═══════════════════════════════════════════════════════════════════════
+#  MILIMO CLAW — NemoClaw Blueprint Manifest
+# ═══════════════════════════════════════════════════════════════════════
+# This manifest orchestrates NVIDIA OpenShell resources, declares platform
+# dependencies, registers inference profiles, and overlays security network
+# additions for the Milimo multi-agent mesh.
+#
+# Dual-track profiles:
+# - openclaw: Original OpenClaw profile (TUI + bridge server)
+# - hermes-milimo: New Hermes profile (web dashboard + OpenAI-compatible API)
+
+version: "0.2.0"
+min_openshell_version: "0.0.24"
+min_openclaw_version: "2026.3.0"
+min_hermes_version: "2026.6.0"
+
+# Pre-defined inference profiles that the squad can toggle at runtime
+profiles:
+  - default      # NVIDIA NIM Cloud (Default)
+  - ncp          # NVIDIA Partner Cloud (Dynamic)
+  - nim-local    # Local NVIDIA NIM (Edge GPU compute)
+  - vllm         # Local vLLM (Mac Silicon / Local CPU/GPU server)
+  - routed       # Private Local Failover Router
+
+# Agent profiles - dual track
+agent_profiles:
+  openclaw:
+    description: "Original OpenClaw profile with TUI and bridge server"
+    sandbox:
+      image: "ghcr.io/nvidia/openshell-community/sandboxesionboxes/openclaw:latest"
+      name: "milimo-openclaw-sandbox"
+      forward_ports:
+        - 18789
+    policy:
+      base: "sandboxes/openclaw/policy.yaml"
+      additions:
+        nim_service:
+          name: nim_service
+          endpoints:
+            - host: "nim-service.local"
+              port: 8000
+              protocol: rest
+        stripe_api:
+          name: stripe_api
+          endpoints:
+            - host: "api.stripe.com"
+              port: 443
+              protocol: rest
+        vercel_api:
+          name: vercel_api
+          endpoints:
+            - host: "api.vercel.com"
+              port: 443
+              protocol: rest
+        sentry_api:
+          name: sentry_api
+          endpoints:
+            - host: "api.sentry.io"
+              port: 443
+              protocol: rest
+
+  hermes-milimo:
+    description: "Hermes profile with web dashboard, OpenAI-compatible API, and 6 claw handlers"
+    sandbox:
+      image: "milimo-hermes-sandbox:latest"
+      name: "milimo-hermes"
+      forward_ports:
+        - 18789   # Hermes dashboard
+        - 8642    # OpenAI-compatible API endpoint
+      build:
+        dockerfile: "milimo-hermes-sandbox/Dockerfile"
+        args:
+          NEMOCLAW_HERMES_DASHBOARD_TUI: "1"
+          SLACK_ALLOWED_CHANNELS: ""
+          CHAT_UI_URL: ""
+    policy:
+      base: "sandboxes/hermes/policy.yaml"
+      preset: "restricted,github"
+      additions:
+        # Binary-scoped egress policies for Milimo claws
+        # Each rule specifies the Hermes Python runtime binary
+        github_api:
+          name: github_api
+          endpoints:
+            - host: "api.github.com"
+              port: 443
+              protocol: rest
+              binaries:
+                - "/opt/hermes/.venv/bin/python"
+            - host: "github.com"
+              port: 443
+              protocol: rest
+              binaries:
+                - "/opt/hermes/.venv/bin/python"
+        npm_registry:
+          name: npm_registry
+          endpoints:
+            - host: "registry.npmjs.org"
+              port: 443
+              protocol: rest
+              binaries:
+                - "/opt/hermes/.venv/bin/python"
+        pypi_registry:
+          name: pypi_registry
+          endpoints:
+            - host: "pypi.org"
+              port: 443
+              protocol: rest
+              binaries:
+                - "/opt/hermes/.venv/bin/python"
+            - host: "files.pythonhosted.org"
+              port: 443
+              protocol: rest
+              binaries:
+                - "/opt/hermes/.venv/bin/python"
+        stripe_api:
+          name: stripe_api
+          endpoints:
+            - host: "api.stripe.com"
+              port: 443
+              protocol: rest
+              binaries:
+                - "/opt/hermes/.venv/bin/python"
+        vercel_api:
+          name: vercel_api
+          endpoints:
+            - host: "api.vercel.com"
+              port: 443
+              protocol: rest
+              binaries:
+                - "/opt/hermes/.venv/bin/python"
+        sentry_api:
+          name: sentry_api
+          endpoints:
+            - host: "api.sentry.io"
+              port: 443
+              protocol: rest
+              binaries:
+                - "/opt/hermes/.venv/bin/python"
+        twitter_api:
+          name: twitter_api
+          endpoints:
+            - host: "api.twitter.com"
+              port: 443
+              protocol: rest
+              binaries:
+                - "/opt/hermes/.venv/bin/python"
+            - host: "api.x.com"
+              port: 443
+              protocol: rest
+              binaries:
+                - "/opt/hermes/.venv/bin/python"
+        linkedin_api:
+          name: linkedin_api
+          endpoints:
+            - host: "api.linkedin.com"
+              port: 443
+              protocol: rest
+              binaries:
+                - "/opt/hermes/.venv/bin/python"
+        tiktok_api:
+          name: tiktok_api
+          endpoints:
+            - host: "api.tiktok.com"
+              port: 443
+              protocol: rest
+              binaries:
+                - "/opt/hermes/.venv/bin/python"
+        nvidia_inference:
+          name: nvidia_inference
+          endpoints:
+            - host: "integrate.api.nvidia.com"
+              port: 443
+              protocol: rest
+              binaries:
+                - "/opt/hermes/.venv/bin/python"
+        ip_geo:
+          name: ip_geo
+          endpoints:
+            - host: "ipapi.co"
+              port: 443
+              protocol: rest
+              binaries:
+                - "/opt/hermes/.venv/bin/python"
+            - host: "ip-api.com"
+              port: 80
+              protocol: rest
+              binaries:
+                - "/opt/hermes/.venv/bin/python"
+
+components:
+  sandbox:
+    image: "ghcr.io/nvidia/openshell-community/sandboxes/openclaw:latest"
+    name: "milimo-openclaw-sandbox"
+    forward_ports:
+      - 18789
+
+  inference:
+    profiles:
+      default:
+        provider_type: "nvidia"
+        provider_name: "nvidia-inference"
+        endpoint: "https://integrate.api.nvidia.com/v1"
+        model: "nvidia/nemotron-3-ultra-550b-a55b"
+        timeout_secs: 120
+
+      ncp:
+        provider_type: "nvidia"
+        provider_name: "nvidia-ncp"
+        endpoint: "https://ncp.api.nvidia.com/v1"
+        model: "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+        timeout_secs: 120
+
+      nim-local:
+        provider_type: "openai"
+        provider_name: "nim-local"
+        endpoint: "http://nim-service.local:8000/v1"
+        model: "nvidia/nemotron-3-ultra-550b-a55b"
+        credential_env: "NIM_API_KEY"
+        timeout_secs: 180
+
+      vllm:
+        provider_type: "openai"
+        provider_name: "vllm-local"
+        endpoint: "http://localhost:8000/v1"
+        model: "nvidia/nemotron-3-nano-30b-a3b"
+        credential_env: "OPENAI_API_KEY"
+        credential_default: "dummy"
+        timeout_secs: 180
+
+      routed:
+        provider_type: "openai"
+        provider_name: "failover-router"
+        endpoint: "http://localhost:4000/v1"
+        model: "nvidia-routed"
+        timeout_secs: 90
+
+  policy:
+    base: "sandboxes/openclaw/policy.yaml"
+    additions:
+      nim_service:
+        name: nim_service
+        endpoints:
+          - host: "nim-service.local"
+            port: 8000
+            protocol: rest
+      stripe_api:
+        name: stripe_api
+        endpoints:
+          - host: "api.stripe.com"
+            port: 443
+            protocol: rest
+      vercel_api:
+        name: vercel_api
+        endpoints:
+          - host: "api.vercel.com"
+            port: 443
+            protocol: rest
+      sentry_api:
+        name: sentry_api
+        endpoints:
+          - host: "api.sentry.io"
+            port: 443
+            protocol: rest
+
+# Model Router Configuration (for Hermes profile)
+model_router:
+  enabled: true
+  prefill_router_checkpoint: "llm-router/checkpoints/prefill_router_qwen08b.pt"
+  pool_config: "nemoclaw-blueprint/router/pool-config.yaml"
+  per_claw_tolerance:
+    finance:
+      approval_flows: 0.0
+      pricing: 0.0
+    ops:
+      approval_flows: 0.0
+      incident_response: 0.0
+    content:
+      generation: 0.30
+      scheduling: 0.20
+    analytics:
+      summarization: 0.15
+      anomaly_detection: 0.10
+    build:
+      code_generation: 0.10
+      deployment: 0.0
+    assistant:
+      general: 0.25
+
+# Credential configuration for Hermes profile
+credentials:
+  hermes:
+    # GitHub tokens via gh auth token (not OpenShell gateway)
+    github:
+      source: "gh_cli"
+      command: "gh auth token"
+    # All other credentials via OpenShell L7 proxy
+    stripe:
+      source: "openshell_gateway"
+      provider_placeholder: "STRIPE_API_KEY"
+    vercel:
+      source: "openshell_gateway"
+      provider_placeholder: "VERCEL_TOKEN"
+    sentry:
+      source: "openshell_gateway"
+      provider_placeholder: "SENTRY_AUTH_TOKEN"
+    nvidia:
+      source: "openshell_gateway"
+      provider_placeholder: "NVIDIA_API_KEY"

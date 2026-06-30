@@ -66,24 +66,27 @@ function createClawLauncherService(pluginConfig) {
             logger.info("[milimo] Starting claw launcher service via RPC...");
             try {
                 const rpc = (0, rpc_bridge_1.getRpcClient)();
-                rpc.call("start_launcher", {
+                rpc
+                    .call("start_launcher", {
                     blueprintDir,
                     squadId: pluginConfig.squadName || "default",
                     clawRole: pluginConfig.clawRole || "solo",
-                }).catch((err) => {
+                })
+                    .catch((err) => {
                     logger.warn(`[milimo] Claw launcher RPC start failed: ${err.message}`);
                     logger.warn("[milimo] Ensure the Python RPC server is running (bridge_server.py)");
                 });
                 // Periodic health check — verifies RPC server is reachable
-                healthInterval = setInterval(async () => {
-                    try {
-                        const rpc = (0, rpc_bridge_1.getRpcClient)();
-                        await rpc.call("ping", {});
-                    }
-                    catch {
-                        logger.warn("[milimo] Python RPC server not reachable. " +
-                            "Claw launcher may not be running.");
-                    }
+                healthInterval = setInterval(() => {
+                    void (async () => {
+                        try {
+                            const rpc = (0, rpc_bridge_1.getRpcClient)();
+                            await rpc.call("ping", {});
+                        }
+                        catch {
+                            logger.warn("[milimo] Python RPC server not reachable. " + "Claw launcher may not be running.");
+                        }
+                    })();
                 }, 60_000);
             }
             catch (err) {

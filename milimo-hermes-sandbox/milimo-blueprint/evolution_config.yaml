@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Milimo Claw — Evolution Engine Configuration
+# ═══════════════════════════════════════════════════════════════════════
+# Global configuration for the self-evolution engine.
+# Squads can override these defaults in their squad state.
+
+evolution_version: "1.0.0"
+
+# ── Cycle Scheduling ──────────────────────────────────────────────────
+schedule:
+  cycle_interval_days: 7           # Run one evolution cycle per week
+  cycle_day: sunday                # Day of the week to run the cycle
+  cycle_hour: 3                    # Hour (24h) to start the cycle (low-activity)
+  allow_manual_trigger: true       # Allow `milimo evolution --trigger-now`
+
+# ── Observation Window ────────────────────────────────────────────────
+observation:
+  window_days: 7                   # How many days of operation log to review
+  minimum_actions: 5               # Min actions in window to justify a cycle (lowered from 20 for bootstrapping)
+  cross_signal_lookback_days: 14   # How far back to look for cross-claw signals
+
+# ── Pattern Detection ─────────────────────────────────────────────────
+detection:
+  minimum_confidence: 0.6          # Patterns below this confidence are ignored
+  max_patterns_per_cycle: 5        # Top N patterns to consider ranking
+  pattern_types:
+    - classifier                   # Categorize inputs/outputs
+    - optimizer                    # Improve timing, format, routing
+    - predictor                    # Forecast outcomes
+    - generator_variant            # Alternative output generation (A/B)
+    - anomaly_detector             # Surface unexpected deviations
+
+# ── Tool Building ─────────────────────────────────────────────────────
+building:
+  backtest_window_weeks: 4         # Replay this many weeks of historical data
+  minimum_improvement_percent: 5   # Tool must beat baseline by ≥ this %
+  max_build_attempts: 3            # Retry tool generation up to N times
+  build_timeout_seconds: 300       # Max time for a single build attempt
+  inference_backend: local-nim     # Tool code generation always local
+
+# ── Tool Deployment ───────────────────────────────────────────────────
+deployment:
+  max_tools_per_claw: 30           # Hard cap on evolved tools per claw
+  require_proposal_approval: false # If true, proposals go to War Room first
+  auto_disable_on_regression: true # Disable a tool if performance drops below baseline
+  version_bump_strategy: patch     # patch per tool, minor per month
+
+# ── Logging ───────────────────────────────────────────────────────────
+logging:
+  log_proposals: true              # Log all proposals (including rejected)
+  log_backtests: true              # Log backtest results
+  notify_war_room: true            # Send evolution events to War Room

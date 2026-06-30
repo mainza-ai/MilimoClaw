@@ -226,10 +226,10 @@ export async function handleV2ThinEvent(
     return reply.code(400).send({ error: 'Missing stripe-signature header' });
   }
 
-  let thinEvent: Stripe.V2.Event;
+  let thinEvent: Stripe.ThinEvent;
 
   try {
-    thinEvent = stripe.v2.core.events.parseThinEvent(request.body, signature, STRIPE_WEBHOOK_SECRET);
+    thinEvent = stripe.parseThinEvent(request.body, signature, STRIPE_WEBHOOK_SECRET);
   } catch (err) {
     console.error('[Webhook] Thin event parsing failed:', err);
     return reply.code(400).send({ error: 'Thin event parsing failed' });
@@ -244,14 +244,10 @@ export async function handleV2ThinEvent(
 
 export function createWebhookRoute(fastify: FastifyInstance): void {
   fastify.post('/webhooks/stripe', {
-    config: {
-      rawBody: true,
-    },
-  }, handleWebhook);
+    config: { rawBody: true },
+  } as Record<string, unknown>, handleWebhook);
 
   fastify.post('/webhooks/stripe/v2', {
-    config: {
-      rawBody: true,
-    },
-  }, handleV2ThinEvent);
+    config: { rawBody: true },
+  } as Record<string, unknown>, handleV2ThinEvent);
 }

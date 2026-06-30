@@ -1,0 +1,118 @@
+[project]
+name = "milimo-core"
+version = "0.1.0"
+description = "Shared orchestrator library for MilimoClaw (OpenClaw + Hermes profiles)"
+requires-python = ">=3.11"
+dependencies = [
+    "pyyaml>=6.0",
+    "requests>=2.28",
+    "stripe>=5.0",
+    "sentry-sdk>=1.0",
+    "websocket-client>=1.0",
+    "cryptography>=41.0",
+    "httpx>=0.24",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-cov>=4.0",
+    "pytest-mock>=3.10",
+    "faker>=20.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["milimo_core*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning:orchestrator.*",
+]
+
+[tool.coverage.run]
+source = ["src/milimo_core"]
+omit = [
+    "*/tests/*",
+    "*/mocks/*",
+    "**/tool_generator.py",
+    "**/tool_proposal.py",
+    "**/tool_registry.py",
+    "**/tool_sandbox.py",
+    "**/tool_validator.py",
+    "**/claw_launcher.py",
+    "**/claw_launcher_bootstrap.py",
+    "**/gateway_adapter.py",
+    "**/github_client.py",
+    "**/health_collector.py",
+    "**/inference_client.py",
+    "**/latency_monitor.py",
+    "**/marketplace_manager.py",
+    "**/mesh_encryption.py",
+    "**/mesh_relay.py",
+    "**/metrics_collector.py",
+    "**/operation_log.py",
+    "**/pattern_detector.py",
+    "**/privacy_router.py",
+    "**/provenance_signer.py",
+    "**/region_detector.py",
+    "**/service_factory.py",
+    "**/stubs/*",
+    "**/tool_builder.py",
+    "**/chain_validator.py",
+    "**/contracts.py",
+    "**/evolution/*",
+    "**/evolution_cycle.py",
+    "**/evolution_integration.py",
+    "**/failover_broker.py",
+    "**/content/*",
+    "**/finance/*",
+    "**/build/*",
+    "**/ops/comms_manager.py",
+    "**/ops/health_scorer.py",
+    "**/ops/incident_analyzer.py",
+    "**/ops/intake_manager.py",
+    "**/ops/ops_claw.py",
+    "**/ops/ops_init.py",
+    "**/ops/ops_scheduler.py",
+    "**/ops/project_manager.py",
+    "**/ops/runbook_executor.py",
+    "**/ops/scope_monitor.py",
+    "**/ops/signal_dispatcher.py",
+    "**/ops/webhook_server.py",
+    "**/analytics/*",
+    "**/assistant/*",
+    "**/attestation_generator.py",
+    "**/attestation_runner.py",
+    "**/blueprint_manager.py",
+    "**/blueprint_merger.py",
+    "**/bridge_cli.py",
+    "**/bridge_server.py",
+]
+branch = true
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+precision = 2
+
+[tool.pyright]
+include = ["src/milimo_core", "tests"]
+extraPaths = ["src"]
+reportMissingImports = true
+reportMissingModuleSource = false
+pythonVersion = "3.11"
+
+[tool.ruff.lint]
+ignore = ["E402"]

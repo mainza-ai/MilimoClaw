@@ -1247,3 +1247,27 @@ Each entry follows this format:
 - Removed `/sandbox/.openclaw/env/github.sh` env file.
 
 **Notes**: The `StubGitHubClient` fallback path (when `GITHUB_TOKEN`/`GITHUB_REPO` are unset) is unchanged. Even with valid tokens, if the proxy blocks API access, the real client behaves identically to the stub — safe logs and empty returns. This aligns with the NemoClaw sandbox security model: work within the proxy's allowed policies, do not attempt to bypass.
+
+---
+
+### 2026-06-30 — Phase E6: TypeScript Build Fixes + Hermes Gateway Debug + Docs Update
+
+**Pages**: `README.md`, `wiki/cli/cli-commands.md`, `wiki/architecture/hermes-profile.md`, `wiki/log.md`
+
+**Files**:
+- `milimo-server/package.json` — Added `"type": "module"` for ESM
+- `milimo-server/src/server.ts` — WebSocket v11 fix, Fastify authenticate type augmentation, query typing
+- `milimo-server/src/payments/stripe.ts` — Stripe V2→V1 API migration, parseThinEvent fix
+- `milimo-server/src/payments/webhooks.ts` — parseThinEvent, rawBody config cast
+- `milimo-server/src/payments/invoices.ts` — Metadata null safety (`?? undefined`)
+- `milimo-server/src/notifications/apns.ts` — Optional `alert` in APS payload for silent notifications
+- `milimo-hermes-sandbox/generate-config.ts` — Random `API_SERVER_KEY` fallback for Hermes v2026.5.16
+- `milimo-hermes-sandbox/Dockerfile` — Updated SOUL.md with MilimoClaw context, updated HERMES_ENVIRONMENT_HINT
+
+**Changes**:
+- Fixed all ~40 TypeScript errors in `milimo-server` (Stripe SDK v17 API changes, Fastify v5 + @fastify/websocket v11 + @fastify/jwt v9 type mismatches, module system)
+- All 3 TypeScript packages (`milimo`, `milimo-server`, `milimo-admin`) now compile and build cleanly
+- Debugged Hermes sandbox gateway: root cause was empty `API_SERVER_KEY` — Hermes v2026.5.16 now requires it for API server startup
+- Updated SOUL.md so Hermes has context about MilimoClaw's six-claw mesh when chatting
+- Documented day-to-day Hermes operations (connect, chat, warroom, exec commands) in README + wiki
+- Added known issues section to hermes-profile.md (API_SERVER_KEY, SOUL.md, version mismatch warning)

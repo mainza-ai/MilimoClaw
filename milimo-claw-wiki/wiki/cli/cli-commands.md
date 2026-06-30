@@ -517,7 +517,7 @@ openshell term
 Start port forwarding to a sandbox. Use `--background` to run in the background.
 
 ```bash
-openshell forward start --background 18789 my-squad
+openshell forward start --background 18790 my-squad
 ```
 
 #### `openshell forward list`
@@ -533,7 +533,102 @@ openshell forward list
 Stop an active port forward.
 
 ```bash
-openshell forward stop 18789
+openshell forward stop 18790
+```
+
+---
+
+## NemoHermes Commands (Hermes Profile)
+
+> The `nemohermes` CLI manages the Hermes sandbox. These commands run on the **host machine**.
+
+### Sandbox Lifecycle
+
+#### `nemohermes <name> connect`
+
+Open an interactive SSH session into the Hermes sandbox. Once inside, type `hermes` to start chatting with the agent.
+
+```bash
+nemohermes milimo-hermes connect
+nemohermes milimo-hermes connect --probe-only   # Check gateway health without connecting
+```
+
+#### `nemohermes <name> exec -- <command>`
+
+Run a command inside the sandbox without opening an interactive session.
+
+```bash
+nemohermes milimo-hermes exec -- hermes gateway status
+nemohermes milimo-hermes exec -- hermes skills list
+```
+
+#### `nemohermes <name> status`
+
+Show sandbox status, inference health, and configuration.
+
+```bash
+nemohermes milimo-hermes status
+```
+
+#### `nemohermes <name> logs`
+
+View sandbox logs. Use `--follow` to stream in real time.
+
+```bash
+nemohermes milimo-hermes logs -n 50
+nemohermes milimo-hermes logs --follow
+```
+
+#### `nemohermes <name> rebuild`
+
+Rebuild the sandbox with the current Hermes base image while preserving workspace state.
+
+```bash
+nemohermes milimo-hermes rebuild
+```
+
+### Gateway Management
+
+#### Start a Chat Session
+
+```bash
+# Interactive shell:
+nemohermes milimo-hermes connect
+# Then inside: hermes
+
+# Or direct:
+nemohermes milimo-hermes exec -- hermes chat
+```
+
+#### Check Gateway Status
+
+```bash
+nemohermes milimo-hermes exec -- hermes gateway status
+```
+
+#### View War Room
+
+The War Room is a static HTML dashboard at `/opt/hermes/warroom/warroom.html`:
+
+```bash
+# Serve via sandbox's HTTP server:
+nemohermes milimo-hermes exec -- python3 -m http.server 8080 --directory /opt/hermes/warroom
+# Then open http://localhost:8080/warroom.html
+```
+
+#### View Gateway Log
+
+```bash
+nemohermes milimo-hermes exec -- cat /tmp/gateway.log
+```
+
+### Port Forwarding
+
+Forward sandbox ports to the host machine for web access:
+
+```bash
+nemohermes milimo-hermes exec -- python3 -m http.server 8080 --directory /opt/hermes/warroom
+# Then forward: nemohermes milimo-hermes port-forward 8080 8080
 ```
 
 ---

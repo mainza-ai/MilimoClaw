@@ -1,0 +1,20 @@
+name: "Event Promotion"
+category: "Marketing & Sales"
+description: "A fast-paced 3-claw mesh optimized for promoting events, managing attendee comms, and tracking engagement."
+
+active_claws:
+  - content
+  - ops
+  - analytics
+
+shared_policies:
+  approval_thresholds:
+    deliverable: REVIEW
+    campaign_blast: REVIEW
+    intake_questionnaire: AUTO
+    intelligence_report: AUTO
+    anomaly_alert: REVIEW
+
+  mesh_rules:
+    allow_finance_routes: false
+    allow_analytics_insights: true

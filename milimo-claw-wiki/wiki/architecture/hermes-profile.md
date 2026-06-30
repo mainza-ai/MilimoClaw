@@ -1,6 +1,6 @@
 # Hermes Profile — Dual-Track Integration
 
-**Summary**: Hermes profile architecture for MilimoClaw — web dashboard (port 18789), OpenAI-compatible API (port 8642), native `delegate_task` + `cronjob` parallelism, binary-scoped network policy.
+**Summary**: Hermes profile architecture for MilimoClaw — web dashboard (port 18790), OpenAI-compatible API (port 8642), native `delegate_task` + `cronjob` parallelism, binary-scoped network policy.
 
 **Sources**:
 - `implementation-plan.md`
@@ -171,6 +171,43 @@ Binary-scoped egress — each rule specifies:
 
 Hosts: GitHub, npm, PyPI, Stripe, Vercel, Sentry, Twitter/X, LinkedIn, TikTok, NVIDIA, IP geolocation
 
+### Known Issues & Fixes
+
+#### Gateway Fails to Start: `API_SERVER_KEY` Required
+Hermes v2026.5.16+ requires a non-empty `API_SERVER_KEY` even for loopback-only binds.
+
+**Fix** (`milimo-hermes-sandbox/generate-config.ts`):
+The config generator now falls back to `crypto.randomBytes(32).toString("hex")` when `API_SERVER_KEY` is not provided as a build arg.
+
+**Manual recovery** on a running sandbox:
+```bash
+# Generate a key and update .env:
+nemohermes milimo-hermes exec -- sh -c 'API_KEY=$(head -c 32 /dev/urandom | xxd -p | head -c 64) && sed -i "s/^API_SERVER_KEY=$/API_SERVER_KEY=$API_KEY/" /sandbox/.hermes/.env'
+
+# Restart gateway:
+nemohermes milimo-hermes exec -- hermes gateway run --replace
+```
+
+#### Hermes Has No Context About MilimoClaw
+The default `SOUL.md` (system prompt) doesn't describe MilimoClaw.
+
+**Fix** (`milimo-hermes-sandbox/Dockerfile`):
+The SOUL.md now includes a description of the six-claw mesh, environment paths, and the agent's role as the MilimoClaw gateway.
+
+**Manual update** on a running sandbox:
+```bash
+# Apply new SOUL.md:
+nemohermes milimo-hermes exec -- sh -c 'cat > /sandbox/.hermes/SOUL.md' < /tmp/milimo-soul.md
+```
+
+**Note:** After updating SOUL.md, start a new chat session (`hermes`) to see the context — existing sessions cache the old prompt.
+
+#### Version Mismatch Warning
+```
+⚠ Sandbox 'milimo-hermes' is running Hermes Agent 0.17.0 (current: 2026.5.16)
+```
+This is cosmetic. The Hermes binary reports `v0.17.0` (Python package version) while `nemohermes` compares against the release tag `2026.5.16`. The actual code is from the correct release (`hermes --version` shows `2026.6.19` git date). No impact on functionality.
+
 ### Dockerfile (`milimo-hermes-sandbox/Dockerfile`)
 - Base: `ghcr.io/nvidia/nemoclaw/hermes-sandbox-base@sha256:8dad3b989a9ed1e601743310b97be21be5f59f89f7913a47d04f3ec3c40b8ce6` (NVIDIA public base image, pre-bakes Hermes from GitHub releases)
 - COPY milimo-core, plugin, warroom HTML, blueprint
@@ -211,10 +248,10 @@ export NEMOCLAW_SANDBOX_NAME=milimo-hermes
 ```
 
 **Result**:
-- Dashboard: `http://127.0.0.1:18789/`
+- Dashboard: `http://127.0.0.1:18790/`
 - OpenAI-compatible API: `http://127.0.0.1:8642/v1`
-- War Room: `http://127.0.0.1:8642/warroom`
-- Headless: SSH tunnel `ssh -L 18789:127.0.0.1:18789 user@host` or set `CHAT_UI_URL`
+- War Room: `/opt/hermes/warroom/warroom.html` inside sandbox
+- Headless: SSH tunnel `ssh -L 18790:127.0.0.1:18790 user@host` or set `CHAT_UI_URL=http://localhost:18790`
 
 ---
 
@@ -243,6 +280,7 @@ export NEMOCLAW_SANDBOX_NAME=milimo-hermes
 | E3 | CLAUDE.md terminology | ✅ Done |
 | E4 | GitHub Actions CI + v0.2.0 tag | ✅ **Complete** |
 | E5 | Fix Hermes base image (public NVIDIA GHCR) + CI smoke test | ✅ **Complete** (2026-06-29) |
+| E6 | Fix API_SERVER_KEY + SOUL.md context + TypeScript build errors | ✅ **Complete** (2026-06-30) |
 
 ---
 
@@ -255,6 +293,36 @@ export NEMOCLAW_SANDBOX_NAME=milimo-hermes
 - [[warroom-hermes]] — Standalone HTML + htmx implementation
 - [[adrs]] — All architectural decision records
 - [[milimo-core-protocols]] — Extension points for third profiles
+
+---
+
+## Day-to-Day Operations
+
+### Start a Chat Session
+```bash
+nemohermes milimo-hermes connect
+# Inside sandbox, type: hermes
+```
+
+### Check Gateway Status
+```bash
+nemohermes milimo-hermes status
+nemohermes milimo-hermes exec -- hermes gateway status
+```
+
+### View War Room
+```bash
+# Serve the warroom HTML via HTTP:
+nemohermes milimo-hermes exec -- python3 -m http.server 8080 --directory /opt/hermes/warroom
+# Open http://localhost:8080/warroom.html
+```
+
+### Run Ad-Hoc Commands
+```bash
+nemohermes milimo-hermes exec -- hermes skills list
+nemohermes milimo-hermes logs -n 50
+nemohermes milimo-hermes exec -- cat /tmp/gateway.log
+```
 
 ---
 

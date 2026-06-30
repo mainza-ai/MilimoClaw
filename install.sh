@@ -591,6 +591,7 @@ deploy_to_sandbox() {
 
   if [ -n "$inferred_model" ]; then
     info "Detected model from nemoclaw list: $inferred_model"
+    # shellcheck disable=SC2027,SC1011,SC1083
     sandbox_exec_root "$gateway" '
 	# Set NEMOCLAW_MODEL env var for runtime fallback
 	if ! grep -q "NEMOCLAW_MODEL=" /etc/environment 2>/dev/null; then

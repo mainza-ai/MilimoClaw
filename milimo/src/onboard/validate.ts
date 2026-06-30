@@ -1,5 +1,7 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import * as fs from "node:fs";
-import * as path from "node:path";
 import { randomBytes } from "node:crypto";
 import { parse as parseYaml } from "yaml";
 
@@ -87,22 +89,22 @@ export function getTemplateInfo(templatePath: string): TemplateInfo | null {
   };
 }
 
-function findBlueprintDir(templatePath: string): string | null {
-  let current = path.dirname(path.resolve(templatePath));
-
-  while (current !== "/") {
-    if (path.basename(current) === "milimo-blueprint") {
-      return current;
-    }
-    const orchestratorDir = path.join(current, "orchestrator");
-    if (fs.existsSync(orchestratorDir) && fs.statSync(orchestratorDir).isDirectory()) {
-      return current;
-    }
-    current = path.dirname(current);
-  }
-
-  return null;
-}
+// function findBlueprintDir(templatePath: string): string | null {
+//   let current = path.dirname(path.resolve(templatePath));
+//
+//   while (current !== "/") {
+//     if (path.basename(current) === "milimo-blueprint") {
+//       return current;
+//     }
+//     const orchestratorDir = path.join(current, "orchestrator");
+//     if (fs.existsSync(orchestratorDir) && fs.statSync(orchestratorDir).isDirectory()) {
+//       return current;
+//     }
+//     current = path.dirname(current);
+//   }
+//
+//   return null;
+// }
 
 export function validateSquadName(name: string): { valid: boolean; error?: string } {
   if (!name || name.trim().length === 0) {

@@ -120,7 +120,7 @@ export async function generateInvoiceFromSession(sessionId: string): Promise<Inv
       sellerPayout: feeBreakdown.sellerPayout,
       currency: 'usd',
     },
-    metadata: session.metadata,
+    metadata: session.metadata ?? undefined,
   };
 }
 

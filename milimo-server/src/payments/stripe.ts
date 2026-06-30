@@ -119,31 +119,26 @@ async function createConnectedAccount(
 
   const { displayName, contactEmail, country = 'us' } = params;
 
-  // Create connected account using V2 API
-  // Platform handles fees and losses
-  const account = await stripe.v2.core.accounts.create({
-    display_name: displayName,
-    contact_email: contactEmail,
-    identity: {
-      country,
+  const account = await stripe.accounts.create({
+    type: 'express',
+    country: country.toUpperCase(),
+    email: contactEmail,
+    business_profile: {
+      name: displayName,
     },
-    dashboard: 'express',
-    defaults: {
-      responsibilities: {
-        fees_collector: 'application',
-        losses_collector: 'application',
-      },
+    capabilities: {
+      card_payments: { requested: true },
+      transfers: { requested: true },
     },
-    configuration: {
-      recipient: {
-        capabilities: {
-          stripe_balance: {
-            stripe_transfers: {
-              requested: true,
-            },
-          },
+    settings: {
+      payouts: {
+        schedule: {
+          interval: 'manual',
         },
       },
+    },
+    tos_acceptance: {
+      service_agreement: 'recipient',
     },
   });
 
@@ -169,16 +164,11 @@ async function createAccountLink(
 ): Promise<string> {
   validateStripeConfig();
 
-  const accountLink = await stripe.v2.core.accountLinks.create({
+  const accountLink = await stripe.accountLinks.create({
     account: accountId,
-    use_case: {
-      type: 'account_onboarding',
-      account_onboarding: {
-        configurations: ['recipient'],
-        refresh_url: refreshUrl,
-        return_url: returnUrl,
-      },
-    },
+    refresh_url: refreshUrl,
+    return_url: returnUrl,
+    type: 'account_onboarding',
   });
 
   return accountLink.url;
@@ -199,17 +189,13 @@ async function getAccountStatus(accountId: string): Promise<{
 }> {
   validateStripeConfig();
 
-  const account = await stripe.v2.core.accounts.retrieve(accountId, {
-    include: ['configuration.recipient', 'requirements'],
-  });
+  const account = await stripe.accounts.retrieve(accountId);
 
-  const readyToReceivePayments =
-    account?.configuration?.recipient?.capabilities?.stripe_balance?.stripe_transfers?.status ===
-    'active';
-
-  const requirementsStatus = account.requirements?.summary?.minimum_deadline?.status;
-  const onboardingComplete =
-    requirementsStatus !== 'currently_due' && requirementsStatus !== 'past_due';
+  const readyToReceivePayments = account.capabilities?.transfers === 'active';
+  const chargesEnabled = account.charges_enabled;
+  const detailsSubmitted = account.details_submitted;
+  const requirementsStatus = account.requirements?.disabled_reason ?? undefined;
+  const onboardingComplete = detailsSubmitted && chargesEnabled;
 
   return {
     onboardingComplete,
@@ -460,9 +446,9 @@ function parseWebhookEvent(payload: string | Buffer, signature: string): Webhook
  * @param signature - Stripe-Signature header
  * @returns Thin event or null if invalid
  */
-function parseThinEvent(payload: string | Buffer, signature: string): Stripe.V2.Event | null {
+function parseThinEvent(payload: string | Buffer, signature: string): Stripe.ThinEvent | null {
   try {
-    const thinEvent = stripe.v2.core.events.parseThinEvent(payload, signature, STRIPE_WEBHOOK_SECRET);
+    const thinEvent = stripe.parseThinEvent(payload, signature, STRIPE_WEBHOOK_SECRET);
     return thinEvent;
   } catch (err) {
     console.error('Thin event parsing failed:', err);

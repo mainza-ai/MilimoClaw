@@ -15,6 +15,7 @@ exports.createNotifier = createNotifier;
 const node_path_1 = require("node:path");
 const node_os_1 = require("node:os");
 const node_fs_1 = require("node:fs");
+const node_child_process_1 = require("node:child_process");
 const NOTIFICATION_DIR = ".openclaw/milimo/notifications";
 const PENDING_FILE = "pending.json";
 class OperatorNotifier {
@@ -62,11 +63,30 @@ class OperatorNotifier {
                 return { delivered: true, method: "pending_file" };
         }
     }
-    notifyMacOS(_title, _message, payload) {
-        return this.notifyPendingFile(payload);
+    notifyMacOS(title, message, payload) {
+        try {
+            const script = `display notification "${this.escapeAppleScript(message)}" with title "${this.escapeAppleScript(title)}"`;
+            const result = (0, node_child_process_1.spawnSync)("osascript", ["-e", script], { encoding: "utf-8" });
+            if (result.status === 0) {
+                return { delivered: true, method: "osascript" };
+            }
+            return this.notifyPendingFile(payload);
+        }
+        catch {
+            return this.notifyPendingFile(payload);
+        }
     }
-    notifyLinux(_title, _message, payload) {
-        return this.notifyPendingFile(payload);
+    notifyLinux(title, message, payload) {
+        try {
+            const result = (0, node_child_process_1.spawnSync)("notify-send", [title, message], { encoding: "utf-8" });
+            if (result.status === 0) {
+                return { delivered: true, method: "notify-send" };
+            }
+            return this.notifyPendingFile(payload);
+        }
+        catch {
+            return this.notifyPendingFile(payload);
+        }
     }
     notifyPendingFile(payload) {
         try {

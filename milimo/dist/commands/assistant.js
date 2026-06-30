@@ -68,7 +68,7 @@ async function assistantVerify() {
         throw new Error("Assistant setup verification failed");
     }
 }
-async function assistantStart() {
+function assistantStart() {
     const agentConfig = ".openclaw/agents/main/config.yaml";
     if (!(0, node_fs_1.existsSync)(agentConfig)) {
         console.error("Assistant not set up. Run: openclaw milimo assistant setup");

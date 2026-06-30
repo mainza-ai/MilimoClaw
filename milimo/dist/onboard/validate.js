@@ -39,7 +39,6 @@ exports.validateSquadName = validateSquadName;
 exports.validateOperatorName = validateOperatorName;
 exports.generateMeshSecret = generateMeshSecret;
 const fs = __importStar(require("node:fs"));
-const path = __importStar(require("node:path"));
 const node_crypto_1 = require("node:crypto");
 const yaml_1 = require("yaml");
 function validateTemplateFile(templatePath) {
@@ -103,20 +102,22 @@ function getTemplateInfo(templatePath) {
         clawsActive: template.claws_active,
     };
 }
-function findBlueprintDir(templatePath) {
-    let current = path.dirname(path.resolve(templatePath));
-    while (current !== "/") {
-        if (path.basename(current) === "milimo-blueprint") {
-            return current;
-        }
-        const orchestratorDir = path.join(current, "orchestrator");
-        if (fs.existsSync(orchestratorDir) && fs.statSync(orchestratorDir).isDirectory()) {
-            return current;
-        }
-        current = path.dirname(current);
-    }
-    return null;
-}
+// function findBlueprintDir(templatePath: string): string | null {
+//   let current = path.dirname(path.resolve(templatePath));
+//
+//   while (current !== "/") {
+//     if (path.basename(current) === "milimo-blueprint") {
+//       return current;
+//     }
+//     const orchestratorDir = path.join(current, "orchestrator");
+//     if (fs.existsSync(orchestratorDir) && fs.statSync(orchestratorDir).isDirectory()) {
+//       return current;
+//     }
+//     current = path.dirname(current);
+//   }
+//
+//   return null;
+// }
 function validateSquadName(name) {
     if (!name || name.trim().length === 0) {
         return { valid: false, error: "Squad name cannot be empty" };

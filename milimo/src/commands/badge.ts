@@ -104,8 +104,8 @@ export async function cliBadge(opts: BadgeOptions): Promise<void> {
   }
 
   if (opts.performance) {
-    generatePerformanceAttestation(opts, state, logger);
-    return Promise.resolve();
+    await generatePerformanceAttestation(opts, state, logger);
+    return;
   }
 
   if (opts.auditor) {

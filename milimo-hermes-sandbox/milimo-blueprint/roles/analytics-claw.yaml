@@ -1,0 +1,142 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# ═══════════════════════════════════════════════════════════════════════
+#  ANALYTICS CLAW — Role Blueprint
+# ═══════════════════════════════════════════════════════════════════════
+# Primary responsibility: The intelligence layer of the squad. Tracks
+# content performance, client satisfaction, revenue trends, delivery
+# velocity, platform algorithm shifts, and competitive opportunities.
+# Synthesizes raw data into actionable weekly intelligence.
+
+schema_version: "0.1.0"
+
+role: analytics
+display_name: "Analytics Claw"
+description: >
+  The intelligence layer — performance tracking, trend analysis,
+  opportunity scoring. Publishes weekly intelligence reports consumed
+  by all other claws.
+
+icon: "📊"
+
+# ── Filesystem ─────────────────────────────────────────────────────────
+filesystem_mount:
+  primary: "/sandbox/.openclaw-data/milimo/claws/analytics"
+  mode: read_write
+  contents:
+    - aggregated performance data
+    - anonymized engagement metrics
+    - revenue summaries
+    - trend datasets
+    - weekly intelligence reports (shared via read-only cross-mount)
+  cross_mounts: []
+  # The analytics/reports subdirectory is exposed as read-only
+  # to other claws via their cross_mounts configuration.
+  # No access to raw client contact data or source code.
+
+# ── Network Egress ─────────────────────────────────────────────────────
+egress_policy: analytics-sandbox
+egress_summary:
+  allowed:
+    - Platform analytics APIs (read-only)
+    - Market research data feeds
+    - Competitor monitoring APIs
+    - Squad's published content endpoints (post-publication tracking)
+  blocked:
+    - Social publishing (write access)
+    - Payment processors
+    - Client communication channels
+    - Code repositories
+    - Email APIs
+
+# ── Inference Routing ──────────────────────────────────────────────────
+inference_routing:
+  rules:
+    - data_type: market_analysis
+      description: "Public trend and market analysis"
+      backend: cloud
+      rationale: "Public data, maximum reasoning quality"
+
+    - data_type: performance_synthesis
+      description: "Internal performance report generation"
+      backend: local-nim
+      rationale: "Squad's operational data is sensitive"
+
+    - data_type: predictive_modeling
+      description: "Predictive models and anomaly detection"
+      backend: local-nim
+      rationale: "Models trained on proprietary squad data"
+
+  default_backend: local-nim
+
+# ── Inter-Claw Policy ─────────────────────────────────────────────────
+inter_claw_policy:
+  inbound:
+    - from: content
+      message_types:
+        - type: query
+          description: "Request for performance data or top patterns"
+
+    - from: build
+      message_types:
+        - type: query
+          description: "Request for user behavior data or retention signals"
+
+    - from: finance
+      message_types:
+        - type: signal
+          description: "Revenue anomaly or pricing opportunity alert"
+
+  outbound:
+    - to: content
+      message_types:
+        - type: response
+          description: "Performance data in response to query"
+        - type: summary
+          description: "Weekly intelligence report"
+
+    - to: ops
+      message_types:
+        - type: signal
+          description: "Client health signals and retention alerts"
+
+    - to: finance
+      message_types:
+        - type: summary
+          description: "Revenue summaries for financial reporting"
+
+    - to: build
+      message_types:
+        - type: response
+          description: "User behavior and retention data"
+        - type: signal
+          description: "Churn signals and feature adoption metrics"
+
+    - to: war_room
+      message_types:
+        - type: signal
+          description: "Performance anomaly or opportunity alert"
+        - type: summary
+          description: "Weekly intelligence digest for squad review"
+
+# ── Approval Thresholds ────────────────────────────────────────────────
+approval_thresholds:
+  data_collection: auto
+  internal_report: auto
+  weekly_intelligence: review
+  competitor_monitoring: auto
+  anomaly_alert: auto
+  experiment_launch: review
+  external_data_sharing: veto
+
+# ── Self-Evolution Seed ────────────────────────────────────────────────
+evolution_signals:
+  primary: "Cross-claw performance data and external market signals"
+  initial_tools:
+    - name: engagement_baseline_model
+      target_week: 2
+      description: "Establishes the squad's historical performance baseline"
+    - name: anomaly_detector
+      target_week: 5
+      description: "Flags performance outliers — unusually high or low — for review"

@@ -96,7 +96,7 @@ Provides public HTTPS URL for the dashboard.
 
 ### Default Port
 
-Dashboard runs on port 18789 (configurable via `DASHBOARD_PORT`).
+Dashboard runs on port 18790 (configurable via `DASHBOARD_PORT`).
 
 ### Installation
 

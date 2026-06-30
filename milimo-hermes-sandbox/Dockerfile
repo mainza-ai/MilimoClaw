@@ -19,6 +19,8 @@ ARG BASE_IMAGE=ghcr.io/nvidia/nemoclaw/hermes-sandbox-base@sha256:8dad3b989a9ed1
 
 FROM ${BASE_IMAGE}
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # ── MilimoClaw Hermes Plugin Layer ──────────────────────────────────────────
 # Install milimo-core and the Hermes plugin into the existing Hermes venv.
 # The base image provides uv globally; use it to install into the Hermes venv.
@@ -29,8 +31,8 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/hermes/.venv
 
 # Copy milimo-core first (changes less often → better layer caching)
 COPY milimo-core/ /opt/milimo-core/
-RUN chmod -R a+rX,go-w /opt/milimo-core/
-RUN uv pip install --no-cache-dir -e /opt/milimo-core/
+RUN chmod -R a+rX,go-w /opt/milimo-core/ \
+    && uv pip install --no-cache-dir -e /opt/milimo-core/
 
 # Copy the Hermes plugin
 COPY milimo-hermes-plugin/ /opt/milimo-hermes-plugin/
@@ -60,8 +62,8 @@ RUN printf 'milimo-hermes\n' > /opt/hermes/.milimo_install
 
 # Generate Hermes config.yaml and .env from build args (adapted from NemoHermes)
 # This mirrors agents/hermes/generate-config.ts but for Milimo profile
-COPY milimo-hermes-sandbox/generate-config.ts /opt/nemoclaw-hermes-config/generate-config.ts
-COPY milimo-hermes-sandbox/config/ /opt/nemoclaw-hermes-config/config/
+COPY generate-config.ts /opt/nemoclaw-hermes-config/generate-config.ts
+COPY config/ /opt/nemoclaw-hermes-config/config/
 RUN chmod -R a+rX /opt/nemoclaw-hermes-config/generate-config.ts \
     && find /opt/nemoclaw-hermes-config -type d -exec chmod 755 {} + \
     && find /opt/nemoclaw-hermes-config -type f -exec chmod 444 {} +
@@ -101,14 +103,32 @@ USER sandbox
 # Generate Hermes config.yaml and .env from build args
 RUN node --experimental-strip-types /opt/nemoclaw-hermes-config/generate-config.ts
 
-# Write default SOUL.md (Hermes identity)
+# Write default SOUL.md (Hermes identity with MilimoClaw context)
 RUN mkdir -p /sandbox/.hermes/memories \
-    && printf '%s' \
-    'You are Hermes Agent, an intelligent AI assistant created by Nous Research. You are helpful, knowledgeable, and direct. You assist users with a wide range of tasks including answering questions, writing and editing code, analyzing information, creative work, and executing actions via your tools. You communicate clearly, admit uncertainty when appropriate, and prioritize being genuinely useful over being verbose unless otherwise directed below. Be targeted and efficient in your exploration and investigations.' \
+    && printf '%s\n' \
+    'You are Hermes Agent running inside a MilimoClaw Hermes profile sandbox.' '' \
+    '## What is MilimoClaw?' \
+    'MilimoClaw is a multi-agent autonomous hustle platform built on NVIDIA NemoClaw.' \
+    'It runs a squad of six autonomous AI "claws" that work as a coordinated business mesh:' '' \
+    '- Content Claw: Creative -- posts, copy, email campaigns, brand assets' \
+    '- Ops Claw: Management -- relationship health, scope briefs, deadline risk' \
+    '- Analytics Claw: Intelligence -- weekly reports, anomaly detection, opportunity scores' \
+    '- Finance Claw: Treasury -- Stripe invoicing, pricing, tax categorization' \
+    '- Build Claw: Engineering -- GitHub issues, code writing, deployments, dependency audits' \
+    '- Assistant Claw (Lucy): Orchestrator -- stateful process supervisor, operator query router, mesh coordinator' '' \
+    '## Environment' \
+    '- NVIDIA OpenShell sandbox, inference routed through NemoClaw' \
+    '- Config and memory: /sandbox/.hermes' \
+    '- Plugin: /sandbox/.hermes/plugins/milimo-hermes/' \
+    '- War Room: /opt/hermes/warroom/' \
+    '- API: 127.0.0.1:18642' '' \
+    '## Your Task' \
+    'You are the MilimoClaw gateway agent. Help the operator manage the claw mesh,' \
+    'execute tasks via tools, and coordinate multi-agent workflows.' \
     > /sandbox/.hermes/SOUL.md
 
 # Describe execution environment via Hermes environment-hint mechanism
-ENV HERMES_ENVIRONMENT_HINT="You are running inside an NVIDIA OpenShell sandbox with MilimoClaw Hermes profile, with inference routed through NemoClaw. Your terminal, file, and web tools execute against the sandbox filesystem and egress through the OpenShell L7 proxy, which enforces network policy and rewrites credentials at the boundary, so you never see raw secrets. Your config and memory live under /sandbox/.hermes and are mutable unless shields are up. Work within the sandbox boundary."
+ENV HERMES_ENVIRONMENT_HINT="MilimoClaw Hermes profile sandbox on NemoClaw. Six-agent business mesh: Content, Ops, Analytics, Finance, Build, Assistant (Lucy). Plugin: /sandbox/.hermes/plugins/milimo-hermes/. War Room: /opt/hermes/warroom/. API: 127.0.0.1:18642. Work within sandbox boundary."
 
 # Set mutable-default permissions (Hermes standard)
 USER root
@@ -268,9 +288,8 @@ RUN mkdir -p /etc/nemoclaw \
 RUN sha256sum /sandbox/.hermes/config.yaml /sandbox/.hermes/.env \
     > /sandbox/.hermes/.config-hash \
     && chmod 600 /sandbox/.hermes/.config-hash \
-    && chown sandbox:sandbox /sandbox/.hermes/.config-hash
-
-RUN if [ "$NEMOCLAW_DARWIN_VM_COMPAT" = "1" ]; then \
+    && chown sandbox:sandbox /sandbox/.hermes/.config-hash \
+    && if [ "$NEMOCLAW_DARWIN_VM_COMPAT" = "1" ]; then \
         chmod -R a+rwX /sandbox/.hermes; \
         find /sandbox/.hermes -type d -exec chmod a+rwx {} +; \
         chmod a+rw /sandbox/.bashrc /sandbox/.profile; \
@@ -284,6 +303,9 @@ ENV MILIMO_PROFILE=hermes \
 
 # Upstream ENTRYPOINT handles privilege separation via nemoclaw-start (s6 supervision)
 # We inherit it from the base image - no changes needed.
+
+# Drop privileges (Hermes standard)
+USER sandbox
 
 # Pass through build-time git SHA for hermes_build_sha
 ARG HERMES_GIT_SHA=

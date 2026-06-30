@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
@@ -46,21 +49,21 @@ function getStatusIcon(status: string): string {
   return STATUS_ICONS[status] || "\u{26AA}";
 }
 
-function formatLatency(ms: number): string {
-  if (ms === Infinity) return "\u221E";
-  if (ms < 1000) return `${Math.round(ms)}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
+// function formatLatency(ms: number): string {
+//   if (ms === Infinity) return "\u221E";
+//   if (ms < 1000) return `${Math.round(ms)}ms`;
+//   return `${(ms / 1000).toFixed(1)}s`;
+// }
 
-function formatThroughput(perMin: number): string {
-  return `${Math.round(perMin)}/min`;
-}
+// function formatThroughput(perMin: number): string {
+//   return `${Math.round(perMin)}/min`;
+// }
 
-function formatScore(score: number): string {
-  const bar =
-    "\u2588".repeat(Math.floor(score / 10)) + "\u2591".repeat(10 - Math.floor(score / 10));
-  return `${bar} ${score.toFixed(1)}`;
-}
+// function formatScore(score: number): string {
+//   const bar =
+//     "\u2588".repeat(Math.floor(score / 10)) + "\u2591".repeat(10 - Math.floor(score / 10));
+//   return `${bar} ${score.toFixed(1)}`;
+// }
 
 async function getHealthData(squadId: string): Promise<SquadHealth | null> {
   const healthPath = join(homedir(), ".milimo", "health", "health.json");
@@ -91,6 +94,7 @@ function printClawHealth(claw: ClawHealth): void {
   console.log(
     ` ${icon} ${color}${claw.role.padEnd(12)}${reset} ${claw.score.toFixed(1).padStart(5)} ${claw.status.padEnd(10)} ${claw.region || "unknown"}`,
   );
+  void reset;
 }
 
 function printDetailedHealth(health: SquadHealth): void {
@@ -113,10 +117,13 @@ function printDetailedHealth(health: SquadHealth): void {
     console.log("\u2500".repeat(60));
     for (const alert of health.alerts) {
       const color = alert.level === "critical" ? "\x1b[31m" : "\x1b[33m";
-      console.log(` ${color}[${alert.level.toUpperCase()}]\x1b[0m ${alert.role}: ${alert.message}`);
+      console.log(
+        ` ${color}[${alert.level.toUpperCase()}]${reset} ${alert.role}: ${alert.message}`,
+      );
     }
   }
   console.log("");
+  void reset;
 }
 
 function printCompactHealth(health: SquadHealth): void {
@@ -130,6 +137,7 @@ function printCompactHealth(health: SquadHealth): void {
     const clawIcon = getStatusIcon(claw.status);
     console.log(` ${clawIcon} ${claw.role}: ${claw.score.toFixed(1)}`);
   }
+  void reset;
 }
 
 function printWatch(health: SquadHealth): void {
@@ -172,9 +180,10 @@ export async function healthCommand(options: HealthOptions): Promise<void> {
       } catch (error) {
         console.error("Update failed:", error);
       }
-      setTimeout(updateLoop, interval);
+      // Use void to suppress floating promise warning
+      void setTimeout(() => void updateLoop(), interval);
     };
-    updateLoop();
+    void updateLoop();
   } else {
     const health = await getHealthData(squadId);
     if (!health) {

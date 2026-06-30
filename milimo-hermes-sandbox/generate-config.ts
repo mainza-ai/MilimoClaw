@@ -4,6 +4,7 @@
 // MilimoClaw Hermes Config Generator
 // Adapted from NemoHermes generate-config.ts to include milimo-hermes plugin
 
+import { randomBytes } from "node:crypto";
 import { Buffer } from "node:buffer";
 import { chmodSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -240,7 +241,8 @@ function main(): void {
   const config = buildHermesConfig(settings);
 
   const envLines: string[] = [];
-  envLines.push(`API_SERVER_KEY=${process.env.API_SERVER_KEY || ""}`);
+  const apiServerKey = process.env.API_SERVER_KEY || randomBytes(32).toString("hex");
+  envLines.push(`API_SERVER_KEY=${apiServerKey}`);
   envLines.push(`NEMOCLAW_MODEL=${settings.model}`);
   envLines.push(`NEMOCLAW_INFERENCE_BASE_URL=${settings.baseUrl}`);
 

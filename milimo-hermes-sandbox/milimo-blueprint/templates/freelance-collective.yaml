@@ -1,0 +1,22 @@
+name: "Freelance Collective"
+category: "Services & Operations"
+description: "A 4-claw mesh for solo dev/design collectives focused on pipeline management, quoting, and client ops."
+
+active_claws:
+  - content
+  - ops
+  - finance
+  - analytics
+
+shared_policies:
+  approval_thresholds:
+    deliverable: REVIEW
+    proposal: REVIEW
+    invoice: REVIEW
+    intake_questionnaire: AUTO
+    intelligence_report: AUTO
+    anomaly_alert: REVIEW
+
+  mesh_rules:
+    allow_finance_routes: true
+    allow_analytics_insights: true

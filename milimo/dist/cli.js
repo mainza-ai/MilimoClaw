@@ -377,8 +377,8 @@ function registerCliCommands(ctx, api) {
     assistant
         .command("start")
         .description("Start the assistant in NemoClaw terminal")
-        .action(async () => {
-        await (0, assistant_js_1.assistantStart)();
+        .action(() => {
+        (0, assistant_js_1.assistantStart)();
     });
     // ── openclaw milimo channels ─────────────────────────────────────────
     const channels = milimo

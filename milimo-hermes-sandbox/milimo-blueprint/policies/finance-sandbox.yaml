@@ -1,0 +1,132 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Finance Claw Sandbox Policy
+# Mount: /sandbox/.openclaw-data/milimo/claws/finance (read-write)
+
+version: 1
+
+filesystem_policy:
+  include_workdir: true
+  read_only:
+  - /usr
+  - /lib
+  - /proc
+  - /dev/urandom
+  - /app
+  - /etc
+  - /var/log
+  - /sandbox/.openclaw-data/milimo/claws/analytics/reports
+  read_write:
+  - /sandbox/.openclaw-data/milimo/claws/finance
+  - /tmp
+  - /dev/null
+
+landlock:
+  compatibility: best_effort
+
+process:
+  run_as_user: sandbox
+  run_as_group: sandbox
+
+network_policies:
+  # ── Cloud Inference (development) ──────────────────────────────────
+  # During development, all claws route inference through NVIDIA cloud endpoints.
+  # Production: switch to nim_local only — financial data must never leave device.
+  nvidia_cloud:
+    name: nvidia_cloud
+    endpoints:
+      - host: integrate.api.nvidia.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+    rules:
+      - allow: { method: POST, path: "/v1/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+
+  # ── LOCAL Inference (production target) ─────────────────────────────
+  # ⚠️ PRODUCTION TARGET: Switch to nim_local only for Finance Claw.
+  # Financial data NEVER leaves the device in production. The NIM local
+  # endpoint is the only inference route allowed in production.
+  # During dev, nvidia_cloud above is used instead.
+  nim_local:
+    name: nim_local
+    endpoints:
+      - host: nim-service.local
+        port: 8000
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: "*", path: "/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+
+  # ── Payment Processors (restricted) ─────────────────────────────────
+  stripe_api:
+    name: stripe_api
+    endpoints:
+      - host: api.stripe.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          # Read-only status checks
+          - allow: { method: GET, path: "/v1/invoices/**" }
+          - allow: { method: GET, path: "/v1/charges/**" }
+          - allow: { method: GET, path: "/v1/customers/**" }
+          - allow: { method: GET, path: "/v1/balance/**" }
+          # Invoice generation (not payment execution)
+          - allow: { method: POST, path: "/v1/invoices" }
+          - allow: { method: POST, path: "/v1/invoices/*/send" }
+    binaries:
+      - { path: /usr/bin/python3 }
+
+  paypal_api:
+    name: paypal_api
+    endpoints:
+      - host: api-m.paypal.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          # Read-only status checks
+          - allow: { method: GET, path: "/v2/invoicing/invoices/**" }
+          - allow: { method: GET, path: "/v1/reporting/**" }
+          # Invoice generation
+          - allow: { method: POST, path: "/v2/invoicing/invoices" }
+          - allow: { method: POST, path: "/v2/invoicing/invoices/*/send" }
+    binaries:
+      - { path: /usr/bin/python3 }
+
+  # ── Accounting ──────────────────────────────────────────────────────
+  quickbooks_api:
+    name: quickbooks_api
+    endpoints:
+      - host: quickbooks.api.intuit.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**/invoice" }
+          - allow: { method: POST, path: "/**/expense" }
+    binaries:
+      - { path: /usr/bin/python3 }
+
+  wave_api:
+    name: wave_api
+    endpoints:
+      - host: gql.waveapps.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: POST, path: "/graphql/public" }
+    binaries:
+      - { path: /usr/bin/python3 }

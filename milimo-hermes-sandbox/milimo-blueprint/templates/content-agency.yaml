@@ -1,0 +1,26 @@
+name: "Content Agency"
+category: "Creative & Content"
+description: "A 3-claw mesh optimized for social media mgmt, copywriting, and marketing campaigns."
+
+active_claws:
+  - content
+  - ops
+  - analytics
+
+shared_policies:
+  approval_thresholds:
+    # All client-facing deliverables require squad review
+    deliverable: REVIEW
+    # Client intake and initial proposals require squad review
+    proposal: REVIEW
+    intake_questionnaire: AUTO
+    # Analytics reports auto-publish to the squad
+    intelligence_report: AUTO
+    # Analytics anomaly alerts flag for immediate review
+    anomaly_alert: REVIEW
+
+  mesh_rules:
+    # Disable finance messaging since the Finance Claw is not in this template
+    allow_finance_routes: false
+    # Allow Content <-> Analytics integration
+    allow_analytics_insights: true

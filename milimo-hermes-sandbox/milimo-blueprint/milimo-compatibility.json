@@ -1,0 +1,61 @@
+{
+  "version": "0.2.0",
+  "description": "MilimoClaw Hermes profile compatibility configuration",
+  "delegation": {
+    "max_concurrent_children": 6,
+    "model_overrides": {
+      "build": "nvidia/nemotron-3-ultra-550b-a55b",
+      "content": "google/gemini-flash-2.0",
+      "ops": "nvidia/nemotron-3-ultra-550b-a55b",
+      "analytics": "google/gemini-flash-2.0",
+      "finance": "nvidia/nemotron-3-ultra-550b-a55b",
+      "assistant": "nvidia/nemotron-3-ultra-550b-a55b"
+    },
+    "toolsets": {
+      "build": ["file", "shell"],
+      "content": ["web", "file"],
+      "ops": ["file", "shell"],
+      "analytics": ["file"],
+      "finance": ["file"],
+      "assistant": ["file", "web"]
+    }
+  },
+  "cron": {
+    "jobs": [
+      {
+        "name": "evolution_cycle",
+        "schedule": "0 2 * * 0",
+        "description": "Weekly evolution cycle (Sunday 2AM)",
+        "handler": "evolution_cycle"
+      },
+      {
+        "name": "tool_backtest",
+        "schedule": "0 */6 * * *",
+        "description": "Tool backtest cycle (every 6 hours)",
+        "handler": "tool_backtest"
+      },
+      {
+        "name": "hold_queue_review",
+        "schedule": "0 */4 * * *",
+        "description": "HOLD queue review (every 4 hours)",
+        "handler": "hold_queue_review"
+      }
+    ]
+  },
+  "warroom": {
+    "endpoint": "/warroom",
+    "html_path": "/opt/hermes/warroom/warroom.html",
+    "auto_refresh_seconds": 30
+  },
+  "cost_guard": {
+    "daily_token_limit": 50000,
+    "alert_threshold_percent": 80
+  },
+  "auth": {
+    "default_mode": "api_key",
+    "nous_oauth": {
+      "enabled": false,
+      "description": "Enable for managed tool gateways (web search, browser automation, image generation, audio, managed code execution)"
+    }
+  }
+}

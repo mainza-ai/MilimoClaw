@@ -25,7 +25,6 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { OpenClawPluginApi, PluginLogger, MilimoConfig, OpenClawConfig } from "../index.js";
-import { ChannelNotifier, loadNotificationConfig } from "./channel-notifier.js";
 import { getRpcClient } from "../lib/rpc-bridge";
 
 // ---------------------------------------------------------------------------
@@ -95,15 +94,17 @@ export function createClawLauncherService(pluginConfig: MilimoConfig): {
           });
 
         // Periodic health check — verifies RPC server is reachable
-        healthInterval = setInterval(async () => {
-          try {
-            const rpc = getRpcClient();
-            await rpc.call("ping", {});
-          } catch {
-            logger.warn(
-              "[milimo] Python RPC server not reachable. " + "Claw launcher may not be running.",
-            );
-          }
+        healthInterval = setInterval(() => {
+          void (async () => {
+            try {
+              const rpc = getRpcClient();
+              await rpc.call("ping", {});
+            } catch {
+              logger.warn(
+                "[milimo] Python RPC server not reachable. " + "Claw launcher may not be running.",
+              );
+            }
+          })();
         }, 60_000);
       } catch (err) {
         logger.error(

@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Milimo Hermes Plugin Requirements
+# Installed into /opt/hermes/.venv at image build time
+
+# Core dependency - shared orchestrator library
+milimo-core>=0.1.0
+
+# Hermes Agent runtime (provided by upstream NousResearch/hermes-agent image)
+# The base image at ghcr.io/nousresearch/hermes-agent includes:
+#   - hermes-agent Python package with CLI, gateway, and plugin APIs
+#   - All provider packages baked in (anthropic, bedrock, azure-identity, hindsight, matrix)
+#   - s6-overlay supervision, uv/venv, node 22 LTS, Playwright
+
+# Optional: For development/testing outside sandbox
+# nemoclaw-hermes-sdk @ git+https://github.com/NVIDIA/nemoclaw.git#subdirectory=hermes/sdk
+
+# Type checking
+pyright>=1.1.380
+
+# Testing
+pytest>=9.0.0
+pytest-asyncio>=0.23.0
+pytest-mock>=3.14.0

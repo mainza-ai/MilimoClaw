@@ -1,0 +1,78 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Milimo Claw — Claw Role Schema Extension
+#
+# Defines the structure every role blueprint must follow.
+# Each role blueprint extends the base NemoClaw blueprint with
+# claw-specific configuration for filesystem, egress, inference,
+# inter-claw messaging, and approval policies.
+
+schema_version: "0.1.0"
+
+# Required fields for every claw role blueprint
+required_fields:
+  - "role"
+  - "display_name"
+  - "description"
+  - "filesystem_mount"
+  - "egress_policy"
+  - "inference_routing"
+  - "inter_claw_policy"
+  - "approval_thresholds"
+
+# Valid role identifiers
+valid_roles:
+  - content
+  - ops
+  - analytics
+  - finance
+  - build
+  - assistant
+
+# Filesystem mount constraints
+filesystem_rules:
+  # Each claw gets exactly one primary mount under /sandbox/
+  mount_prefix: "/sandbox/"
+  # Mounts are kernel-enforced via Landlock — no claw can access
+  # another claw's mount, even if instructed to
+  isolation: landlock
+  # Optional read-only cross-mounts (e.g., Analytics reports)
+  cross_mounts_allowed: true
+  cross_mount_mode: read_only
+
+# Inference routing modes
+inference_backends:
+- id: cloud
+  name: "Cloud (NEMOCLAW_MODEL)"
+  description: "Max quality for client-facing work"
+- id: local-nim
+  name: "Local NIM (NEMOCLAW_MODEL)"
+  description: "Private data stays on device"
+- id: local-vllm
+  name: "Local vLLM"
+  description: "Tightest isolation, lightweight"
+
+# Approval mode definitions
+approval_modes:
+  auto:
+    description: "Claw acts immediately, logs for review"
+    requires_human: false
+  review:
+    description: "Claw drafts, queues for human approval before executing"
+    requires_human: true
+  hold:
+    description: "Claw flags and pauses. Requires explicit squad confirmation"
+    requires_human: true
+  veto:
+    description: "Any squad member can block. Requires re-vote to proceed"
+    requires_human: true
+
+# Inter-claw message type categories
+message_categories:
+  - brief
+  - query
+  - response
+  - signal
+  - deliverable
+  - summary

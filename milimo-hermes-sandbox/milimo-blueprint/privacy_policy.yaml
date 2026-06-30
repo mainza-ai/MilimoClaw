@@ -1,0 +1,145 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Milimo Claw — Default Sensitivity Routing Policy
+# ═══════════════════════════════════════════════════════════════════════
+# Maps data types to inference backends. The privacy router loads this
+# policy at startup and uses it to intercept and route every inference
+# call transparently.
+#
+# Backends:
+# cloud = Cloud inference via NEMOCLAW_MODEL (max quality)
+# local-nim = Local NIM (NEMOCLAW_MODEL, private, on-device)
+# local-vllm = Local vLLM (tightest isolation)
+#
+# Override: squads can customize this file during onboarding.
+# Constraint: some routes are LOCKED and cannot be overridden
+# (e.g., financial data → local-nim is non-negotiable).
+
+policy_version: "0.1.0"
+default_backend: local-nim
+
+# ── Data Type → Backend Routing Rules ──────────────────────────────────
+# Ordered by specificity. First match wins.
+# locked: true means the squad CANNOT override this route.
+
+routes:
+  # --- Financial (LOCKED to local-nim) ---
+  - data_type: financial_records
+    description: "Revenue, invoices, expenses, payment status"
+    backend: local-nim
+    locked: true
+
+  - data_type: payment_details
+    description: "Credit card numbers, bank account info, payment tokens"
+    backend: local-nim
+    locked: true
+
+  - data_type: pricing_strategy
+    description: "Rate calculations, margin analysis, cost estimation"
+    backend: local-nim
+    locked: true
+
+  - data_type: tax_data
+    description: "Tax categorization, filing data, tax reports"
+    backend: local-nim
+    locked: true
+
+  # --- Personal / Private (LOCKED to local-vllm) ---
+  - data_type: personal_notes
+    description: "Private context, personal journal, relationship notes"
+    backend: local-vllm
+    locked: true
+
+  - data_type: credentials
+    description: "API keys, passwords, tokens, secrets"
+    backend: local-vllm
+    locked: true
+
+  # --- Internal Business (local-nim) ---
+  - data_type: internal_comms
+    description: "Internal squad communications, DMs, strategy discussions"
+    backend: local-nim
+    locked: false
+
+  - data_type: client_contacts
+    description: "Client names, emails, phone numbers, addresses"
+    backend: local-nim
+    locked: true
+
+  - data_type: contract_review
+    description: "Contract terms, legal review, NDA content"
+    backend: local-nim
+    locked: true
+
+  - data_type: internal_drafts
+    description: "Internal brainstorming, ideation, rough drafts"
+    backend: local-nim
+    locked: false
+
+  - data_type: performance_synthesis
+    description: "Internal performance report generation"
+    backend: local-nim
+    locked: false
+
+  - data_type: predictive_modeling
+    description: "Models trained on proprietary squad data"
+    backend: local-nim
+    locked: false
+
+  # --- Public / Client-Facing (cloud) ---
+  - data_type: public_drafts
+    description: "Client-facing content drafts, proposals"
+    backend: cloud
+    locked: false
+
+  - data_type: client_communications
+    description: "Client-facing messages, emails, proposals"
+    backend: cloud
+    locked: false
+
+  - data_type: trend_research
+    description: "Trend analysis, market research, competitive intel"
+    backend: cloud
+    locked: false
+
+  - data_type: market_analysis
+    description: "Public market trends, industry analysis"
+    backend: cloud
+    locked: false
+
+  - data_type: scheduling
+    description: "Calendar optimization, meeting scheduling"
+    backend: cloud
+    locked: false
+
+  - data_type: boilerplate
+    description: "Template code, documentation, standard text"
+    backend: cloud
+    locked: false
+
+# ── Role Overrides ─────────────────────────────────────────────────────
+# Per-role constraints that ALWAYS apply regardless of data type.
+# These supplement the routes above.
+
+role_overrides:
+  finance:
+    # Finance Claw: ALL inference goes local. No exceptions.
+    force_backend: local-nim
+    cloud_allowed: false
+
+  build:
+    # Build Claw: source code always stays local.
+    force_local_types:
+      - source_code
+      - production_logs
+      - deployment_secrets
+
+# ── Fallback ───────────────────────────────────────────────────────────
+# Any data type not matched by the routes above or role overrides
+# falls back to local-nim. This is a safety net: unknown data is
+# treated as sensitive until explicitly classified.
+fallback:
+  backend: local-nim
+  log_unclassified: true

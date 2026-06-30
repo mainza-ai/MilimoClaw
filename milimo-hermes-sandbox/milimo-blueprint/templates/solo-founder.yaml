@@ -1,0 +1,334 @@
+# milimo-blueprint/templates/solo-founder.yaml
+# ─────────────────────────────────────────────
+# MILIMO CLAW — SOLO FOUNDER TEMPLATE
+# Run all six claws from a single machine.
+# One operator. Full company. Always on.
+# ─────────────────────────────────────────────
+
+template:
+  name: solo-founder
+  display_name: "Solo Founder"
+  category: founder
+  description: >
+    All six claws running on a single machine under a single operator.
+    Designed for solo founders who want to run a full autonomous operation
+    before scaling to a squad. The War Room surfaces every claw's actions
+    in a single unified queue — one person approves everything.
+  squad_size: 1
+  claws_active:
+  - content
+  - ops
+  - analytics
+  - finance
+  - build
+  - assistant
+  recommended_gpu: RTX 4070 or better
+  note: >
+    Running all six claws simultaneously is GPU-intensive.
+    On an RTX 3060, disable the Build claw unless actively
+    shipping code. Re-enable it when needed.
+
+# ─────────────────────────────────────────────
+# OPERATOR POLICY
+# Single operator = you approve everything.
+# Thresholds are set higher to reduce noise —
+# you don't need four people to review a tweet.
+# ─────────────────────────────────────────────
+
+operator_policy:
+  squad_lead: mainza
+  approval_modes:
+
+    # Content Claw — trust it more, review less
+    content:
+      social_post_draft: AUTO # posts queue for your morning review
+      client_proposal_draft: REVIEW # you always see proposals before they go out
+      email_campaign_draft: REVIEW
+      brand_asset_usage: AUTO
+      content_calendar_update: AUTO # calendar changes logged, can override anytime
+      ab_test_variant: REVIEW # both variants shown side-by-side for selection
+      trend_reactive_post: REVIEW # flagged as trend-triggered — you confirm relevance
+
+    # Ops Claw — client-facing actions need eyes
+    ops:
+      new_client_inquiry: REVIEW # you decide who to work with
+      welcome_message: AUTO # standard intake, let it run
+      deadline_risk: REVIEW # 5+ days out — elevated risk, surface for review
+      deadline_critical: HOLD # 24 hours — explicit action required
+      scope_change: HOLD # never auto-handle scope changes
+      client_offboarding: REVIEW
+
+    # Analytics Claw — trust it fully, it only reads
+    analytics:
+      weekly_report: AUTO # just publish it
+      anomaly_alert: REVIEW # surface anomalies for your call
+      opportunity_score: AUTO
+
+    # Finance Claw — nothing moves without you
+    finance:
+      invoice_generation: REVIEW # you approve every invoice
+      invoice_send: HOLD # you explicitly send every invoice
+      payment_follow_up: REVIEW
+      pricing_recommendation: REVIEW
+      expense_log: AUTO
+
+    # Build Claw — code changes need human eyes
+    build:
+      pr_open: REVIEW # you review every PR
+      pr_merge: HOLD # you explicitly merge
+      production_deploy: HOLD # you explicitly deploy
+      issue_triage: AUTO # let it score and sort issues
+      dependency_audit: AUTO # security PRs auto-drafted, you approve
+      documentation_update: AUTO
+
+    # Assistant Claw — always auto, it only coordinates
+    assistant:
+      cross_claw_query: AUTO # read-only status checks to other claws
+      cross_claw_task: REVIEW # task assignments need your approval
+      operator_message: AUTO # relay operator messages via Telegram
+
+# ─────────────────────────────────────────────
+# FILESYSTEM LAYOUT
+# All six sandboxes on one machine.
+# Each claw reads only its own mount.
+# ─────────────────────────────────────────────
+
+filesystem:
+  content: /sandbox/.openclaw-data/milimo/claws/content
+  ops: /sandbox/.openclaw-data/milimo/claws/ops
+  analytics: /sandbox/.openclaw-data/milimo/claws/analytics
+  finance: /sandbox/.openclaw-data/milimo/claws/finance
+  build: /sandbox/.openclaw-data/milimo/claws/build
+  assistant: /sandbox/.openclaw-data/milimo/claws/assistant
+
+shared_read:
+  - /sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json
+
+# ─────────────────────────────────────────────
+# INFERENCE ROUTING
+# Solo mode — macOS Docker testing configuration.
+# Local inference (MLX/NIM) not available from Docker
+# on macOS, so we route to cloud for all operations.
+# Locked routes (financial_data, source_code) remain local
+# conceptually but use cloud in Docker testing mode.
+# ─────────────────────────────────────────────
+
+inference:
+  solo_mode: true
+  docker_testing: true  # macOS Docker mode — all routes go to cloud
+
+  routing_overrides:
+  client_facing_drafts: cloud # NEMOCLAW_MODEL (set during nemoclaw onboard)
+  internal_ideation: cloud # NEMOCLAW_MODEL
+  financial_data: cloud # Docker testing mode override — locked route
+  source_code: cloud # Docker testing mode override — locked route
+  client_records: cloud # NEMOCLAW_MODEL
+  analytics_synthesis: cloud # NEMOCLAW_MODEL
+  public_docs_changelogs: cloud # NEMOCLAW_MODEL
+
+  cost_guard:
+    daily_cloud_token_budget: 50000 # Solo spec requirement
+    alert_at_percent: 80
+    fallback_on_exceed: lighter_prompt # Reduced context strategy when budget exceeded
+    never_block_claw_action: true # always fallback, never fail
+
+# ─────────────────────────────────────────────
+# WAR ROOM — SOLO CONFIGURATION
+# Single operator view. All six claw queues
+# merged into one prioritized action feed.
+# Morning review target: under 15 minutes.
+# ─────────────────────────────────────────────
+
+war_room:
+  operator: mainza
+  mode: solo
+
+  queue_priority:
+    1: HOLD                     # show blockers first
+    2: REVIEW                   # then items needing your decision
+    3: AUTO                     # then auto-completed items for awareness
+
+  digest_schedule:
+    morning_brief:    "07:00"   # daily summary of overnight autonomous activity
+    evening_wrap:     "20:00"   # what ran today, what's queued for tomorrow
+
+  evolution_log:
+    show_on_startup:  true      # always see what your claws built this week
+    require_ack:      false     # don't block the queue on evolution updates
+
+  escalation:
+    urgent_channels:
+      - war_room_tui            # primary — always on
+      - cli_notification        # terminal ping for HOLD items
+
+# ─────────────────────────────────────────────
+# SELF-EVOLUTION — SOLO SETTINGS
+# Weekly cycle runs as normal.
+# Solo mode means richer operational logs —
+# you're approving/editing everything yourself,
+# so the signal quality is exceptionally high.
+# ─────────────────────────────────────────────
+
+evolution:
+  cycle_day: sunday
+  schedule:
+    analytics_baseline: "01:00"
+    analytics_report: "02:00"
+    content: "02:05"
+    ops: "02:15"
+    analytics_evolution: "02:25"
+    build: "02:35"
+    finance: "03:00"
+    assistant: "03:15"
+
+  min_thresholds:
+    content:
+      approved_posts: 10
+      rejected_drafts: 3
+      performance_weeks: 1
+    ops:
+      client_interactions: 5
+      projects: 3
+      comms_weeks: 2
+    analytics:
+      signal_weeks: 3
+      revenue_summaries: 1
+      health_signals: 1
+    finance:
+      invoices: 3
+      completed_projects: 2
+      expense_weeks: 4
+    build:
+      merged_prs: 5
+      sprints: 3
+      deploys: 2
+      cost_weeks: 4
+
+  per_claw:
+    content:
+      enabled: true
+      min_approved_posts: 10    # needs at least 10 approved posts before first evolution
+      performance_threshold: 5  # 5% minimum improvement to deploy a tool
+
+    ops:
+      enabled: true
+      min_client_interactions: 5
+      performance_threshold: 5
+
+    analytics:
+      enabled: true
+      min_data_weeks: 3         # needs 3 weeks of data before first evolution
+      performance_threshold: 5
+
+    finance:
+      enabled: true
+      min_invoices: 3
+      performance_threshold: 5
+
+    build:
+      enabled: true
+      min_prs_merged: 5 # needs real shipping history before evolving
+      performance_threshold: 5
+
+    assistant:
+      enabled: true
+      min_coordinated_tasks: 10 # needs cross-claw task history before evolving
+      performance_threshold: 5
+
+  capacity:
+    max_tools_per_claw: 30
+    evolution_log_retention: 90  # days
+
+# ─────────────────────────────────────────────
+# NETWORK EGRESS — SOLO DEFAULTS
+# Conservative during testing.
+# Uncomment additional APIs as you activate
+# each part of your operation.
+# ─────────────────────────────────────────────
+
+network_egress:
+
+  content:
+    approved:
+      - api.twitter.com
+      - graph.facebook.com
+      - api.instagram.com
+      - api.linkedin.com
+      - api.tiktok.com
+      - unsplash.com             # stock assets
+    # - api.buffer.com           # uncomment when scheduling live
+
+  ops:
+    approved:
+      - api.gmail.com
+      - api.calendar.google.com
+      - api.notion.com
+    # - api.calendly.com         # uncomment when scheduling clients
+
+  analytics:
+    approved:
+      - api.twitter.com          # read-only analytics
+      - api.instagram.com        # read-only insights
+      - api.linkedin.com         # read-only analytics
+    # - api.google-analytics.com # uncomment when web analytics live
+
+  finance:
+    approved:
+      - api.stripe.com           # read-only — status checks and invoice generation
+    # - api.quickbooks.com       # uncomment when accounting integration needed
+
+  build:
+    approved:
+    - api.github.com
+    - api.vercel.com
+    - registry.npmjs.org
+    - pypi.org
+    - api.sentry.io
+    # - api.railway.app # uncomment when Railway deployment active
+    # - api.cloudflare.com # uncomment when Cloudflare integration needed
+
+  assistant:
+    approved:
+    - api.telegram.org # Telegram bot API for operator bridge
+
+# ─────────────────────────────────────────────
+# FINALS MODE — SOLO EQUIVALENT: DEEP WORK MODE
+# For solo founders, "finals" is deep work —
+# shipping sprints, conference travel, or
+# any period where you need to go heads-down.
+# ─────────────────────────────────────────────
+
+deep_work_mode:
+  alias: finals-mode            # same CLI command works: milimo squad finals-mode
+
+  on_activate:
+    content: pause_drafts # queue only, no publishing
+    ops: maintenance # auto-responses to active clients
+    analytics: passive # collect data, no new experiments
+    finance: invoices_only # sends continue, no new intake
+    build: issues_only # triage only, no new PRs opened
+    assistant: reduced # only operator-initiated queries, no proactive tasks
+
+  auto_response_template: >
+    Hey [name], I'm heads-down on a focused sprint until [resume_date].
+    Your project is on track — I'll be back in full swing then. 🙏
+
+  resume_on: scheduled          # milimo squad finals-mode --resume-date YYYY-MM-DD
+
+# ─────────────────────────────────────────────
+# BLUEPRINT METADATA
+# ─────────────────────────────────────────────
+
+blueprint:
+  version: "1.0.0"
+  evolved_from: null            # starter template — no parent
+  niche_tags:
+    - solo-founder
+    - AI-startup
+    - full-stack
+  business_type: tech
+  operational_months: 0         # starts at zero, evolves from your usage
+
+integrity:
+  digest: ~                     # computed on first deploy
+  provenance_chain: []

@@ -14,10 +14,10 @@
 #   --name NAME           Sandbox name (default: milimo-hermes)
 #   --profile PROFILE     Policy profile: restricted, balanced, open (default: restricted)
 #   --model-router        Enable Model Router (requires qualifying Python 3.10-3.13)
-#   --auth-mode MODE       Auth mode: api_key (default) or nous_oauth (managed tool gateways)
-#   --nous-oauth           DEPRECATED: Use --auth-mode nous_oauth instead
+#   --auth-mode MODE      Auth mode: api_key (default) or nous_oauth (managed tool gateways)
+#   --nous-oauth          DEPRECATED: Use --auth-mode nous_oauth instead
 #   --headless            Headless remote deployment (prompts for CHAT_UI_URL)
-#   --slack-channels      Comma-separated Slack channels for alerts
+#   --slack-channels LIST Comma-separated Slack channels for alerts
 #   --chat-ui-url URL     Remote dashboard URL for headless deployments
 #   --non-interactive     Non-interactive mode (requires all env vars set)
 #   --dry-run             Show commands without executing
@@ -78,7 +78,7 @@ ENVIRONMENT VARIABLES (for non-interactive mode):
     SLACK_ALLOWED_CHANNELS       Comma-separated Slack channels
     CHAT_UI_URL                  Remote dashboard URL
     NVIDIA_API_KEY               NVIDIA API key (required)
-    NEMOCLAW_ACCEPT_THIRD_PARTY  1 to accept third-party software
+    NEMOCLAW_ACCEPT_THIRD_PARTY 1 to accept third-party software
     NEMOCLAW_NON_INTERACTIVE     1 for non-interactive mode
     NEMOCLAW_MODEL_ROUTER_PYTHON Python path for Model Router
 
@@ -161,6 +161,22 @@ parse_args() {
 
 check_prerequisites() {
   log_info "Checking prerequisites..."
+
+  # Source .env file from project root if it exists
+  local script_path
+  script_path="$(realpath "${BASH_SOURCE[0]}")"
+  local project_root
+  project_root="$(dirname "$(dirname "$script_path")")"
+  log_info "Project root: $project_root"
+  if [[ -f "$project_root/.env" ]]; then
+    log_info "Sourcing .env file from project root..."
+    set -a
+    source "$project_root/.env"
+    set +a
+    log_info "NVIDIA_API_KEY set: ${NVIDIA_API_KEY:+yes}"
+  else
+    log_warn ".env file not found at $project_root/.env"
+  fi
 
   # Check for nemoclaw CLI
   if ! command -v nemoclaw &>/dev/null; then
@@ -263,11 +279,11 @@ prompt_chat_ui_url() {
     fi
 
     echo ""
-    log_info "Headless deployment detected. The Hermes dashboard runs on port 18789."
+    log_info "Headless deployment detected. The Hermes dashboard runs on port 18790."
     log_info "To access it remotely, you need to set CHAT_UI_URL."
     echo ""
     echo "Options:"
-    echo "  1. SSH port forwarding: ssh -L 18789:127.0.0.1:18789 user@host"
+    echo "  1. SSH port forwarding: ssh -L 18790:127.0.0.1:18790 user@host"
     echo "  2. Reverse proxy (nginx, traefik) with CHAT_UI_URL=https://your-domain.com"
     echo "  3. Tailscale/VPN with direct IP access"
     echo ""
@@ -275,7 +291,7 @@ prompt_chat_ui_url() {
 
     if [[ -z "$CHAT_UI_URL" ]]; then
       log_info "Using SSH port forwarding. Run this after onboarding:"
-      log_info "  ssh -L 18789:127.0.0.1:18789 $(whoami)@$(hostname -f)"
+      log_info "  ssh -L 18790:127.0.0.1:18790 $(whoami)@$(hostname -f)"
     fi
   fi
 }
@@ -351,33 +367,77 @@ prompt_model_router() {
   fi
 }
 
+prepare_build_context() {
+  log_info "Preparing build context..."
+
+  local script_path
+  script_path="$(realpath "${BASH_SOURCE[0]}")"
+  local project_root
+  project_root="$(dirname "$(dirname "$script_path")")"
+  local sandbox_dir
+  sandbox_dir="$(dirname "$script_path")"
+
+  log_info "Project root: $project_root"
+  log_info "Sandbox dir: $sandbox_dir"
+
+  for dir in milimo-core milimo-hermes-plugin milimo-blueprint; do
+    if [[ -d "$sandbox_dir/$dir" ]]; then
+      log_info "Removing existing $dir from build context..."
+      rm -rf "${sandbox_dir:?}/${dir:?}"
+    fi
+    if [[ -d "$project_root/$dir" ]]; then
+      log_info "Copying $dir into sandbox build context..."
+      cp -r "$project_root/$dir" "$sandbox_dir/$dir"
+    else
+      log_error "Required directory not found: $project_root/$dir"
+      exit 1
+    fi
+  done
+
+  if [[ ! -f "$sandbox_dir/generate-config.ts" ]]; then
+    log_error "Required file not found: $sandbox_dir/generate-config.ts"
+    exit 1
+  fi
+  if [[ ! -d "$sandbox_dir/config" ]]; then
+    log_error "Required directory not found: $sandbox_dir/config"
+    exit 1
+  fi
+
+  log_success "Build context prepared successfully"
+}
+
 build_docker_image() {
   log_info "Building Milimo Hermes sandbox image..."
 
-  local docker_args
-  docker_args=$(build_onboard_args)
-
-  run_command "docker build $docker_args -t milimo-hermes-sandbox:latest -f milimo-hermes-sandbox/Dockerfile ."
-
-  log_success "Sandbox image built successfully"
-}
-
-build_onboard_args() {
-  local args=()
+  local docker_args=()
+  docker_args+=(-f milimo-hermes-sandbox/Dockerfile)
+  docker_args+=(-t milimo-hermes-sandbox:latest)
+  docker_args+=(--build-arg "NEMOCLAW_MODEL=${NEMOCLAW_MODEL}")
+  docker_args+=(--build-arg "NEMOCLAW_PROVIDER_KEY=${NEMOCLAW_PROVIDER_KEY}")
+  docker_args+=(--build-arg "NEMOCLAW_INFERENCE_BASE_URL=${NEMOCLAW_INFERENCE_BASE_URL}")
+  docker_args+=(--build-arg "CHAT_UI_URL=${CHAT_UI_URL}")
+  docker_args+=(--build-arg "NEMOCLAW_MESSAGING_CHANNELS_B64=${NEMOCLAW_MESSAGING_CHANNELS_B64}")
+  docker_args+=(--build-arg "NEMOCLAW_MESSAGING_ALLOWED_IDS_B64=${NEMOCLAW_MESSAGING_ALLOWED_IDS_B64}")
+  docker_args+=(--build-arg "NEMOCLAW_DISCORD_GUILDS_B64=${NEMOCLAW_DISCORD_GUILDS_B64}")
+  docker_args+=(--build-arg "NEMOCLAW_TELEGRAM_CONFIG_B64=${NEMOCLAW_TELEGRAM_CONFIG_B64}")
+  docker_args+=(--build-arg "NEMOCLAW_WECHAT_CONFIG_B64=${NEMOCLAW_WECHAT_CONFIG_B64}")
+  docker_args+=(--build-arg "NEMOCLAW_SLACK_CONFIG_B64=${NEMOCLAW_SLACK_CONFIG_B64}")
+  docker_args+=(--build-arg "NEMOCLAW_HERMES_TOOL_GATEWAY_BROKER=${NEMOCLAW_HERMES_TOOL_GATEWAY_BROKER}")
+  docker_args+=(--build-arg "NEMOCLAW_HERMES_TOOL_GATEWAY_PRESETS_B64=${NEMOCLAW_HERMES_TOOL_GATEWAY_PRESETS_B64}")
+  docker_args+=(--build-arg "NEMOCLAW_BUILD_ID=${NEMOCLAW_BUILD_ID}")
+  docker_args+=(--build-arg "NEMOCLAW_DARWIN_VM_COMPAT=${NEMOCLAW_DARWIN_VM_COMPAT}")
 
   if [[ -n "$SLACK_CHANNELS" ]]; then
     local slack_json
     slack_json=$(echo "$SLACK_CHANNELS" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$"; ""))')
     local slack_b64
     slack_b64=$(echo -n "$slack_json" | base64 -w0)
-    args+=(--build-arg "NEMOCLAW_SLACK_CONFIG_B64=$slack_b64")
+    docker_args+=(--build-arg "NEMOCLAW_SLACK_CONFIG_B64=$slack_b64")
   fi
 
-  if [[ -n "$CHAT_UI_URL" ]]; then
-    args+=(--build-arg "CHAT_UI_URL=$CHAT_UI_URL")
-  fi
+  run_command "docker build ${docker_args[*]} ."
 
-  echo "${args[@]}"
+  log_success "Sandbox image built successfully"
 }
 
 run_command() {
@@ -388,6 +448,31 @@ run_command() {
     return 0
   fi
   eval "$cmd"
+}
+
+build_onboard_command() {
+  local cmd="nemohermes onboard"
+  cmd+=" --name $SANDBOX_NAME"
+  cmd+=" --from ./milimo-hermes-sandbox/Dockerfile"
+
+  if [[ "$ENABLE_MODEL_ROUTER" == "true" ]]; then
+    cmd+=" --model-router"
+    if [[ -n "${NEMOCLAW_MODEL_ROUTER_PYTHON:-}" ]]; then
+      cmd+=" --model-router-python ${NEMOCLAW_MODEL_ROUTER_PYTHON}"
+    fi
+  fi
+
+  if [[ "$NON_INTERACTIVE" == "true" ]]; then
+    cmd+=" --non-interactive --yes"
+    cmd+=" --yes-i-accept-third-party-software"
+    cmd+=" --fresh"
+    export NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1
+    export NEMOCLAW_NON_INTERACTIVE=1
+    export NEMOCLAW_POLICY_TIER="${NEMOCLAW_POLICY_TIER:-$POLICY_TIER}"
+    export NEMOCLAW_POLICY_MODE="${NEMOCLAW_POLICY_MODE:-suggested}"
+  fi
+
+  printf '%s\n' "$cmd"
 }
 
 main() {
@@ -430,34 +515,13 @@ main() {
   log_info "  CHAT_UI_URL: ${CHAT_UI_URL:-none}"
   echo ""
 
-# Prepare onboarding command - uses nemohermes onboard with our custom Dockerfile
-  # Note: nemohermes onboard doesn't support --policy-tier, --policy-preset, or --build-arg flags
-  # Policy configuration is done via environment variables and the onboarding wizard
-  # Build args are passed via environment variables (matching Dockerfile ARG names)
+  # Prepare onboarding command - uses nemohermes onboard with our custom Dockerfile
+  # Note: nemohermes onboard only supports flags shown in `nemohermes onboard --help`
+  # Build args are passed explicitly to `docker build --build-arg`
+  # Auth/nous_oauth is handled by the onboarding wizard; do not pass --auth here
   local onboard_cmd="nemohermes onboard"
   onboard_cmd+=" --name $SANDBOX_NAME"
   onboard_cmd+=" --from ./milimo-hermes-sandbox/Dockerfile"
-
-  if [[ "$AUTH_MODE" == "nous_oauth" ]]; then
-    onboard_cmd+=" --auth nous"
-  fi
-
-  if [[ "$ENABLE_MODEL_ROUTER" == "true" ]]; then
-    onboard_cmd+=" --model-router"
-    if [[ -n "${NEMOCLAW_MODEL_ROUTER_PYTHON:-}" ]]; then
-      onboard_cmd+=" --model-router-python ${NEMOCLAW_MODEL_ROUTER_PYTHON}"
-    fi
-  fi
-
-  if [[ "$NON_INTERACTIVE" == "true" ]]; then
-    onboard_cmd+=" --non-interactive --yes"
-    export NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1
-    export NEMOCLAW_NON_INTERACTIVE=1
-    # Policy tier for non-interactive onboarding (restricted, balanced, open)
-    export NEMOCLAW_POLICY_TIER="${NEMOCLAW_POLICY_TIER:-$POLICY_TIER}"
-    # Policy mode: suggested (default, additive), custom (exact list via NEMOCLAW_POLICY_PRESETS), skip
-    export NEMOCLAW_POLICY_MODE="${NEMOCLAW_POLICY_MODE:-suggested}"
-  fi
 
   # Set build arg environment variables (Docker will use these for ARGs in Dockerfile)
   export NEMOCLAW_MODEL="${NEMOCLAW_MODEL:-nvidia/nemotron-3-super-120b-a12b}"
@@ -484,41 +548,14 @@ main() {
     export NEMOCLAW_SLACK_CONFIG_B64="$slack_b64"
   fi
 
+  prepare_build_context
+  build_docker_image
+
   if [[ "$DRY_RUN" == "true" ]]; then
     log_info "[DRY RUN] Would execute onboarding:"
     log_info "  $onboard_cmd"
     log_info "  Build arg env vars set: NEMOCLAW_MODEL, CHAT_UI_URL, NEMOCLAW_SLACK_CONFIG_B64, etc."
     return 0
-  fi
-
-  # Copy required source directories into sandbox directory for build context
-  log_info "Preparing build context..."
-  local script_path="$(realpath "${BASH_SOURCE[0]}")"
-  local project_root="$(dirname "$(dirname "$script_path")")"
-  local sandbox_dir="$(dirname "$script_path")"
-  
-  log_info "Project root: $project_root"
-  log_info "Sandbox dir: $sandbox_dir"
-
-  # Copy required source directories to sandbox directory for Docker build context
-  for dir in milimo-core milimo-hermes-plugin milimo-blueprint; do
-    if [[ -d "$project_root/$dir" ]]; then
-      log_info "Copying $dir to build context..."
-      rm -rf "$sandbox_dir/$dir"
-      cp -r "$project_root/$dir" "$sandbox_dir/"
-    else
-      log_error "Required directory not found: $project_root/$dir"
-      exit 1
-    fi
-  done
-
-  # Copy generate-config.ts and config/ for config generation
-  if [[ -f "$project_root/milimo-hermes-sandbox/generate-config.ts" ]]; then
-    cp "$project_root/milimo-hermes-sandbox/generate-config.ts" "$sandbox_dir/"
-  fi
-  if [[ -d "$project_root/milimo-hermes-sandbox/config" ]]; then
-    rm -rf "$sandbox_dir/config"
-    cp -r "$project_root/milimo-hermes-sandbox/config" "$sandbox_dir/"
   fi
 
   # Run onboarding
@@ -531,7 +568,7 @@ main() {
     echo ""
     log_info "Next steps:"
     log_info "  1. Start the sandbox: nemoclaw start $SANDBOX_NAME"
-    log_info "  2. Access dashboard: http://127.0.0.1:18789/"
+    log_info "  2. Access dashboard: http://127.0.0.1:18790/"
     log_info "  3. OpenAI-compatible API: http://127.0.0.1:8642/v1"
 
     if [[ -n "$CHAT_UI_URL" ]]; then
@@ -539,7 +576,7 @@ main() {
     fi
 
     if [[ "$HEADLESS" == "true" && -z "$CHAT_UI_URL" ]]; then
-      log_info "  4. SSH tunnel: ssh -L 18789:127.0.0.1:18789 $(whoami)@$(hostname -f)"
+      log_info "  4. SSH tunnel: ssh -L 18790:127.0.0.1:18790 $(whoami)@$(hostname -f)"
     fi
   else
     log_error "Onboarding failed"

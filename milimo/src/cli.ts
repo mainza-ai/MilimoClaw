@@ -517,8 +517,8 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
   assistant
     .command("start")
     .description("Start the assistant in NemoClaw terminal")
-    .action(async () => {
-      await assistantStart();
+    .action(() => {
+      assistantStart();
     });
 
   // ── openclaw milimo channels ─────────────────────────────────────────

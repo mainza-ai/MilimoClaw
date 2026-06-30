@@ -72,7 +72,7 @@ export async function assistantVerify(): Promise<void> {
   }
 }
 
-export async function assistantStart(): Promise<void> {
+export function assistantStart(): void {
   const agentConfig = ".openclaw/agents/main/config.yaml";
   if (!existsSync(agentConfig)) {
     console.error("Assistant not set up. Run: openclaw milimo assistant setup");

@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://milimoclaw.com/schemas/cohort.json",
+  "title": "Cohort Template",
+  "description": "Template for bulk squad creation in university/accelerator programs",
+  "type": "object",
+  "required": ["name", "squads"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the cohort",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the cohort program"
+    },
+    "tenant_id": {
+      "type": "string",
+      "description": "Tenant identifier"
+    },
+    "template": {
+      "type": "string",
+      "description": "Blueprint template to use for all squads",
+      "enum": ["content-agency", "design-studio", "ai-micro-saas", "campus-ai-tool"],
+      "default": "campus-ai-tool"
+    },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "auto_approve_members": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically approve member join requests"
+        },
+        "notify_on_creation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Send email notifications when squads are created"
+        },
+        "default_timezone": {
+          "type": "string",
+          "default": "America/New_York",
+          "description": "Default timezone for all squads"
+        }
+      }
+    },
+    "squads": {
+      "type": "array",
+      "description": "List of squads to create",
+      "minItems": 1,
+      "maxItems": 500,
+      "items": {
+        "type": "object",
+        "required": ["name", "members"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the squad",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "members": {
+            "type": "array",
+            "description": "Initial members to invite",
+            "minItems": 1,
+            "maxItems": 10,
+            "items": {
+              "type": "object",
+              "required": ["email", "role"],
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "format": "email",
+                  "description": "Member's email address"
+                },
+                "role": {
+                  "type": "string",
+                  "description": "Claw role assignment",
+                  "enum": ["content", "ops", "analytics", "finance", "build"]
+                },
+                "is_admin": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Whether this member is a squad admin"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Member's display name"
+                }
+              }
+            }
+          },
+          "custom_config": {
+            "type": "object",
+            "description": "Optional custom configuration for this squad"
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "program_name": {
+          "type": "string"
+        },
+        "semester": {
+          "type": "string"
+        },
+        "year": {
+          "type": "integer"
+        },
+        "instructor": {
+          "type": "string"
+        },
+        "course_code": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

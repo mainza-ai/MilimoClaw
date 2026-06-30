@@ -1,0 +1,24 @@
+{
+  "include": ["orchestrator"],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.venv",
+    "**/tests",
+    "**/test_*.py",
+    "*.pyi"
+  ],
+  "reportMissingImports": false,
+  "reportMissingModuleSource": false,
+  "reportUnknownMemberType": false,
+  "reportAttributeAccessIssue": false,
+  "reportInvalidStubStatement": false,
+  "reportOptionalMemberAccess": false,
+  "reportOptionalOperand": false,
+  "reportArgumentType": false,
+  "reportGeneralTypeIssues": false,
+  "reportUnusedExpression": false,
+  "typeCheckingMode": "basic",
+  "pythonVersion": "3.11",
+  "extraPaths": [".", "orchestrator"]
+}

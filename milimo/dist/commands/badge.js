@@ -72,8 +72,8 @@ async function cliBadge(opts) {
         return Promise.resolve();
     }
     if (opts.performance) {
-        generatePerformanceAttestation(opts, state, logger);
-        return Promise.resolve();
+        await generatePerformanceAttestation(opts, state, logger);
+        return;
     }
     if (opts.auditor) {
         requestAuditorVerification(opts, state, logger);

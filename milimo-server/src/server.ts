@@ -7,11 +7,18 @@
  * Fastify server providing REST and WebSocket API for mobile app access.
  */
 
-import Fastify from "fastify";
+import Fastify, { FastifyRequest, FastifyReply } from "fastify";
 import cors from "@fastify/cors";
 import websocket from "@fastify/websocket";
 import jwt from "@fastify/jwt";
 import rateLimit from "@fastify/rate-limit";
+
+// Augment FastifyInstance with runtime authenticate decorator
+declare module "fastify" {
+  interface FastifyInstance {
+    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  }
+}
 
 import { pendingRoutes } from "./routes/pending.js";
 import { actionRoutes } from "./routes/actions.js";
@@ -122,12 +129,13 @@ fastify.addHook("onRequest", async (request, reply) => {
 
 // WebSocket endpoint for real-time updates (requires JWT authentication)
 fastify.register(async function (fastify) {
-  fastify.get("/ws", { websocket: true }, (connection, request) => {
+  fastify.get("/ws", { websocket: true }, (socket, request) => {
     // Authenticate WebSocket connection via query parameter
-    const token = request.query?.token as string | undefined;
+    const query = request.query as { token?: string };
+    const token = query.token;
     if (!token) {
       fastify.log.warn("WebSocket connection rejected: no token provided");
-      connection.socket.close(4001, "Authentication required");
+      socket.close(4001, "Authentication required");
       return;
     }
 
@@ -136,18 +144,18 @@ fastify.register(async function (fastify) {
       fastify.log.info({ user: decoded }, "WebSocket client authenticated");
     } catch (err) {
       fastify.log.warn("WebSocket connection rejected: invalid token");
-      connection.socket.close(4001, "Invalid token");
+      socket.close(4001, "Invalid token");
       return;
     }
 
     fastify.log.info("WebSocket client connected");
 
-    connection.socket.on("message", (message) => {
+    socket.on("message", (message: Buffer) => {
       try {
         const data = JSON.parse(message.toString());
 
         if (data.type === "ping") {
-          connection.socket.send(
+          socket.send(
             JSON.stringify({
               type: "pong",
               timestamp: new Date().toISOString(),
@@ -155,7 +163,7 @@ fastify.register(async function (fastify) {
           );
         } else if (data.type === "subscribe") {
           fastify.log.info({ channel: data.channel }, "Client subscribed");
-          connection.socket.send(
+          socket.send(
             JSON.stringify({
               type: "subscribed",
               channel: data.channel,
@@ -167,7 +175,7 @@ fastify.register(async function (fastify) {
       }
     });
 
-    connection.socket.on("close", () => {
+    socket.on("close", () => {
       fastify.log.info("WebSocket client disconnected");
     });
   });

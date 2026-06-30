@@ -119,20 +119,20 @@ describe("assistant commands", () => {
   });
 
   describe("assistantStart", () => {
-    it("exits when agent config does not exist", async () => {
+    it("exits when agent config does not exist", () => {
       mockExistsSync.mockReturnValue(false);
 
       const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
         throw new Error("process.exit");
       }) as never);
 
-      await expect(assistantStart()).rejects.toThrow("process.exit");
+      expect(() => assistantStart()).toThrow("process.exit");
 
       expect(mockExit).toHaveBeenCalledWith(1);
       mockExit.mockRestore();
     });
 
-    it("prints instruction message when config exists", async () => {
+    it("prints instruction message when config exists", () => {
       mockExistsSync.mockImplementation((p: string) => {
         if (p.includes("config.yaml") || p.includes("config.json")) return true;
         return false;
@@ -143,7 +143,7 @@ describe("assistant commands", () => {
         }),
       );
 
-      await assistantStart();
+      assistantStart();
 
       expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining("Starting Nova"));
       expect(mockConsoleLog).toHaveBeenCalledWith(
@@ -151,14 +151,14 @@ describe("assistant commands", () => {
       );
     });
 
-    it("uses default name when assistant config missing", async () => {
+    it("uses default name when assistant config missing", () => {
       mockExistsSync.mockImplementation((p: string) => {
         if (p.includes("config.yaml") || p.includes("config.json")) return true;
         return false;
       });
       mockReadFileSync.mockReturnValue(JSON.stringify({}));
 
-      await assistantStart();
+      assistantStart();
 
       expect(mockConsoleLog).toHaveBeenCalledWith(
         expect.stringContaining("Starting your assistant"),

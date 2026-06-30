@@ -1,4 +1,6 @@
-import { join } from "node:path";
+// SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import { getRpcClient, RpcBridgeClient } from "./rpc-bridge";
 
 export interface PythonBridgeResult {
@@ -27,7 +29,7 @@ export interface BridgeCommandOptions {
   resolvePath?: (input: string) => string;
 }
 
-const BRIDGE_CLI_PATH = "orchestrator/bridge_cli.py";
+// const BRIDGE_CLI_PATH = "orchestrator/bridge_cli.py";
 
 function rpc(): RpcBridgeClient {
   return getRpcClient();
