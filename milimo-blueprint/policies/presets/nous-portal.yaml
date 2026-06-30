@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Nous Portal access preset for Hermes.
+#
+# Enables hermes setup --portal OAuth login, managed Tool Gateway setup,
+# and Nous inference API access.
+# Uses access: full (L4 tunnel) because OAuth and inference require end-to-end TLS.
+
+preset:
+  name: nous-portal
+  description: "Nous Portal OAuth login, inference API, and managed Tool Gateway setup"
+
+network_policies:
+  nous-portal:
+    name: nous-portal
+    endpoints:
+      - host: portal.nousresearch.com
+        port: 443
+        access: full
+      - host: inference-api.nousresearch.com
+        port: 443
+        access: full
+    binaries:
+      - { path: /usr/local/bin/hermes }
+      - { path: /opt/hermes/.venv/bin/python }

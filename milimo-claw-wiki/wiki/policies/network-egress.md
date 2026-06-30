@@ -8,7 +8,7 @@
 - [OpenShell Policy Schema Reference](https://docs.nvidia.com/openshell/latest/reference/policy-schema/)
 - [[sandbox-isolation]]
 
-**Last updated**: 2026-04-29
+**Last updated**: 2026-06-30
 
 **Tags**: #policies #network #egress
 
@@ -408,6 +408,73 @@ network_policies:
       protocol: rest
       enforcement: enforce
       access: read-only
+```
+
+---
+
+---
+
+## Hermes Profile: Binary-Scoped Policy
+
+The Hermes profile uses **binary-scoped** network policies — each rule specifies the binary that may open the connection in addition to the host/port. Unlike OpenClaw policies (hostname-only allowlists), Hermes policies require a `binaries` array per endpoint group.
+
+### Hermes Egress (milimo-mcp policy)
+
+```yaml
+network_policies:
+  # Nous Portal — OAuth login and Tool Gateway setup
+  nous_portal:
+    endpoints:
+      - host: portal.nousresearch.com
+        port: 443
+        access: full          # L4 tunnel (OAuth needs end-to-end TLS)
+    binaries:
+      - { path: /usr/local/bin/hermes }
+      - { path: /opt/hermes/.venv/bin/python }
+
+  # NVIDIA NIM inference
+  nvidia_inference:
+    endpoints:
+      - host: integrate.api.nvidia.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: read-write
+    binaries:
+      - { path: /opt/hermes/.venv/bin/python }
+```
+
+For the full Hermes policy, see `milimo-blueprint/policies/milimo-mcp.yaml`.
+
+### Custom Policy Presets
+
+The Hermes profile supports custom policy presets in the OpenShell policy preset format:
+
+```yaml
+preset:
+  name: nous-portal
+  description: "Allow access to Nous Portal"
+
+network_policies:
+  nous-portal:
+    name: nous-portal
+    endpoints:
+      - host: portal.nousresearch.com
+        port: 443
+        access: full
+    binaries:
+      - { path: /usr/local/bin/hermes }
+```
+
+Key differences from raw policy YAML:
+- Requires `preset:` wrapper at top level
+- Endpoints use `access: full` (L4 tunnel) for raw TLS instead of `protocol: rest`
+- Valid protocols for L7 inspection: `rest`, `websocket`, `graphql`, `sql` (not `https`)
+- Place preset files in `policies/presets/` subdirectory
+
+Apply at runtime:
+```bash
+nemohermes milimo-hermes policy-add --from-dir milimo-blueprint/policies/presets/ --yes
 ```
 
 ---

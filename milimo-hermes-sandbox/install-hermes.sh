@@ -574,6 +574,20 @@ main() {
   if eval "$onboard_cmd"; then
     log_success "Hermes onboarding completed!"
     echo ""
+
+    # Apply network policy presets from the blueprint's presets/ directory.
+    # The nemohermes CLI supports --from-dir to load custom preset YAML files
+    # (OpenShell policy preset format: preset.name + network_policies.*).
+    local preset_dir="$sandbox_dir/milimo-blueprint/policies/presets"
+    if [[ -d "$preset_dir" ]]; then
+      log_info "Applying network policy presets from $preset_dir..."
+      if nemohermes "$SANDBOX_NAME" policy-add --from-dir "$preset_dir" --yes 2>&1; then
+        log_success "Network policy presets applied!"
+      else
+        log_warn "Some presets may not have applied. Check 'nemohermes $SANDBOX_NAME policy-list'."
+      fi
+    fi
+
     log_info "Next steps:"
     log_info "  1. Connect: nemohermes $SANDBOX_NAME connect"
     log_info "  2. Access dashboard: http://127.0.0.1:18790/"
@@ -581,12 +595,14 @@ main() {
     log_info "  4. OpenAI-compatible API: http://127.0.0.1:8642/v1"
 
     if [[ -n "$CHAT_UI_URL" ]]; then
-      log_info "  4. Remote dashboard: $CHAT_UI_URL"
+      log_info "  5. Remote dashboard: $CHAT_UI_URL"
     fi
 
     if [[ "$HEADLESS" == "true" && -z "$CHAT_UI_URL" ]]; then
-      log_info "  4. SSH tunnel: ssh -L 18790:127.0.0.1:18790 $(whoami)@$(hostname -f)"
+      log_info "  5. SSH tunnel: ssh -L 18790:127.0.0.1:18790 $(whoami)@$(hostname -f)"
     fi
+
+    log_info "  6. Nous Portal login (interactive): nemohermes $SANDBOX_NAME exec --tty -- hermes setup --portal"
   else
     log_error "Onboarding failed"
     exit 1

@@ -69,7 +69,7 @@ RUN chmod -R a+rX /opt/nemoclaw-hermes-config/generate-config.ts \
     && find /opt/nemoclaw-hermes-config -type f -exec chmod 444 {} +
 
 # Build args for config that varies per deployment
-ARG NEMOCLAW_MODEL=nvidia/nemotron-3-super-120b-a12b
+ARG NEMOCLAW_MODEL=stepfun-ai/step-3.7-flash
 ARG NEMOCLAW_PROVIDER_KEY=inference
 ARG NEMOCLAW_INFERENCE_BASE_URL=https://inference.local/v1
 ARG CHAT_UI_URL=http://127.0.0.1:8642
@@ -278,6 +278,12 @@ RUN set -eu; \
         ln -s "runtime/${name}" "/sandbox/.hermes/${name}"; \
     done
 
+# ── File Sync Scripts ───────────────────────────────────────────────────────
+# In-sandbox claw file inventory tool used by host-side hermes-sync.sh.
+COPY scripts/hermes-inventory.py /opt/hermes/scripts/hermes-inventory.py
+RUN chmod 755 /opt/hermes/scripts/hermes-inventory.py \
+    && chown sandbox:sandbox /opt/hermes/scripts/hermes-inventory.py
+
 # ── Gateway Daemon (supervision only) ──────────────────────────────────────
 # Bake the gateway daemon + init script so the Hermes gateway survives
 # sandbox restarts after a shell connects.
@@ -343,6 +349,24 @@ RUN { echo; echo "# Auto-start Hermes gateway daemon if not already running"; \
      } >> /sandbox/.profile \
     && chown sandbox:sandbox /sandbox/.bashrc /sandbox/.profile \
     && chmod 644 /sandbox/.bashrc /sandbox/.profile
+
+# ── Claw Data Directories ──────────────────────────────────────────────────
+# Pre-create claw filesystem roots at build time so the directory layout is
+# baked into the image (not created lazily at runtime).  Layouts are defined
+# centrally in milimo-core/src/milimo_core/claw_layouts.py — keep in sync.
+# These paths are served by the Hermes file sync system to the host.
+RUN mkdir -p /sandbox/.hermes/claws/build \
+               /sandbox/.hermes/claws/content \
+               /sandbox/.hermes/claws/ops \
+               /sandbox/.hermes/claws/analytics \
+               /sandbox/.hermes/claws/finance \
+               /sandbox/.hermes/claws/assistant \
+    && chown sandbox:sandbox /sandbox/.hermes/claws \
+    && chmod 770 /sandbox/.hermes/claws \
+    && for d in /sandbox/.hermes/claws/*/; do \
+         chmod 770 "$d"; \
+         chown sandbox:sandbox "$d"; \
+       done
 
 # Runtime environment
 ENV MILIMO_PROFILE=hermes \

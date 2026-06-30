@@ -9,7 +9,7 @@
 - `milimo-hermes-sandbox/`
 - `docs/adr/001-subagent-isolation.md` through `005-delegation-asymmetry.md`
 
-**Last updated**: 2026-06-30
+**Last updated**: 2026-06-30 (E8)
 
 **Tags**: #architecture #hermes #profile #dual-track
 
@@ -163,6 +163,7 @@
   "auth": { "default_mode": "api_key", "nous_oauth": { "enabled": false } }
 }
 ```
+> Note: The default model for the sandbox is `stepfun-ai/step-3.7-flash` via NVIDIA NIM provider (`nvidia-nim`), set at runtime via `nemohermes inference set`. The `model_overrides` in `milimo-compatibility.json` define per-claw model preferences for delegation, not the sandbox default.
 
 ### Network Policy (`milimo-blueprint/policies/milimo-mcp.yaml`)
 Binary-scoped egress — each rule specifies:
@@ -249,6 +250,61 @@ nemohermes milimo-hermes exec -- sh -c '
 nemohermes milimo-hermes exec -- nohup /opt/hermes/scripts/gateway-daemon.sh >/dev/null 2>&1 &
 ```
 
+#### Nous Portal 403 (Sandbox Blocks portal.nousresearch.com)
+`hermes setup --portal` fails with HTTP 403 because `portal.nousresearch.com:443` is not in the sandbox network policy. The OpenShell proxy at `10.200.0.1:3128` blocks unlisted hosts.
+
+**Fix** (baked in `install-hermes.sh`): Post-onboarding step runs `nemohermes milimo-hermes policy-add --from-dir .../presets/ --yes`, which loads the `nous-portal` preset. The preset file is at `milimo-blueprint/policies/presets/nous-portal.yaml`.
+
+**Correct OpenShell policy preset format**:
+```yaml
+preset:
+  name: nous-portal
+  description: "..."
+
+network_policies:
+  nous-portal:
+    name: nous-portal
+    endpoints:
+      - host: portal.nousresearch.com
+        port: 443
+        access: full    # L4 tunnel (OAuth needs end-to-end TLS)
+    binaries:
+      - { path: /usr/local/bin/hermes }
+```
+Key rules:
+- `preset:` wrapper at top level (not raw `name:`/`endpoints:`)
+- Use `access: full` for raw TCP/HTTPS tunnels (not `protocol: https`)
+- Valid protocols: `rest`, `websocket`, `graphql`, `sql` (not `https`)
+- Endpoint field `methods` is not valid — use `access` or `rules` instead
+- `--from-file <path>` uses the file path as the preset label, not the `preset.name` from YAML
+- `--from-dir <dir>` loads all YAML files in the directory as presets (each must have valid `preset.name`)
+- Built-in presets (brew, github, telegram, etc.) are compiled into the nemohermes binary, not file-based
+
+#### `--fresh` Does Not Recreate the Sandbox Container
+`nemohermes onboard --fresh` only clears saved state (config, credentials) but does NOT destroy and recreate the sandbox container. The old container's restored policy files (from backup) override any policy changes in the new Docker image.
+
+**Fix**: Always pass both `--fresh` AND `--recreate-sandbox`:
+```bash
+nemohermes onboard --name milimo-hermes --from ./Dockerfile --fresh --recreate-sandbox
+```
+
+Even with `--recreate-sandbox`, nemohermes restores policy from backup. The reliable approach is to apply presets at runtime via `policy-add --from-dir`.
+
+#### `build_onboard_command()` Was Dead Code in `install-hermes.sh`
+The `build_onboard_command()` function defined the correct onboard flags with `--fresh`, but `main()` was constructing the command inline without calling it, so `--fresh` was never passed in non-interactive mode. Same for `--recreate-sandbox`.
+
+**Fix**: `main()` now calls `build_onboard_command()` and passes its output to `eval`. Both flags are now included in non-interactive mode.
+
+#### Two Copies of `milimo-mcp.yaml` Must Stay in Sync
+There are two copies of the policy file:
+- `milimo-blueprint/policies/milimo-mcp.yaml` (repo root — authoritative)
+- `milimo-hermes-sandbox/milimo-blueprint/policies/milimo-mcp.yaml` (build context copy)
+
+`prepare_build_context()` in `install-hermes.sh` copies from repo root into the build context, so the sandbox copy is overwritten at build time. However, both copies should be kept in sync in git to avoid confusion.
+
+#### `pull_claw_files.sh` Is OpenClaw-Only
+The sync script `scripts/pull_claw_files.sh` expects container names matching `openshell-my-assistant` and paths under `/sandbox/.openclaw/milimo/claws/<role>/`. Neither convention exists on the Hermes profile. The script should not be used with Hermes sandboxes.
+
 ### Dockerfile (`milimo-hermes-sandbox/Dockerfile`)
 - Base: `ghcr.io/nvidia/nemoclaw/hermes-sandbox-base@sha256:8dad3b989a9ed1e601743310b97be21be5f59f89f7913a47d04f3ec3c40b8ce6` (NVIDIA public base image, pre-bakes Hermes from GitHub releases)
 - COPY milimo-core (including `milimo_core.build` subpackage), plugin, warroom HTML, blueprint
@@ -275,6 +331,9 @@ nemohermes milimo-hermes exec -- nohup /opt/hermes/scripts/gateway-daemon.sh >/d
 - `SLACK_ALLOWED_CHANNELS` baked at build time
 - Probes Python 3.10–13 for Model Router (opt-in)
 - Docker build uses `$sandbox_dir` as context (was `.` — fixed to resolve COPY path mismatches inside the sandbox build directory)
+- `build_onboard_command()` now called by `main()` (was dead code — `main()` used inline command without `--fresh`/`--recreate-sandbox`)
+- Post-onboarding: applies network policy presets from `milimo-blueprint/policies/presets/` via `nemohermes policy-add --from-dir`, including `nous-portal`
+- Model default: `stepfun-ai/step-3.7-flash` (set via `NEMOCLAW_MODEL` env var, passed as Docker build arg)
 
 ---
 
@@ -327,6 +386,7 @@ export NEMOCLAW_SANDBOX_NAME=milimo-hermes
 | E5 | Fix Hermes base image (public NVIDIA GHCR) + CI smoke test | ✅ **Complete** (2026-06-29) |
 | E6 | Fix API_SERVER_KEY + SOUL.md context + TypeScript build errors | ✅ **Complete** (2026-06-30) |
 | E7 | Gateway daemon sandbox resilience: socat forwarder, `.bashrc`/`.profile` hooks for auto-start, CI build context path fixes | ✅ **Complete** (2026-06-30) |
+| E8 | Model change (`stepfun-ai/step-3.7-flash`), Nous Portal network policy (`nous-portal` preset via `--from-dir`), `--recreate-sandbox` flag, `build_onboard_command()` fix, presets persisted to repo | ✅ **Complete** (2026-06-30) |
 
 ---
 
@@ -376,19 +436,19 @@ Note: `openshell inference set` is not available inside Hermes sandboxes. Always
 `hermes setup --portal` connects the sandbox to Nous Portal for 300+ models and managed tool gateways (web search, browser automation, image generation, TTS, audio processing, managed code execution):
 
 ```bash
-# Run inside the sandbox:
-nemohermes milimo-hermes exec -- hermes setup --portal
+# Run inside the sandbox with TTY for browser OAuth flow:
+nemohermes milimo-hermes exec --tty -- hermes setup --portal
 ```
 
 This opens an OAuth login flow. After success, the inference provider switches to Nous (use `nemohermes inference set` to switch back).
 
-**Prerequisite**: The sandbox network policy must allow `portal.nousresearch.com:443`. The `milimo-mcp` policy preset includes this rule. Policy changes require `--fresh` during rebuild (otherwise nemohermes restores the old saved state). If on an existing sandbox, add the rule at runtime instead of rebuilding:
+**Prerequisite**: The sandbox network policy must allow `portal.nousresearch.com:443`. The `nous-portal` preset (at `milimo-blueprint/policies/presets/nous-portal.yaml`) provides the rule. The install script applies it automatically post-onboarding. To apply manually:
 
 ```bash
-nemohermes milimo-hermes policy-add \
-  --host portal.nousresearch.com --port 443 --protocol https \
-  --binary /usr/local/bin/hermes
+nemohermes milimo-hermes policy-add --from-dir milimo-blueprint/policies/presets/ --yes
 ```
+
+**Policy restore caveat**: `--fresh` clears saved state but does NOT recreate the sandbox container — the old policy is restored from backup. Always use `--fresh --recreate-sandbox` together to get a clean policy from the Docker image. Even then, nemohermes may restore saved policy from backup; applying the `nous-portal` preset at runtime is the reliable workaround.
 
 ### Run Ad-Hoc Commands
 ```bash

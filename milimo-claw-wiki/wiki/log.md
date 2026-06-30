@@ -8,6 +8,23 @@
 
 ---
 
+---
+
+### 2026-06-30 — Phase 1 + 3: Hermes File Sync (Claw Layouts, Paths, Sync CLI, Inventory)
+
+**Pages**: `wik/idevelopment/sandbox-file-sharing.md`, `wiki/architecture/hermes-profile.md`, `index.md`
+
+**Source**: Hermes-native claw paths, centralized layout definitions, host sync CLI
+
+**Changes**:
+- Created `milimo-core/src/milimo_core/claw_layouts.py` — centralized `ClawLayout` dataclass with all 6 claws' dirs and files; exported from `milimo_core/__init__.py`
+- Updated `milimo_paths.py`: Hermes profile detection via `MILIMO_PROFILE=hermes`, resolves to `/sandbox/.hermes/` paths instead of `/sandbox/.openclaw/milimo/`
+- Dockerfile: added `RUN mkdir -p` for all 6 claw dirs under `/sandbox/.hermes/claws/` at build time; baked `hermes-inventory.py` into `/opt/hermes/scripts/`
+- Created `scripts/hermes-sync.sh` — host-side sync CLI with `docker cp` primary transport + `nemohermes exec` + tar fallback; supports `--role`, `--watch`, `--archive`, `--dry-run`
+- Created `milimo-hermes-sandbox/scripts/hermes-inventory.py` — in-sandbox file manifest generator (JSON output, filterable by role/pattern/since)
+- Updated `README.md` with sync commands, Hermes-native paths in claw table, profile-based path resolution docs
+- Rewrote `sandbox-file-sharing.md` wiki page for Hermes-centric sync (was OpenClaw-only)
+
 ## Log Format
 
 Each entry follows this format:

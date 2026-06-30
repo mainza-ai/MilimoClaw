@@ -293,6 +293,7 @@ Installation and service management scripts.
 | Mesh pages | 4 |
 | Onboard pages | 1 |
 | Infrastructure pages | 2 |
+| File Sync pages | 1 |
 
 ---
 
@@ -303,7 +304,8 @@ See [[log]] for complete operation history.
 | Date | Change | Pages Affected |
 |------|--------|----------------|
 | 2026-06-30 | Phase E7: Gateway daemon sandbox resilience (socat forwarder, .bashrc/.profile hooks), CI build context fixes, gh CLI, milimo_core.build git fix | hermes-profile.md, implementation-plan.md, log.md, index.md |
-| 2026-06-30 | Nous Portal docs: `hermes setup --portal` for managed tool gateways, network policy prerequisite for portal.nousresearch.com | hermes-profile.md, README.md, index.md |
+| 2026-06-30 | Nous Portal login fix, policy preset format, `inference-api.nousresearch.com` added to nous-portal preset | hermes-profile.md, README.md, network-egress.md, log.md, index.md |
+| 2026-06-30 | Hermes file sync: `claw_layouts.py` centralized layouts, `milimo_paths.py` Hermes-native paths, `hermes-sync.sh` CLI, `hermes-inventory.py`, Dockerfile claw dirs at build time | sandbox-file-sharing.md, development-scripts.md, log.md, index.md |
 | 2026-05-28 | Dynamic delay optimization inside sandbox/tests, offline inference fallback mocks, E2E background execution pipeline integration, and robust host file synchronization scripting. | index.md, log.md, sandbox-sync.md |
 | 2026-05-24 | Operational stabilization audit, YAML indentation fixes for solo-founder, loop correction in launcher status, dual-namespace mock test containment, sliding window log aging timestamp correction, contract alias relaxation for assistant_response/pricing_response, and Build Claw response envelope mapping | index.md, log.md, contracts.md, message-contracts.md, issues-and-fixes.md |
 | 2026-05-12 | Full code audit fixes: Path resolution false positive `_is_sandbox`, ToolRegistry `mkdir` fallback, ContentClaw assert crash, InboxPoller race condition, Evolution minimum actions, Build Claw auth fallback | index.md, log.md, milimo_paths.py, tool_registry.py, content_claw.py, claw_launcher.py, evolution.ts |
