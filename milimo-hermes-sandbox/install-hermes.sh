@@ -473,8 +473,10 @@ build_onboard_command() {
     cmd+=" --non-interactive --yes"
     cmd+=" --yes-i-accept-third-party-software"
     cmd+=" --fresh"
+    cmd+=" --recreate-sandbox"
     export NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1
     export NEMOCLAW_NON_INTERACTIVE=1
+    export NEMOCLAW_RECREATE_SANDBOX=1
     export NEMOCLAW_POLICY_TIER="${NEMOCLAW_POLICY_TIER:-$POLICY_TIER}"
     export NEMOCLAW_POLICY_MODE="${NEMOCLAW_POLICY_MODE:-suggested}"
   fi
