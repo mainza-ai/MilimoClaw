@@ -27,7 +27,7 @@ daemon_pid() {
 }
 
 gateway_pid() {
-  pgrep -f "hermes.*gateway.*run" 2>/dev/null | head -1 || echo ""
+  pgrep -f "/usr/local/bin/hermes gateway run" 2>/dev/null | head -1 || echo ""
 }
 
 start() {

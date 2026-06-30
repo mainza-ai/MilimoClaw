@@ -37,7 +37,7 @@ ensure_env() {
 }
 
 gateway_pid() {
-  pgrep -f 'hermes.*gateway.*run' 2>/dev/null || true
+  pgrep -f '/usr/local/bin/hermes gateway run' 2>/dev/null || true
 }
 
 gateway_running() {
@@ -46,8 +46,9 @@ gateway_running() {
 
 start_gateway() {
   log "Starting Hermes gateway..."
-  # hermes gateway run is foreground; background it via nohup
-  nohup hermes gateway run >>"${GATEWAY_LOG}" 2>&1 &
+  # hermes gateway run is foreground; background it via nohup.
+  # --replace kills any previous instance to avoid duplicates.
+  nohup hermes gateway run --replace >>"${GATEWAY_LOG}" 2>&1 &
   local pid=$!
   log "Gateway started with PID ${pid}"
 }
