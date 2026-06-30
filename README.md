@@ -205,7 +205,11 @@ $ cd MilimoClaw
 $ cp .env.example .env
 
 # Automated non-interactive install (CI/CD ready)
-$ ./milimo-hermes-sandbox/install-hermes.sh --non-interactive --chat-ui-url http://localhost:18789
+export NVIDIA_API_KEY=nvapi-your-key
+export NEMOCLAW_NON_INTERACTIVE=1
+export NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1
+export CHAT_UI_URL=http://localhost:18789
+./milimo-hermes-sandbox/install-hermes.sh --non-interactive
 
 # Or interactive install (prompts for auth mode, Slack channels, etc.)
 $ ./milimo-hermes-sandbox/install-hermes.sh
