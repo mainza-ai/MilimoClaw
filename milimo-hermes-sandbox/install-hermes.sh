@@ -409,8 +409,11 @@ prepare_build_context() {
 build_docker_image() {
   log_info "Building Milimo Hermes sandbox image..."
 
+  local sandbox_dir
+  sandbox_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+
   local docker_args=()
-  docker_args+=(-f milimo-hermes-sandbox/Dockerfile)
+  docker_args+=(-f "$sandbox_dir/Dockerfile")
   docker_args+=(-t milimo-hermes-sandbox:latest)
   docker_args+=(--build-arg "NEMOCLAW_MODEL=${NEMOCLAW_MODEL}")
   docker_args+=(--build-arg "NEMOCLAW_PROVIDER_KEY=${NEMOCLAW_PROVIDER_KEY}")
@@ -435,7 +438,7 @@ build_docker_image() {
     docker_args+=(--build-arg "NEMOCLAW_SLACK_CONFIG_B64=$slack_b64")
   fi
 
-  run_command "docker build ${docker_args[*]} ."
+  run_command "docker build ${docker_args[*]} \"$sandbox_dir\""
 
   log_success "Sandbox image built successfully"
 }

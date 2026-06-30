@@ -302,6 +302,18 @@ RUN chmod 755 /opt/hermes/scripts/gateway-daemon.sh \
           ln -s /etc/init.d/hermes-gateway /etc/rcS.d/S99hermes-gateway; \
         fi
 
+# Install gh CLI for Build Claw (GitHub issue management)
+# hadolint ignore=DL3008
+RUN if command -v apt-get >/dev/null 2>&1; then \
+        apt-get update -qq && apt-get install -y -qq --no-install-recommends gh 2>/dev/null || \
+        (curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+          | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+        && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+        && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+          | tee /etc/apt/sources.list.d/github-cli.list >/dev/null \
+        && apt-get update -qq && apt-get install -y -qq --no-install-recommends gh); \
+    fi && rm -rf /var/lib/apt/lists/*
+
 # Pin config hash at build time for integrity verification
 RUN mkdir -p /etc/nemoclaw \
     && sha256sum /sandbox/.hermes/config.yaml /sandbox/.hermes/.env \
