@@ -124,16 +124,20 @@ The platform maintains infinite conversation execution loops without prompt ceil
 
 Each claw runs inside its own highly isolated NemoClaw sandbox with kernel-level seccomp, Landlock, and dropped capability protections. Claws communicate through typed inter-sandbox message contracts enforced by the **OpenShell Gateway**.
 
-| Claw | Specialty Role | OpenClaw Path | Hermes Path |
-| :--- | :--- | :--- | :--- |
-| 🎨 **Content Claw** | Creative Department: generates posts, copy, email campaigns, and brand assets | `/sandbox/.openclaw/milimo/claws/content` | `/sandbox/.hermes/claws/content` |
-| 📋 **Ops Claw** | Account & Project Management: scores relationship health, scopes briefs, and runs deadline risk | `/sandbox/.openclaw/milimo/claws/ops` | `/sandbox/.hermes/claws/ops` |
-| 📊 **Analytics Claw** | Intelligence Layer: generates weekly reports, runs anomaly detection, and opportunity scores | `/sandbox/.openclaw/milimo/claws/analytics` | `/sandbox/.hermes/claws/analytics` |
-| 💰 **Finance Claw** | Financial Nervous System: Stripe invoicing, pricing floor calculation, tax categorization | `/sandbox/.openclaw/milimo/claws/finance` | `/sandbox/.hermes/claws/finance` |
-| 🔧 **Build Claw** | Technical Execution: scores GitHub issues, writes code, staged deployments, and dependency audits | `/sandbox/.openclaw/milimo/claws/build` | `/sandbox/.hermes/claws/build` |
-| 🤖 **Assistant Claw (Lucy)** | Operator Bridge: stateful process supervisor, operator query router, and mesh coordinator | `/sandbox/.openclaw/milimo/claws/assistant` | `/sandbox/.hermes/claws/assistant` |
+Paths resolve automatically based on `MILIMO_PROFILE`:
+- **OpenClaw**: `/sandbox/.openclaw/milimo/claws/{role}/`
+- **Hermes**: `/sandbox/.hermes/claws/{role}/`
 
-Profile detection is automatic via `MILIMO_PROFILE` env var. Layouts and paths are defined centrally in `milimo-core/src/milimo_core/claw_layouts.py`.
+| Claw | Specialty Role | Sandbox Path |
+| :--- | :--- | :--- |
+| 🎨 **Content Claw** | Creative Department — posts, copy, campaigns | `<profile>/claws/content/` |
+| 📋 **Ops Claw** | Account & Project Management — health, briefs, risk | `<profile>/claws/ops/` |
+| 📊 **Analytics Claw** | Intelligence Layer — reports, anomalies, scores | `<profile>/claws/analytics/` |
+| 💰 **Finance Claw** | Financial System — invoicing, pricing, tax | `<profile>/claws/finance/` |
+| 🔧 **Build Claw** | Engineering — PRs, code, deploys, audits | `<profile>/claws/build/` |
+| 🤖 **Assistant Claw (Lucy)** | Operator Bridge — supervision, routing, coordination | `<profile>/claws/assistant/` |
+
+Profile detection is automatic via `MILIMO_PROFILE` env var. Layouts are defined centrally in `milimo-core/src/milimo_core/claw_layouts.py`.
 
 ---
 
