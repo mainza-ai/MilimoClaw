@@ -278,6 +278,30 @@ RUN set -eu; \
         ln -s "runtime/${name}" "/sandbox/.hermes/${name}"; \
     done
 
+# ── Gateway Auto-Start (boot + supervision) ─────────────────────────────────
+# Bake the gateway daemon + init script + custom entrypoint so the Hermes
+# gateway survives sandbox restarts without requiring nemoclaw CLI recovery.
+#
+# The custom entrypoint (entrypoint.sh) starts the gateway daemon as the
+# sandbox user at boot, then chains to the base image's docker-entrypoint.sh
+# which hands control to openshell-sandbox (PID 1).
+#
+# The init script (/etc/init.d/hermes-gateway) and SysV rc symlinks are
+# also created for environments where openshell-sandbox honours rcS.d.
+COPY scripts/gateway-daemon.sh /opt/hermes/scripts/gateway-daemon.sh
+COPY scripts/hermes-gateway-init.sh /etc/init.d/hermes-gateway
+COPY scripts/entrypoint.sh /usr/local/bin/milimo-entrypoint.sh
+RUN chmod 755 /opt/hermes/scripts/gateway-daemon.sh \
+    && chmod 755 /etc/init.d/hermes-gateway \
+    && chmod 755 /usr/local/bin/milimo-entrypoint.sh \
+    && mkdir -p /opt/hermes/scripts \
+    && chown -R root:root /etc/init.d/hermes-gateway \
+    && if command -v update-rc.d >/dev/null 2>&1; then \
+          update-rc.d hermes-gateway defaults; \
+        else \
+          ln -s /etc/init.d/hermes-gateway /etc/rcS.d/S99hermes-gateway; \
+        fi
+
 # Pin config hash at build time for integrity verification
 RUN mkdir -p /etc/nemoclaw \
     && sha256sum /sandbox/.hermes/config.yaml /sandbox/.hermes/.env \
@@ -301,10 +325,13 @@ ENV MILIMO_PROFILE=hermes \
     DELEGATION_MAX_CONCURRENT_CHILDREN=6 \
     NEMOCLAW_HERMES_DASHBOARD_TUI=1
 
-# Upstream ENTRYPOINT handles privilege separation via nemoclaw-start (s6 supervision)
-# We inherit it from the base image - no changes needed.
+# Custom ENTRYPOINT starts the gateway daemon before openshell-sandbox.
+# The base image's docker-entrypoint.sh is called via milimo-entrypoint.sh.
+ENTRYPOINT ["/usr/local/bin/milimo-entrypoint.sh"]
 
-# Drop privileges (Hermes standard)
+# Drop privileges (Hermes standard).
+# Note: NemoClaw overrides container user to 'sandbox' at runtime per
+# sandbox policy, so this setting is advisory but follows convention.
 USER sandbox
 
 # Pass through build-time git SHA for hermes_build_sha

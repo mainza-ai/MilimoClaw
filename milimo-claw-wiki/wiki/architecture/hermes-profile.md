@@ -208,6 +208,28 @@ nemohermes milimo-hermes exec -- sh -c 'cat > /sandbox/.hermes/SOUL.md' < /tmp/m
 ```
 This is cosmetic. The Hermes binary reports `v0.17.0` (Python package version) while `nemohermes` compares against the release tag `2026.5.16`. The actual code is from the correct release (`hermes --version` shows `2026.6.19` git date). No impact on functionality.
 
+#### Gateway Not Running After Sandbox Restart
+```
+Hermes Agent gateway is not running inside the sandbox (sandbox likely restarted).
+  Recovering...
+```
+The gateway was started manually (not as a supervised service), so it doesn't survive container restarts.
+
+**Fix** (baked in `milimo-hermes-sandbox/Dockerfile`):
+The Dockerfile now registers the gateway as a SysV init service (`/etc/init.d/hermes-gateway`) with an rcS.d symlink. At boot, `gateway-daemon.sh` starts the gateway under the `sandbox` user and monitors it every 30 seconds, restarting if it exits.
+
+**Manual fix** on an existing sandbox (if rebuilding is not an option):
+```bash
+# Upload the daemon scripts and register the service:
+nemohermes milimo-hermes exec -- sh -c '
+  sudo tee /etc/init.d/hermes-gateway > /dev/null < /dev/null
+  # (Upload scripts via nemohermes exec with heredoc or volume mount;
+  #   then:) sudo ln -s /etc/init.d/hermes-gateway /etc/rcS.d/S99hermes-gateway
+'
+# Start the daemon:
+nemohermes milimo-hermes exec -- sudo /etc/init.d/hermes-gateway start
+```
+
 ### Dockerfile (`milimo-hermes-sandbox/Dockerfile`)
 - Base: `ghcr.io/nvidia/nemoclaw/hermes-sandbox-base@sha256:8dad3b989a9ed1e601743310b97be21be5f59f89f7913a47d04f3ec3c40b8ce6` (NVIDIA public base image, pre-bakes Hermes from GitHub releases)
 - COPY milimo-core, plugin, warroom HTML, blueprint
@@ -217,6 +239,7 @@ This is cosmetic. The Hermes binary reports `v0.17.0` (Python package version) w
 - Sets up blueprint at `/sandbox/.nemoclaw/blueprints/0.1.0/`
 - Bakes `MILIMO_PROFILE=hermes`, `MILIMO_PLUGIN_DIR=/sandbox/.hermes/plugins/milimo-hermes`
 - Preserves NemoClaw Hermes plugin at `/sandbox/.hermes/plugins/nemoclaw`
+- Registers `/etc/init.d/hermes-gateway` (SysV init) with rcS.d symlink so the gateway auto-starts on sandbox boot and is monitored by `gateway-daemon.sh`
 - `ENV NEMOCLAW_SANDBOX_NAME=milimo-hermes`
 - `ENV NEMOCLAW_POLICY_PRESETS=restricted,github`
 
@@ -308,6 +331,7 @@ nemohermes milimo-hermes connect
 ```bash
 nemohermes milimo-hermes status
 nemohermes milimo-hermes exec -- hermes gateway status
+nemohermes milimo-hermes exec -- sudo /etc/init.d/hermes-gateway status
 ```
 
 ### View War Room
