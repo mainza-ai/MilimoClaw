@@ -351,12 +351,21 @@ prompt_model_router() {
   fi
 }
 
+build_docker_image() {
+  log_info "Building Milimo Hermes sandbox image..."
+
+  local docker_args
+  docker_args=$(build_onboard_args)
+
+  run_command "docker build $docker_args -t milimo-hermes-sandbox:latest -f milimo-hermes-sandbox/Dockerfile ."
+
+  log_success "Sandbox image built successfully"
+}
+
 build_onboard_args() {
   local args=()
 
-  # Build args that get passed to the Dockerfile at build time
   if [[ -n "$SLACK_CHANNELS" ]]; then
-    # Convert comma-separated to JSON array, then base64
     local slack_json
     slack_json=$(echo "$SLACK_CHANNELS" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$"; ""))')
     local slack_b64
@@ -421,13 +430,13 @@ main() {
   log_info "  CHAT_UI_URL: ${CHAT_UI_URL:-none}"
   echo ""
 
-  # Prepare onboarding command - uses nemohermes onboard with our custom Dockerfile
+# Prepare onboarding command - uses nemohermes onboard with our custom Dockerfile
+  # Note: nemohermes onboard doesn't support --policy-tier, --policy-preset, or --build-arg flags
+  # Policy configuration is done via environment variables and the onboarding wizard
+  # Build args are passed via environment variables (matching Dockerfile ARG names)
   local onboard_cmd="nemohermes onboard"
   onboard_cmd+=" --name $SANDBOX_NAME"
   onboard_cmd+=" --from ./milimo-hermes-sandbox/Dockerfile"
-  onboard_cmd+=" --policy-tier $POLICY_TIER"
-  onboard_cmd+=" --policy-preset github"
-  onboard_cmd+=" --policy-preset milimo-mcp"
 
   if [[ "$AUTH_MODE" == "nous_oauth" ]]; then
     onboard_cmd+=" --auth nous"
@@ -441,21 +450,40 @@ main() {
   fi
 
   if [[ "$NON_INTERACTIVE" == "true" ]]; then
-    onboard_cmd+=" --non-interactive"
+    onboard_cmd+=" --non-interactive --yes"
     export NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1
     export NEMOCLAW_NON_INTERACTIVE=1
   fi
 
-  # Add build args for Dockerfile
-  local docker_build_args
-  docker_build_args=$(build_onboard_args)
-  if [[ -n "$docker_build_args" ]]; then
-    onboard_cmd+=" $docker_build_args"
+  # Set build arg environment variables (Docker will use these for ARGs in Dockerfile)
+  export NEMOCLAW_MODEL="${NEMOCLAW_MODEL:-nvidia/nemotron-3-super-120b-a12b}"
+  export NEMOCLAW_PROVIDER_KEY="${NEMOCLAW_PROVIDER_KEY:-inference}"
+  export NEMOCLAW_INFERENCE_BASE_URL="${NEMOCLAW_INFERENCE_BASE_URL:-https://inference.local/v1}"
+  export CHAT_UI_URL="${CHAT_UI_URL:-http://127.0.0.1:8642}"
+  export NEMOCLAW_MESSAGING_CHANNELS_B64="${NEMOCLAW_MESSAGING_CHANNELS_B64:-W10=}"
+  export NEMOCLAW_MESSAGING_ALLOWED_IDS_B64="${NEMOCLAW_MESSAGING_ALLOWED_IDS_B64:-e30=}"
+  export NEMOCLAW_DISCORD_GUILDS_B64="${NEMOCLAW_DISCORD_GUILDS_B64:-e30=}"
+  export NEMOCLAW_TELEGRAM_CONFIG_B64="${NEMOCLAW_TELEGRAM_CONFIG_B64:-e30=}"
+  export NEMOCLAW_WECHAT_CONFIG_B64="${NEMOCLAW_WECHAT_CONFIG_B64:-e30=}"
+  export NEMOCLAW_SLACK_CONFIG_B64="${NEMOCLAW_SLACK_CONFIG_B64:-e30=}"
+  export NEMOCLAW_HERMES_TOOL_GATEWAY_BROKER="${NEMOCLAW_HERMES_TOOL_GATEWAY_BROKER:-0}"
+  export NEMOCLAW_HERMES_TOOL_GATEWAY_PRESETS_B64="${NEMOCLAW_HERMES_TOOL_GATEWAY_PRESETS_B64:-W10=}"
+  export NEMOCLAW_BUILD_ID="${NEMOCLAW_BUILD_ID:-default}"
+  export NEMOCLAW_DARWIN_VM_COMPAT="${NEMOCLAW_DARWIN_VM_COMPAT:-0}"
+
+  if [[ -n "$SLACK_CHANNELS" ]]; then
+    # Convert comma-separated to JSON array, then base64
+    local slack_json
+    slack_json=$(echo "$SLACK_CHANNELS" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$"; ""))')
+    local slack_b64
+    slack_b64=$(echo -n "$slack_json" | base64 -w0)
+    export NEMOCLAW_SLACK_CONFIG_B64="$slack_b64"
   fi
 
   if [[ "$DRY_RUN" == "true" ]]; then
     log_info "[DRY RUN] Would execute onboarding:"
     log_info "  $onboard_cmd"
+    log_info "  Build arg env vars set: NEMOCLAW_MODEL, CHAT_UI_URL, NEMOCLAW_SLACK_CONFIG_B64, etc."
     return 0
   fi
 
