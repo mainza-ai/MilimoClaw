@@ -527,7 +527,7 @@ main() {
   onboard_cmd+=" --from ./milimo-hermes-sandbox/Dockerfile"
 
   # Set build arg environment variables (Docker will use these for ARGs in Dockerfile)
-  export NEMOCLAW_MODEL="${NEMOCLAW_MODEL:-nvidia/nemotron-3-super-120b-a12b}"
+  export NEMOCLAW_MODEL="${NEMOCLAW_MODEL:-stepfun-ai/step-3.7-flash}"
   export NEMOCLAW_PROVIDER_KEY="${NEMOCLAW_PROVIDER_KEY:-inference}"
   export NEMOCLAW_INFERENCE_BASE_URL="${NEMOCLAW_INFERENCE_BASE_URL:-https://inference.local/v1}"
   export CHAT_UI_URL="${CHAT_UI_URL:-http://127.0.0.1:8642}"
@@ -570,9 +570,10 @@ main() {
     log_success "Hermes onboarding completed!"
     echo ""
     log_info "Next steps:"
-    log_info "  1. Start the sandbox: nemoclaw start $SANDBOX_NAME"
+    log_info "  1. Connect: nemohermes $SANDBOX_NAME connect"
     log_info "  2. Access dashboard: http://127.0.0.1:18790/"
-    log_info "  3. OpenAI-compatible API: http://127.0.0.1:8642/v1"
+    log_info "  3. Change model: nemohermes inference set --model <model> --provider <provider> --sandbox $SANDBOX_NAME"
+    log_info "  4. OpenAI-compatible API: http://127.0.0.1:8642/v1"
 
     if [[ -n "$CHAT_UI_URL" ]]; then
       log_info "  4. Remote dashboard: $CHAT_UI_URL"

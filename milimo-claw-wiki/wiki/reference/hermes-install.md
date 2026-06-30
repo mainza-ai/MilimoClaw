@@ -6,6 +6,8 @@
 
 **Last updated**: 2026-06-30
 
+> Note: After onboarding, the sandbox is already running. Use `nemohermes milimo-hermes connect` to start a chat session, not `nemoclaw start`.
+
 **Tags**: #installation #hermes #operations #reference
 
 ---
@@ -59,6 +61,22 @@ Source `.env` before running the fallback path; `nemohermes` reads the host envi
 - Phase: `Ready`
 - Policies: `restricted`
 - Auth mode: `api_key` (standard NVIDIA inference), `nous_oauth` enables managed tool gateways (web search, browser automation, image generation, audio processing, managed code execution).
+
+## Model / Inference
+
+Change the model on a running Hermes sandbox (no rebuild needed):
+
+```bash
+nemohermes inference set --model stepfun-ai/step-3.7-flash --provider nvidia-nim --sandbox milimo-hermes
+```
+
+> `openshell inference set` is not available inside Hermes sandboxes. Always use `nemohermes inference set` from the host.
+
+Check current inference config:
+
+```bash
+nemohermes inference get --json
+```
 
 ## Recovery
 

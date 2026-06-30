@@ -206,6 +206,17 @@ $ nemohermes milimo-hermes exec -- python3 -m http.server 8080 --directory /opt/
 $ nemohermes milimo-hermes logs -n 50
 ```
 
+#### Change Model / Inference Provider
+```console
+$ nemohermes inference set --model stepfun-ai/step-3.7-flash --provider nvidia-nim --sandbox milimo-hermes
+```
+> `openshell inference set` is not available inside Hermes sandboxes. Always use `nemohermes inference set` from the host.
+
+#### Check Inference Config
+```console
+$ nemohermes inference get --json
+```
+
 #### Run Commands Inside Sandbox
 ```console
 $ nemohermes milimo-hermes exec -- hermes gateway status

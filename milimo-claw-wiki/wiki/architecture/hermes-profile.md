@@ -364,6 +364,13 @@ nemohermes milimo-hermes exec -- python3 -m http.server 8080 --directory /opt/he
 # Open http://localhost:8080/warroom.html
 ```
 
+### Change Model / Inference Provider
+```bash
+# Update model on the running sandbox (no rebuild needed):
+nemohermes inference set --model stepfun-ai/step-3.7-flash --provider nvidia-nim --sandbox milimo-hermes
+```
+Note: `openshell inference set` is not available inside Hermes sandboxes. Always use `nemohermes inference set` from the host.
+
 ### Run Ad-Hoc Commands
 ```bash
 nemohermes milimo-hermes exec -- hermes skills list
