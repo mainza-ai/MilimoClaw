@@ -279,28 +279,35 @@ RUN set -eu; \
     done
 
 # ── Gateway Auto-Start (boot + supervision) ─────────────────────────────────
-# Bake the gateway daemon + init script + custom entrypoint so the Hermes
+# Bake the gateway daemon + init script + openshell wrapper so the Hermes
 # gateway survives sandbox restarts without requiring nemoclaw CLI recovery.
 #
-# The custom entrypoint (entrypoint.sh) starts the gateway daemon as the
-# sandbox user at boot, then chains to the base image's docker-entrypoint.sh
-# which hands control to openshell-sandbox (PID 1).
+# nemohermes overrides the container ENTRYPOINT to openshell-sandbox
+# directly (docker-entrypoint.sh in the base image is not used), so a
+# custom ENTRYPOINT won't work.  Instead, we wrap the openshell-sandbox
+# binary itself: the real binary is moved to openshell-sandbox.real and
+# replaced with a shell script that starts the gateway daemon before
+# exec-ing the real binary.
 #
 # The init script (/etc/init.d/hermes-gateway) and SysV rc symlinks are
 # also created for environments where openshell-sandbox honours rcS.d.
 COPY scripts/gateway-daemon.sh /opt/hermes/scripts/gateway-daemon.sh
 COPY scripts/hermes-gateway-init.sh /etc/init.d/hermes-gateway
-COPY scripts/entrypoint.sh /usr/local/bin/milimo-entrypoint.sh
+COPY scripts/openshell-wrapper.sh /opt/hermes/scripts/openshell-wrapper.sh
 RUN chmod 755 /opt/hermes/scripts/gateway-daemon.sh \
     && chmod 755 /etc/init.d/hermes-gateway \
-    && chmod 755 /usr/local/bin/milimo-entrypoint.sh \
+    && chmod 755 /opt/hermes/scripts/openshell-wrapper.sh \
     && mkdir -p /opt/hermes/scripts \
     && chown -R root:root /etc/init.d/hermes-gateway \
     && if command -v update-rc.d >/dev/null 2>&1; then \
           update-rc.d hermes-gateway defaults; \
         else \
           ln -s /etc/init.d/hermes-gateway /etc/rcS.d/S99hermes-gateway; \
-        fi
+        fi \
+    && mv /opt/openshell/bin/openshell-sandbox /opt/openshell/bin/openshell-sandbox.real \
+    && cp /opt/hermes/scripts/openshell-wrapper.sh /opt/openshell/bin/openshell-sandbox \
+    && chmod 755 /opt/openshell/bin/openshell-sandbox \
+    && chown sandbox:sandbox /opt/openshell/bin/openshell-sandbox
 
 # Pin config hash at build time for integrity verification
 RUN mkdir -p /etc/nemoclaw \
@@ -324,10 +331,6 @@ ENV MILIMO_PROFILE=hermes \
     MILIMO_PLUGIN_DIR=/sandbox/.hermes/plugins/milimo-hermes \
     DELEGATION_MAX_CONCURRENT_CHILDREN=6 \
     NEMOCLAW_HERMES_DASHBOARD_TUI=1
-
-# Custom ENTRYPOINT starts the gateway daemon before openshell-sandbox.
-# The base image's docker-entrypoint.sh is called via milimo-entrypoint.sh.
-ENTRYPOINT ["/usr/local/bin/milimo-entrypoint.sh"]
 
 # Drop privileges (Hermes standard).
 # Note: NemoClaw overrides container user to 'sandbox' at runtime per
