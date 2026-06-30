@@ -278,6 +278,22 @@ RUN set -eu; \
         ln -s "runtime/${name}" "/sandbox/.hermes/${name}"; \
     done
 
+# ── Gateway Auto-Start (SysV init) ──────────────────────────────────────────
+# Bake the gateway daemon and init script so the gateway survives sandbox
+# restarts.  Without this, nemoclaw CLI must recover the gateway on every
+# connect (which produces a "not running / recovering" warning).
+COPY scripts/gateway-daemon.sh /opt/hermes/scripts/gateway-daemon.sh
+COPY scripts/hermes-gateway-init.sh /etc/init.d/hermes-gateway
+RUN chmod 755 /opt/hermes/scripts/gateway-daemon.sh \
+    && chmod 755 /etc/init.d/hermes-gateway \
+    && mkdir -p /opt/hermes/scripts \
+    && chown -R root:root /etc/init.d/hermes-gateway \
+    && if command -v update-rc.d >/dev/null 2>&1; then \
+          update-rc.d hermes-gateway defaults; \
+        else \
+          ln -s /etc/init.d/hermes-gateway /etc/rcS.d/S99hermes-gateway; \
+        fi
+
 # Pin config hash at build time for integrity verification
 RUN mkdir -p /etc/nemoclaw \
     && sha256sum /sandbox/.hermes/config.yaml /sandbox/.hermes/.env \
