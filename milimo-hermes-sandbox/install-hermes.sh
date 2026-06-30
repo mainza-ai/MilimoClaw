@@ -522,9 +522,8 @@ main() {
   # Note: nemohermes onboard only supports flags shown in `nemohermes onboard --help`
   # Build args are passed explicitly to `docker build --build-arg`
   # Auth/nous_oauth is handled by the onboarding wizard; do not pass --auth here
-  local onboard_cmd="nemohermes onboard"
-  onboard_cmd+=" --name $SANDBOX_NAME"
-  onboard_cmd+=" --from ./milimo-hermes-sandbox/Dockerfile"
+  local onboard_cmd
+  onboard_cmd=$(build_onboard_command)
 
   # Set build arg environment variables (Docker will use these for ARGs in Dockerfile)
   export NEMOCLAW_MODEL="${NEMOCLAW_MODEL:-stepfun-ai/step-3.7-flash}"

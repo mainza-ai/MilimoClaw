@@ -382,7 +382,7 @@ nemohermes milimo-hermes exec -- hermes setup --portal
 
 This opens an OAuth login flow. After success, the inference provider switches to Nous (use `nemohermes inference set` to switch back).
 
-**Prerequisite**: The sandbox network policy must allow `portal.nousresearch.com:443`. The `milimo-mcp` policy preset includes this rule. If on an existing sandbox, add it at runtime:
+**Prerequisite**: The sandbox network policy must allow `portal.nousresearch.com:443`. The `milimo-mcp` policy preset includes this rule. Policy changes require `--fresh` during rebuild (otherwise nemohermes restores the old saved state). If on an existing sandbox, add the rule at runtime instead of rebuilding:
 
 ```bash
 nemohermes milimo-hermes policy-add \
