@@ -28,11 +28,13 @@ USER root
 ENV UV_PROJECT_ENVIRONMENT=/opt/hermes/.venv
 
 # Copy milimo-core first (changes less often → better layer caching)
-COPY --chmod=a+rX,go-w milimo-core/ /opt/milimo-core/
+COPY milimo-core/ /opt/milimo-core/
+RUN chmod -R a+rX,go-w /opt/milimo-core/
 RUN uv pip install --no-cache-dir -e /opt/milimo-core/
 
 # Copy the Hermes plugin
-COPY --chmod=a+rX,go-w milimo-hermes-plugin/ /opt/milimo-hermes-plugin/
+COPY milimo-hermes-plugin/ /opt/milimo-hermes-plugin/
+RUN chmod -R a+rX,go-w /opt/milimo-hermes-plugin/
 RUN uv pip install --no-cache-dir -r /opt/milimo-hermes-plugin/requirements.txt \
     && uv pip install --no-cache-dir --no-deps -e /opt/milimo-hermes-plugin/
 
@@ -43,10 +45,12 @@ RUN mkdir -p /sandbox/.hermes/plugins/milimo-hermes \
     && chmod -R a+rX /sandbox/.hermes/plugins/milimo-hermes
 
 # Copy War Room static assets
-COPY --chmod=a+rX,go-w milimo-hermes-plugin/warroom/ /opt/hermes/warroom/
+COPY milimo-hermes-plugin/warroom/ /opt/hermes/warroom/
+RUN chmod -R a+rX,go-w /opt/hermes/warroom/
 
 # Copy blueprint for delegation/workflows
-COPY --chmod=a+rX,go-w milimo-blueprint/ /opt/nemoclaw-blueprint/
+COPY milimo-blueprint/ /opt/nemoclaw-blueprint/
+RUN chmod -R a+rX,go-w /opt/nemoclaw-blueprint/
 RUN mkdir -p /sandbox/.nemoclaw/blueprints/0.1.0 \
     && cp -r /opt/nemoclaw-blueprint/* /sandbox/.nemoclaw/blueprints/0.1.0/ \
     && chown -R sandbox:sandbox /sandbox/.nemoclaw/blueprints/0.1.0
@@ -58,7 +62,8 @@ RUN printf 'milimo-hermes\n' > /opt/hermes/.milimo_install
 # This mirrors agents/hermes/generate-config.ts but for Milimo profile
 COPY milimo-hermes-sandbox/generate-config.ts /opt/nemoclaw-hermes-config/generate-config.ts
 COPY milimo-hermes-sandbox/config/ /opt/nemoclaw-hermes-config/config/
-RUN find /opt/nemoclaw-hermes-config -type d -exec chmod 755 {} + \
+RUN chmod -R a+rX /opt/nemoclaw-hermes-config/generate-config.ts \
+    && find /opt/nemoclaw-hermes-config -type d -exec chmod 755 {} + \
     && find /opt/nemoclaw-hermes-config -type f -exec chmod 444 {} +
 
 # Build args for config that varies per deployment
