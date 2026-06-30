@@ -23,73 +23,32 @@
 
 ### 🎯 Choose Your Profile
 
-MilimoClaw runs on **NemoClaw** with two profiles:
+MilimoClaw runs on **NemoClaw** with two profiles sharing a single `milimo-core` library:
 
-| Profile | Interface | Best For | Inference |
-|---------|-----------|----------|-----------|
-| **OpenClaw** (default) | TUI + Bridge Server | Solo operators, local development | NVIDIA NIM / Local |
-|| **Hermes** | Web Dashboard (port 18790) + OpenAI-compatible API (port 8642) | Teams, headless CI/CD, managed tool gateways | Native `delegate_task` + `cronjob` |
+| Profile | Interface | Parallelism | Scheduling | Best For |
+|---------|-----------|-------------|------------|----------|
+| **OpenClaw** (default) | TUI + Bridge Server | `sessions_spawn` (depth ≤ 2) | Python `threading.Timer` | Solo operators, local development, terminal-native users |
+| **Hermes** | Web Dashboard (:18790) + OpenAI API (:8642) | Native `delegate_task` (no depth limit) | Native `cronjob` (durable) | Teams, CI/CD, headless servers, managed tool gateways |
 
-**Decision tree**:
+**Quick guide**:
+
 ```
 Need web search / browser automation / image gen / audio?
-  → Yes: Use Hermes profile + Nous Portal OAuth at onboarding (--auth-mode nous_oauth)
-  → No:  Use OpenClaw profile (standard API key)
+  → Use Hermes + Nous Portal OAuth (--auth-mode nous_oauth)
 
-Need durable scheduled jobs (cronjob) that survive restarts?
-  → Yes: Use Hermes profile (native cronjob)
-  → No:  OpenClaw (threading.Timer works for solo)
+Need durable scheduled jobs that survive restarts?
+  → Use Hermes (native cronjob)
 
-Running in CI/CD or headless server?
-  → Yes: Hermes profile (non-interactive onboarding, OpenAI-compatible API)
-  → No:  OpenClaw profile (TUI-first)
+Running CI/CD or headless server?
+  → Use Hermes (non-interactive onboarding, OpenAI-compatible API)
 
-Want zero-config solo setup?
-  → Yes: OpenClaw (`./install.sh --solo`)
-  → No:  Hermes (Docker + dashboard)
+Want zero-config solo setup on your laptop?
+  → Use OpenClaw (`./install.sh --solo`)
 ```
 
 ### 💡 Solo Operator Mode
 
-For solo founders and edge developers, **Solo Mode** runs all six autonomous claws concurrently within a single sandboxed environment (using any GPU-enabled PC for local inference, or any CPU/GPU system using cloud connections). It delivers the full power of a multi-agent business mesh without multi-host cluster configuration overhead, making it the most popular and streamlined way to run the platform.
-
----
-
-## Key Highlights & Capabilities
-
-### Hardware & Platform Agnostic
-
-Milimo Claw supports cross-platform environments, freeing operators from specific hardware restrictions:
-* **Apple Silicon Macs** (M1/M2/M3/M4) via macOS Docker.
-* **Linux CPU & GPU Servers** on-premise or in the cloud.
-* **NVIDIA GPU-Enabled PCs** (such as RTX or data center cards) for local NIM inference.
-
-By utilizing NemoClaw's flexible inference router, claws fall back from local containerized NIM microservices to cloud APIs (such as the NVIDIA NIM Cloud API) when running on non-NVIDIA or light hardware.
-
-### Dual-Profile Architecture (New in v0.2.0)
-
-Milimo Claw now runs on **two NemoClaw profiles** sharing a single `milimo-core` library:
-
-| Profile | Interface | Parallelism | Scheduling | Use Case |
-|---------|-----------|-------------|------------|----------|
-| **OpenClaw** (default) | TUI + Bridge Server | `sessions_spawn` (depth ≤ 2) | Python `threading.Timer` | Terminal-native operators, existing OpenClaw users |
-|| **Hermes** | Web Dashboard (port 18790) + OpenAI-compatible API (port 8642) | Native `delegate_task` (no depth limit) | Native `cronjob` (durable) | Web-based operators, CI/CD, managed tool gateways |
-
-**Quick decision tree**:
-
-```
-Do you want web search / browser automation inside Hermes?
-  → Yes: Use Nous Portal OAuth at onboarding (--auth-mode nous_oauth)
-  → No:  API-key mode is sufficient
-
-Are you on a headless remote host?
-  → Yes: Set CHAT_UI_URL before onboarding, or use SSH port forwarding
-  → No (local machine): Dashboard at http://127.0.0.1:18790/
-
-Do you want a web dashboard UI?
-  → Yes: nemohermes (Hermes profile)
-  → No:  nemoclaw (OpenClaw profile, default)
-```
+For solo founders and edge developers, **Solo Mode** runs all six autonomous claws concurrently within a single sandboxed environment (any GPU-enabled PC for local inference, or any CPU/GPU system with cloud connections). Delivers the full power of a multi-agent mesh without cluster overhead.
 
 ### Stateful Process Supervision
 
@@ -139,25 +98,25 @@ Each claw runs inside its own highly isolated NemoClaw sandbox with kernel-level
 | 📋 **Ops Claw** | Account & Project Management: scores relationship health, scopes briefs, and runs deadline risk | `/sandbox/.openclaw-data/milimo/claws/ops` |
 | 📊 **Analytics Claw** | Intelligence Layer: generates weekly reports, runs anomaly detection, and opportunity scores | `/sandbox/.openclaw-data/milimo/claws/analytics` |
 | 💰 **Finance Claw** | Financial Nervous System: Stripe invoicing, pricing floor calculation, tax categorization | `/sandbox/.openclaw-data/milimo/claws/finance` |
-| 🔧 **Build Claw** | Technical Execution: scores Github issues, writes code, staged deployments, and dependency audits | `/sandbox/.openclaw-data/milimo/claws/build` |
+| 🔧 **Build Claw** | Technical Execution: scores GitHub issues, writes code, staged deployments, and dependency audits | `/sandbox/.openclaw-data/milimo/claws/build` |
 | 🤖 **Assistant Claw (Lucy)** | Operator Bridge: stateful process supervisor, operator query router, and mesh coordinator | `/sandbox/.openclaw-data/milimo/claws/assistant` |
 
 ---
 
 ## 📚 The Milimo Knowledge Vault (Obsidian-Powered)
 
-To coordinate and govern a high-leverage multi-agent system, you need a living, interlinked knowledge base. Inside [milimo-claw-wiki/](file:///Users/mck/Desktop/MilimoClaw/milimo-claw-wiki) lives a fully structured, **Obsidian-ready markdown vault** designed on Andrej Karpathy's LLM Wiki pattern.
+To coordinate and govern a high-leverage multi-agent system, you need a living, interlinked knowledge base. Inside [milimo-claw-wiki/](./milimo-claw-wiki) lives a fully structured, **Obsidian-ready markdown vault** designed on Andrej Karpathy's LLM Wiki pattern.
 
 It serves as the **ultimate source of truth** for human operators and AI assistants alike:
 
 * **Interactive Graph Visualization**: Load the vault into [Obsidian](https://obsidian.md/) to inspect the full agent topology, message contracts, and data-flow pathways visually via the interactive Graph View.
-* **LLM-Optimized Architecture**: The vault features an AI-first structure (curated in [CLAUDE.md](file:///Users/mck/Desktop/MilimoClaw/milimo-claw-wiki/CLAUDE.md)) with strict metadata schemas, tags hierarchies, and ground-truth validation rules, allowing LLMs to absorb the complete system context in seconds.
+* **LLM-Optimized Architecture**: The vault features an AI-first structure (curated in [CLAUDE.md](./milimo-claw-wiki/CLAUDE.md)) with strict metadata schemas, tags hierarchies, and ground-truth validation rules, allowing LLMs to absorb the complete system context in seconds.
 * **Comprehensive Knowledge Base**:
   * 🔒 **Security & Policies**: Documents kernel-level seccomp boundaries, Landlock constraints, and the privacy router.
   * 💬 **Coordination Matrix**: Explains the 27 typed inter-claw message contracts, sequencing rules, and approval modes.
   * 🌱 **Self-Evolution Logs**: Tracks autonomous Sunday tool-generation outcomes, baseline calibrations, and complexity scores.
 
-*To explore the vault locally, simply open the [milimo-claw-wiki/](file:///Users/mck/Desktop/MilimoClaw/milimo-claw-wiki) directory inside Obsidian.*
+*To explore the vault locally, simply open the [milimo-claw-wiki/](./milimo-claw-wiki) directory inside Obsidian.*
 
 ---
 
@@ -174,7 +133,7 @@ It serves as the **ultimate source of truth** for human operators and AI assista
 * **Runtime**: Node.js 22.16+ & Python 3.11+.
 * **Credentials**:
   - NVIDIA API Key — [build.nvidia.com](https://build.nvidia.com/) (Required for local or cloud NIM inference).
-  - Github Personal Access Token (Required for Build Claw automation).
+  - GitHub Personal Access Token (Required for Build Claw automation).
 
 ### Installation & Onboarding
 
@@ -200,21 +159,18 @@ To run the Hermes profile with web dashboard (port 18790) and OpenAI-compatible 
 ```console
 $ export NVIDIA_API_KEY=nvapi-your-key-here
 $ export GITHUB_TOKEN=github_pat_your-token-here
+$ export NEMOCLAW_NON_INTERACTIVE=1
+$ export NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1
+$ export CHAT_UI_URL=http://localhost:18790
 $ git clone https://github.com/mainza-ai/MilimoClaw.git
 $ cd MilimoClaw
 $ cp .env.example .env
-
-# Automated non-interactive install (CI/CD ready)
-export NVIDIA_API_KEY=nvapi-your-key
-export NEMOCLAW_NON_INTERACTIVE=1
-export NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1
-export CHAT_UI_URL=http://localhost:18790
-./milimo-hermes-sandbox/install-hermes.sh --non-interactive
-
-# Or interactive install (prompts for auth mode, Slack channels, etc.)
+$ ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
+$
+$ # Or interactive install (prompts for auth mode, Slack channels, etc.)
 $ ./milimo-hermes-sandbox/install-hermes.sh
-
-# Or manually onboard using the Dockerfile
+$
+$ # Or manually onboard using the Dockerfile
 $ nemohermes onboard --name milimo-hermes --from ./milimo-hermes-sandbox/Dockerfile
 ```
 
@@ -230,40 +186,30 @@ Once the Hermes sandbox is running, use these commands:
 
 #### Start a Chat Session
 ```console
-# Open an interactive SSH session and chat with Hermes:
-nemohermes milimo-hermes connect
-
-# Inside the sandbox, type 'hermes' to start chatting.
+$ nemohermes milimo-hermes connect
 ```
 
 #### Check Gateway Status
 ```console
-nemohermes milimo-hermes status
+$ nemohermes milimo-hermes status
 ```
 
 #### View War Room
 The War Room is a static HTML dashboard at `/opt/hermes/warroom/warroom.html` inside the sandbox:
 ```console
-# Serve it locally via the sandbox's Python HTTP server:
-nemohermes milimo-hermes exec -- python3 -m http.server 8080 --directory /opt/hermes/warroom
-# Then open http://localhost:8080/warroom.html in your browser.
-```
-
-Alternatively, for a quick text summary from inside the sandbox:
-```console
-nemohermes milimo-hermes connect
-# Then inside: cat /opt/hermes/warroom/warroom.html
+$ nemohermes milimo-hermes exec -- python3 -m http.server 8080 --directory /opt/hermes/warroom
+# Then open http://localhost:8080/warroom.html
 ```
 
 #### Check Sandbox Logs
 ```console
-nemohermes milimo-hermes logs -n 50
+$ nemohermes milimo-hermes logs -n 50
 ```
 
 #### Run Commands Inside Sandbox
 ```console
-nemohermes milimo-hermes exec -- hermes gateway status
-nemohermes milimo-hermes exec -- hermes skills list
+$ nemohermes milimo-hermes exec -- hermes gateway status
+$ nemohermes milimo-hermes exec -- hermes skills list
 ```
 
 **Auth Modes:**
@@ -350,16 +296,9 @@ The Hermes CI pipeline validates:
 Milimo Claw enforces absolute type safety and robust validation protocols:
 
 ```console
-# Test standard javascript packages
 $ cd milimo && npm test
-
-# Test core Python library
 $ .venv/bin/pytest milimo-core/tests/
-
-# Test Hermes plugin
 $ .venv/bin/pytest milimo-hermes-plugin/tests/
-
-# Test blueprint orchestrator
 $ cd milimo-blueprint && PYTHONPATH=.:orchestrator uv run pytest
 ```
 
