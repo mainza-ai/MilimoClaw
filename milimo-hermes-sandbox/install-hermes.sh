@@ -380,6 +380,10 @@ prepare_build_context() {
   log_info "Project root: $project_root"
   log_info "Sandbox dir: $sandbox_dir"
 
+  # IMPORTANT: Dockerfile COPY paths are relative to milimo-hermes-sandbox/ (the build
+  # context).  The sandbox-local copies under $sandbox_dir/ are the authoritative
+  # build-time sources — they match the COPY paths in the Dockerfile.
+  # $project_root/ copies are secondary mirrors kept in sync manually.
   for dir in milimo-core milimo-hermes-plugin milimo-blueprint; do
     if [[ -d "$sandbox_dir/$dir" ]]; then
       log_info "Removing existing $dir from build context..."
