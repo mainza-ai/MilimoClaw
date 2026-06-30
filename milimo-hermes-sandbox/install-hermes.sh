@@ -453,6 +453,10 @@ main() {
     onboard_cmd+=" --non-interactive --yes"
     export NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1
     export NEMOCLAW_NON_INTERACTIVE=1
+    # Policy tier for non-interactive onboarding (restricted, balanced, open)
+    export NEMOCLAW_POLICY_TIER="${NEMOCLAW_POLICY_TIER:-$POLICY_TIER}"
+    # Policy mode: suggested (default, additive), custom (exact list via NEMOCLAW_POLICY_PRESETS), skip
+    export NEMOCLAW_POLICY_MODE="${NEMOCLAW_POLICY_MODE:-suggested}"
   fi
 
   # Set build arg environment variables (Docker will use these for ARGs in Dockerfile)
