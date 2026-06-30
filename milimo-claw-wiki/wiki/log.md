@@ -1271,3 +1271,27 @@ Each entry follows this format:
 - Updated SOUL.md so Hermes has context about MilimoClaw's six-claw mesh when chatting
 - Documented day-to-day Hermes operations (connect, chat, warroom, exec commands) in README + wiki
 - Added known issues section to hermes-profile.md (API_SERVER_KEY, SOUL.md, version mismatch warning)
+
+---
+
+### 2026-06-30 — Phase E7 Complete: Gateway Daemon Sandbox Resilience + CI Build Context Fixes
+
+**Pages**: `wiki/architecture/hermes-profile.md`, `wiki/implementation-plan.md`, `wiki/log.md`, `wiki/index.md`, `milimo-hermes-sandbox/Dockerfile`, `milimo-hermes-sandbox/scripts/gateway-daemon.sh`, `.github/workflows/hermes-ci.yml`, `milimo-hermes-sandbox/install-hermes.sh`, `.gitignore`
+
+**Source**: Gateway failed to survive sandbox restarts; nemohermes health probe timed out during provisioning; CI Docker build failed due to wrong context/path; `milimo_core.build` subpackage missing from sandbox context
+
+**Changes**:
+- **Fixed gateway auto-start mechanism**: Dockerfile's `.bashrc`/`.profile` hooks (not SysV init) launch `gateway-daemon.sh` because `openshell sandbox create --from` overrides Docker entrypoint. SysV init fallback retained for environments that support it.
+- **Added socat forwarder to gateway-daemon.sh**: Bridges `0.0.0.0:8642 → 127.0.0.1:18642` so `nemohermes` health probe (`:8642/health`) succeeds. Both gateway and socat are monitored every 30s and restarted if dead.
+- **Fixed CI Docker build context**:
+  - `context: .` → `context: milimo-hermes-sandbox/` (COPY paths resolve correctly)
+  - `file: Dockerfile` → `file: milimo-hermes-sandbox/Dockerfile` (prevents picking up root `./Dockerfile` with `ARG SANDBOX_BASE`)
+  - `install-hermes.sh` `docker build .` → `docker build "$sandbox_dir"`
+- **Installed `gh` CLI** in Dockerfile for GitHub authentication inside sandbox
+- **Fixed `.gitignore`**: Added `!milimo-hermes-sandbox/milimo-core/src/milimo_core/build/` exception so the `milimo_core.build` Python subpackage is tracked in git and available in CI Docker builds
+
+**Verification**:
+- ✅ Sandbox restart: gateway daemon, socat, and gateway process all survive
+- ✅ `curl http://localhost:8642/health` returns 200 within seconds of boot
+- ✅ `nemohermes milimo-hermes recover` completes without timeout
+- ✅ All CI fixes committed to `origin/main`

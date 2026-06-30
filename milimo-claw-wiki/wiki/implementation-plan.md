@@ -201,6 +201,13 @@ env:
   NEMOCLAW_SANDBOX_NAME: milimo-hermes-ci
 ```
 
+**CI fixes (2026-06-30)**:
+- Docker build `context:` set to `milimo-hermes-sandbox/` (was repo root `.`)
+- Docker `file:` set to `milimo-hermes-sandbox/Dockerfile` (was `Dockerfile`, which picked up root `./Dockerfile` using `ARG SANDBOX_BASE`)
+- `install-hermes.sh` `docker build .` changed to `docker build "$sandbox_dir"` to match build context
+- `gh` CLI installed in Dockerfile for GitHub interactions
+- `milimo_core.build/` subpackage committed to sandbox build context (was excluded by `.gitignore`'s `build/` pattern)
+
 ### D2. `milimo-core` Coverage Gate ✅ COMPLETE
 ```bash
 pytest --cov=milimo_core --cov-fail-under=80

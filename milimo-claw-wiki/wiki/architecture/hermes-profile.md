@@ -9,7 +9,7 @@
 - `milimo-hermes-sandbox/`
 - `docs/adr/001-subagent-isolation.md` through `005-delegation-asymmetry.md`
 
-**Last updated**: 2026-06-29
+**Last updated**: 2026-06-30
 
 **Tags**: #architecture #hermes #profile #dual-track
 
@@ -202,6 +202,14 @@ nemohermes milimo-hermes exec -- sh -c 'cat > /sandbox/.hermes/SOUL.md' < /tmp/m
 
 **Note:** After updating SOUL.md, start a new chat session (`hermes`) to see the context — existing sessions cache the old prompt.
 
+#### Socat Forwarder Fails in `start.sh` (start_socat_forwarder)
+The `start_socat_forwarder` function in the default `start.sh` (`/usr/local/bin/nemoclaw-start`) exits immediately without creating the port bridge. The health probe at `http://localhost:8642/health` times out, causing `nemohermes recover` to fail with a 90-second provisioning timeout.
+
+**Fix** (baked in `milimo-hermes-sandbox/Dockerfile`):
+`gateway-daemon.sh` runs its own socat forwarder (`0.0.0.0:8642 → 127.0.0.1:18642`) alongside the gateway, monitored every 30 seconds. This is the authoritative socat instance — the one in `start.sh` is redundant and its failure is harmless.
+
+**Verification**: `curl -s http://localhost:8642/health` returns `200` within seconds of sandbox boot.
+
 #### Version Mismatch Warning
 ```
 ⚠ Sandbox 'milimo-hermes' is running Hermes Agent 0.17.0 (current: 2026.5.16)
@@ -215,31 +223,44 @@ Hermes Agent gateway is not running inside the sandbox (sandbox likely restarted
 ```
 The gateway was started manually (not as a supervised service), so it doesn't survive container restarts.
 
+**Root cause**: `openshell sandbox create --from` overrides the Dockerfile's `ENTRYPOINT`, so SysV init (`/etc/rcS.d/`) does not fire. The entrypoint binary (`openshell-sandbox`) does not source init scripts — it launches the sandbox user's shell.
+
 **Fix** (baked in `milimo-hermes-sandbox/Dockerfile`):
-The Dockerfile now registers the gateway as a SysV init service (`/etc/init.d/hermes-gateway`) with an rcS.d symlink. At boot, `gateway-daemon.sh` starts the gateway under the `sandbox` user and monitors it every 30 seconds, restarting if it exits.
+The Dockerfile appends to `/sandbox/.bashrc` and `/sandbox/.profile` to launch `gateway-daemon.sh` in the background when the sandbox user logs in. SysV init fallback (`/etc/init.d/hermes-gateway` with rcS.d symlink) is also provided for environments where openshell-sandbox honours it.
+
+`gateway-daemon.sh` supervises two processes:
+- **Hermes gateway** (`hermes gateway run --replace`) — the API server on `127.0.0.1:18642`
+- **Socat forwarder** (`0.0.0.0:8642 → 127.0.0.1:18642`) — bridges the nemohermes health probe port to the internal listener
+
+Both processes are polled every 30 seconds and restarted if either exits.
 
 **Manual fix** on an existing sandbox (if rebuilding is not an option):
 ```bash
-# Upload the daemon scripts and register the service:
+# Upload the daemon scripts:
+nemohermes milimo-hermes exec -- mkdir -p /opt/hermes/scripts
+# (Use heredoc to write gateway-daemon.sh to /opt/hermes/scripts/)
+# Install the .bashrc hook:
 nemohermes milimo-hermes exec -- sh -c '
-  sudo tee /etc/init.d/hermes-gateway > /dev/null < /dev/null
-  # (Upload scripts via nemohermes exec with heredoc or volume mount;
-  #   then:) sudo ln -s /etc/init.d/hermes-gateway /etc/rcS.d/S99hermes-gateway
+  echo "if [ -x /opt/hermes/scripts/gateway-daemon.sh ] && ! pgrep -f gateway-daemon.sh >/dev/null 2>&1; then" >> /sandbox/.bashrc
+  echo "  /opt/hermes/scripts/gateway-daemon.sh >/dev/null 2>&1 &" >> /sandbox/.bashrc
+  echo "fi" >> /sandbox/.bashrc
 '
-# Start the daemon:
-nemohermes milimo-hermes exec -- sudo /etc/init.d/hermes-gateway start
+# Start the daemon manually:
+nemohermes milimo-hermes exec -- nohup /opt/hermes/scripts/gateway-daemon.sh >/dev/null 2>&1 &
 ```
 
 ### Dockerfile (`milimo-hermes-sandbox/Dockerfile`)
 - Base: `ghcr.io/nvidia/nemoclaw/hermes-sandbox-base@sha256:8dad3b989a9ed1e601743310b97be21be5f59f89f7913a47d04f3ec3c40b8ce6` (NVIDIA public base image, pre-bakes Hermes from GitHub releases)
-- COPY milimo-core, plugin, warroom HTML, blueprint
+- COPY milimo-core (including `milimo_core.build` subpackage), plugin, warroom HTML, blueprint
 - Installs milimo-core and plugin into Hermes venv via `uv pip`
+- Installs `gh` CLI (GitHub's apt repository)
 - Generates Hermes `config.yaml` and `.env` at build time via `generate-config.ts`
 - Installs plugin to standard Hermes location `/sandbox/.hermes/plugins/milimo-hermes`
 - Sets up blueprint at `/sandbox/.nemoclaw/blueprints/0.1.0/`
 - Bakes `MILIMO_PROFILE=hermes`, `MILIMO_PLUGIN_DIR=/sandbox/.hermes/plugins/milimo-hermes`
 - Preserves NemoClaw Hermes plugin at `/sandbox/.hermes/plugins/nemoclaw`
-- Registers `/etc/init.d/hermes-gateway` (SysV init) with rcS.d symlink so the gateway auto-starts on sandbox boot and is monitored by `gateway-daemon.sh`
+- Adds `.bashrc`/`.profile` hooks to launch `gateway-daemon.sh` at sandbox login (primary mechanism; SysV init fallback at `/etc/init.d/hermes-gateway` with rcS.d symlink also provided)
+- `gateway-daemon.sh` supervises both the Hermes gateway and a socat forwarder (`0.0.0.0:8642 → 127.0.0.1:18642`) for the health probe port
 - `ENV NEMOCLAW_SANDBOX_NAME=milimo-hermes`
 - `ENV NEMOCLAW_POLICY_PRESETS=restricted,github`
 
@@ -253,6 +274,7 @@ nemohermes milimo-hermes exec -- sudo /etc/init.d/hermes-gateway start
 - Headless detection → prompts for `CHAT_UI_URL`
 - `SLACK_ALLOWED_CHANNELS` baked at build time
 - Probes Python 3.10–13 for Model Router (opt-in)
+- Docker build uses `$sandbox_dir` as context (was `.` — fixed to resolve COPY path mismatches inside the sandbox build directory)
 
 ---
 
@@ -304,6 +326,7 @@ export NEMOCLAW_SANDBOX_NAME=milimo-hermes
 | E4 | GitHub Actions CI + v0.2.0 tag | ✅ **Complete** |
 | E5 | Fix Hermes base image (public NVIDIA GHCR) + CI smoke test | ✅ **Complete** (2026-06-29) |
 | E6 | Fix API_SERVER_KEY + SOUL.md context + TypeScript build errors | ✅ **Complete** (2026-06-30) |
+| E7 | Gateway daemon sandbox resilience: socat forwarder, `.bashrc`/`.profile` hooks for auto-start, CI build context path fixes | ✅ **Complete** (2026-06-30) |
 
 ---
 
