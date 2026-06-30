@@ -89,11 +89,17 @@ $ ./scripts/hermes-sync.sh
 # Sync only the finance claw
 $ ./scripts/hermes-sync.sh --role finance
 
+# Sync to a custom output directory
+$ ./scripts/hermes-sync.sh --output /tmp/my-claws
+
 # Watch mode: sync every 5 minutes
 $ ./scripts/hermes-sync.sh --watch --interval 300
 
 # Archive as tarball
-$ ./scripts/hermes-sync.sh --archive --output ./claws-backup.tar.gz
+$ ./scripts/hermes-sync.sh --archive --output ./claws-export.tar.gz
+
+# Dry run (show what would sync without copying)
+$ ./scripts/hermes-sync.sh --dry-run
 ```
 
 **Sandbox Inventory** (`hermes-inventory.py`): List all claw files with metadata from inside the sandbox:
