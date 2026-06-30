@@ -452,7 +452,8 @@ describe("DigestScheduler", () => {
 
       const nextMorning = scheduler.getNextMorningTime();
       expect(nextMorning).not.toBeNull();
-      expect(nextMorning?.getDate()).toBeGreaterThan(now.getDate() - 1);
+      // Compare full timestamps to handle month boundaries (e.g., Jan 31 → Feb 1)
+      expect(nextMorning!.getTime()).toBeGreaterThan(now.getTime());
     });
   });
 });
