@@ -278,36 +278,29 @@ RUN set -eu; \
         ln -s "runtime/${name}" "/sandbox/.hermes/${name}"; \
     done
 
-# ── Gateway Auto-Start (boot + supervision) ─────────────────────────────────
-# Bake the gateway daemon + init script + openshell wrapper so the Hermes
-# gateway survives sandbox restarts without requiring nemoclaw CLI recovery.
+# ── Gateway Daemon (supervision only) ──────────────────────────────────────
+# Bake the gateway daemon + init script so the Hermes gateway survives
+# sandbox restarts after a shell connects.
 #
-# nemohermes overrides the container ENTRYPOINT to openshell-sandbox
-# directly (docker-entrypoint.sh in the base image is not used), so a
-# custom ENTRYPOINT won't work.  Instead, we wrap the openshell-sandbox
-# binary itself: the real binary is moved to openshell-sandbox.real and
-# replaced with a shell script that starts the gateway daemon before
-# exec-ing the real binary.
+# openshell-sandbox is the container ENTRYPOINT (added by `openshell sandbox
+# create --from` after our Dockerfile builds), so we CANNOT wrap or replace
+# it at build time.  Instead, the gateway daemon is started by ~/.bashrc /
+# ~/.profile on shell login.  The init script is provided for environments
+# where openshell-sandbox honours rcS.d.
 #
-# The init script (/etc/init.d/hermes-gateway) and SysV rc symlinks are
-# also created for environments where openshell-sandbox honours rcS.d.
+# The nemohermes CLI also auto-recovery script (start.sh) already starts
+# `hermes gateway run` inside the sandbox at boot and on connect.
 COPY scripts/gateway-daemon.sh /opt/hermes/scripts/gateway-daemon.sh
 COPY scripts/hermes-gateway-init.sh /etc/init.d/hermes-gateway
-COPY scripts/openshell-wrapper.sh /opt/hermes/scripts/openshell-wrapper.sh
 RUN chmod 755 /opt/hermes/scripts/gateway-daemon.sh \
     && chmod 755 /etc/init.d/hermes-gateway \
-    && chmod 755 /opt/hermes/scripts/openshell-wrapper.sh \
     && mkdir -p /opt/hermes/scripts \
     && chown -R root:root /etc/init.d/hermes-gateway \
     && if command -v update-rc.d >/dev/null 2>&1; then \
           update-rc.d hermes-gateway defaults; \
         else \
           ln -s /etc/init.d/hermes-gateway /etc/rcS.d/S99hermes-gateway; \
-        fi \
-    && mv /opt/openshell/bin/openshell-sandbox /opt/openshell/bin/openshell-sandbox.real \
-    && cp /opt/hermes/scripts/openshell-wrapper.sh /opt/openshell/bin/openshell-sandbox \
-    && chmod 755 /opt/openshell/bin/openshell-sandbox \
-    && chown sandbox:sandbox /opt/openshell/bin/openshell-sandbox
+        fi
 
 # Pin config hash at build time for integrity verification
 RUN mkdir -p /etc/nemoclaw \
@@ -325,6 +318,19 @@ RUN sha256sum /sandbox/.hermes/config.yaml /sandbox/.hermes/.env \
         find /sandbox/.hermes -type d -exec chmod a+rwx {} +; \
         chmod a+rw /sandbox/.bashrc /sandbox/.profile; \
     fi
+
+# Start the gateway daemon on shell login (defense-in-depth — nemohermes
+# recovery script also starts the gateway at connect time, but this ensures
+# it stays running across reconnects and after crashes).
+RUN { echo; echo "# Auto-start Hermes gateway daemon if not already running"; \
+    echo "if [ -x /opt/hermes/scripts/gateway-daemon.sh ] && ! pgrep -f 'gateway-daemon.sh' >/dev/null 2>&1; then"; \
+    echo "  /opt/hermes/scripts/gateway-daemon.sh >/dev/null 2>&1 &"; \
+    echo "fi"; } >> /sandbox/.bashrc \
+    && { echo; echo "# Auto-start Hermes gateway daemon on login"; \
+       echo "[ -x /opt/hermes/scripts/gateway-daemon.sh ] && [ -z \"\$(pgrep -f gateway-daemon.sh 2>/dev/null)\" ] && /opt/hermes/scripts/gateway-daemon.sh >/dev/null 2>&1 &"; \
+     } >> /sandbox/.profile \
+    && chown sandbox:sandbox /sandbox/.bashrc /sandbox/.profile \
+    && chmod 644 /sandbox/.bashrc /sandbox/.profile
 
 # Runtime environment
 ENV MILIMO_PROFILE=hermes \
