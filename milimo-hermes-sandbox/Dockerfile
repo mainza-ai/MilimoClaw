@@ -329,11 +329,10 @@ ENV MILIMO_PROFILE=hermes \
 # The base image's docker-entrypoint.sh is called via milimo-entrypoint.sh.
 ENTRYPOINT ["/usr/local/bin/milimo-entrypoint.sh"]
 
-# Run as root so milimo-entrypoint.sh can use gosu before chaining to
-# openshell-sandbox.  openshell-sandbox handles sandbox isolation
-# regardless of the user it runs under.
-# hadolint ignore=DL3002
-USER root
+# Drop privileges (Hermes standard).
+# Note: NemoClaw overrides container user to 'sandbox' at runtime per
+# sandbox policy, so this setting is advisory but follows convention.
+USER sandbox
 
 # Pass through build-time git SHA for hermes_build_sha
 ARG HERMES_GIT_SHA=

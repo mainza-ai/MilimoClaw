@@ -4,16 +4,19 @@
 #
 # Custom entrypoint for Milimo Hermes sandbox.
 #
-# Starts the Hermes gateway daemon at boot using gosu (privilege-dropping
-# tool installed by the base image), then chains to docker-entrypoint.sh
-# which runs openshell-sandbox (PID 1).
+# Starts the Hermes gateway daemon at boot, then chains to the base image's
+# entrypoint (docker-entrypoint.sh) which runs openshell-sandbox (PID 1).
+#
+# NOTE: NemoClaw overrides the container user to 'sandbox' at runtime
+# (per sandbox policy), so gosu/su privilege dropping is unnecessary.
+# We run the daemon directly as the current (sandbox) user.
 
 set -eu
 
-# Start the gateway daemon in background as the sandbox user.
-# The daemon will be re-parented to PID 1 automatically.
+# Start the gateway daemon in background.
+# The daemon will be re-parented to PID 1 (openshell-sandbox) automatically.
 if [ -x /opt/hermes/scripts/gateway-daemon.sh ]; then
-  gosu sandbox:sandbox /opt/hermes/scripts/gateway-daemon.sh &
+  /opt/hermes/scripts/gateway-daemon.sh &
 fi
 
 # Give the daemon a moment to start the gateway before openshell-sandbox
