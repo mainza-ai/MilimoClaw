@@ -192,6 +192,18 @@ endpoints:
       purpose: "NCP inference endpoint"
     optional: true
 
+  # Nous Portal - OAuth login and Tool Gateway (hermes setup --portal)
+  - host: "portal.nousresearch.com"
+    port: 443
+    protocol: "https"
+    methods: ["GET", "POST"]
+    binaries:
+      - "/usr/local/bin/hermes"
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "all"
+      purpose: "Nous Portal OAuth authentication and managed tool gateways"
+
   # Optional: Local NIM service
   - host: "nim-service.local"
     port: 8000

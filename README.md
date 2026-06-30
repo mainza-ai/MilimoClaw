@@ -212,6 +212,18 @@ $ nemohermes inference set --model stepfun-ai/step-3.7-flash --provider nvidia-n
 ```
 > `openshell inference set` is not available inside Hermes sandboxes. Always use `nemohermes inference set` from the host.
 
+#### Use Nous Portal Models (Managed Tool Gateways)
+Connect to Nous Portal for 300+ models and managed tool gateways (web search, browser automation, image generation, TTS, audio processing):
+```console
+$ nemohermes milimo-hermes exec -- hermes setup --portal
+```
+Prerequisite: `portal.nousresearch.com:443` must be in the sandbox network policy. If not, add at runtime:
+```console
+$ nemohermes milimo-hermes policy-add \
+    --host portal.nousresearch.com --port 443 --protocol https \
+    --binary /usr/local/bin/hermes
+```
+
 #### Check Inference Config
 ```console
 $ nemohermes inference get --json

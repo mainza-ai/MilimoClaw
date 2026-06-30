@@ -371,6 +371,25 @@ nemohermes inference set --model stepfun-ai/step-3.7-flash --provider nvidia-nim
 ```
 Note: `openshell inference set` is not available inside Hermes sandboxes. Always use `nemohermes inference set` from the host.
 
+### Use Nous Portal Models (Managed Tool Gateways)
+
+`hermes setup --portal` connects the sandbox to Nous Portal for 300+ models and managed tool gateways (web search, browser automation, image generation, TTS, audio processing, managed code execution):
+
+```bash
+# Run inside the sandbox:
+nemohermes milimo-hermes exec -- hermes setup --portal
+```
+
+This opens an OAuth login flow. After success, the inference provider switches to Nous (use `nemohermes inference set` to switch back).
+
+**Prerequisite**: The sandbox network policy must allow `portal.nousresearch.com:443`. The `milimo-mcp` policy preset includes this rule. If on an existing sandbox, add it at runtime:
+
+```bash
+nemohermes milimo-hermes policy-add \
+  --host portal.nousresearch.com --port 443 --protocol https \
+  --binary /usr/local/bin/hermes
+```
+
 ### Run Ad-Hoc Commands
 ```bash
 nemohermes milimo-hermes exec -- hermes skills list
