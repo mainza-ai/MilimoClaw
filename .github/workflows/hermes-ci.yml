@@ -114,8 +114,8 @@ jobs:
       - name: Build Milimo Hermes sandbox image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: milimo-hermes-sandbox/Dockerfile
+          context: milimo-hermes-sandbox
+          file: Dockerfile
           push: false
           load: true
           tags: milimo-hermes-sandbox:ci
