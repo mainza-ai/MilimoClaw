@@ -491,6 +491,36 @@ main() {
     return 0
   fi
 
+  # Copy required source directories into sandbox directory for build context
+  log_info "Preparing build context..."
+  local script_path="$(realpath "${BASH_SOURCE[0]}")"
+  local project_root="$(dirname "$(dirname "$script_path")")"
+  local sandbox_dir="$(dirname "$script_path")"
+  
+  log_info "Project root: $project_root"
+  log_info "Sandbox dir: $sandbox_dir"
+
+  # Copy required source directories to sandbox directory for Docker build context
+  for dir in milimo-core milimo-hermes-plugin milimo-blueprint; do
+    if [[ -d "$project_root/$dir" ]]; then
+      log_info "Copying $dir to build context..."
+      rm -rf "$sandbox_dir/$dir"
+      cp -r "$project_root/$dir" "$sandbox_dir/"
+    else
+      log_error "Required directory not found: $project_root/$dir"
+      exit 1
+    fi
+  done
+
+  # Copy generate-config.ts and config/ for config generation
+  if [[ -f "$project_root/milimo-hermes-sandbox/generate-config.ts" ]]; then
+    cp "$project_root/milimo-hermes-sandbox/generate-config.ts" "$sandbox_dir/"
+  fi
+  if [[ -d "$project_root/milimo-hermes-sandbox/config" ]]; then
+    rm -rf "$sandbox_dir/config"
+    cp -r "$project_root/milimo-hermes-sandbox/config" "$sandbox_dir/"
+  fi
+
   # Run onboarding
   log_info "Starting Hermes onboarding..."
   log_info "Command: $onboard_cmd"

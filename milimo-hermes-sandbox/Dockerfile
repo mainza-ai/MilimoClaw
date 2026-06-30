@@ -60,11 +60,11 @@ RUN printf 'milimo-hermes\n' > /opt/hermes/.milimo_install
 
 # Generate Hermes config.yaml and .env from build args (adapted from NemoHermes)
 # This mirrors agents/hermes/generate-config.ts but for Milimo profile
-COPY milimo-hermes-sandbox/generate-config.ts /opt/nemoclaw-hermes-config/generate-config.ts
-COPY milimo-hermes-sandbox/config/ /opt/nemoclaw-hermes-config/config/
+COPY generate-config.ts /opt/nemoclaw-hermes-config/generate-config.ts
+COPY config/ /opt/nemoclaw-hermes-config/config/
 RUN chmod -R a+rX /opt/nemoclaw-hermes-config/generate-config.ts \
     && find /opt/nemoclaw-hermes-config -type d -exec chmod 755 {} + \
-    && find /opt/nemoclaw-hermes-config -type f -exec chmod 444 {} +
+    && find /opt/nemoclaw-hermes-config -type f -exec chmod 444444 {} +
 
 # Build args for config that varies per deployment
 ARG NEMOCLAW_MODEL=nvidia/nemotron-3-super-120b-a12b
