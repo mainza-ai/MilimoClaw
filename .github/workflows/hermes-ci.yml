@@ -115,7 +115,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: milimo-hermes-sandbox
-          file: Dockerfile
+          file: milimo-hermes-sandbox/Dockerfile
           push: false
           load: true
           tags: milimo-hermes-sandbox:ci
