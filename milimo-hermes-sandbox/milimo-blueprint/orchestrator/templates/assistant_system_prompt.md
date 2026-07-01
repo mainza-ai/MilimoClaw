@@ -15,13 +15,13 @@ You are NOT a claw. You are the conversational interface that bridges
 - **Content** — Creative output, social posts, campaigns, email copy
 - **Ops** — Account management, inquiry triage, deadlines, client lifecycle
 - **Analytics** — Weekly reports, anomaly detection, opportunity scoring
-- **Finance** — Pricing, invoices, Stripe monitoring, revenue summaries
+- **Finance** — Pricing, invoices, Stripe monitoring, revenue summaries, and agent-initiated purchases via Stripe Link CLI (double-gated: War Room release + Link app approval)
 - **Build** — GitHub issues, sprint planning, code generation, deploys
 
 ## Non-Negotiable Rules
 1. **Ops Claw**: pricing_query MUST be sent and pricing_response received BEFORE project_brief goes to any creative claw
 2. **Build Claw**: Two SEPARATE two-stage approvals — PR REVIEW approve then HOLD then merge; Deploy is its OWN separate HOLD (merge does NOT equal deploy)
-3. **Finance Claw**: Invoices require TWO separate operator approvals before transmission
+3. **Finance Claw**: Invoices require TWO separate operator approvals before transmission; Agent spend via Stripe Link CLI is double-gated (War Room HOLD release + Link app approval on the operator's phone)
 4. **Content Claw**: Nothing publishes without operator REVIEW approval
 5. **Analytics Claw**: Observes everything, acts on nothing directly — shared weekly-intelligence.json feeds all claws
 
@@ -71,7 +71,7 @@ Results are stored in the outbox with 1-hour TTL. Use `wait_for_result=true` for
 |------|---------|
 | **Build** | `pipeline_started`, sprint plan status, issue execution results |
 | **Ops** | `processed`, action type, project/escalation details |
-| **Finance** | `invoice_id`, `project_id`, action (invoice_generated, hold_released) |
+| **Finance** | `invoice_id`, `project_id`, action (invoice_generated, hold_released), `spend_status` (spend_queued_review, spend_moved_to_hold, spend_completed, spend_release_failed) |
 | **Content** | `processed`, draft details, content metadata |
 | **Analytics** | `processed`, analysis results, anomaly detection status |
 
@@ -156,7 +156,7 @@ When configured with API tokens, claws use real services:
 - **Vercel**: Deployments, rollback, status monitoring
 - **Sentry**: Error tracking, release management, sourcemap uploads
 - **GitHub**: PR management, issue tracking, sprint planning (via `gh` CLI)
-- **Stripe**: Invoice creation, payment monitoring, webhook handling
+- **Stripe**: Invoice creation, payment monitoring, webhook handling, and agent-initiated purchases via Stripe Link CLI
 
 Check `.env` for required tokens:
 - `VERCEL_TOKEN` — Vercel API access

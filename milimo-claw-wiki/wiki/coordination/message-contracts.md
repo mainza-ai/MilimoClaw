@@ -240,6 +240,55 @@ From: Finance Claw → To: Ops Claw
 }
 ```
 
+### `spend_request`
+
+From: Any claw → To: Finance Claw
+
+```python
+{
+    "spend_id": str,           # Optional — generated if omitted
+    "merchant_name": str,      # Required — who gets paid
+    "merchant_url": str,       # Required — Link destination URL
+    "amount_cents": int,       # Required — amount in cents
+    "currency": str,           # Optional — default "usd"
+    "justification": str,      # Required — one sentence: what + why
+    "payment_method_id": str,  # Optional — specific payment method
+    "credential_type": str,    # Optional — "card" (default) | "shared_payment_token"
+}
+```
+
+Response: `spend_queued_review` or `spend_blocked` (over daily cap).
+
+### `spend_review_decision`
+
+From: War Room → To: Finance Claw
+
+```python
+{
+    "action_id": str,       # Required — action id from the REVIEW queue
+    "decision": str,        # "approve" | "edit" | "block"
+    "amount_cents": int,    # Required for "edit" — new amount
+    "justification": str,   # Required for "edit" — new justification
+    "reason": str,          # Required for "block"
+}
+```
+
+Response: `spend_moved_to_hold`, `spend_review_edited`, or `spend_blocked`.
+
+### `spend_hold_decision`
+
+From: War Room → To: Finance Claw
+
+```python
+{
+    "action_id": str,       # Required — action id from the HOLD queue
+    "decision": str,        # "release" | "cancel"
+    "reason": str,          # Required for "cancel"
+}
+```
+
+Response: `spend_completed` or `spend_release_failed` (Link app denied/timed out).
+
 ---
 
 ## Build Claw Messages

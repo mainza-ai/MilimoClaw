@@ -294,11 +294,12 @@ Retention correlator → Competitor signal tracker → Forward projection engine
 - Logs and tax-categorizes all expenses
 - Generates weekly revenue summaries and sends totals to Analytics Claw
 - Prepares quarterly tax summaries on quarter start dates
+- **Manages agent-initiated purchases** via Stripe Link CLI (double-gated: War Room + Link app)
 
 **What it cannot do:**
 - Communicate with clients directly — ever
 - Read `/sandbox/.openclaw-data/milimo/claws/ops`, `/sandbox/.openclaw-data/milimo/claws/content`, `/sandbox/.openclaw-data/milimo/claws/build`, or `/sandbox/.openclaw-data/milimo/claws/assistant`
-- Initiate financial transfers — payment status checks only
+- Spend money without **two independent human gates** (War Room HOLD release + Stripe Link app approval)
 - Send any invoice without two-stage operator approval (see below)
 - Include line items, client names, or invoice IDs in `revenue_summary` — totals only
 
@@ -315,6 +316,21 @@ Stage 2 — HOLD release:
 If Stage 1 approval triggers transmission: CRITICAL BUG.
 ```
 
+**Two-stage spend approval — double-gated:**
+```
+Stage 1 — REVIEW:
+  Agent wants to buy X for $Y, because Z.
+  Approving Stage 1 does NOT spend. Moves to HOLD only.
+
+Stage 2 — HOLD release:
+  Invokes `link-cli spend-request create --request-approval`.
+  This blocks on an independent second approval in the user's Stripe Link app.
+  Hermes cannot self-approve the payment.
+
+If Stage 2 release triggers the charge without Link app confirmation: NOT A BUG
+(the Link app is the final gate — the charge only completes if the user taps approve).
+```
+
 **Approval thresholds:**
 | Action | Mode |
 |---|---|
@@ -326,6 +342,8 @@ If Stage 1 approval triggers transmission: CRITICAL BUG.
 | Margin compression alert | REVIEW |
 | Rate optimization advisory | REVIEW |
 | Tax quarterly summary | AUTO |
+| Spend request (agent purchase) | REVIEW |
+| Spend release (charge card via Link) | HOLD |
 
 **Scheduling:**
 | Time | Action |
@@ -343,6 +361,9 @@ If Stage 1 approval triggers transmission: CRITICAL BUG.
 **Inter-claw messages received:**
 - `pricing_query` from Ops Claw
 - `project_complete` from Ops Claw
+- `spend_request` from any claw — agent wants to buy something
+- `spend_review_decision` from War Room — approve/edit/block a spend request
+- `spend_hold_decision` from War Room — release/cancel a held spend
 
 **Evolution tools (emerge autonomously over time):**
 Scope cost estimator v2 → Pricing floor guardian → Payment risk scorer v2 →

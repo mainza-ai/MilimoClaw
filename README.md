@@ -111,6 +111,28 @@ $ nemohermes milimo-hermes exec -- python3 /opt/hermes/scripts/hermes-inventory.
 
 **Git Security**: The `claws_data/` directory is registered in the workspace `.gitignore` file to ensure client records and developer assets are kept secure.
 
+### Agent-Initiated Spend (Stripe Link CLI)
+
+Claws can request to buy things through the Finance Claw using the Hermes `stripe-link-cli` skill — double-gated so no purchase happens without your explicit approval:
+
+1. **Stage 1 — REVIEW**: A claw (Build, Ops, Content, etc.) sends a `spend_request` message. The operator sees the purchase in the War Room (`. Wagner review` — what, why, how much).
+2. **Stage 2 — HOLD**: The operator presses `R` to release the hold. This invokes `link-cli spend-request create --request-approval`, which sends a push notification to your Stripe Link app on your phone.
+3. **Link App Approval**: The charge only completes when you tap **Approve** in the Link app. Hermes cannot self-approve at any step.
+
+```console
+# Install the skill (Hermes sandbox)
+$ hermes skills install official/payments/stripe-link-cli
+
+# Set daily spend cap (default $100)
+$ export MILIMO_DAILY_SPEND_CAP_CENTS=10000
+
+# Trigger a spend from any claw (Finance Claw handles the approval flow)
+```
+
+**Web Search / Browser Automation / Image Gen / Audio**: Use Hermes + Nous Portal OAuth (`--auth-mode nous_oauth`)
+
+**Stripe Purchases / SaaS Provisioning / Per-Request APIs**: Install `stripe-link-cli` skill — agent-initiated purchases via Finance Claw double-gate.
+
 ### Native Memory & Context Calibration
 
 The platform maintains infinite conversation execution loops without prompt ceiling crashes:

@@ -2,11 +2,28 @@
 
 **Summary**: Append-only record of all wiki operations.
 
-**Last updated**: 2026-06-28
+**Last updated**: 2026-06-30
 
 **Tags**: #log #meta
 
 ---
+
+---
+
+### 2026-06-30 — Stripe Link Spend Integration (Hackathon)
+
+**Pages**: `wiki/modules/finance/spend-handler.md`, `wiki/coordination/approval-thresholds.md`, `wiki/coordination/message-contracts.md`, `wiki/claws/finance-claw.md`, `wiki/modules/finance/finance-claw.md`, `README.md`, `index.md`
+
+**Source**: `milimo-core/src/milimo_core/finance/spend_handler.py`, `milimo-blueprint/orchestrator/finance/spend_warroom_bridge.py`, `milimo-claw-docs/reference/MILIMO_CLAW_FINANCE_CLAW_SPEC.md`, `.agents/AGENTS.md`
+
+**Changes**:
+- Created `wiki/modules/finance/spend-handler.md` — SpendApprovalHandler docs (mirror of FinanceApprovalHandler for payables)
+- Updated `wiki/claws/finance-claw.md` — added spend capability, thresholds, handlers
+- Updated `wiki/coordination/approval-thresholds.md` — spend_review/spend_hold + flow diagram
+- Updated `wiki/coordination/message-contracts.md` — spend_request, spend_review_decision, spend_hold_decision
+- Updated `.agents/AGENTS.md` — Finance Claw with spend approval and message types
+- Updated `milimo-claw-docs/reference/MILIMO_CLAW_FINANCE_CLAW_SPEC.md` — spec with stripe-link-cli endpoints, double-gate rules
+- Updated `README.md` — Agent-Initiated Spend section
 
 ---
 

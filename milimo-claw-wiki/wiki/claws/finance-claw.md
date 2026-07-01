@@ -6,7 +6,7 @@
 - `raw/FINANCE_CLAW_SPEC.md`
 - `milimo-blueprint/roles/finance-claw.yaml`
 
-**Last updated**: 2026-04-28
+**Last updated**: 2026-06-30
 
 **Tags**: #claw #finance
 
@@ -34,12 +34,13 @@ The Finance Claw is the **financial nervous system** of MilimoClaw. It tracks ev
 - Logs and tax-categorizes all expenses
 - Generates weekly revenue summaries and sends totals to Analytics Claw
 - Prepares quarterly tax summaries on quarter start dates
+- **Manages agent-initiated purchases** via Stripe Link CLI (double-gated: War Room release → Link app approval)
 
 ## What It Cannot Do
 
 - Communicate with clients directly — ever
 - Read `/sandbox/.openclaw/milimo/claws/ops`, `/sandbox/.openclaw/milimo/claws/content`, or `/sandbox/.openclaw/milimo/claws/build`
-- Initiate financial transfers — payment status checks only
+- Spend money without **two independent human gates** (War Room HOLD release + Stripe Link app approval)
 - Send any invoice without two-stage operator approval
 - Include line items, client names, or invoice IDs in `revenue_summary` — totals only
 
@@ -71,6 +72,8 @@ If Stage 1 approval triggers transmission: CRITICAL BUG.
 | Margin compression alert | REVIEW | Profitability warning |
 | Rate optimization advisory | REVIEW | Pricing suggestions |
 | Tax quarterly summary | AUTO | Routine reporting |
+| Spend request (agent purchase) | REVIEW | Stage 1: Review purchase justification |
+| Spend release (charge card) | HOLD | Stage 2: Release → link-cli → Link app |
 
 ## Scheduling
 
@@ -98,6 +101,9 @@ If Stage 1 approval triggers transmission: CRITICAL BUG.
 | `pricing_query` | Ops | Generate pricing based on scope |
 | `project_complete` | Ops | Initiate invoice generation |
 | `revenue_anomaly` | Analytics | Investigate revenue patterns |
+| `spend_request` | Any claw | Agent wants to buy something |
+| `spend_review_decision` | War Room | Approve/edit/block a spend request |
+| `spend_hold_decision` | War Room | Release/cancel a held spend |
 | `assistant_query` | Assistant | Return status and state |
 | `assistant_task` | Assistant | Execute finance-related tasks |
 
@@ -118,6 +124,7 @@ If Stage 1 approval triggers transmission: CRITICAL BUG.
 - [[expense-tracker]] — Expense logging and categorization
 - [[revenue-tracker]] — Revenue tracking
 - [[approval-handler]] — Two-stage approval processing
+- [[spend-handler]] — Agent-initiated purchase approval
 - [[signal-dispatcher]] — Inter-claw message sending
 - [[finance-scheduler]] — Scheduled tasks
 

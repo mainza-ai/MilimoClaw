@@ -271,10 +271,10 @@ Installation and service management scripts.
 
 | Metric | Value |
 |--------|-------|
-| Total pages | 152+ |
+| Total pages | 153+ |
 | Architecture pages | 12 |
 | Claw pages | 6 |
-| Module pages | 75+ |
+| Module pages | 76+ |
 | Coordination pages | 5 |
 | Evolution pages | 8 |
 | Development pages | 3 |
@@ -306,6 +306,7 @@ See [[log]] for complete operation history.
 | 2026-06-30 | Phase E7: Gateway daemon sandbox resilience (socat forwarder, .bashrc/.profile hooks), CI build context fixes, gh CLI, milimo_core.build git fix | hermes-profile.md, implementation-plan.md, log.md, index.md |
 | 2026-06-30 | Nous Portal login fix, policy preset format, `inference-api.nousresearch.com` added to nous-portal preset | hermes-profile.md, README.md, network-egress.md, log.md, index.md |
 | 2026-06-30 | Hermes file sync: `claw_layouts.py` centralized layouts, `milimo_paths.py` Hermes-native paths, `hermes-sync.sh` CLI, `hermes-inventory.py`, Dockerfile claw dirs at build time | sandbox-file-sharing.md, development-scripts.md, log.md, index.md |
+| 2026-06-30 | Stripe Link spend integration: SpendApprovalHandler (mirror of FinanceApprovalHandler), spend_warroom_bridge, 3 message handlers, solo-founder.yaml spend_review/spend_hold modes | finance-claw.md, spend-handler.md, approval-thresholds.md, message-contracts.md, AGENTS.md, log.md, index.md |
 | 2026-05-28 | Dynamic delay optimization inside sandbox/tests, offline inference fallback mocks, E2E background execution pipeline integration, and robust host file synchronization scripting. | index.md, log.md, sandbox-sync.md |
 | 2026-05-24 | Operational stabilization audit, YAML indentation fixes for solo-founder, loop correction in launcher status, dual-namespace mock test containment, sliding window log aging timestamp correction, contract alias relaxation for assistant_response/pricing_response, and Build Claw response envelope mapping | index.md, log.md, contracts.md, message-contracts.md, issues-and-fixes.md |
 | 2026-05-12 | Full code audit fixes: Path resolution false positive `_is_sandbox`, ToolRegistry `mkdir` fallback, ContentClaw assert crash, InboxPoller race condition, Evolution minimum actions, Build Claw auth fallback | index.md, log.md, milimo_paths.py, tool_registry.py, content_claw.py, claw_launcher.py, evolution.ts |

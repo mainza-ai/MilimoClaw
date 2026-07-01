@@ -90,6 +90,8 @@ Every claw action has an approval threshold that determines whether it requires 
 | Margin compression alert | REVIEW | Profitability warning |
 | Rate optimization advisory | REVIEW | Pricing suggestions |
 | Tax quarterly summary | AUTO | Routine reporting |
+| Spend request (agent purchase) | REVIEW | Stage 1: Review purchase justification |
+| Spend release (charge via Link) | HOLD | Stage 2: Release → link-cli → Link app |
 
 ---
 
@@ -132,6 +134,16 @@ Stage 1: REVIEW (view invoice)
 Stage 2: HOLD (authorize transmission)
     ↓ Released
 Stripe transmission
+```
+
+### Finance Spend
+
+```
+Stage 1: REVIEW (review purchase justification)
+    ↓ Approved
+Stage 2: HOLD (authorize charge)
+    ↓ Released
+link-cli → Stripe Link app approval (on phone)
 ```
 
 ### Build PR + Deploy (Independent)

@@ -178,13 +178,23 @@ api.github.com                   # Finance Claw never touches code
 All other endpoints              # strict default-deny
 ```
 
+**Approved write endpoints (agent spend via stripe-link-cli):**
+```
+link-cli spend-request create          # Agent-initiated purchases
+                                       # Requires double-gate: War Room
+                                       # HOLD release + Link app approval
+```
+
 **Critical rules:**
 1. The Finance Claw never communicates directly with clients.
    All client-facing invoice delivery happens via Stripe's invoice system
    after operator HOLD approval — not via email or any other channel.
 2. The Finance Claw never initiates outbound financial transfers.
    It reads payment status only. It does not initiate payments.
-3. Every external API call is logged to payment-events.log.
+3. **Agent spend** via stripe-link-cli requires **two independent human gates**:
+   Gate 1: War Room HOLD release (operator explicitly releases the spend hold)
+   Gate 2: Stripe Link app (user taps approve on their phone — no agent can self-approve)
+4. Every external API call is logged to payment-events.log.
 
 ---
 
@@ -359,6 +369,9 @@ All communication via typed message contracts through OpenShell gateway.
 |---|---|---|---|
 | `pricing_query` | Ops Claw | Before any proposal is sent | project_id, scope_description, complexity_estimate, deadline |
 | `project_complete` | Ops Claw | Client confirms delivery | project_id, client_id, delivered_at |
+| `spend_request` | Any claw | Agent wants to buy something | merchant_name, merchant_url, amount_cents, justification |
+| `spend_review_decision` | War Room | Operator reviews spend | action_id, decision (approve/edit/block) |
+| `spend_hold_decision` | War Room | Operator releases/cancels | action_id, decision (release/cancel) |
 
 ### Messages the Finance Claw SENDS:
 
@@ -403,6 +416,8 @@ Money never moves without explicit human authorization.
 | Margin compression alert | REVIEW | Operator informed — no immediate action required |
 | Tax quarterly summary | AUTO | Logged, visible in morning digest |
 | Rate optimization advisory | REVIEW | Recommendation only — operator decides |
+| Spend request (agent purchase) | REVIEW | Stage 1: Review why agent wants to spend |
+| Spend release (charge via Link) | HOLD | Stage 2: Release → link-cli → Stripe Link app approval |
 
 ### Two-stage invoice approval (non-negotiable):
 
@@ -548,6 +563,9 @@ evolved tools suggest.
 | Pricing floor not flagging | Pricing rules.json not loaded or floor value not set |
 | Repeat overdue not escalating to HOLD | Decision logic only checking single invoice — check repeat detection |
 | Tax quarterly prep not triggered | Quarterly scheduler not initialized — check finance_scheduler |
+| Spend request auto-blocked | Over daily spend cap — check MILIMO_DAILY_SPEND_CAP_CENTS |
+| Spend release fails after operator approval | Link app denied or timed out — check agent-spend.log |
+| link-cli not found | stripe-link-cli skill not installed — run `hermes skills install official/payments/stripe-link-cli` |
 
 ---
 
@@ -600,6 +618,8 @@ orchestrator/finance/payment_monitor.py      — Payment status checking and ove
 orchestrator/finance/expense_tracker.py      — Expense logging and tax classification
 orchestrator/finance/revenue_tracker.py      — Revenue aggregation and weekly summaries
 orchestrator/finance/approval_handler.py     — Two-stage War Room approval flow
+orchestrator/finance/spend_handler.py        — Two-stage spend approval (mirror of approval_handler)
+orchestrator/finance/spend_warroom_bridge.py — Spend <-> War Room bridge
 orchestrator/finance/signal_dispatcher.py   — Outbound message sending
 orchestrator/finance/finance_scheduler.py    — Scheduled autonomous actions
 orchestrator/finance/finance_claw.py         — Main entry point
