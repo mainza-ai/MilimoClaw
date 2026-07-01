@@ -71,6 +71,8 @@ operator_policy:
       payment_follow_up: REVIEW
       pricing_recommendation: REVIEW
       expense_log: AUTO
+      spend_review: REVIEW # agent wants to buy something — you see it first
+      spend_hold: HOLD # you explicitly release the charge (Link app confirms too)
 
     # Build Claw — code changes need human eyes
     build:

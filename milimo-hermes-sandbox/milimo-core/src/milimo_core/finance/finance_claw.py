@@ -28,6 +28,7 @@ from .signal_dispatcher import FinanceSignalDispatcher
 from .pricing_engine import PricingEngine
 from .invoice_manager import InvoiceManager
 from .approval_handler import FinanceApprovalHandler
+from .spend_handler import SpendApprovalHandler, SpendRequest
 from .payment_risk_scorer import PaymentRiskScorer
 from .payment_monitor import PaymentMonitor
 from .revenue_tracker import RevenueTracker
@@ -184,6 +185,17 @@ class FinanceClaw:
             decisions_path=self.base_path / "logs" / "decisions.log",
         )
 
+        import os as _os
+
+        spend_handler = SpendApprovalHandler(
+            operational_log=operational_log,
+            decisions_path=self.base_path / "logs" / "decisions.log",
+            spend_log_path=self.base_path / "logs" / "agent-spend.log",
+            daily_spend_cap_cents=int(
+                _os.environ.get("MILIMO_DAILY_SPEND_CAP_CENTS", "10000")
+            ),
+        )
+
         revenue_tracker = RevenueTracker(
             fs=fs,
             inference_client=self.inference_client,
@@ -228,6 +240,7 @@ class FinanceClaw:
             "revenue_tracker": revenue_tracker,
             "expense_tracker": expense_tracker,
             "approval_handler": approval_handler,
+            "spend_handler": spend_handler,
             "payment_monitor": payment_monitor,
             "scheduler": scheduler,
         }
@@ -290,6 +303,8 @@ class FinanceClaw:
         message_type = raw_message.get("message_type", "")
         sender_role = raw_message.get("sender_role", "")
         payload = raw_message.get("payload", {})
+
+        import uuid
 
         operational_log = self._components.get("operational_log")
         self._components.get("dispatcher")
@@ -400,6 +415,74 @@ class FinanceClaw:
                                 details={"reason": payload.get("reason", "")},
                             )
                         )
+
+            elif message_type == "spend_request":
+                spend_handler = self._components.get("spend_handler")
+                if spend_handler:
+                    request = SpendRequest(
+                        spend_id=payload.get("spend_id", uuid.uuid4().hex[:12]),
+                        claw=sender_role,
+                        merchant_name=payload.get("merchant_name", ""),
+                        merchant_url=payload.get("merchant_url", ""),
+                        amount_cents=int(payload.get("amount_cents", 0)),
+                        currency=payload.get("currency", "usd"),
+                        justification=payload.get("justification", ""),
+                        payment_method_id=payload.get("payment_method_id"),
+                        credential_type=payload.get("credential_type", "card"),
+                    )
+                    action_id = spend_handler.queue_spend_review(request)
+                    result["action_id"] = action_id
+                    result["spend_id"] = request.spend_id
+                    result["action"] = (
+                        "spend_blocked"
+                        if request.status == "blocked"
+                        else "spend_queued_review"
+                    )
+
+            elif message_type == "spend_review_decision":
+                spend_handler = self._components.get("spend_handler")
+                if spend_handler:
+                    action_id = payload.get("action_id", "")
+                    decision = payload.get("decision", "")
+                    if decision == "approve":
+                        hold_action_id = spend_handler.handle_review_approve(
+                            action_id
+                        )
+                        result["hold_action_id"] = hold_action_id
+                        result["action"] = "spend_moved_to_hold"
+                    elif decision == "edit":
+                        spend_handler.handle_review_edit(
+                            action_id,
+                            amount_cents=int(payload.get("amount_cents", 0)),
+                            justification=payload.get("justification", ""),
+                        )
+                        result["action"] = "spend_review_edited"
+                    elif decision == "block":
+                        spend_handler.handle_review_block(
+                            action_id, reason=payload.get("reason", "")
+                        )
+                        result["action"] = "spend_blocked"
+                    result["action_id"] = action_id
+
+            elif message_type == "spend_hold_decision":
+                spend_handler = self._components.get("spend_handler")
+                if spend_handler:
+                    action_id = payload.get("action_id", "")
+                    decision = payload.get("decision", "")
+                    if decision == "release":
+                        request = spend_handler.handle_hold_release(action_id)
+                        result["spend_status"] = request.status
+                        result["action"] = (
+                            "spend_completed"
+                            if request.status == "released"
+                            else "spend_release_failed"
+                        )
+                    elif decision == "cancel":
+                        spend_handler.handle_hold_cancel(
+                            action_id, reason=payload.get("reason", "")
+                        )
+                        result["action"] = "spend_hold_cancelled"
+                    result["action_id"] = action_id
 
             elif message_type == "assistant_query":
                 import json

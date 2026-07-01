@@ -3,29 +3,32 @@
 
 """Centralized path resolver for Milimo Claw data directories.
 
-In a NemoClaw sandbox, the writable base directory is
-/sandbox/.openclaw/milimo/ (NOT ~/.milimo/ which varies by user).
+In a NemoClaw sandbox under the OpenClaw profile, the writable base is
+``/sandbox/.openclaw/milimo/``.
 
-All Python modules should use milimo_paths.MILIMO_DIR / "subdir"
-instead of Path.home() / ".milimo" / "subdir".
+Under the **Hermes** profile (``MILIMO_PROFILE=hermes``) the base is
+``/sandbox/.hermes/`` — consistent with Hermes' own config layout and
+exposed to the host via ``scripts/hermes-sync.sh``.
 
-Claw mount paths use CLAWS_DIR / <role> (e.g. /sandbox/.openclaw/milimo/claws/build)
-because /sandbox/<role> is read-only under NemoClaw's Landlock policy.
+All Python modules should use ``milimo_paths.MILIMO_DIR / "subdir"``
+instead of ``Path.home() / ".milimo" / "subdir"``.
 
-IMPORTANT: MILIMO_DIR uses /sandbox/.openclaw/milimo/ (absolute) in sandbox mode,
-not Path.home()/.openclaw/milimo/, because the launcher runs as root ($HOME=/root)
-while the agent runs as sandbox ($HOME=/sandbox). Using Path.home() would cause the
-launcher and agent to read/write to different directories.
+Claw mount paths use ``CLAWS_DIR / <role>`` (e.g.
+``/sandbox/.hermes/claws/build`` for Hermes or
+``/sandbox/.openclaw/milimo/claws/build`` for OpenClaw).
 
-Per NVIDIA NemoClaw docs (docs.nvidia.com/nemoclaw/latest/) and the NemoClaw
-Dockerfile (NVIDIA/NemoClaw refs/heads/main, issue #514):
-  - /sandbox/.openclaw/  — unified agent config, state, workspace, plugins
-  - /sandbox/.nemoclaw/  — NemoClaw plugin state and config (root-owned, 1755 sticky)
-  - /tmp/                — temporary files
+IMPORTANT: MILIMO_DIR always resolves to an absolute path in sandbox mode,
+not ``Path.home()/.openclaw/milimo/``, because the launcher runs as root
+(``$HOME=/root``) while the agent runs as sandbox (``$HOME=/sandbox``).
+Using ``Path.home()`` would cause the launcher and agent to read/write to
+different directories.
 
-Milimo stores all claw data under MILIMO_DIR which resolves to:
-  - Sandbox: /sandbox/.openclaw/milimo/
-  - Host:    ~/.openclaw/milimo/  (or ~/.milimo/ for legacy installs)
+Profile resolution order:
+1. ``MILIMO_PROFILE=hermes`` → ``/sandbox/.hermes/``
+2. ``/sandbox/.openclaw/milimo/`` exists → OpenClaw sandbox
+3. ``/sandbox/.openclaw-data/milimo/`` exists → legacy OpenClaw
+4. ``NEMOCLAW_MODEL`` + ``/sandbox/`` exists → generic sandbox (default OpenClaw)
+5. Host paths (``~/.openclaw/milimo/`` or legacy)
 """
 
 from __future__ import annotations
@@ -33,6 +36,11 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+# ── Hermes profile paths ────────────────────────────────────────────────────
+_HERMES_SANDBOX_DIR = Path("/sandbox/.hermes")
+_HERMES_CLAWS_BASE = Path("/sandbox/.hermes/claws")
+
+# ── OpenClaw profile paths ──────────────────────────────────────────────────
 _SANDBOX_MILIMO_DIR = Path("/sandbox/.openclaw/milimo")
 _HOME_MILIMO_DIR = Path.home() / ".openclaw" / "milimo"
 _LEGACY_MILIMO_DIR = Path.home() / ".milimo"
@@ -44,33 +52,55 @@ _SANDBOX_CLAWS_BASE = Path("/sandbox/.openclaw/milimo/claws")
 _LEGACY_CLAWS_BASE = Path("/sandbox")
 
 
+def _is_hermes_profile() -> bool:
+    """Return True when running under the Hermes profile.
+
+    The environment variable ``MILIMO_PROFILE`` is set to ``hermes`` in the
+    Hermes Dockerfile and is the canonical signal.
+    """
+    return os.environ.get("MILIMO_PROFILE") == "hermes"
+
+
 def _is_sandbox() -> bool:
     """Detect if running inside a NemoClaw sandbox container.
 
-    NEMOCLAW_MODEL alone is NOT sufficient — it is also set on the host
-    when nemoclaw is configured. We require the sandbox data directory
-    to actually exist on the filesystem.
+    ``NEMOCLAW_MODEL`` alone is NOT sufficient — it is also set on the host
+    when nemoclaw is configured.  We require the sandbox data directory
+    to actually exist on the filesystem (or ``MILIMO_PROFILE=hermes``).
     """
     return (
-        _SANDBOX_MILIMO_DIR.is_dir()
+        _is_hermes_profile()
+        or _SANDBOX_MILIMO_DIR.is_dir()
         or _LEGACY_OPENCLAW_DATA_DIR.is_dir()
         or (bool(os.environ.get("NEMOCLAW_MODEL")) and Path("/sandbox").is_dir())
     )
 
 
 def _resolve_base() -> Path:
-    """Return the primary Milimo data directory.
+    """Return the primary MilimoClaw data directory.
 
-    In a NemoClaw sandbox: /sandbox/.openclaw/milimo/ (absolute, shared across users).
-    Falls back to legacy /sandbox/.openclaw-data/milimo/ for existing installs.
-    Outside sandbox: ~/.openclaw/milimo/ or ~/.openclaw-data/milimo/ or ~/.milimo/.
+    Resolution order
+    ----------------
+    1. ``MILIMO_PROFILE=hermes`` → ``/sandbox/.hermes/``
+    2. ``/sandbox/.openclaw/milimo/`` exists → OpenClaw sandbox
+    3. ``/sandbox/.openclaw-data/milimo/`` exists → legacy OpenClaw
+    4. Fallback OpenClaw sandbox ``/sandbox/.openclaw/milimo/``
+    5. ``~/.openclaw/milimo/`` exists → host profile
+    6. ``~/.openclaw-data/milimo/`` exists → legacy host
+    7. ``~/.milimo/`` exists → legacy standalone
+    8. Default ``~/.openclaw/milimo/``
     """
+    # Hermes profile gets its own native base
+    if _is_hermes_profile():
+        return _HERMES_SANDBOX_DIR
+
     if _is_sandbox():
         if _SANDBOX_MILIMO_DIR.is_dir():
             return _SANDBOX_MILIMO_DIR
         if _LEGACY_OPENCLAW_DATA_DIR.is_dir():
             return _LEGACY_OPENCLAW_DATA_DIR
         return _SANDBOX_MILIMO_DIR
+
     if _HOME_MILIMO_DIR.is_dir():
         return _HOME_MILIMO_DIR
     if _LEGACY_HOME_OPENCLAW_DATA_DIR.is_dir():
@@ -83,11 +113,17 @@ def _resolve_base() -> Path:
 def _resolve_claws_base() -> Path:
     """Return the base directory for claw mount points.
 
-    In a NemoClaw sandbox, claw data directories live under
-    /sandbox/.openclaw/milimo/claws/<role>.
-    On the host, they live under ~/.milimo/claws/<role> or
-    ~/.openclaw/milimo/claws/<role>.
+    Resolution order
+    ----------------
+    1. ``MILIMO_PROFILE=hermes`` → ``/sandbox/.hermes/claws/``
+    2. ``/sandbox/.openclaw/milimo/claws/`` exists → OpenClaw sandbox
+    3. ``/sandbox/.openclaw-data/milimo/claws/`` exists → legacy OpenClaw
+    4. In sandbox (detected) → OpenClaw default
+    5. Host → ``<resolved-base>/claws/``
     """
+    if _is_hermes_profile():
+        return _HERMES_CLAWS_BASE
+
     if _SANDBOX_CLAWS_BASE.is_dir():
         return _SANDBOX_CLAWS_BASE
     legacy_sandbox_claws = Path("/sandbox/.openclaw-data/milimo/claws")
@@ -95,7 +131,6 @@ def _resolve_claws_base() -> Path:
         return legacy_sandbox_claws
     if _is_sandbox():
         return _SANDBOX_CLAWS_BASE
-    # Host fallback: claws under the resolved MILIMO base
     return _resolve_base() / "claws"
 
 

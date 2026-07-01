@@ -95,6 +95,18 @@ from .notifications import (
     init_warroom_notifier,
 )
 
+from .claw_layouts import (
+    ClawLayout,
+    CLAW_LAYOUTS,
+    CLAW_ROLES,
+    BUILD_LAYOUT,
+    CONTENT_LAYOUT,
+    OPS_LAYOUT,
+    ANALYTICS_LAYOUT,
+    FINANCE_LAYOUT,
+    ASSISTANT_LAYOUT,
+)
+
 __version__ = "0.1.0"
 
 __all__ = [
@@ -152,6 +164,16 @@ __all__ = [
     "run_evolution_cycle_sync",
     "run_tool_backtest_sync",
     "run_hold_queue_review_sync",
+    # Claw Layouts
+    "ClawLayout",
+    "CLAW_LAYOUTS",
+    "CLAW_ROLES",
+    "BUILD_LAYOUT",
+    "CONTENT_LAYOUT",
+    "OPS_LAYOUT",
+    "ANALYTICS_LAYOUT",
+    "FINANCE_LAYOUT",
+    "ASSISTANT_LAYOUT",
     # Cost Guard
     "CostGuard",
     "CostGuardConfig",
