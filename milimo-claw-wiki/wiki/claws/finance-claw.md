@@ -35,6 +35,7 @@ The Finance Claw is the **financial nervous system** of MilimoClaw. It tracks ev
 - Generates weekly revenue summaries and sends totals to Analytics Claw
 - Prepares quarterly tax summaries on quarter start dates
 - **Manages agent-initiated purchases** via Stripe Link CLI (double-gated: War Room release → Link app approval)
+- Supports per-operator Link isolation (`MILIMO_OPERATOR`) — each operator's spend routes to their own Link account and approval phone
 
 ## What It Cannot Do
 
@@ -156,6 +157,10 @@ Full specification: `raw/FINANCE_CLAW_SPEC.md`
 - [[ops-claw]] — Pricing queries and invoice coordination
 - [[analytics-claw]] — Revenue summaries
 - [[privacy-router]] — All data routed locally
+- [[link-cli-setup]] — Stripe Link CLI auth and per-operator isolation
+- [[spend-warroom-bridge]] — Spend → War Room two-stage gate bridge
+- [[spend-handler]] — Agent-initiated purchase approval
+- [[war-room]] — TUI and HTMX dashboard for pending actions
 
 ## See Also
 

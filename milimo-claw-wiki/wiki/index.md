@@ -78,7 +78,7 @@ Detailed documentation for each code module:
 
 **[[analytics-claw|Analytics]]**: analytics-init • signal-processor • anomaly-detector • opportunity-scorer • report-generator • [[baseline-manager]] • [[query-handler]] • [[forward-projector]] • [[collection-workers]] • [[data-collectors]]
 
-**[[finance-claw|Finance]]**: finance-init • pricing-engine • invoice-manager • payment-monitor • revenue-tracker • [[payment-risk-scorer]] • [[expense-tracker]] • [[stripe-client]] • [[link-cli-setup]]
+**[[finance-claw|Finance]]**: finance-init • pricing-engine • invoice-manager • payment-monitor • revenue-tracker • [[payment-risk-scorer]] • [[expense-tracker]] • [[stripe-client]] • [[link-cli-setup]] • [[spend-warroom-bridge]] • [[link-cli-setup]]
 
 **[[build-claw|Build]]**: build-init • issue-manager • code-generator • pr-manager • deploy-manager • error-monitor • github-client
 

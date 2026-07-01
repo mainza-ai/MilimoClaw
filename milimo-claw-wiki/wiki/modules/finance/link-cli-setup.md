@@ -17,7 +17,8 @@
 
 1. Hermes sandbox running (`nemohermes milimo-hermes connect` or `docker compose up`)
 2. [[network-egress]] policy loaded — the `stripe-link` preset must be applied (contains `api.link.com` + `/usr/local/bin/link-cli` binary allowlist)
-3. `XDG_CONFIG_HOME` set (Hermes gateway daemon sets `HOME=/sandbox`, so `~/.config` resolves to `/sandbox/.config` automatically)
+3. `MILIMO_OPERATOR` set (see [[war-room]] dashboard). `XDG_CONFIG_HOME` is derived from it automatically: `/sandbox/.config/users/{operator_id}`
+4. If running locally inside the sandbox shell, `.bashrc`/`.profile` exports `XDG_CONFIG_HOME` for you — verify with `echo $XDG_CONFIG_HOME`
 
 ---
 
@@ -76,23 +77,35 @@ If you are walking a second person through the flow (e.g., a teammate testing th
 
 ---
 
-## Where the Token Lives
+## Where the Token Lives (Per-Operator)
 
 After successful auth, `link-cli` stores credentials at:
 
 ```
-/sandbox/.config/link-cli-nodejs/config.json
+$XDG_CONFIG_HOME/link-cli-nodejs/config.json
 ```
 
-This path is derived from `$XDG_CONFIG_HOME` (resolves to `$HOME/.config` = `/sandbox/.config` inside the Hermes gateway daemon environment).
+For the default system operator, this resolves to `/sandbox/.config/link-cli-nodejs/config.json`. For any named operator (`MILIMO_OPERATOR=<name>`), it resolves to:
 
-**Contents are single-account.** There is one token file, one active session. If a second person runs `link-cli auth login` with different Stripe credentials, it silently overwrites this file.
+```
+/sandbox/.config/users/<operator_id>/link-cli-nodejs/config.json
+```
 
-You can inspect the current session (without exposing the raw token):
+This isolation is automatic — the Dockerfile `.bashrc`/`.profile` hook exports:
+
+```bash
+if [ -n "$MILIMO_OPERATOR" ]; then
+  export XDG_CONFIG_HOME="/sandbox/.config/users/${MILIMO_OPERATOR}"
+fi
+```
+
+`SpendApprovalHandler.handle_hold_release()` reads `MILIMO_OPERATOR` from the runtime environment and propagates it through the release flow. Each operator has an isolated Link account, isolated approval phone, and isolated spend log — no shared state.
+
+Inspect the current session for a given operator:
 
 ```bash
 link-cli auth status
-# → Logged in as you@example.com (account: acct_...)
+# → Logged in as operator@example.com (account: acct_...)
 ```
 
 ---
@@ -170,17 +183,68 @@ To run live in production, set `MILIMO_SPEND_TEST_MODE=false` and authenticate a
 
 ---
 
-## Multi-User / Shared Sandbox
+## Multi-User / Operator Isolation
 
-The sandbox is **single-account by design**:
+The sandbox supports **multiple operators with isolated Link accounts**. Isolation is implemented via per-operator `XDG_CONFIG_HOME`:
 
 | Scenario | Behavior |
 |----------|----------|
-| Two operators, same sandbox, same auth | Both use the same Stripe Link account; approvals hit the same phone |
-| Two operators, same sandbox, different auth | The second `auth login` silently overwrites the first person's token |
-| Two operators, separate sandboxes | Each sandbox has its own `/sandbox/.config/link-cli-nodejs/` volume; accounts are isolated |
+| Operator A sets `MILIMO_OPERATOR=alice` and runs `link-cli auth login` | Token stored at `/sandbox/.config/users/alice/link-cli-nodejs/config.json` |
+| Operator B sets `MILIMO_OPERATOR=bob` and runs `link-cli auth login` | Token stored at `/sandbox/.config/users/bob/link-cli-nodejs/config.json` |
+| Both operators post spend requests in the same sandbox | Each request routes to the **correct operator's** Link account and phone |
+| Operator A inspects state while logged in as A | `link-cli auth status` shows alice's account only |
 
-For hackathos or demos with multiple testers, prefer **separate sandbox containers** (separate Docker volumes) so each tester has an isolated Link account and approval flow.
+### How It Works
+
+1. **Dockerfile `.bashrc`/`.profile` hook** exports `XDG_CONFIG_HOME=/sandbox/.config/users/${MILIMO_OPERATOR}` if `MILIMO_OPERATOR` is set.
+2. **`SpendApprovalHandler.handle_hold_release(operator_id=...)`** reads the operator ID at runtime and sets `XDG_CONFIG_HOME` in the subprocess environment before calling `link-cli`.
+3. **`finance_claw.py` and `spend_warroom_bridge.py`** propagate the operator name through the release flow so the right token is used automatically.
+4. **The HTMX War Room server** (`milimo-hermes-plugin/warroom/server.py`) scopes approval sessions per operator in its own session store, so `/v1/warroom/approve/{action_id}` routes to the correct operator's approval action.
+
+### Operator-Aware Spend Release
+
+```python
+# spend_handler.py
+def handle_hold_release(self, action_id: str, operator_id: str) -> SpendRequest:
+    spend_id = action_id.replace("spend-hold-", "")
+    request = self._requests[spend_id]
+
+    env = os.environ.copy()
+    if operator_id and operator_id != "system":
+        env["XDG_CONFIG_HOME"] = f"/sandbox/.config/users/{operator_id}"
+
+    cmd = [
+        self.link_cli_path,
+        "spend-request",
+        "create",
+        ...
+        "--test",
+        "--format", "json",
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=310, env=env)
+```
+
+### When to Use Named Operators
+
+- **Hackathons / demos** — each tester uses their own `MILIMO_OPERATOR` handle; their approvals hit their own phone
+- **Multi-operator production** — each human operator has a persistent Link account scoped to their identity
+- **CI / automated tests** — use `MILIMO_OPERATOR=system` (or omit) to use the default shared config; test mode (`--test`) prevents real charges
+
+### Verifying Isolation
+
+```bash
+# As alice
+MILIMO_OPERATOR=alice link-cli auth status
+# → Logged in as alice@example.com
+
+# As bob
+MILIMO_OPERATOR=bob link-cli auth status
+# → Logged in as bob@example.com
+
+# Create spend request as alice
+MILIMO_OPERATOR=alice link-cli spend-request create ... --request-approval --test
+# → Approval URL goes to alice's phone
+```
 
 ---
 
@@ -226,9 +290,11 @@ Also verify the OpenShell proxy is not intercepting TLS (the preset uses `access
 
 ## Related Pages
 
-- [[spend-handler]] — SpendApprovalHandler implementation and two-stage gate
+- [[spend-handler]] — SpendApprovalHandler implementation, two-stage gate, and per-operator isolation
 - [[finance-claw]] — Finance Claw entry point and inbound message handlers
+- [[spend-warroom-bridge]] — Bridges spend handler into SoloWarRoom action queue
 - [[approval-thresholds]] — REVIEW/HOLD/AUTO rules for spend actions
+- [[war-room]] — War Room TUI and HTMX dashboard server
 - [[network-egress]] — Policy configuration and preset management
 - [[stripe-client]] — Stripe API client (invoices, customers, charges)
 
@@ -239,4 +305,5 @@ Also verify the OpenShell proxy is not intercepting TLS (the preset uses `access
 - Stripe Link documentation: https://docs.stripe.com/link
 - `link-cli` reference: https://docs.stripe.com/link/cli
 - Policy preset: `milimo-blueprint/policies/presets/stripe-link.yaml`
-- Environment config: `/sandbox/.hermes/.env` — `MILIMO_SPEND_TEST_MODE`, `XDG_CONFIG_HOME`
+- HTMX War Room server: `milimo-hermes-plugin/warroom/server.py`
+- Environment config: `/sandbox/.hermes/.env` — `MILIMO_SPEND_TEST_MODE`, `MILIMO_OPERATOR`, `XDG_CONFIG_HOME`

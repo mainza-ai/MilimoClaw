@@ -1,6 +1,6 @@
 # War Room
 
-**Summary**: Terminal UI for viewing all pending actions from every claw.
+**Summary**: Terminal UI for viewing all pending actions from every claw. Also includes the dynamic HTMX server for a web-based War Room dashboard with per-operator approval routing.
 
 **Sources**:
 - `milimo/src/warroom/warroom-tui.ts`
@@ -78,6 +78,30 @@ class ApprovalEngine {
 }
 ```
 
+### HTMX War Room Server
+
+Location: `milimo-hermes-plugin/warroom/server.py`
+
+Dynamic HTTP server that replaces the static `python3 -m http.server`. Serves the static `warroom.html` dashboard and handles dynamic `/v1/warroom/...` HTMX endpoints. Approvals route directly into the inter-claw gateway mailboxes.
+
+```bash
+# Start the HTMX War Room dashboard
+python3 /opt/hermes/warroom/server.py
+# → http://localhost:8080/v1/warroom/
+```
+
+Key endpoints:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/warroom/` | GET | Dashboard shell (HTMX partials) |
+| `/v1/warroom/queue` | GET | Live action queue |
+| `/v1/warroom/approve/{action_id}` | POST | Approve a REVIEW or release a HOLD |
+| `/v1/warroom/block/{action_id}` | POST | Block an action |
+| `/v1/warroom/hold/{action_id}` | POST | Move to HOLD queue |
+
+The server scopes approval sessions per operator (by `MILIMO_OPERATOR`), so concurrent operators do not interfere with each other's queue state.
+
 ### Audit Trail
 
 Location: `milimo/src/warroom/audit.ts`
@@ -101,11 +125,13 @@ class AuditTrail {
 | **A** | Approve | Approve current REVIEW item |
 | **B** | Block | Block current item |
 | **E** | Edit | Edit item inline |
-| **R** | Release | Release current HOLD |
+| **R** | Release / Refresh | Release current HOLD if selected item is in HOLD mode; otherwise refresh the queue |
 | **D** | Digest | Toggle morning/evening digest |
 | **F** | Finals | Toggle Deep Work Mode |
 | **H** | Help | Show help overlay |
 | **Q** | Quit | Exit War Room |
+
+> **Note**: `R` is context-sensitive. If the current selected message is in HOLD mode (e.g. `spend_hold_decision` or `hold_release`), pressing `R` invokes the approval/release flow. Otherwise it falls back to a standard queue refresh. This avoids accidental refreshes when the operator meant to release a spend.
 
 ## Daily Schedule
 
@@ -151,6 +177,8 @@ milimo squad finals-mode --duration 2weeks --resume-date 2026-05-12
 
 - [[approval-thresholds]] — Approval modes
 - [[sequencing-rules]] — Ordering constraints
+- [[spend-handler]] — Stripe Link spend approval and operator isolation
+- [[link-cli-setup]] — Stripe Link CLI auth and per-operator tokens
 - [[content-claw]] — Content actions
 - [[ops-claw]] — Ops actions
 - [[finance-claw]] — Finance actions

@@ -1,0 +1,139 @@
+# Spend War Room Bridge
+
+**Summary**: Glue layer between `SpendApprovalHandler` and `SoloWarRoom` that turns agent-initiated purchase requests into standard War Room REVIEW/HOLD actions. Propagates the active operator ID so `handle_hold_release` uses the correct per-operator `XDG_CONFIG_HOME` when invoking `link-cli`.
+
+**Sources**:
+- `milimo-blueprint/orchestrator/finance/spend_warroom_bridge.py`
+- `milimo-blueprint/orchestrator/finance/spend_handler.py`
+- `milimo-blueprint/templates/solo-founder.yaml`
+
+**Last updated**: 2026-07-01
+
+**Tags**: #module #finance #warroom #spend #bridge #approvals
+
+---
+
+## Purpose
+
+`SpendWarRoomBridge` is the only integration point between the Finance Claw spend flow and the War Room action queue. It exists so:
+
+1. Spend requests appear in the *same* unified queue as invoices, PRs, and deploys
+2. The *same* keyboard shortcuts (`A` approve, `R` release, `B` block) work for spend
+3. `SpendApprovalHandler.handle_hold_release()` receives the active `operator_id` so it routes to the correct per-operator `XDG_CONFIG_HOME` (`/sandbox/.config/users/{operator_id}/link-cli-nodejs/config.json`)
+
+Nothing about the TUI or [[war-room]] server needs to change — `solo_warroom.py` is already generic over claw/action_type/payload.
+
+---
+
+## Operator Propagation Chain
+
+```
+FinanceClaw
+   ↓ operator_id from solo_warroom.operator
+SpendWarRoomBridge.submit_spend_request(request)
+   ↓
+operator_id passed through approve_review() → release_hold()
+   ↓
+SpendApprovalHandler.handle_hold_release(action_id, operator_id=...)
+   ↓
+subprocess.run(link-cli ..., env={XDG_CONFIG_HOME: /sandbox/.config/users/{operator_id}})
+   ↓
+link-cli uses /sandbox/.config/users/{operator_id}/link-cli-nodejs/config.json
+```
+
+---
+
+## Methods
+
+### `submit_spend_request(request)`
+
+Turns a `SpendRequest` into a War Room `spend_review` action.
+
+- Calls `SpendApprovalHandler.queue_spend_review(request)`
+- If daily spend cap exceeded, returns `None` (request never reaches War Room)
+- Otherwise queues a REVIEW action in `solo_warroom` and returns the action ID
+
+### `approve_review(warroom_action_id)`
+
+Operator presses `A` on a `spend_review` action.
+
+- Moves spend request from REVIEW → HOLD
+- Queues a new `spend_hold` action in the War Room with a summary that mentions the Link app approval
+
+### `release_hold(warroom_action_id)`
+
+Operator presses `R` on a `spend_hold` action.
+
+- Reads `operator_id` from `self.solo_warroom.operator`
+- Calls `SpendApprovalHandler.handle_hold_release(hold_action_id, operator_id=operator_id)`
+- The handler sets `XDG_CONFIG_HOME=/sandbox/.config/users/{operator_id}` in the subprocess env
+- Returns `(war_room_action, spend_request)` — check `spend_request.status == "released"` to confirm Link approval completed
+
+### `block_review(warroom_action_id)` / `cancel_hold(warroom_action_id)`
+
+Operator presses `B` — kills the request at either stage.
+
+---
+
+## Usage
+
+```python
+from milimo_hermes_plugin.spend_warroom_bridge import SpendWarRoomBridge
+
+bridge = SpendWarRoomBridge(spend_handler, solo_warroom)
+
+# Any claw submits a purchase request
+wr_action_id = bridge.submit_spend_request(request)
+
+# Operator presses 'A' on the spend_review action
+bridge.approve_review(wr_action_id)
+
+# A new spend_hold action appears; operator presses 'R'
+action, spend_request = bridge.release_hold(hold_action_id)
+
+if spend_request and spend_request.status == "released":
+    print(f"Charge completed: {spend_request.link_request_id}")
+else:
+    print("Charge denied or timed out in Link app")
+```
+
+---
+
+## Approval Thresholds
+
+Configured in `solo-founder.yaml`:
+
+```yaml
+finance:
+  spend_review: REVIEW   # Stage 1: operator sees full justification
+  spend_hold: HOLD       # Stage 2: operator explicitly releases → link-cli → Link app
+```
+
+---
+
+## Error Handling
+
+| Path | Behavior |
+|------|----------|
+| Daily spend cap exceeded | `submit_spend_request()` returns `None`; request logged in `agent-spend.log` with status `blocked` |
+| No tracked action ID | Logs warning and returns `None` — no crash |
+| Link app denies/times out | `spend_request.status` is `denied` or `timed_out`; operator sees result in next queue pass |
+| link-cli subprocess fails | Exceptions propagate to `solo_warroom.handle_*`; operator sees error in queue |
+
+---
+
+## Related Pages
+
+- [[spend-handler]] — SpendApprovalHandler two-stage gate and per-operator isolation
+- [[finance-claw]] — Finance Claw entry point
+- [[war-room]] — TUI and HTMX dashboard for pending actions
+- [[approval-thresholds]] — REVIEW/HOLD/AUTO configuration
+- [[link-cli-setup]] — Stripe Link CLI auth, device flow, and token locations
+- [[message-contracts]] — `spend_request`, `spend_review_decision`, `spend_hold_decision` schemas
+
+---
+
+## See Also
+
+- `milimo-blueprint/orchestrator/finance/spend_handler.py` — Python implementation
+- `milimo-blueprint/templates/solo-founder.yaml` — Approval mode configuration
