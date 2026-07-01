@@ -536,8 +536,8 @@ OpenShell gateway. Every message must conform to its schema in `contracts.py`.
 }
 ```
 
-**Contracts file:** `milimo-blueprint/orchestrator/contracts.py`
-Currently defines 27 message type schemas.
+**Contracts file:** `milimo-core/src/milimo_core/contracts.py` (shimmed at `milimo-blueprint/orchestrator/contracts.py`)
+Currently defines 33 message type schemas.
 
 ### Complete Message Matrix
 
@@ -568,6 +568,15 @@ Currently defines 27 message type schemas.
 | Build | Ops | `feature_brief_acknowledged` | Within 10 min of feature_brief |
 | Build | Content | `shipping_summary` | Friday 17:00 (weekly accumulated) |
 | Build | Analytics | `behavior_query` | Before sprint planning |
+| Content | Finance | `spend_request` | Spend request |
+| Ops | Finance | `spend_request` | Spend request |
+| Build | Finance | `spend_request` | Spend request |
+| Assistant | Finance | `spend_request` | Spend request |
+| Assistant | Finance | `spend_review_decision` | Stage 1 review decision |
+| Assistant | Finance | `spend_hold_decision` | Stage 2 hold decision |
+| Assistant | Finance | `hold_release` | Release hold signal |
+| Assistant | Finance | `review_approve` | Approve invoice signal |
+| Assistant | Finance | `review_reject` | Reject invoice signal |
 | Assistant | Any worker | `assistant_query` | On operator request |
 | Assistant | Any worker | `assistant_task` | Delegated task from operator |
 | Any worker | Assistant | `assistant_response` | Response to query/task |
@@ -608,7 +617,11 @@ arrive within 5 minutes, proceed with complexity scores only. Log. Never block.
 recipient claw. Broadcast queries are not permitted — use per-claw queries.
 
 10. **ASSISTANT task delegation:** `assistant_task` requires operator REVIEW
-approval before dispatch if the task involves financial, client, or deploy actions.
+   approval before dispatch if the task involves financial, client, or deploy actions.
+
+11. **FINANCE two-stage spend approval:** Stage 1 REVIEW approve → HOLD queue only.
+   Stage 2 HOLD release → triggers `link-cli` with Stripe Link app tap confirmation.
+
 
 ### Filesystem Isolation
 
