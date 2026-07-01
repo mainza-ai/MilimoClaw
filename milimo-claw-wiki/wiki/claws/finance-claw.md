@@ -125,6 +125,7 @@ If Stage 1 approval triggers transmission: CRITICAL BUG.
 - [[revenue-tracker]] — Revenue tracking
 - [[approval-handler]] — Two-stage approval processing
 - [[spend-handler]] — Agent-initiated purchase approval
+- [[link-cli-setup]] — Stripe Link CLI auth, device flow, and approval URLs
 - [[signal-dispatcher]] — Inter-claw message sending
 - [[finance-scheduler]] — Scheduled tasks
 
