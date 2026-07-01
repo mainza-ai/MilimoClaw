@@ -118,9 +118,7 @@ class SpendWarRoomBridge:
             return None
 
         def _execute() -> None:
-            hold_action_id = self.spend_handler.handle_review_approve(
-                spend_action_id
-            )
+            hold_action_id = self.spend_handler.handle_review_approve(spend_action_id)
             spend_id = spend_action_id.replace("spend-review-", "")
             request = self.spend_handler._requests[spend_id]
 
@@ -179,9 +177,7 @@ class SpendWarRoomBridge:
         result: dict[str, Any] = {}
 
         def _execute() -> None:
-            result["request"] = self.spend_handler.handle_hold_release(
-                hold_action_id
-            )
+            result["request"] = self.spend_handler.handle_hold_release(hold_action_id)
 
         action = self.solo_warroom.handle_hold_release(
             warroom_action_id, execute_fn=_execute

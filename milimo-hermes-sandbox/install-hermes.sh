@@ -374,7 +374,6 @@ prepare_build_context() {
   script_path="$(realpath "${BASH_SOURCE[0]}")"
   local project_root
   project_root="$(dirname "$(dirname "$script_path")")"
-  local sandbox_dir
   sandbox_dir="$(dirname "$script_path")"
 
   log_info "Project root: $project_root"

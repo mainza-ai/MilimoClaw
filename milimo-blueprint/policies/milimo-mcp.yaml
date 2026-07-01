@@ -193,16 +193,32 @@ endpoints:
     optional: true
 
   # Nous Portal - OAuth login and Tool Gateway (hermes setup --portal)
+  # Uses access: full (L4 tunnel) because the hermes CLI binary makes raw
+  # TLS connections that the L7 proxy cannot terminate or inspect.
+  # tls: skip is required so the proxy passes encrypted bytes through
+  # unmodified — OAuth redirects and inference API calls require E2E TLS.
   - host: "portal.nousresearch.com"
     port: 443
-    protocol: "https"
-    methods: ["GET", "POST"]
+    access: full
+    tls: skip
     binaries:
       - "/usr/local/bin/hermes"
       - "/opt/hermes/.venv/bin/python"
     metadata:
       claw: "all"
       purpose: "Nous Portal OAuth authentication and managed tool gateways"
+
+  # Nous Inference API - chat completions after portal login
+  - host: "inference-api.nousresearch.com"
+    port: 443
+    access: full
+    tls: skip
+    binaries:
+      - "/usr/local/bin/hermes"
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "all"
+      purpose: "Nous inference API - chat completions after portal login"
 
   # Optional: Local NIM service
   - host: "nim-service.local"

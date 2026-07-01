@@ -235,6 +235,7 @@ def register_finance_claw(skill_registry: Any) -> None:
             "track_revenue",
             "track_expenses",
             "assess_risk",
+            "request_agent_spend",
         ],
     )
 

@@ -18,9 +18,11 @@ network_policies:
       - host: portal.nousresearch.com
         port: 443
         access: full
+        tls: skip
       - host: inference-api.nousresearch.com
         port: 443
         access: full
+        tls: skip
     binaries:
       - { path: /usr/local/bin/hermes }
       - { path: /opt/hermes/.venv/bin/python }
