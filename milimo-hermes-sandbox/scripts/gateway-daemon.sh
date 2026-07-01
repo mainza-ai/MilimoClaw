@@ -10,6 +10,7 @@
 
 set -euo pipefail
 
+export HOME="/sandbox"
 HERMES_HOME="${HERMES_HOME:-/sandbox/.hermes}"
 ENV_FILE="${HERMES_HOME}/.env"
 GATEWAY_LOG="${HERMES_HOME}/logs/gateway-daemon.log"

@@ -129,6 +129,41 @@ $ export MILIMO_DAILY_SPEND_CAP_CENTS=10000
 # Trigger a spend from any claw (Finance Claw handles the approval flow)
 ```
 
+#### Demo / Test Mode Spend Flow
+
+For testing the spend flow in `test-mode` without using real money, you can use the following test execution protocol (all Stripe calls must include `--test`):
+
+1. **Verify Environment**:
+   * Check that `link-cli` is available (`which link-cli`).
+   * Confirm `MILIMO_SPEND_TEST_MODE` is set in this sandbox environment.
+
+2. **List Available Test Payment Methods**:
+   * Run: `link-cli payment-methods list --format json --test`
+   * *Note*: If the list is empty, add a test card at [app.link.com/wallet](https://app.link.com/wallet) (Card: `4242 4242 4242 4242`, any future expiry, any CVC).
+
+3. **Fetch Payment Method ID**:
+   * Fetch the first payment method ID from the list and store it in the variable `PM_ID`.
+
+4. **Submit Spend Review Request**:
+   * Submit a spend review request via the Finance Claw skill using the `SpendApprovalHandler` / `SpendWarRoomBridge` path (not raw shell):
+     * **Requesting claw**: `build-claw`
+     * **Merchant**: `Vercel`
+     * **Merchant URL**: `https://vercel.com`
+     * **Amount**: `2000` cents ($20.00)
+     * **Justification**: `"Provision preview environment for MilimoVPN demo"`
+     * **Payment method**: `$PM_ID`
+
+5. **Auto-Approve Review**:
+   * Auto-approve the `REVIEW` step (operator == `"system"`) to move it into `HOLD`.
+
+6. **Release Hold**:
+   * Release the `HOLD` — this invokes `link-cli spend-request create --test --request-approval --format json`.
+   * Capture the full `stdout`, `stderr`, and return code.
+
+7. **Verify Output**:
+   * Confirm the `--test` flag was present in the command.
+   * Verify the returned payload contains the created `spend_id`, `link_spend_request_id` (`lsrq_...`), exit code `0`, and the full JSON payload.
+
 **Web Search / Browser Automation / Image Gen / Audio**: Use Hermes + Nous Portal OAuth (`--auth-mode nous_oauth`)
 
 **Stripe Purchases / SaaS Provisioning / Per-Request APIs**: Install `stripe-link-cli` skill — agent-initiated purchases via Finance Claw double-gate.
