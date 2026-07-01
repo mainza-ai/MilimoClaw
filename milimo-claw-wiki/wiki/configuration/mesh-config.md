@@ -27,13 +27,14 @@ Defines the message matrix showing which claws can send which message types to w
 | Analytics | `query`, `content_performance_query`, `performance_signal` |
 | War Room | `draft_ready` |
 | Assistant | `assistant_response` |
+| Finance | `spend_request` |
 
 ### Ops Claw Sends
 
 | Recipient | Message Types |
 |-----------|--------------|
 | Content | `brief`, `project_brief`, `revision_request` |
-| Finance | `query`, `pricing_query`, `project_complete` |
+| Finance | `query`, `pricing_query`, `project_complete`, `spend_request` |
 | Build | `brief`, `feature_brief` |
 | Analytics | `client_onboarded` |
 | War Room | `signal`, `deliverable` |
@@ -56,7 +57,7 @@ Defines the message matrix showing which claws can send which message types to w
 |-----------|--------------|
 | Ops | `response`, `signal`, `pricing_response`, `invoice_ready` |
 | Analytics | `summary`, `revenue_summary` |
-| War Room | `signal`, `deliverable`, `finance_summary`, `overdue_alert` |
+| War Room | `signal`, `deliverable`, `finance_summary`, `overdue_alert`, `spend_hold_decision`, `hold_release` |
 | Assistant | `assistant_response` |
 
 ### Build Claw Sends
@@ -68,6 +69,7 @@ Defines the message matrix showing which claws can send which message types to w
 | Content | `summary`, `shipping_summary` |
 | War Room | `signal`, `deliverable`, `tool_proposal` |
 | Assistant | `assistant_response` |
+| Finance | `spend_request` |
 
 ### Assistant Sends
 
@@ -76,7 +78,7 @@ Defines the message matrix showing which claws can send which message types to w
 | Content | `assistant_query`, `assistant_task` |
 | Ops | `assistant_query`, `assistant_task` |
 | Analytics | `assistant_query`, `assistant_task` |
-| Finance | `assistant_query`, `assistant_task` |
+| Finance | `assistant_query`, `assistant_task`, `spend_request`, `spend_review_decision`, `spend_hold_decision`, `hold_release`, `review_approve`, `review_reject` |
 | Build | `assistant_query`, `assistant_task` |
 | War Room | `assistant_response` |
 
@@ -88,6 +90,7 @@ Defines the message matrix showing which claws can send which message types to w
 | `draft_ready` | Content draft ready |
 | `invoice_ready` | Invoice for approval |
 | `tool_proposal` | Evolution-generated tool |
+| `spend_request` | Request to spend money via Stripe Link |
 
 ## Escalation Rules
 

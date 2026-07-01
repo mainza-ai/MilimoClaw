@@ -470,7 +470,8 @@ class FinanceClaw:
                     action_id = payload.get("action_id", "")
                     decision = payload.get("decision", "")
                     if decision == "release":
-                        request = spend_handler.handle_hold_release(action_id)
+                        operator_id = payload.get("operator_id") or payload.get("approver")
+                        request = spend_handler.handle_hold_release(action_id, operator_id=operator_id)
                         result["spend_status"] = request.status
                         result["action"] = (
                             "spend_completed"

@@ -45,6 +45,15 @@
 | Assistant | Any | `assistant_query` | Status request | 2 min |
 | Assistant | Any | `assistant_task` | Task assignment | Async |
 | Any | Assistant | `assistant_response` | Response to query | Varies |
+| Content | Finance | `spend_request` | Spend request | REVIEW |
+| Ops | Finance | `spend_request` | Spend request | REVIEW |
+| Build | Finance | `spend_request` | Spend request | REVIEW |
+| Assistant | Finance | `spend_request` | Spend request | REVIEW |
+| Assistant | Finance | `spend_review_decision` | Stage 1 review decision | Immediate |
+| Assistant | Finance | `spend_hold_decision` | Stage 2 hold decision | Immediate |
+| Assistant | Finance | `hold_release` | Release hold signal | Immediate |
+| Assistant | Finance | `review_approve` | Approve invoice signal | Immediate |
+| Assistant | Finance | `review_reject` | Reject invoice signal | Immediate |
 
 ---
 
@@ -113,6 +122,15 @@
 - `feature_brief_acknowledged` ← Build
 - `deploy_complete` → Ops
 - `shipping_summary` → Content
+
+### Spend & Approvals
+
+- `spend_request` → Finance (requires approval)
+- `spend_review_decision` → Finance
+- `spend_hold_decision` → Finance
+- `hold_release` → Finance
+- `review_approve` → Finance
+- `review_reject` → Finance
 
 ---
 

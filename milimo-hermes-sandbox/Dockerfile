@@ -347,6 +347,14 @@ RUN { echo; echo "# Auto-start Hermes gateway daemon if not already running"; \
     && { echo; echo "# Auto-start Hermes gateway daemon on login"; \
        echo "[ -x /opt/hermes/scripts/gateway-daemon.sh ] && [ -z \"\$(pgrep -f gateway-daemon.sh 2>/dev/null)\" ] && /opt/hermes/scripts/gateway-daemon.sh >/dev/null 2>&1 &"; \
      } >> /sandbox/.profile \
+    && { echo; echo "# Multi-user Stripe Link credentials isolation"; \
+         echo "if [ -n \"\${MILIMO_OPERATOR:-}\" ]; then"; \
+         echo "  export XDG_CONFIG_HOME=\"/sandbox/.config/users/\${MILIMO_OPERATOR}\""; \
+         echo "fi"; } >> /sandbox/.bashrc \
+    && { echo; echo "# Multi-user Stripe Link credentials isolation"; \
+         echo "if [ -n \"\${MILIMO_OPERATOR:-}\" ]; then"; \
+         echo "  export XDG_CONFIG_HOME=\"/sandbox/.config/users/\${MILIMO_OPERATOR}\""; \
+         echo "fi"; } >> /sandbox/.profile \
     && chown sandbox:sandbox /sandbox/.bashrc /sandbox/.profile \
     && chmod 644 /sandbox/.bashrc /sandbox/.profile
 

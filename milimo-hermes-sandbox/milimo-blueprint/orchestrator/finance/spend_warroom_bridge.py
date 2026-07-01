@@ -177,7 +177,8 @@ class SpendWarRoomBridge:
         result: dict[str, Any] = {}
 
         def _execute() -> None:
-            result["request"] = self.spend_handler.handle_hold_release(hold_action_id)
+            operator_id = getattr(self.solo_warroom, "operator", None)
+            result["request"] = self.spend_handler.handle_hold_release(hold_action_id, operator_id=operator_id)
 
         action = self.solo_warroom.handle_hold_release(
             warroom_action_id, execute_fn=_execute

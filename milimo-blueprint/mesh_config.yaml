@@ -14,9 +14,10 @@ message_matrix:
     analytics: [query, content_performance_query, performance_signal]
     war_room: [draft_ready]
     assistant: [assistant_response]
+    finance: [spend_request]
   ops:
     content: [brief, project_brief, revision_request]
-    finance: [query, pricing_query, project_complete]
+    finance: [query, pricing_query, project_complete, spend_request]
     build: [brief, feature_brief]
     analytics: [client_onboarded]
     war_room: [signal, deliverable]
@@ -31,7 +32,7 @@ message_matrix:
   finance:
     ops: [response, signal, pricing_response, invoice_ready]
     analytics: [summary, revenue_summary]
-    war_room: [signal, deliverable, finance_summary, overdue_alert]
+    war_room: [signal, deliverable, finance_summary, overdue_alert, spend_hold_decision, hold_release]
     assistant: [assistant_response]
   build:
     ops: [signal, deliverable, deploy_complete, feature_brief_acknowledged]
@@ -39,11 +40,12 @@ message_matrix:
     content: [summary, shipping_summary]
     war_room: [signal, deliverable, tool_proposal]
     assistant: [assistant_response]
+    finance: [spend_request]
   assistant:
     content: [assistant_query, assistant_task]
     ops: [assistant_query, assistant_task]
     analytics: [assistant_query, assistant_task]
-    finance: [assistant_query, assistant_task]
+    finance: [assistant_query, assistant_task, spend_request, spend_review_decision, spend_hold_decision, hold_release, review_approve, review_reject]
     build: [assistant_query, assistant_task]
     war_room: [assistant_response]
 
@@ -147,6 +149,25 @@ message_types:
   assistant_response:
     description: "Claw response back to assistant via War Room"
     requires_approval: false
+  spend_request:
+    description: "Request from a claw to spend money via Stripe Link"
+    requires_approval: true
+  spend_review_decision:
+    description: "Decision from operator on spend review (Stage 1)"
+    requires_approval: false
+  spend_hold_decision:
+    description: "Decision from operator on releasing spend hold (Stage 2)"
+    requires_approval: false
+  hold_release:
+    description: "Release signal for held invoice/payment"
+    requires_approval: false
+  review_approve:
+    description: "Approval for invoice review"
+    requires_approval: false
+  review_reject:
+    description: "Rejection for invoice review"
+    requires_approval: false
+
 
 escalation_rules:
   - trigger: "invoice_over_500"

@@ -95,6 +95,13 @@ VALID_MESSAGE_TYPES = {
     "assistant_query",
     "assistant_task",
     "assistant_response",
+    # Spend & approval mesh message types
+    "spend_request",
+    "spend_review_decision",
+    "spend_hold_decision",
+    "hold_release",
+    "review_approve",
+    "review_reject",
 }
 
 # Message types that require War Room approval (AUTO priority by default)
@@ -102,6 +109,54 @@ AUTO_APPROVAL_TYPES = {"finance_summary"}
 
 # Message type schemas for validation
 MESSAGE_TYPE_SCHEMAS: dict[str, dict[str, Any]] = {
+    "spend_request": {
+        "sender_roles": ["build", "ops", "content", "assistant"],
+        "recipient_roles": ["finance"],
+        "required_payload": ["merchant_name", "merchant_url", "amount_cents", "justification"],
+        "optional_payload": ["spend_id", "currency", "payment_method_id", "credential_type"],
+        "frequency": "on_event",
+        "priority": "REVIEW",
+    },
+    "spend_review_decision": {
+        "sender_roles": ["assistant", "war_room"],
+        "recipient_roles": ["finance"],
+        "required_payload": ["action_id", "decision"],
+        "optional_payload": ["amount_cents", "justification", "reason"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    "spend_hold_decision": {
+        "sender_roles": ["assistant", "war_room"],
+        "recipient_roles": ["finance"],
+        "required_payload": ["action_id", "decision"],
+        "optional_payload": ["reason", "operator_id", "approver"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    "hold_release": {
+        "sender_roles": ["assistant", "war_room"],
+        "recipient_roles": ["finance"],
+        "required_payload": [],
+        "optional_payload": ["payment_id", "action_id", "operator_id", "approver", "notes"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    "review_approve": {
+        "sender_roles": ["assistant", "war_room"],
+        "recipient_roles": ["finance"],
+        "required_payload": [],
+        "optional_payload": ["invoice_id", "project_id", "action_id", "operator_id"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
+    "review_reject": {
+        "sender_roles": ["assistant", "war_room"],
+        "recipient_roles": ["finance"],
+        "required_payload": [],
+        "optional_payload": ["invoice_id", "project_id", "action_id", "reason", "operator_id"],
+        "frequency": "on_event",
+        "priority": "AUTO",
+    },
     # Content → War Room: Draft ready for review
     "draft_ready": {
         "sender_roles": ["content"],

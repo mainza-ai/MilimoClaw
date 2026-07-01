@@ -219,6 +219,18 @@ export class WarRoomTUI {
     this.screen.key(["q", "Q"], () => this.stop());
 
     this.screen.key(["r", "R"], () => {
+      if (this.pendingQueue.length > 0 && this.currentIndex < this.pendingQueue.length) {
+        const msg = this.pendingQueue[this.currentIndex];
+        const evalResult = this.engine.evaluateAction(msg);
+        if (
+          evalResult.mode === "HOLD" ||
+          msg.message_type === "spend_hold_decision" ||
+          msg.message_type === "hold_release"
+        ) {
+          this.approveAction();
+          return;
+        }
+      }
       this.refresh();
       this.screen.render();
     });

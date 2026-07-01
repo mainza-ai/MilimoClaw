@@ -299,7 +299,7 @@ $ nemohermes milimo-hermes status
 #### View War Room
 The War Room is a static HTML dashboard at `/opt/hermes/warroom/warroom.html` inside the sandbox:
 ```console
-$ nemohermes milimo-hermes exec -- python3 -m http.server 8080 --directory /opt/hermes/warroom
+$ nemohermes milimo-hermes exec -- python3 /opt/hermes/warroom/server.py 8080
 # Then open http://localhost:8080/warroom.html
 ```
 

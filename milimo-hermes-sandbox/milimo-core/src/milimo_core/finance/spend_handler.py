@@ -255,7 +255,7 @@ class SpendApprovalHandler:
         )
         return action_id
 
-    def handle_hold_release(self, action_id: str) -> SpendRequest:
+    def handle_hold_release(self, action_id: str, operator_id: str | None = None) -> SpendRequest:
         """
         HOLD release -> THIS SPENDS (pending the user's Link app tap).
 
@@ -290,8 +290,20 @@ class SpendApprovalHandler:
             cmd += ["--payment-method-id", request.payment_method_id]
         if request.credential_type == "shared_payment_token":
             cmd += ["--credential-type", "shared_payment_token"]
+        if self.test_mode:
+            cmd += ["--test"]
 
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=310)
+        import os
+        env = {**os.environ}
+        if operator_id:
+            safe_op_id = "".join(c for c in operator_id if c.isalnum() or c in ("-", "_")).strip()
+            if safe_op_id and safe_op_id not in ("system", "operator", "sandbox"):
+                base_config_dir = "/sandbox/.config" if os.path.exists("/sandbox") else os.path.expanduser("~/.config")
+                user_config_dir = f"{base_config_dir}/users/{safe_op_id}"
+                env["XDG_CONFIG_HOME"] = user_config_dir
+                logger.info("Isolating link-cli XDG_CONFIG_HOME for operator %s to %s", safe_op_id, user_config_dir)
+
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=310, env=env)
 
         if proc.returncode != 0:
             request.status = "blocked"
