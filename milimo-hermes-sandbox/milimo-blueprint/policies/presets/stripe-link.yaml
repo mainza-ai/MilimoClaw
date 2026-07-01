@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Stripe Link CLI preset for Milimo Claw.
+#
+# Enables Finance Claw access to the Stripe Link API for payment methods,
+# spend-request creation, and in-app approval flows.
+
+preset:
+  name: stripe-link
+  description: "Stripe Link CLI - payment methods, spend-request approval flows"
+
+network_policies:
+  stripe-link:
+    name: stripe-link
+    endpoints:
+      - host: api.link.com
+        port: 443
+        access: full
+        tls: skip
+
+    binaries:
+      - { path: /usr/local/bin/node }
+      - { path: /usr/local/bin/link-cli }
+      - { path: /opt/hermes/.venv/bin/python }

@@ -42,7 +42,7 @@ ensure_env() {
 }
 
 gateway_pid() {
-  pgrep -f '/usr/local/bin/hermes gateway run' 2>/dev/null || true
+  pgrep -f 'hermes gateway run' 2>/dev/null || true
 }
 
 gateway_running() {

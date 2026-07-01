@@ -86,7 +86,8 @@ class SpendApprovalHandler:
         decisions_path: Path | None = None,
         spend_log_path: Path | None = None,
         link_cli_path: str = "link-cli",
-        daily_spend_cap_cents: int = 10_000,  # $100/day default safety cap
+        daily_spend_cap_cents: int = 10_000,
+        test_mode: bool = True,
     ):
         self.operational_log = operational_log
         self.decisions_path = (
@@ -97,6 +98,7 @@ class SpendApprovalHandler:
         )
         self.link_cli_path = link_cli_path
         self.daily_spend_cap_cents = daily_spend_cap_cents
+        self.test_mode = test_mode
         self._requests: dict[str, SpendRequest] = {}
 
     # ------------------------------------------------------------------
@@ -290,6 +292,8 @@ class SpendApprovalHandler:
             cmd += ["--payment-method-id", request.payment_method_id]
         if request.credential_type == "shared_payment_token":
             cmd += ["--credential-type", "shared_payment_token"]
+        if self.test_mode:
+            cmd += ["--test"]
 
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=310)
 
