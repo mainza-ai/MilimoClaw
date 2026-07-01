@@ -3,8 +3,10 @@
 
 import os
 
-ORCHESTRATOR_DIR = "/Users/mck/Desktop/MilimoClaw/milimo-blueprint/orchestrator"
-MILIMO_CORE_DIR = "/Users/mck/Desktop/MilimoClaw/milimo-core/src/milimo_core"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(SCRIPT_DIR)
+ORCHESTRATOR_DIR = os.path.join(ROOT_DIR, "milimo-blueprint", "orchestrator")
+MILIMO_CORE_DIR = os.path.join(ROOT_DIR, "milimo-core", "src", "milimo_core")
 
 PACKAGE_MAP = {
     "analytics": "analytics",
