@@ -2,7 +2,7 @@
 
 **Summary**: Append-only record of all wiki operations.
 
-**Last updated**: 2026-06-30
+**Last updated**: 2026-07-01
 
 **Tags**: #log #meta
 
@@ -26,6 +26,20 @@
 - Updated `README.md` — Agent-Initiated Spend section
 
 ---
+
+### 2026-06-30 — Fix: Nous Portal 403 + install-hermes.sh sandbox_dir scope bug
+
+**Pages**: `wiki/architecture/hermes-profile.md`, `wiki/policies/network-egress.md`, `index.md`, `log.md`
+
+**Source**: Live proxy diagnosis in running milimo-hermes sandbox (CONNECT tunnel 403 from `10.200.0.1:3128`), bash `local` scope bug
+
+**Changes**:
+- `milimo-blueprint/policies/presets/nous-portal.yaml`: added `tls: skip` to both `portal.nousresearch.com` and `inference-api.nousresearch.com` endpoints (L4 raw tunnel required for hermes CLI binary)
+- `milimo-blueprint/policies/milimo-mcp.yaml`: switched Nous Portal entries from `protocol: https` (L7) to `access: full + tls: skip` (L4), added `inference-api.nousresearch.com` for chat completions
+- `milimo-hermes-sandbox/install-hermes.sh`: removed `local` keyword from `sandbox_dir` on line 377 so it is in scope for `main()` at line 581
+- Applied `nous-portal` preset v7 to running sandbox live
+- Wiki `hermes-profile.md`: documented `tls: skip` requirement, `inference-api` endpoint, sandbox_dir fix
+- Wiki `network-egress.md`: updated Nous Portal tunnel config in both `milimo-mcp` section and preset example
 
 ### 2026-06-30 — Phase 1 + 3: Hermes File Sync (Claw Layouts, Paths, Sync CLI, Inventory)
 

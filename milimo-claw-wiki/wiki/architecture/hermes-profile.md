@@ -255,11 +255,13 @@ nemohermes milimo-hermes exec -- nohup /opt/hermes/scripts/gateway-daemon.sh >/d
 
 **Fix** (baked in `install-hermes.sh`): Post-onboarding step runs `nemohermes milimo-hermes policy-add --from-dir .../presets/ --yes`, which loads the `nous-portal` preset. The preset file is at `milimo-blueprint/policies/presets/nous-portal.yaml`.
 
-**Correct OpenShell policy preset format**:
+**Root cause (v7 fix)**: The preset and `milimo-mcp.yaml` both used `access: full` (L4 tunnel) but were missing `tls: skip`. Without `tls: skip`, the proxy attempts to terminate TLS at L7 instead of passing raw bytes through — the CONNECT tunnel is rejected with 403. `tls: skip` tells the proxy to pass encrypted bytes unmodified, which is required for OAuth flows and the `hermes` CLI binary's raw TLS connections.
+
+**Correct OpenShell policy preset format** (`nous-portal.yaml`):
 ```yaml
 preset:
   name: nous-portal
-  description: "..."
+  description: "Nous Portal OAuth login, inference API, and managed Tool Gateway setup"
 
 network_policies:
   nous-portal:
@@ -267,13 +269,45 @@ network_policies:
     endpoints:
       - host: portal.nousresearch.com
         port: 443
-        access: full    # L4 tunnel (OAuth needs end-to-end TLS)
+        access: full
+        tls: skip          # REQUIRED — pass raw TLS through L4 tunnel
+      - host: inference-api.nousresearch.com
+        port: 443
+        access: full
+        tls: skip          # REQUIRED — chat completions after portal login
     binaries:
       - { path: /usr/local/bin/hermes }
+      - { path: /opt/hermes/.venv/bin/python }
 ```
+
+**Correct `milimo-mcp.yaml` entries** (base policy, loaded at build time):
+```yaml
+# Nous Portal - OAuth login and Tool Gateway (hermes setup --portal)
+# Uses access: full (L4 tunnel) because the hermes CLI binary makes raw
+# TLS connections that the L7 proxy cannot terminate or inspect.
+# tls: skip is required so the proxy passes encrypted bytes through
+# unmodified — OAuth redirects and inference API calls require E2E TLS.
+- host: "portal.nousresearch.com"
+  port: 443
+  access: full
+  tls: skip
+  binaries:
+    - "/usr/local/bin/hermes"
+    - "/opt/hermes/.venv/bin/python"
+
+# Nous Inference API - chat completions after portal login
+- host: "inference-api.nousresearch.com"
+  port: 443
+  access: full
+  tls: skip
+  binaries:
+    - "/usr/local/bin/hermes"
+    - "/opt/hermes/.venv/bin/python"
+```
+
 Key rules:
 - `preset:` wrapper at top level (not raw `name:`/`endpoints:`)
-- Use `access: full` for raw TCP/HTTPS tunnels (not `protocol: https`)
+- Use `access: full` + `tls: skip` for raw TCP/HTTPS tunnels (NOT `protocol: https`)
 - Valid protocols: `rest`, `websocket`, `graphql`, `sql` (not `https`)
 - Endpoint field `methods` is not valid — use `access` or `rules` instead
 - `--from-file <path>` uses the file path as the preset label, not the `preset.name` from YAML
@@ -294,6 +328,13 @@ Even with `--recreate-sandbox`, nemohermes restores policy from backup. The reli
 The `build_onboard_command()` function defined the correct onboard flags with `--fresh`, but `main()` was constructing the command inline without calling it, so `--fresh` was never passed in non-interactive mode. Same for `--recreate-sandbox`.
 
 **Fix**: `main()` now calls `build_onboard_command()` and passes its output to `eval`. Both flags are now included in non-interactive mode.
+
+#### `sandbox_dir` Unbound Variable in `install-hermes.sh`
+`prepare_build_context()` declared `sandbox_dir` as `local` (line 377). Bash `local` variables are function-scoped, so `main()` could not see `sandbox_dir` at line 581 when applying policy presets post-onboarding.
+
+**Error**: `./install-hermes.sh: line 581: sandbox_dir: unbound variable`
+
+**Fix**: Removed `local` keyword from line 377 so `sandbox_dir` is in `main()`'s scope. Same issue existed in `build_docker_image()` at line 416 but that function uses its own copy — only the `main()` reference needed fixing.
 
 #### Two Copies of `milimo-mcp.yaml` Must Stay in Sync
 There are two copies of the policy file:

@@ -423,11 +423,26 @@ The Hermes profile uses **binary-scoped** network policies — each rule specifi
 ```yaml
 network_policies:
   # Nous Portal — OAuth login and Tool Gateway setup
+  # Uses access: full + tls: skip (L4 tunnel) because the hermes CLI
+  # binary makes raw TLS connections that the L7 proxy cannot terminate.
   nous_portal:
     endpoints:
       - host: portal.nousresearch.com
         port: 443
-        access: full          # L4 tunnel (OAuth needs end-to-end TLS)
+        access: full
+        tls: skip
+    binaries:
+      - { path: /usr/local/bin/hermes }
+      - { path: /opt/hermes/.venv/bin/python }
+
+  # Nous Inference API - chat completions after portal login
+  # Also L4 tunnel with tls: skip — required for E2E TLS.
+  nous_inference:
+    endpoints:
+      - host: inference-api.nousresearch.com
+        port: 443
+        access: full
+        tls: skip
     binaries:
       - { path: /usr/local/bin/hermes }
       - { path: /opt/hermes/.venv/bin/python }
@@ -453,7 +468,7 @@ The Hermes profile supports custom policy presets in the OpenShell policy preset
 ```yaml
 preset:
   name: nous-portal
-  description: "Allow access to Nous Portal"
+  description: "Allow access to Nous Portal OAuth, inference API, and managed tool gateways"
 
 network_policies:
   nous-portal:
@@ -462,13 +477,20 @@ network_policies:
       - host: portal.nousresearch.com
         port: 443
         access: full
+        tls: skip          # REQUIRED — L4 tunnel for raw TLS
+      - host: inference-api.nousresearch.com
+        port: 443
+        access: full
+        tls: skip          # REQUIRED — chat completions
     binaries:
       - { path: /usr/local/bin/hermes }
+      - { path: /opt/hermes/.venv/bin/python }
 ```
 
 Key differences from raw policy YAML:
 - Requires `preset:` wrapper at top level
-- Endpoints use `access: full` (L4 tunnel) for raw TLS instead of `protocol: rest`
+- Endpoints use `access: full` + `tls: skip` (L4 tunnel) for raw TLS instead of `protocol: rest`
+- `tls: skip` is **required** — without it, the OpenShell proxy attempts to terminate TLS at L7 and rejects the CONNECT tunnel with 403
 - Valid protocols for L7 inspection: `rest`, `websocket`, `graphql`, `sql` (not `https`)
 - Place preset files in `policies/presets/` subdirectory
 
