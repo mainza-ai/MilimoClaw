@@ -48,7 +48,27 @@ link-cli uses the scoped config for the correct Link account
 
 ---
 
-## Methods
+## ⚠️ Verified Audit Findings
+
+| Finding | Severity | Status |
+|---|---|---|
+| **SA-1.1** [Critical] | War Room operator surface absent from OpenClaw (NemoClaw profile); Hermes HTMX server in `server.py:L42-76` is the only human-approval UI | **Verified Correct** |
+| **SA-1.3** [High] | Bridge CLI lacks `approve-action` / `veto-action` subcommands; operators forced to use Hermes HTMX UI | **Verified Correct** |
+| **SA3-1** [Critical] | `handle_hold_release()` has no idempotency lock; duplicate `R` press → duplicate Link sessions → duplicate charges | **Verified Correct** |
+
+### SA-1.1: OpenClaw (NemoClaw) Has No Native War Room Operator UI
+
+`server.py:L87-133` defines the HTMX HTTP server that moves files from `war_room` queue inbox to claw-specific inboxes (`mesh/inbox/finance`). The native NemoClaw profile uses `solo_warroom.py` to stage actions but has no HTTP listener, server loop, or CLI approval command. OpenClaw operators are blind to the War Room queue unless using the Hermes plugin manually.
+
+**Fix**: Port `server.py` to `milimo-blueprint/orchestrator/` or add a CLI command: `milimo warroom approve <action_id>`.
+
+### SA3-1: Duplicate Charge Risk on Hold Release
+
+`SpendWarRoomBridge.release_hold()` calls `SpendApprovalHandler.handle_hold_release()` synchronously. There is no check whether a Link session ID already exists for the `spend_id`. If the operator presses `R` twice (or the bridge dispatches twice before the first call completes), `subprocess.run(cmd_create, ...)` creates two Stripe Link sessions and charges the operator twice.
+
+**Fix**: Write a `spend_lock_<spend_id>` sentinel file before executing the create command; skip if already present.
+
+---
 
 ### `submit_spend_request(request)`
 

@@ -71,7 +71,55 @@ Manual verification:
 2. Reject events older than 5 minutes (replay attack prevention)
 3. Verify HMAC-SHA256 signature
 
-## API Fallback
+## CLI Implementation
+
+### Stripe CLI Subprocess (MilimoClaw Spend Handler)
+
+The spend path in `milimo-core` invokes the Stripe CLI directly via `subprocess.run`:
+
+```python
+cmd = ["stripe", *args, "--api-key", self.api_key, "--format", "json"]
+proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
+```
+
+> [!WARNING]
+> **Audit Finding F5-1 [Critical]**: Passing the Stripe secret key on the command line as `--api-key` exposes it to all local users via `/proc/*/cmdline` and `ps aux`. The key should be passed via the `STRIPE_API_KEY` environment variable instead of as an argument:
+> ```python
+> cmd = ["stripe", *args, "--format", "json"]
+> env = {**os.environ, "STRIPE_API_KEY": self.api_key}
+> proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds, env=env)
+> ```
+
+Source: `milimo-core/src/milimo_core/finance/stripe_client.py:L84`.
+
+### Python SDK Path (Direct API)
+
+When Stripe CLI is unavailable, direct REST calls use the `Authorization: Bearer` header in urllib — this does not expose the key to the process table:
+```python
+headers = {
+    "Authorization": f"Bearer {api_key}",
+    "Content-Type": "application/x-www-form-urlencoded",
+    "Stripe-Version": "2024-12-18.acacia",
+}
+```
+
+## Webhook Handling
+
+```python
+def verify_webhook(payload: str, sig_header: str) -> dict | None:
+    # Uses Stripe SDK if available
+    # Falls back to manual HMAC verification
+```
+
+Manual verification:
+1. Parse signature header for timestamp and signature
+2. Reject events older than 5 minutes (replay attack prevention)
+3. Verify HMAC-SHA256 signature
+
+> [!WARNING]
+> **Audit Finding SA-7.1 [High]**: `webhook_server.py:L89-98` catches all exceptions in inbound handlers, logs the error, and always returns HTTP 200. A malformed or spoofed webhook will be silently dropped rather than causing a visible 5xx, masking delivery failures. Returns should be HTTP 500 when internal execution fails.
+
+Source: `milimo-core/src/milimo_core/ops/webhook_server.py:L89-98`.
 
 When Stripe CLI unavailable:
 ```python

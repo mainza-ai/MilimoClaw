@@ -6,7 +6,7 @@
 - `raw/AGENTS.md`
 - `raw/SOLO_TEMPLATE_SPEC.md`
 
-**Last updated**: 2026-04-23
+**Last updated**: 2026-07-03
 
 **Tags**: #coordination #sequencing #rules
 
@@ -165,6 +165,27 @@ Never block sprint planning.
 **Enforcement**:
 - 5-minute timeout in Issue Manager
 - Log timeout and proceed
+
+---
+
+## ⚠️ Verified Audit Findings
+
+### SA2-1 [Critical]: Sprint Pipeline Stall — `handle_sprint_plan_approved()` Is Unwired
+
+**Location**: `milimo-core/src/milimo_core/build/issue_manager.py:L278-295`, `milimo-core/src/milimo_core/build/build_claw.py:L537-583`
+
+**Trace**:
+1. Build Claw generates a sprint plan, writes it to `current-plan.json` with status `"pending_review"`.
+2. `_watch_for_approval` polls the file every 30 seconds.
+3. When the operator approves the plan via the War Room, the War Room writes a `sprint_plan_approved` action.
+4. **No route, CLI command, or event bus subscriber calls `IssueManager.handle_sprint_plan_approved()`.**
+5. The status field is never updated; the polling loop waits indefinitely and the pipeline times out.
+
+**Status**: **Verified Correct** (only calls are from `test_build_unit.py`).
+
+**Fix**: Wire `SoloWarRoom` approvals for `action_type == "sprint_plan"` to trigger `handle_sprint_plan_approved()`.
+
+> Related: [[build-claw]], [[sequencing-rules|Rule 8]].
 
 ---
 

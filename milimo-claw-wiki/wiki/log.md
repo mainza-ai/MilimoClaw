@@ -1343,3 +1343,30 @@ Each entry follows this format:
 - ✅ `curl http://localhost:8642/health` returns 200 within seconds of boot
 - ✅ `nemohermes milimo-hermes recover` completes without timeout
 - ✅ All CI fixes committed to `origin/main`
+
+---
+
+### 2026-07-03 — Independent Line-Level Audit: Wiki Updated (1,239 Tests Verified)
+
+**Pages**: `wiki/modules/finance/stripe-client.md`, `wiki/modules/evolution/sandbox-runner.md`, `wiki/security/sandbox-hardening.md`, `wiki/modules/finance/spend-handler.md`, `wiki/modules/finance/spend-warroom-bridge.md`, `wiki/modules/finance/invoice-manager.md`, `wiki/modules/finance/finance-claw.md`, `wiki/architecture/mesh-coordinator.md`, `wiki/coordination/sequencing-rules.md`, `wiki/modules/infrastructure/bridge-cli.md`, `wiki/architecture/system-overview.md`, `wiki/index.md`, `wiki/log.md`
+
+**Source**: `milimo-audit-report.md` (independent line-level audit, 2026-07-03, 11 scope areas, 302 lines). All findings verified against current codebase. Hallucinated findings removed (F5-2, SA-1.4'Orphaned `RegionDetector` one removed; copy-drift SA-1.4 confirmed and retained).
+
+**Changes**:
+- Added **Finding F5-1 [Critical]** to `stripe-client.md`: Stripe api-key exposed via subprocess command line; environment variable mitigation documented.
+- Added **Finding SA-4.3 [Critical]** to `sandbox-runner.md`: `subprocess.run([sys.executable, "-c", script])` is un-jailed; added "Known Limitation" section; confirmed claims in `sandbox-hardening.md` and `sandbox-isolation.md` do NOT apply to `SandboxRunner`.
+- Added **Finding 10-A [High]** notice to `sandbox-hardening.md`: NemoClaw container controls are correct; `SandboxRunner` in-process isolation is not.
+- Added **Findings SA3-1, SA3-2, SA3-3** to `spend-handler.md`: idempotency gap, per-tx daily cap, missing fsync on decisions.log.
+- Added **Findings SA-1.1, SA-1.3, SA3-1** to `spend-warroom-bridge.md`: OpenClaw lacks War Room operator UI; handle_hold_release has no idempotency lock.
+- Added **Finding SA3-5** to `invoice-manager.md`: duplicate invoice creation on retry due to unchecked `stripe_invoice_id`.
+- Added **Finding SA-1.4** to `finance-claw.md`: sandboxed `finance_claw.py` omits `test_mode` parameter; real payment flows cannot be enabled even with `MILIMO_SPEND_TEST_MODE=false`.
+- Added **Findings SA-4.1, SA-4.2, SA2-1** to `mesh-coordinator.md`: plaintext mesh fallback, outbox pattern missing, ContractValidator softly enforced.
+- Added **Finding SA2-1** to `sequencing-rules.md`: sprint pipeline stalls because `handle_sprint_plan_approved()` has no production caller.
+- Added **Finding SA-1.3** to `bridge-cli.md`: `SoloWarRoom` imported but CLI approval subcommands absent.
+- Added **Finding SA-6.1** to `system-overview.md`: `RegionDetector` is dead/orphaned code, never imported.
+- Added "Audit & Production-Readiness" section to `index.md` with scope area index and `milimo-audit-report.md` reference.
+
+**Verification**:
+- ✅ 1,239 tests pass in `milimo-blueprint/tests/` (0 warnings, 0 issues)
+- ✅ All edited wiki pages follow CLAUDE.md format template
+- ✅ No hallucinated findings retained; all cited with file:line references

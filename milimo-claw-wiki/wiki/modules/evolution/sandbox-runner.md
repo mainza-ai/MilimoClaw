@@ -1,6 +1,6 @@
 # Sandbox Runner
 
-**Summary**: Executes tool backtests in isolated subprocess with restricted builtins, no network access, and resource limits.
+**Summary**: Backtest execution in an isolated subprocess. ⚠️ **AUDIT FINDING SA-4.3 [Critical]**: The Python `SandboxRunner` executes code directly on the host shell via `subprocess.run([sys.executable, "-c", sandbox_script], ...)` with no Bubblewrap, Docker, or Landlock containment boundary. Any generated code has unrestricted filesystem and network access. The original Architecture doc and this page claimed strict isolation — this is **incorrect**.
 
 **Sources**: `milimo-blueprint/orchestrator/evolution/sandbox_runner.py`
 
@@ -71,6 +71,35 @@ if result.improvement_pct >= 5.0:
 3. **Sandbox Script Creation** — Generate isolated execution script
 4. **Subprocess Execution** — Run with resource limits and timeout
 5. **Result Parsing** — Extract JSON output, calculate improvement
+
+## ⚠️ Known Limitation: No Process Isolation Boundary
+
+**Audit Finding SA-4.3 [Critical]** confirms that `SandboxRunner` does not isolate execution:
+
+```python
+result = subprocess.run(
+    [sys.executable, "-c", sandbox_script],
+    capture_output=True,
+    text=True,
+    timeout=self._config.timeout_seconds,
+)
+```
+
+The subprocess inherits the current user's full filesystem, network, and environment. The "SandboxConfig" parameters (`blocked_imports`, `read_only_paths`, memory limits) are **best-effort hints applied within the script itself** — a malicious LLM-generated tool can bypass them trivially (e.g., `importlib.import_module`, `ctypes`, raw HTTP requests without `requests`/`urllib`).
+
+**Current mitigations only**:
+- AST pre-scan blocks explicit imports of `subprocess`, `socket`, `eval`, etc.
+- Memory limit via `resource.setrlimit` (Linux only; silently skipped on macOS)
+- 30-second subprocess timeout
+- Read-only historical data passed via temp file
+
+**What is missing**:
+- No `bwrap` (Bubblewrap) containment
+- No Docker container isolation
+- No Landlock per-invocation enforcement
+- No network namespace separation
+
+Source: `milimo-core/src/milimo_core/evolution/sandbox_runner.py` (verified 2026-07-03).
 
 ## Security Features
 

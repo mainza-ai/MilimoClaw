@@ -4,7 +4,7 @@
 
 **Sources**: `milimo-blueprint/orchestrator/finance/finance_claw.py`
 
-**Last updated**: 2026-04-17
+**Last updated**: 2026-07-03
 
 **Tags**: #claw #finance #entry-point
 
@@ -70,6 +70,26 @@ STRIPE_API_KEY=sk_...
 ```
 
 If not configured, Finance Claw uses a mock Stripe client with a warning logged.
+
+> [!WARNING]
+> **Audit Finding F5-1 [Critical]**: `stripe_client.py:L84` passes the Stripe secret key as `--api-key` on the subprocess command line. The key is visible to all local users via `ps` and `/proc/*/cmdline`. Fix: pass via `STRIPE_API_KEY` environment variable. See [[stripe-client]] for details and remediation.
+
+---
+
+## ⚠️ Audit Finding SA-1.4 [Medium]: Copy-Drift Between Core and Sandbox
+
+Verified copy-drift between `milimo-core` and `milimo-hermes-sandbox`:
+
+| File | `test_mode` prop passed to `SpendApprovalHandler`? |
+|---|---|
+| `milimo-core/src/milimo_core/finance/finance_claw.py:L197-198` | ✅ Yes: `test_mode=_os.environ.get("MILIMO_SPEND_TEST_MODE", "true").lower() == "true"` |
+| `milimo-hermes-sandbox/milimo-core/src/milimo_core/finance/finance_claw.py:L190-197` | ❌ No: `test_mode` parameter entirely omitted |
+
+**Impact**: The sandbox copy forces `SpendApprovalHandler` to use its default (`test_mode=True`) regardless of the `MILIMO_SPEND_TEST_MODE` environment variable. **Real-payment flows can never be enabled in the sandbox, even when `MILIMO_SPEND_TEST_MODE=false` is set.** This is a parity/configuration bug — the operator believes test mode is off while the handler stays in test mode.
+
+**Fix**: Sync `finance_claw.py` from `milimo-core/` to `milimo-hermes-sandbox/`, including the `test_mode=_os.environ.get(...)` line. Use `docker cp` to propagate changes to the running container.
+
+Source: `milimo-audit-report.md`, Finding SA-1.4.
 
 ---
 

@@ -8,7 +8,7 @@
 - `milimo/src/lib/python-bridge.ts`
 - `milimo/src/lib/rpc-bridge.ts`
 
-**Last updated**: 2026-06-19
+**Last updated**: 2026-07-03
 
 **Tags**: #module #bridge #cli #typescript
 
@@ -162,6 +162,12 @@ const result = await rpc.call("bridge", {
 | `handle_claw_status()` | `claw_status` |
 | `handle_mesh_status()` | `mesh_status` |
 | `handle_squad_status()` | `squad_status` |
+
+## ⚠️ Verified Audit Finding SA-1.3 [High]: Missing CLI Approval Commands
+
+`bridge_cli.py:L456-535` imports `SoloWarRoom` but only exposes read-only summary commands (`handle_revenue_summary`, `handle_morning_brief`). Neither `approve-action` nor `veto-action` subcommands exist. Operators are forced to use the Hermes HTMX web UI; shell-native CLI operators have no approval path.
+
+**Fix**: Add CLI handlers for `approve-action <action_id>` and `veto-action <action_id>` routing through `SoloWarRoom.decide()`.
 
 ---
 

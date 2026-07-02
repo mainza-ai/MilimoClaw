@@ -47,6 +47,12 @@ class InvoiceManager:
         pass
 ```
 
+## ⚠️ Audit Findings — Verified Limitations
+
+| Finding | Severity | Location | Gap |
+|---|---|---|---|
+| **SA3-5** | Medium | `invoice_manager.py:L444-463` | `send_invoice()` calls `stripe_client.create_invoice()` without first checking `invoice.stripe_invoice_id`. If the Stage 2 release handler crashes after writing the Stripe return ID but before the local file write, a retry creates a duplicate Stripe invoice. Fix: check `if invoice.stripe_invoice_id: return` before calling Stripe create APIs. |
+
 ## Two-Stage Approval
 
 **CRITICAL**: Two-stage approval is NON-NEGOTIABLE.

@@ -97,7 +97,7 @@ Inter-claw communication and mesh management.
 - **Mesh Coordinator**: Central message routing
 - **Gateway Adapter**: OpenShell gateway interface
 - **Typed Contracts**: Message schema validation
-- **Region Detector**: Multi-region support
+- **Region Detector**: Multi-region support — ⚠️ **SA-6.1 [High]: `region_detector.py:L108-442` is never imported or called anywhere. Class is dead/orphaned code as of 2026-07-03.**
 - **Latency Monitor**: Performance tracking
 - **Failover Manager**: Redundancy handling
 
