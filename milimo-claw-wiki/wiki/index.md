@@ -304,6 +304,7 @@ See [[log]] for complete operation history.
 
 | Date | Change | Pages Affected |
 |------|--------|----------------|
+| 2026-07-02 | Stripe Link system/default operator XDG_CONFIG_HOME fallback: handle_hold_release defaults to /sandbox/.config for empty/system/operator/sandbox operator_ids; added container runtime code paths to spend-handler.md and test-spend-flow.md | spend-handler.md, link-cli-setup.md, spend-warroom-bridge.md, test-spend-flow.md |
 | 2026-07-02 | Stripe Link spend flow robustness: robust JSON list parsing in handle_hold_release, SpendApprovalHandler state recovery via _get_request() from decisions.log, SpendWarRoomBridge _find_action_payload fallback, new test_spend_flow.py (3 tests) | spend-handler.md, spend-warroom-bridge.md, test-spend-flow.md, testing.md, link-cli-setup.md, network-egress.md |
 | 2026-07-01 | Wiki multi-user link-cli isolation + HTMX war room + key binding fix: per-operator XDG_CONFIG_HOME, Dockerfile .bashrc/.profile hook, handle_hold_release operator_id propagation, operator-aware env; war-room HTMX server docs, context-sensitive R key; new spend-warroom-bridge page | link-cli-setup.md, war-room.md, spend-warroom-bridge.md, finance-claw.md, index.md |
 | 2026-06-30 | Phase E7: Gateway daemon sandbox resilience (socat forwarder, .bashrc/.profile hooks), CI build context fixes, gh CLI, milimo_core.build git fix | hermes-profile.md, implementation-plan.md, log.md, index.md |

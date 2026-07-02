@@ -92,6 +92,22 @@ This prevents crashes when `link-cli` wraps its response in an array due to mult
 
 ---
 
+## XDG_CONFIG_HOME Fallback for Default Operators
+
+`handle_hold_release` defaults `XDG_CONFIG_HOME` to `/sandbox/.config` when `operator_id` is missing, empty, or one of the default system IDs (`system`, `operator`, `sandbox`). This prevents the orchestrator daemon from falling back to `/root/.config/link-cli-nodejs/config.json`, which is unauthenticated and causes Stripe Link API failures.
+
+```python
+env = os.environ.copy()
+if operator_id and operator_id not in ("system", "operator", "sandbox", ""):
+    env["XDG_CONFIG_HOME"] = f"/sandbox/.config/users/{operator_id}"
+else:
+    env["XDG_CONFIG_HOME"] = "/sandbox/.config"
+```
+
+This pairs with `_get_request(spend_id)` replacing direct `self._requests[...]` access in `handle_hold_release`, so a post-restart handler never crashes mid-release due to an empty in-memory cache.
+
+---
+
 ## Daemon Restart / State Recovery
 
 `SpendApprovalHandler` survives orchestrator restarts without losing spend state. A private `_get_request(spend_id)` method:
@@ -142,6 +158,38 @@ A dedicated `agent-spend.log` records completed purchase details:
 
 ```json
 {"spend_id": "abc123", "claw": "build", "merchant_name": "Neon", "amount_cents": 5000, ...}
+```
+
+---
+
+## Container / Runtime Code Paths
+
+Inside a running Hermes sandbox container, the active Python modules may resolve from one of several paths depending on how the blueprint was installed:
+
+| Path | When Used |
+|------|-----------|
+| `/sandbox/.nemoclaw/blueprints/0.1.0/orchestrator/finance/spend_handler.py` | Blueprint-managed runtime |
+| `/opt/nemoclaw-blueprint/orchestrator/finance/spend_handler.py` | System-wide blueprint |
+| `/opt/milimo-core/src/milimo_core/finance/spend_handler.py` | Core package install |
+
+The host source of truth is `milimo-core/src/milimo_core/finance/spend_handler.py`. After host edits, sync to the container with:
+
+```bash
+docker cp milimo-core/src/milimo_core/finance/spend_handler.py \
+  <container>:/sandbox/.nemoclaw/blueprints/0.1.0/orchestrator/finance/spend_handler.py
+
+docker cp milimo-core/src/milimo_core/finance/spend_handler.py \
+  <container>:/opt/nemoclaw-blueprint/orchestrator/finance/spend_handler.py
+
+docker cp milimo-core/src/milimo_core/finance/spend_handler.py \
+  <container>:/opt/milimo-core/src/milimo_core/finance/spend_handler.py
+```
+
+Run tests inside the container against the blueprint path:
+
+```bash
+docker exec -u sandbox <container> env PYTHONPATH=/sandbox/.nemoclaw/blueprints/0.1.0 \
+  /opt/hermes/.venv/bin/pytest /sandbox/.nemoclaw/blueprints/0.1.0/tests/test_spend_flow.py
 ```
 
 ---

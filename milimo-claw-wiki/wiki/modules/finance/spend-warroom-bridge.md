@@ -36,10 +36,15 @@ operator_id passed through approve_review() → release_hold()
    ↓
 SpendApprovalHandler.handle_hold_release(action_id, operator_id=...)
    ↓
-subprocess.run(link-cli ..., env={XDG_CONFIG_HOME: /sandbox/.config/users/{operator_id}})
+if operator_id is named (alice, bob, ...):
+  XDG_CONFIG_HOME=/sandbox/.config/users/{operator_id}
+else (system/operator/sandbox/empty):
+  XDG_CONFIG_HOME=/sandbox/.config
    ↓
-link-cli uses /sandbox/.config/users/{operator_id}/link-cli-nodejs/config.json
+link-cli uses the scoped config for the correct Link account
 ```
+
+> **Default operator fallback**: When `operator_id` is missing, empty, or one of the default system IDs (`system`, `operator`, `sandbox`), `handle_hold_release` falls back to `/sandbox/.config` instead of leaving `XDG_CONFIG_HOME` unset. Leaving it unset causes `link-cli` to use `/root/.config/link-cli-nodejs/config.json`, which is unauthenticated and results in Stripe Link API failures.
 
 ---
 
@@ -66,7 +71,7 @@ Operator presses `R` on a `spend_hold` action.
 
 - Reads `operator_id` from `self.solo_warroom.operator`
 - Calls `SpendApprovalHandler.handle_hold_release(hold_action_id, operator_id=operator_id)`
-- The handler sets `XDG_CONFIG_HOME=/sandbox/.config/users/{operator_id}` in the subprocess env
+- The handler sets `XDG_CONFIG_HOME` for named operators (`/sandbox/.config/users/{operator_id}`) or falls back to `/sandbox/.config` for system/empty operators
 - Returns `(war_room_action, spend_request)` — check `spend_request.status == "released"` to confirm Link approval completed
 
 ### `block_review(warroom_action_id)` / `cancel_hold(warroom_action_id)`

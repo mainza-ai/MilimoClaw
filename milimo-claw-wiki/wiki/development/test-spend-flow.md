@@ -22,6 +22,16 @@ pytest milimo-blueprint/tests/test_spend_flow.py
 # Result: 3 passed in 0.05s
 ```
 
+Run inside the live Hermes sandbox container:
+
+```bash
+docker exec -u sandbox <container-id> env PYTHONPATH=/sandbox/.nemoclaw/blueprints/0.1.0 \
+  /opt/hermes/.venv/bin/pytest /sandbox/.nemoclaw/blueprints/0.1.0/tests/test_spend_flow.py
+# Result: 3 passed in 0.05s
+```
+
+The container active code path is typically `/sandbox/.nemoclaw/blueprints/0.1.0/`. If host edits do not appear inside the container, sync with `docker cp` to that path before running tests.
+
 Run with the full suite:
 
 ```bash

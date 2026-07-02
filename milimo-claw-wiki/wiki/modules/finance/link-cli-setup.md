@@ -235,11 +235,13 @@ The sandbox supports **multiple operators with isolated Link accounts**. Isolati
 # spend_handler.py
 def handle_hold_release(self, action_id: str, operator_id: str) -> SpendRequest:
     spend_id = action_id.replace("spend-hold-", "")
-    request = self._requests[spend_id]
+    request = self._get_request(spend_id)
 
     env = os.environ.copy()
-    if operator_id and operator_id != "system":
+    if operator_id and operator_id not in ("system", "operator", "sandbox", ""):
         env["XDG_CONFIG_HOME"] = f"/sandbox/.config/users/{operator_id}"
+    else:
+        env["XDG_CONFIG_HOME"] = "/sandbox/.config"
 
     cmd = [
         self.link_cli_path,
@@ -250,6 +252,21 @@ def handle_hold_release(self, action_id: str, operator_id: str) -> SpendRequest:
         "--format", "json",
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=310, env=env)
+```
+
+### Default / System Operator Fallback
+
+When `operator_id` is missing, empty, or one of the default system IDs (`system`, `operator`, `sandbox`), `XDG_CONFIG_HOME` falls back to `/sandbox/.config`. This prevents the orchestrator daemon (which may run as `root` with no `HOME=/sandbox`) from silently using `/root/.config/link-cli-nodejs/config.json`, which is unauthenticated and causes Stripe Link API failures.
+
+Verified behavior:
+```bash
+# System operator (no MILIMO_OPERATOR set)
+link-cli auth status
+# → uses /sandbox/.config/link-cli-nodejs/config.json
+
+# Named operator
+MILIMO_OPERATOR=alice link-cli auth status
+# → uses /sandbox/.config/users/alice/link-cli-nodejs/config.json
 ```
 
 ### When to Use Named Operators
@@ -343,3 +360,4 @@ Use: `link-cli payment-methods list`
 - Policy preset: `milimo-blueprint/policies/presets/stripe-link.yaml`
 - HTMX War Room server: `milimo-hermes-plugin/warroom/server.py`
 - Environment config: `/sandbox/.hermes/.env` — `MILIMO_SPEND_TEST_MODE`, `MILIMO_OPERATOR`, `XDG_CONFIG_HOME`
+- Container code paths: inside a running Hermes sandbox, the active orchestrator code may be at `/sandbox/.nemoclaw/blueprints/0.1.0/orchestrator/finance/`, `/opt/nemoclaw-blueprint/orchestrator/finance/`, or `/opt/milimo-core/src/milimo_core/finance/` — sync host changes with `docker cp` if the container does not bind-mount `/sandbox`
