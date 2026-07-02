@@ -144,6 +144,29 @@ Common issues and fixes.
 
 ---
 
+## Audit & Production-Readiness
+
+Line-level code audit findings verified against the current codebase (2026-07-03).
+
+| Document | Description |
+|----------|-------------|
+| `milimo-audit-report.md` | Full 11-scope-area production-readiness audit report (~302 lines) — the authoritative source for all verified findings |
+| Cross-references below inline in module pages |
+
+**11 Scope Areas**:
+- SA-1.x: Cross-profile parity (Hermes vs. OpenClaw)
+- SA-2.x: Cross-claw sequencing
+- SA-3.x: Approval-gate integrity
+- SA-4.x: Multi-agent mesh reliability
+- SA-5.x: Secrets / credential handling
+- SA-6.x: Multi-tenant / multi-region
+- SA-7.x: Error handling & observability
+- SA-8.x: Testing & CI honesty
+- SA-9.x: Dependency & supply-chain risk
+- SA-10.x: Documentation-to-code drift
+
+---
+
 ## Reference
 
 Quick reference tables and diagrams.
@@ -304,6 +327,7 @@ See [[log]] for complete operation history.
 
 | Date | Change | Pages Affected |
 |------|--------|----------------|
+| 2026-07-03 | Line-level audit completed and wiki updated: F5-1 Stripe API key CLI leak, SA-4.3 SandboxRunner un-jailed execution, SA-1.4 sandbox finance_claw.py test_mode copy-drift, SA3-1 spend idempotency gap, SA3-2 daily spend cap per-transaction not aggregate, SA3-3 decisions.log fsync missing, SA3-5 duplicate invoice on retry, SA-4.2 mesh outbox missing, SA-4.1 plaintext mesh fallback, SA-6.1 RegionDetector orphaned, SA-7.1 webhook silent failure, SA-1.1 War Room Hermes-only, SA-1.3 Bridge CLI missing approval subcommands, SA2-1 sprint pipeline stall | stripe-client.md, sandbox-runner.md, sandbox-hardening.md, spend-handler.md, spend-warroom-bridge.md, invoice-manager.md, finance-claw.md, mesh-coordinator.md, sequencing-rules.md, bridge-cli.md, system-overview.md |
 | 2026-07-03 | Stripe Link non-blocking spend release: replaced blocking --request-approval with --no-request-approval + separate request-approval call, background polling thread every 2s, self-healing _recover_and_resume_polling() on init, test_background_polling_and_restart_recovery added (4 tests total) | spend-handler.md, spend-warroom-bridge.md, link-cli-setup.md, test-spend-flow.md |
 | 2026-07-02 | Stripe Link system/default operator XDG_CONFIG_HOME fallback: handle_hold_release defaults to /sandbox/.config for empty/system/operator/sandbox operator_ids; added container runtime code paths to spend-handler.md and test-spend-flow.md | spend-handler.md, link-cli-setup.md, spend-warroom-bridge.md, test-spend-flow.md |
 | 2026-07-02 | Stripe Link spend flow robustness: robust JSON list parsing in handle_hold_release, SpendApprovalHandler state recovery via _get_request() from decisions.log, SpendWarRoomBridge _find_action_payload fallback, new test_spend_flow.py (3 tests) | spend-handler.md, spend-warroom-bridge.md, test-spend-flow.md, testing.md, link-cli-setup.md, network-egress.md |

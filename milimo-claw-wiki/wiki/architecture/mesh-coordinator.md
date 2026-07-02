@@ -6,7 +6,7 @@
 - `milimo-blueprint/orchestrator/mesh.py`
 - `raw/ARCHITECTURE.md`
 
-**Last updated**: 2026-05-06
+**Last updated**: 2026-07-03
 
 **Tags**: #architecture #mesh #coordination #routing
 
@@ -161,7 +161,29 @@ Manages inbox directories for each claw.
 7. Message moved to processed/
 ```
 
-## Error Handling
+## ⚠️ Verified Audit Findings
+
+| Finding | Severity | Status |
+|---|---|---|
+| **SA-4.1** [Medium] | `mesh.py:L128-138` silently disables encryption when `mesh_secret` is empty — no error raised, plaintext transmission | Verified Correct |
+| **SA-4.2** [High] | `mesh.py:L404-409` sends synchronously; if the gateway drops mid-transmit, the outbound message is lost (no persistent outbox) | Verified Correct |
+| **SA2-1** [Critical] | `issue_manager.py:L278-295` handles `sprint_plan_approved` but **no production path calls it** — sprint plans stall indefinitely once queued | Verified Correct |
+
+### SA-4.2: No Outbox Pattern for Outbound Mesh Messages
+
+`MeshCoordinator.send_message` delivers synchronously through `_send_via_gateway`. If the gateway disconnects during transmit, the message is permanently discarded. There is no `mesh/outbox/` retry queue.
+
+**Fix**: Write outbound messages to `mesh/outbox/<message_id>.json` before transmission; unlink only upon receive/timeout acknowledgement. On startup, flush the outbox before processing new messages.
+
+### ContractValidator is Only Softly Enforced
+
+`MeshCoordinator.send_message` calls `ContractValidator` at `mesh.py:L339-409`, but transport wrappers (`_send_via_gateway`) do not reject on validation failure. A corrupted inbound message crashes the receiving claw's local parser — the boundary check is bypassed.
+
+**Fix**: Enforce validation at `MeshCoordinator.get_pending_messages` before handing any message to claw handlers.
+
+---
+
+
 
 ### Memory-Only Mode
 

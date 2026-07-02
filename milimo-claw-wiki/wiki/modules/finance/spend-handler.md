@@ -194,6 +194,18 @@ This keeps the TUI and inter-claw gateway responsive for the entire approval win
 
 ---
 
+## ⚠️ Audit Findings — Verified Limitations
+
+Three confirmed gaps in the current `SpendApprovalHandler` implementation (audit: 2026-07-03, verified line-level):
+
+| Finding | Severity | Location | Gap |
+|---|---|---|---|
+| **SA3-1** | Critical | `spend_handler.py:L360-387` | `handle_hold_release()` has no idempotency check. If the background polling thread crashes and the operator re-approves (or double-clicks), `subprocess.run(cmd_create, ...)` can generate duplicate Stripe Link sessions, causing duplicate charges. Fix: write a local `spend_lock_<spend_id>` file before executing the create command. |
+| **SA3-2** | Critical | `spend_handler.py:L188` | Daily spend cap is per-transaction, not daily aggregate. `request.amount_cents > self.daily_spend_cap_cents` does not sum previously released transactions from `agent-spend.log`. Sub-cap repeated charges bypass the cap. Fix: sum all `released`/`purchase_approved` entries in the last 24 h before approving new requests. |
+| **SA3-3** | Medium | `spend_handler.py:L534-543` | `_log_decision()` writes with `fcntl.flock` but omits `.flush()` + `os.fsync(f.fileno())`. A crash after transaction completion but before fsync loses the log entry, impairing restart recovery. Fix: call `f.flush()` and `os.fsync(f.fileno())` after every write. |
+
+---
+
 ## Self-Healing Startup Recovery
 
 `_recover_and_resume_polling()` is called automatically during `SpendApprovalHandler.__init__`. On startup, it scans `logs/decisions.log` for any spend requests that were released but never reached a terminal state. For each orphaned request, it resumes the background polling thread automatically.
