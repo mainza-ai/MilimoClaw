@@ -143,7 +143,7 @@ Do not use real money. All Stripe calls must include --test.
    - Confirm MILIMO_SPEND_TEST_MODE is set in this sandbox environment
 
 2) List available test payment methods
-   Run: link-cli payment-methods list --format json --test
+   Run: link-cli payment-methods list --format json
    If the list is empty, tell me to add a test card at app.link.com/wallet
    (card: 4242 4242 4242 4242, any future expiry, any CVC)
 
