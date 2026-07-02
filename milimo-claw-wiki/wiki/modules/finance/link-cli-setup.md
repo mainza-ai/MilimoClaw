@@ -113,8 +113,10 @@ link-cli auth status
 ## List Connected Payment Methods
 
 ```bash
-link-cli payment-methods list --test
+link-cli payment-methods list
 ```
+
+> **Note**: `payment-methods list` does **not** accept `--test`. The card wallet structure is shared across modes; test vs. live mode division happens at `spend-request create` time.
 
 Shows cards, bank accounts, and wallets connected to the authenticated Stripe Link account. Note the `id` of any payment method you want to use with `--payment-method-id` in spend requests.
 
@@ -123,6 +125,32 @@ To add a test payment method, you can use a Stripe test card:
 - Expiry: any future date
 - CVC: any 3 digits
 - Add via the Stripe Dashboard → Link → Test mode, or use `link-cli payment-methods create` if available in your version.
+
+---
+
+## Required Egress Endpoints
+
+For the device auth authorization flow to work, the sandbox egress policy **must** allow outbound HTTPS to both:
+
+| Host | Purpose |
+|------|---------|
+| `api.link.com` | Spend request creation and retrieval |
+| `login.link.com` | Device authorization flow — token issuance and validation |
+
+If `login.link.com` is blocked, `link-cli auth login` returns an `UNKNOWN` request failure and `auth status` cannot validate the session.
+
+Verify the policy is loaded:
+
+```bash
+nemohermes milimo-hermes policy-list | grep -E "link|login"
+# → should show entries for login.link.com and api.link.com
+```
+
+If missing, apply the `stripe-link` preset:
+
+```bash
+nemohermes milimo-hermes policy-add --from-dir milimo-blueprint/policies/presets/ --yes
+```
 
 ---
 
@@ -269,16 +297,24 @@ link-cli auth status    # confirm current account
 link-cli auth login     # re-authenticate
 ```
 
-### Policy blocks `api.link.com`
+### Policy blocks `api.link.com` or `login.link.com`
 
 The `stripe-link` preset is not loaded.
 
 ```bash
 nemohermes milimo-hermes policy-add --from-dir milimo-blueprint/policies/presets/ --yes
-nemohermes milimo-hermes policy-list | grep stripe
+nemohermes milimo-hermes policy-list | grep -E "link|login"
 ```
 
+Both `api.link.com` and `login.link.com` must be present. `login.link.com` is required for the device authorization flow — if it is missing, `link-cli auth login` returns `UNKNOWN` and `auth status` cannot validate the session.
+
 Also verify the OpenShell proxy is not intercepting TLS (the preset uses `access: full` + `tls: skip`).
+
+### `Unknown flag: --test` on `payment-methods list`
+
+`link-cli payment-methods list` does not accept `--test`. Test mode only applies to `spend-request create`.
+
+Use: `link-cli payment-methods list`
 
 ### Approval URL does not open / app says "request not found"
 

@@ -243,6 +243,23 @@ network_policies:
       enforcement: enforce
       access: read-write
 
+  # Stripe Link CLI — device auth flow requires login.link.com
+  stripe_link:
+    endpoints:
+      - host: login.link.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: read-write
+      - host: api.link.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: read-write
+    binaries:
+      - { path: /usr/bin/node }
+      - { path: /usr/local/bin/link-cli }
+
   # Stripe API
   stripe_api:
     endpoints:
@@ -447,6 +464,24 @@ network_policies:
       - { path: /usr/local/bin/hermes }
       - { path: /opt/hermes/.venv/bin/python }
 
+  # Stripe Link CLI — device auth requires login.link.com + api.link.com
+  stripe_link:
+    endpoints:
+      - host: login.link.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: read-write
+      - host: api.link.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: read-write
+    binaries:
+      - { path: /usr/local/bin/link-cli }
+      - { path: /usr/local/bin/node }
+      - { path: /opt/hermes/.venv/bin/python }
+
   # NVIDIA NIM inference
   nvidia_inference:
     endpoints:
@@ -486,6 +521,35 @@ network_policies:
       - { path: /usr/local/bin/hermes }
       - { path: /opt/hermes/.venv/bin/python }
 ```
+
+### Stripe Link Preset
+
+```yaml
+preset:
+  name: stripe-link
+  description: "Allow Stripe Link CLI device auth and spend request creation"
+
+network_policies:
+  stripe-link:
+    name: stripe-link
+    endpoints:
+      - host: login.link.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: read-write
+      - host: api.link.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: read-write
+    binaries:
+      - { path: /usr/local/bin/link-cli }
+      - { path: /usr/local/bin/node }
+      - { path: /opt/hermes/.venv/bin/python }
+```
+
+`login.link.com` is required for the OAuth device authorization flow. `api.link.com` is required for spend request creation and retrieval. Both must be present; if `login.link.com` is missing, `link-cli auth login` returns `UNKNOWN` and `auth status` cannot validate the session.
 
 Key differences from raw policy YAML:
 - Requires `preset:` wrapper at top level
