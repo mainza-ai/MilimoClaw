@@ -38,7 +38,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 import json
+import logging
 import subprocess
+
+logger = logging.getLogger("milimo.spend_handler")
 
 from ..milimo_paths import claw_base
 
@@ -101,6 +104,67 @@ class SpendApprovalHandler:
         self.test_mode = test_mode
         self._requests: dict[str, SpendRequest] = {}
 
+    def _get_request(self, spend_id: str) -> SpendRequest:
+        """Retrieve request from memory or recover it from the decisions log."""
+        if spend_id in self._requests:
+            return self._requests[spend_id]
+
+        # Reconstruct request from decisions.log
+        if self.decisions_path.exists():
+            try:
+                with open(self.decisions_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if not line.strip():
+                            continue
+                        dec = json.loads(line)
+                        if (
+                            dec.get("spend_id") == spend_id
+                            and dec.get("stage") == "review"
+                            and dec.get("action_type") == "queued"
+                        ):
+                            details = dec.get("details", {})
+                            req = SpendRequest(
+                                spend_id=spend_id,
+                                claw=details.get("claw", ""),
+                                merchant_name=details.get("merchant_name", ""),
+                                merchant_url=details.get("merchant_url", ""),
+                                amount_cents=details.get("amount_cents", 0),
+                                currency=details.get("currency", "USD"),
+                                justification=details.get("justification", ""),
+                                payment_method_id=details.get("payment_method_id"),
+                                credential_type=details.get("credential_type", "card"),
+                            )
+                            self._requests[spend_id] = req
+            except Exception as e:
+                logger.error("Failed to recover request %s from log: %s", spend_id, e)
+
+        if spend_id in self._requests:
+            # Replay any subsequent state updates
+            req = self._requests[spend_id]
+            try:
+                with open(self.decisions_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if not line.strip():
+                            continue
+                        dec = json.loads(line)
+                        if dec.get("spend_id") == spend_id:
+                            action_type = dec.get("action_type")
+                            stage = dec.get("stage")
+                            if stage == "review" and action_type == "approve":
+                                req.status = "held"
+                            elif stage == "review" and action_type == "block":
+                                req.status = "blocked"
+                            elif stage == "hold" and action_type == "release":
+                                req.status = "released"
+                                req.link_spend_request_id = dec.get("details", {}).get("link_spend_request_id")
+                            elif stage == "hold" and action_type == "cancel":
+                                req.status = "cancelled"
+            except Exception as e:
+                logger.error("Failed to replay states for request %s: %s", spend_id, e)
+            return req
+
+        raise KeyError(f"Spend request {spend_id} not found and could not be recovered.")
+
     # ------------------------------------------------------------------
     # Stage 1: REVIEW
     # ------------------------------------------------------------------
@@ -161,7 +225,7 @@ class SpendApprovalHandler:
         Returns the new hold action_id.
         """
         spend_id = action_id.replace("spend-review-", "")
-        request = self._requests[spend_id]
+        request = self._get_request(spend_id)
         request.status = "held"
 
         hold_action_id = self.queue_spend_hold(request)
@@ -184,7 +248,7 @@ class SpendApprovalHandler:
     ) -> None:
         """REVIEW edit -> re-queues REVIEW with the corrected amount/reason."""
         spend_id = action_id.replace("spend-review-", "")
-        request = self._requests[spend_id]
+        request = self._get_request(spend_id)
         request.amount_cents = amount_cents
         request.justification = justification
 
@@ -206,7 +270,7 @@ class SpendApprovalHandler:
     def handle_review_block(self, action_id: str, reason: str) -> None:
         """REVIEW block -> purchase never happens."""
         spend_id = action_id.replace("spend-review-", "")
-        self._requests[spend_id].status = "blocked"
+        self._get_request(spend_id).status = "blocked"
 
         self._log_decision(
             {
@@ -268,7 +332,7 @@ class SpendApprovalHandler:
         does not mark the request released.
         """
         spend_id = action_id.replace("spend-hold-", "")
-        request = self._requests[spend_id]
+        request = self._get_request(spend_id)
 
         cmd = [
             self.link_cli_path,
@@ -327,8 +391,11 @@ class SpendApprovalHandler:
 
         try:
             payload = json.loads(proc.stdout)
-            request.link_spend_request_id = payload.get("id")
-        except (json.JSONDecodeError, AttributeError):
+            if isinstance(payload, list) and len(payload) > 0:
+                payload = payload[0]
+            if isinstance(payload, dict):
+                request.link_spend_request_id = payload.get("id")
+        except (json.JSONDecodeError, AttributeError, IndexError):
             pass
 
         request.status = "released"
@@ -353,7 +420,7 @@ class SpendApprovalHandler:
     def handle_hold_cancel(self, action_id: str, reason: str = "") -> None:
         """Cancel the HOLD — purchase never made, request stays logged."""
         spend_id = action_id.replace("spend-hold-", "")
-        self._requests[spend_id].status = "cancelled"
+        self._get_request(spend_id).status = "cancelled"
 
         self._log_decision(
             {

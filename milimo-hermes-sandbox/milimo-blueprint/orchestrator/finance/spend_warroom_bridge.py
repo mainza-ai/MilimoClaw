@@ -59,6 +59,16 @@ class SpendWarRoomBridge:
         self._review_actions: dict[str, str] = {}
         self._hold_actions: dict[str, str] = {}
 
+    def _find_action_payload(self, warroom_action_id: str) -> Optional[dict[str, Any]]:
+        """Recover action payload from SoloWarRoom to restore state across restarts."""
+        all_actions = []
+        if hasattr(self.solo_warroom, "_queue"):
+            all_actions.extend(self.solo_warroom._queue)
+        if hasattr(self.solo_warroom, "_processed"):
+            all_actions.extend(self.solo_warroom._processed)
+        action = next((a for a in all_actions if a.id == warroom_action_id), None)
+        return action.payload if action else None
+
     # ------------------------------------------------------------------
     # Submission
     # ------------------------------------------------------------------
@@ -114,13 +124,17 @@ class SpendWarRoomBridge:
         """
         spend_action_id = self._review_actions.get(warroom_action_id)
         if not spend_action_id:
+            payload = self._find_action_payload(warroom_action_id)
+            if payload:
+                spend_action_id = payload.get("spend_action_id")
+        if not spend_action_id:
             logger.warning("No spend request tracked for %s", warroom_action_id)
             return None
 
         def _execute() -> None:
             hold_action_id = self.spend_handler.handle_review_approve(spend_action_id)
             spend_id = spend_action_id.replace("spend-review-", "")
-            request = self.spend_handler._requests[spend_id]
+            request = self.spend_handler._get_request(spend_id)
 
             wr_hold_action = self.solo_warroom.queue_action(
                 claw="finance",
@@ -145,6 +159,10 @@ class SpendWarRoomBridge:
     def block_review(self, warroom_action_id: str, reason: str = "") -> Optional[Any]:
         """Operator pressed 'B' on a spend_review action. Purchase never happens."""
         spend_action_id = self._review_actions.get(warroom_action_id)
+        if not spend_action_id:
+            payload = self._find_action_payload(warroom_action_id)
+            if payload:
+                spend_action_id = payload.get("spend_action_id")
         if not spend_action_id:
             return None
 
@@ -171,6 +189,10 @@ class SpendWarRoomBridge:
         """
         hold_action_id = self._hold_actions.get(warroom_action_id)
         if not hold_action_id:
+            payload = self._find_action_payload(warroom_action_id)
+            if payload:
+                hold_action_id = payload.get("spend_action_id")
+        if not hold_action_id:
             logger.warning("No HOLD tracked for %s", warroom_action_id)
             return None, None
 
@@ -178,7 +200,9 @@ class SpendWarRoomBridge:
 
         def _execute() -> None:
             operator_id = getattr(self.solo_warroom, "operator", None)
-            result["request"] = self.spend_handler.handle_hold_release(hold_action_id, operator_id=operator_id)
+            result["request"] = self.spend_handler.handle_hold_release(
+                hold_action_id, operator_id=operator_id
+            )
 
         action = self.solo_warroom.handle_hold_release(
             warroom_action_id, execute_fn=_execute
@@ -188,6 +212,10 @@ class SpendWarRoomBridge:
     def cancel_hold(self, warroom_action_id: str, reason: str = "") -> Optional[Any]:
         """Operator pressed 'B' on a spend_hold action. Stays approved, never charged."""
         hold_action_id = self._hold_actions.get(warroom_action_id)
+        if not hold_action_id:
+            payload = self._find_action_payload(warroom_action_id)
+            if payload:
+                hold_action_id = payload.get("spend_action_id")
         if not hold_action_id:
             return None
 
