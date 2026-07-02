@@ -7,7 +7,7 @@
 - `milimo-blueprint/orchestrator/finance/spend_handler.py`
 - `milimo-blueprint/templates/solo-founder.yaml`
 
-**Last updated**: 2026-07-02
+**Last updated**: 2026-07-03
 
 **Tags**: #module #finance #warroom #spend #bridge #approvals
 
@@ -19,7 +19,7 @@
 
 1. Spend requests appear in the *same* unified queue as invoices, PRs, and deploys
 2. The *same* keyboard shortcuts (`A` approve, `R` release, `B` block) work for spend
-3. `SpendApprovalHandler.handle_hold_release()` receives the active `operator_id` so it routes to the correct per-operator `XDG_CONFIG_HOME` (`/sandbox/.config/users/{operator_id}/link-cli-nodejs/config.json`)
+3. `SpendApprovalHandler.handle_hold_release()` receives the active `operator_id` so it routes to the correct per-operator `XDG_CONFIG_HOME` (`/sandbox/.config/users/{operator_id}/link-cli-nodejs/config.json`). The release is now **non-blocking**: `release_hold` returns immediately after starting a background polling thread, without waiting for the Link app approval.
 
 Nothing about the TUI or [[war-room]] server needs to change — `solo_warroom.py` is already generic over claw/action_type/payload.
 
@@ -71,8 +71,9 @@ Operator presses `R` on a `spend_hold` action.
 
 - Reads `operator_id` from `self.solo_warroom.operator`
 - Calls `SpendApprovalHandler.handle_hold_release(hold_action_id, operator_id=operator_id)`
-- The handler sets `XDG_CONFIG_HOME` for named operators (`/sandbox/.config/users/{operator_id}`) or falls back to `/sandbox/.config` for system/empty operators
-- Returns `(war_room_action, spend_request)` — check `spend_request.status == "released"` to confirm Link approval completed
+- The handler immediately creates the spend request with `--no-request-approval`, fires a separate `request-approval` command, and starts a background polling thread
+- Returns `(war_room_action, spend_request)` **immediately** — does NOT wait for Link app approval
+- Check `spend_request.status == "released"` after the background polling thread completes to confirm Link approval; until then, the status will be `pending_approval`
 
 ### `block_review(warroom_action_id)` / `cancel_hold(warroom_action_id)`
 
@@ -135,8 +136,9 @@ finance:
 |------|----------|
 | Daily spend cap exceeded | `submit_spend_request()` returns `None`; request logged in `agent-spend.log` with status `blocked` |
 | No tracked action ID | Logs warning and returns `None` — no crash |
-| Link app denies/times out | `spend_request.status` is `denied` or `timed_out`; operator sees result in next queue pass |
-| link-cli subprocess fails | Exceptions propagate to `solo_warroom.handle_*`; operator sees error in queue |
+| Link app denies/times out | `spend_request.status` becomes `denied` or `timed_out` asynchronously; background polling thread logs the outcome |
+| `link-cli` missing at runtime | Background polling thread catches `FileNotFoundError` and terminates cleanly; no crash |
+| Daemon restart during approval | `_recover_and_resume_polling()` resumes background threads on startup for any orphaned `hold` + `release` entries in `decisions.log` |
 
 ---
 
@@ -148,7 +150,7 @@ finance:
 - [[approval-thresholds]] — REVIEW/HOLD/AUTO configuration
 - [[link-cli-setup]] — Stripe Link CLI auth, device flow, and token locations
 - [[message-contracts]] — `spend_request`, `spend_review_decision`, `spend_hold_decision` schemas
-- [[test-spend-flow]] — Automated tests for JSON parsing, state recovery, and bridge fallback
+- [[test-spend-flow]] — Automated tests for JSON parsing, state recovery, background polling, and bridge fallback
 
 ---
 

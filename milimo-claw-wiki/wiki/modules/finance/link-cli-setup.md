@@ -7,7 +7,7 @@
 - `milimo-blueprint/policies/presets/stripe-link.yaml`
 - Hermes skill: `official/payments/stripe-link-cli`
 
-**Last updated**: 2026-07-01
+**Last updated**: 2026-07-03
 
 **Tags**: #module #finance #stripe #link-cli #oauth #setup #sandbox
 
@@ -165,24 +165,33 @@ link-cli spend-request create \
   --context "Test spend request from Finance Claw" \
   --amount 5000 \
   --total "type:total,display_text:Total,amount:5000" \
-  --request-approval \
+  --no-request-approval \
   --test \
   --format json
 ```
+
+> **Note**: The Finance Claw spend handler uses `--no-request-approval` during creation, then fires `link-cli spend-request request-approval <id>` in a separate call. This is the non-blocking pattern: creation returns immediately, and approval is triggered asynchronously.
 
 Expected response:
 
 ```json
 {
   "id": "lsrq_1ToFQOK2MJSohSIrORocpMZM",
-  "status": "pending_approval",
-  "approval_url": "https://app.link.com/activity/approve/lsrq_1ToFQOK2MJSohSIrORocpMZM"
+  "status": "pending_approval"
 }
 ```
 
+After creation, trigger approval manually:
+
+```bash
+link-cli spend-request request-approval lsrq_1ToFQOK2MJSohSIrORocpMZM
+```
+
+This sends the push notification to the user's phone. The `approval_url` is not returned by `create` when using `--no-request-approval`; construct it manually as `https://app.link.com/activity/approve/<id>` if needed.
+
 ### The Approval URL
 
-The `approval_url` (or the `https://app.link.com/activity/approve/{id}` pattern) is the **second human gate**.
+The `https://app.link.com/activity/approve/{id}` URL is the **second human gate**.
 
 - The operator clicks (or opens on their phone) the approval URL.
 - They log in to their Stripe Link account if not already authenticated.

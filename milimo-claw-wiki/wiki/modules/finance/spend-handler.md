@@ -6,7 +6,7 @@
 - `milimo-core/src/milimo_core/finance/spend_handler.py`
 - `milimo-blueprint/orchestrator/finance/spend_warroom_bridge.py`
 
-**Last updated**: 2026-07-02
+**Last updated**: 2026-07-03
 
 **Tags**: #module #finance #spend #stripe #approval
 
@@ -30,13 +30,18 @@ Stage 1 — REVIEW:
   Approving Stage 1 does NOT spend. It moves the request to HOLD only.
 
 Stage 2 — HOLD release:
-  Invokes `link-cli spend-request create --request-approval`.
-  This blocks on an independent second approval in the user's Stripe Link app.
+  Operator presses R. The handler immediately creates the spend request
+  with --no-request-approval, then fires a separate request-approval
+  command in the background. The link-cli subprocess does NOT block
+  the TUI or the inter-claw gateway. A background daemon thread polls
+  for final state (approved/denied/timed_out) and logs the outcome.
 ```
 
 **Two independent human gates** sit between the agent and the charge:
 1. War Room HOLD release — operator explicitly releases the spend hold
 2. Stripe Link in-app approval — Hermes cannot self-approve this step either
+
+The release is **non-blocking**: after the operator presses `R`, control returns immediately. Link approval happens asynchronously in the background.
 
 ---
 
@@ -55,40 +60,65 @@ cap = int(os.environ.get("MILIMO_DAILY_SPEND_CAP_CENTS", "10000"))  # $100
 
 ```
 Any claw sends a spend_request message
-       ↓
+        ↓
 SpendApprovalHandler.queue_spend_review()
-       ↓
+        ↓
 Daily cap check — auto-blocked if exceeded
-       ↓
+        ↓
 Queued in War Room as spend_review (REVIEW priority)
-       ↓
+        ↓
 Operator presses A → approve_review()
-       ↓
+        ↓
 Moves to HOLD — new spend_hold action appears in War Room (HOLD priority)
-       ↓
+        ↓
 Operator presses R → release_hold()
-       ↓
-SpendApprovalHandler.handle_hold_release() invokes link-cli
-       ↓
-link-cli blocks on Stripe Link app approval (user's phone)
-       ↓
-Charge completes or is denied/timed out
+        ↓
+handle_hold_release() creates spend request with --no-request-approval
+        ↓
+Separate background thread calls request-approval <id>
+        ↓
+link-cli push notification sent to user's phone (async)
+        ↓
+Polling thread checks status every 2s via link-cli spend-request retrieve
+        ↓
+Final outcome logged: purchase_approved or purchase_denied
 ```
+
+The flow is **non-blocking** after the operator presses `R`. The TUI and inter-claw gateway remain responsive while the Link approval happens in the background.
 
 ---
 
-## Robust JSON List Parsing
+## Non-Blocking Command Execution
 
-`link-cli spend-request create --format json` returns a JSON **array** of objects, not a single object. `handle_hold_release` extracts the first element before accessing `.get("id")` to avoid `AttributeError`:
+`handle_hold_release` no longer blocks on `link-cli` during the approval push. It makes two quick sequential calls:
+
+1. `link-cli spend-request create --no-request-approval ... --test --format json`
+2. `link-cli spend-request request-approval <id>`
+
+The first call creates the transaction immediately and returns the `lsrq_*` ID. The second call fires the push notification to the user's phone. Neither call waits for the user to approve — control returns to the War Room instantly.
 
 ```python
-payload = json.loads(stdout)
+# 1. Create without blocking on approval
+create_cmd = [
+    self.link_cli_path, "spend-request", "create",
+    "--no-request-approval",
+    "--merchant-name", request.merchant_name,
+    ...
+    "--test", "--format", "json",
+]
+create_proc = subprocess.run(create_cmd, capture_output=True, text=True, timeout=310, env=env)
+payload = json.loads(create_proc.stdout)
 if isinstance(payload, list):
     payload = payload[0]
-request_id = payload.get("id")
-```
+spend_id = payload.get("id")
 
-This prevents crashes when `link-cli` wraps its response in an array due to multi-item results or version differences.
+# 2. Fire approval notification in background
+approval_cmd = [self.link_cli_path, "spend-request", "request-approval", spend_id]
+subprocess.run(approval_cmd, capture_output=True, text=True, timeout=30, env=env)
+
+# 3. Hand off to background polling thread
+self._start_polling_thread(spend_id)
+```
 
 ---
 
@@ -117,6 +147,71 @@ This pairs with `_get_request(spend_id)` replacing direct `self._requests[...]` 
 3. Reconstructs a `SpendRequest` and replays all subsequent states (`approve`, `block`, `release`, `cancel`) from the log
 
 All direct `self._requests[...]` accesses were replaced with `_get_request(spend_id)`, so no restart can trigger a `KeyError` on a valid spend ID.
+
+---
+
+## Background Polling Thread
+
+After firing the approval notification, `handle_hold_release` starts a background daemon thread via `_start_polling_thread(spend_id)`. The thread:
+
+- Calls `link-cli spend-request retrieve <id>` every 2 seconds
+- Updates the in-memory spend state on each poll
+- Logs the final outcome when the request reaches a terminal state:
+  - `purchase_approved` — operator approved in the Link app
+  - `purchase_denied` — operator denied in the Link app
+  - `purchase_expired` / `purchase_failed` — terminal failure states
+- Catches `FileNotFoundError` safely to terminate if `link-cli` is missing (e.g., during tests)
+
+```python
+def _start_polling_thread(self, spend_id: str) -> None:
+    thread = threading.Thread(
+        target=self._poll_spend_request,
+        args=(spend_id,),
+        daemon=True,
+    )
+    thread.start()
+
+def _poll_spend_request(self, spend_id: str) -> None:
+    while True:
+        time.sleep(2)
+        try:
+            proc = subprocess.run(
+                [self.link_cli_path, "spend-request", "retrieve", spend_id],
+                capture_output=True, text=True, timeout=30, env=self._link_env,
+            )
+            status = json.loads(proc.stdout).get("status")
+            request = self._get_request(spend_id)
+            request.status = status
+            if status in ("approved", "denied", "expired", "failed"):
+                self._log_terminal_state(spend_id, status)
+                break
+        except FileNotFoundError:
+            self._log_missing_link_cli(spend_id)
+            break
+```
+
+This keeps the TUI and inter-claw gateway responsive for the entire approval window, which can be minutes.
+
+---
+
+## Self-Healing Startup Recovery
+
+`_recover_and_resume_polling()` is called automatically during `SpendApprovalHandler.__init__`. On startup, it scans `logs/decisions.log` for any spend requests that were released but never reached a terminal state. For each orphaned request, it resumes the background polling thread automatically.
+
+This handles the case where:
+- The orchestrator daemon restarts while a Link approval is pending
+- The operator approves on their phone while the daemon is down
+- The daemon comes back online and must catch up
+
+```python
+def _recover_and_resume_polling(self) -> None:
+    for entry in self._read_decisions_log():
+        if entry.get("stage") == "hold" and entry.get("action_type") == "release":
+            spend_id = entry["action_id"].replace("spend-hold-", "")
+            request = self._get_request(spend_id)
+            if request and request.status not in ("approved", "denied", "expired", "failed"):
+                self._start_polling_thread(spend_id)
+```
 
 ---
 
@@ -213,7 +308,7 @@ finance:
 - [[approval-thresholds]] — REVIEW/HOLD/AUTO rules
 - [[war-room]] — TUI for pending actions
 - [[message-contracts]] — Message types
-- [[test-spend-flow]] — Automated tests for JSON parsing, state recovery, and bridge fallback
+- [[test-spend-flow]] — Automated tests for JSON parsing, state recovery, background polling, and bridge fallback
 
 ---
 
