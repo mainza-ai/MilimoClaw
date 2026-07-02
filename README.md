@@ -116,7 +116,7 @@ $ nemohermes milimo-hermes exec -- python3 /opt/hermes/scripts/hermes-inventory.
 Claws can request to buy things through the Finance Claw using the Hermes `stripe-link-cli` skill — double-gated so no purchase happens without your explicit approval:
 
 1. **Stage 1 — REVIEW**: A claw (Build, Ops, Content, etc.) sends a `spend_request` message. The operator sees the purchase in the War Room (`. Wagner review` — what, why, how much).
-2. **Stage 2 — HOLD**: The operator presses `R` to release the hold. This invokes `link-cli spend-request create --request-approval`, which sends a push notification to your Stripe Link app on your phone.
+2. **Stage 2 — HOLD**: The operator presses `R` to release the hold. This invokes `link-cli spend-request create` (non-blocking) and triggers the phone push notification asynchronously, polling in the background without freezing the War Room TUI.
 3. **Link App Approval**: The charge only completes when you tap **Approve** in the Link app. Hermes cannot self-approve at any step.
 
 ```console
@@ -160,7 +160,7 @@ Do not use real money. All Stripe calls must include --test.
 
 5) Auto-approve the REVIEW step (operator == "system") to move it into HOLD.
 
-6) Release the HOLD — this invokes link-cli spend-request create --test --request-approval --format json.
+6) Release the HOLD — this runs the non-blocking create + request-approval calls and starts background retrieve polling.
    Capture the full stdout, stderr, and return code.
 
 7) Report back:
