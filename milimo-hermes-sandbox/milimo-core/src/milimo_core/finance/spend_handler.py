@@ -368,6 +368,14 @@ class SpendApprovalHandler:
                 user_config_dir = f"{base_config_dir}/users/{safe_op_id}"
                 env["XDG_CONFIG_HOME"] = user_config_dir
                 logger.info("Isolating link-cli XDG_CONFIG_HOME for operator %s to %s", safe_op_id, user_config_dir)
+            else:
+                if os.path.exists("/sandbox/.config"):
+                    env["XDG_CONFIG_HOME"] = "/sandbox/.config"
+                    logger.info("Setting default sandbox XDG_CONFIG_HOME to /sandbox/.config")
+        else:
+            if os.path.exists("/sandbox/.config"):
+                env["XDG_CONFIG_HOME"] = "/sandbox/.config"
+                logger.info("Setting default sandbox XDG_CONFIG_HOME to /sandbox/.config")
 
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=310, env=env)
 
