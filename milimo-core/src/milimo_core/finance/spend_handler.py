@@ -103,6 +103,7 @@ class SpendApprovalHandler:
         self.daily_spend_cap_cents = daily_spend_cap_cents
         self.test_mode = test_mode
         self._requests: dict[str, SpendRequest] = {}
+        self._recover_and_resume_polling()
 
     def _get_request(self, spend_id: str) -> SpendRequest:
         """Retrieve request from memory or recover it from the decisions log."""
@@ -154,9 +155,13 @@ class SpendApprovalHandler:
                                 req.status = "held"
                             elif stage == "review" and action_type == "block":
                                 req.status = "blocked"
-                            elif stage == "hold" and action_type == "release":
+                            if stage == "hold" and action_type == "release":
                                 req.status = "released"
                                 req.link_spend_request_id = dec.get("details", {}).get("link_spend_request_id")
+                            elif stage == "hold" and action_type == "purchase_approved":
+                                req.status = "released"
+                            elif stage == "hold" and action_type in ("purchase_denied", "purchase_expired", "release_failed"):
+                                req.status = "blocked"
                             elif stage == "hold" and action_type == "cancel":
                                 req.status = "cancelled"
             except Exception as e:
@@ -334,31 +339,6 @@ class SpendApprovalHandler:
         spend_id = action_id.replace("spend-hold-", "")
         request = self._get_request(spend_id)
 
-        cmd = [
-            self.link_cli_path,
-            "spend-request",
-            "create",
-            "--merchant-name",
-            request.merchant_name,
-            "--merchant-url",
-            request.merchant_url,
-            "--context",
-            request.justification,
-            "--amount",
-            str(request.amount_cents),
-            "--total",
-            f"type:total,display_text:Total,amount:{request.amount_cents}",
-            "--request-approval",
-            "--format",
-            "json",
-        ]
-        if request.payment_method_id:
-            cmd += ["--payment-method-id", request.payment_method_id]
-        if request.credential_type == "shared_payment_token":
-            cmd += ["--credential-type", "shared_payment_token"]
-        if self.test_mode:
-            cmd += ["--test"]
-
         import os
         env = {**os.environ}
         if operator_id:
@@ -377,9 +357,35 @@ class SpendApprovalHandler:
                 env["XDG_CONFIG_HOME"] = "/sandbox/.config"
                 logger.info("Setting default sandbox XDG_CONFIG_HOME to /sandbox/.config")
 
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=310, env=env)
+        cmd_create = [
+            self.link_cli_path,
+            "spend-request",
+            "create",
+            "--merchant-name",
+            request.merchant_name,
+            "--merchant-url",
+            request.merchant_url,
+            "--context",
+            request.justification,
+            "--amount",
+            str(request.amount_cents),
+            "--total",
+            f"type:total,display_text:Total,amount:{request.amount_cents}",
+            "--no-request-approval",
+            "--format",
+            "json",
+        ]
+        if request.payment_method_id:
+            cmd_create += ["--payment-method-id", request.payment_method_id]
+        if request.credential_type == "shared_payment_token":
+            cmd_create += ["--credential-type", "shared_payment_token"]
+        if self.test_mode:
+            cmd_create += ["--test"]
 
-        if proc.returncode != 0:
+        # Run Create Command (non-blocking, returns immediately)
+        proc_create = subprocess.run(cmd_create, capture_output=True, text=True, timeout=30, env=env)
+
+        if proc_create.returncode != 0:
             request.status = "blocked"
             self._log_decision(
                 {
@@ -388,17 +394,18 @@ class SpendApprovalHandler:
                     "stage": "hold",
                     "action_type": "release_failed",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "operator": "operator",
+                    "operator": operator_id or "operator",
                     "details": {
-                        "outcome": "denied_or_timed_out",
-                        "stderr": proc.stderr[-500:],
+                        "outcome": "create_failed",
+                        "stderr": proc_create.stderr[-500:],
                     },
                 }
             )
             return request
 
+        # Parse ID
         try:
-            payload = json.loads(proc.stdout)
+            payload = json.loads(proc_create.stdout)
             if isinstance(payload, list) and len(payload) > 0:
                 payload = payload[0]
             if isinstance(payload, dict):
@@ -406,6 +413,56 @@ class SpendApprovalHandler:
         except (json.JSONDecodeError, AttributeError, IndexError):
             pass
 
+        if not request.link_spend_request_id:
+            request.status = "blocked"
+            self._log_decision(
+                {
+                    "action_id": action_id,
+                    "spend_id": spend_id,
+                    "stage": "hold",
+                    "action_type": "release_failed",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "operator": operator_id or "operator",
+                    "details": {
+                        "outcome": "missing_spend_request_id",
+                    },
+                }
+            )
+            return request
+
+        # Request Approval (triggers app notification, returns immediately)
+        cmd_req = [
+            self.link_cli_path,
+            "spend-request",
+            "request-approval",
+            request.link_spend_request_id,
+            "--format",
+            "json",
+        ]
+        if self.test_mode:
+            cmd_req += ["--test"]
+
+        proc_req = subprocess.run(cmd_req, capture_output=True, text=True, timeout=30, env=env)
+
+        if proc_req.returncode != 0:
+            request.status = "blocked"
+            self._log_decision(
+                {
+                    "action_id": action_id,
+                    "spend_id": spend_id,
+                    "stage": "hold",
+                    "action_type": "release_failed",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "operator": operator_id or "operator",
+                    "details": {
+                        "outcome": "request_approval_failed",
+                        "stderr": proc_req.stderr[-500:],
+                    },
+                }
+            )
+            return request
+
+        # Transition status to released and log decision
         request.status = "released"
         self._append_spend_log(request)
 
@@ -416,13 +473,17 @@ class SpendApprovalHandler:
                 "stage": "hold",
                 "action_type": "release",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "operator": "operator",
+                "operator": operator_id or "operator",
                 "details": {
-                    "outcome": "purchase_completed",
+                    "outcome": "release_initiated",
                     "link_spend_request_id": request.link_spend_request_id,
                 },
             }
         )
+
+        # Start background polling thread
+        self._start_polling_thread(request, action_id, operator_id)
+
         return request
 
     def handle_hold_cancel(self, action_id: str, reason: str = "") -> None:
@@ -490,3 +551,151 @@ class SpendApprovalHandler:
             details=decision,
         )
         self.operational_log.append(entry)
+
+    def _recover_and_resume_polling(self) -> None:
+        """Scan the decisions log for pending spend releases and resume polling threads."""
+        if not self.decisions_path.exists():
+            return
+
+        released_requests = {}
+        try:
+            with open(self.decisions_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    dec = json.loads(line)
+                    spend_id = dec.get("spend_id")
+                    if not spend_id:
+                        continue
+                    action_type = dec.get("action_type")
+                    stage = dec.get("stage")
+                    if stage == "hold":
+                        if action_type == "release":
+                            released_requests[spend_id] = {
+                                "action_id": dec.get("action_id"),
+                                "link_spend_request_id": dec.get("details", {}).get("link_spend_request_id"),
+                                "operator_id": dec.get("operator"),
+                            }
+                        elif action_type in ("purchase_approved", "purchase_denied", "purchase_expired", "release_failed", "cancel"):
+                            if spend_id in released_requests:
+                                del released_requests[spend_id]
+        except Exception as e:
+            logger.error("Failed to scan pending spend requests for recovery: %s", e)
+            return
+
+        for spend_id, info in released_requests.items():
+            link_id = info.get("link_spend_request_id")
+            if not link_id:
+                continue
+            logger.info("Resuming background polling for recovered spend request %s (Link ID: %s)", spend_id, link_id)
+            try:
+                req = self._get_request(spend_id)
+                self._start_polling_thread(req, info["action_id"], info["operator_id"])
+            except Exception as e:
+                logger.error("Failed to resume polling for request %s: %s", spend_id, e)
+
+    def _start_polling_thread(self, request: SpendRequest, action_id: str, operator_id: str | None) -> None:
+        """Start a background thread to poll the Link request status."""
+        import threading
+        thread = threading.Thread(
+            target=self._poll_spend_request,
+            args=(request, action_id, operator_id),
+            daemon=True,
+        )
+        thread.start()
+
+    def _poll_spend_request(self, request: SpendRequest, action_id: str, operator_id: str | None) -> None:
+        """Background thread logic to poll link-cli retrieve status."""
+        import time
+        import os
+
+        # Set environment with correct isolation
+        env = {**os.environ}
+        if operator_id:
+            safe_op_id = "".join(c for c in operator_id if c.isalnum() or c in ("-", "_")).strip()
+            if safe_op_id and safe_op_id not in ("system", "operator", "sandbox"):
+                base_config_dir = "/sandbox/.config" if os.path.exists("/sandbox") else os.path.expanduser("~/.config")
+                user_config_dir = f"{base_config_dir}/users/{safe_op_id}"
+                env["XDG_CONFIG_HOME"] = user_config_dir
+            else:
+                if os.path.exists("/sandbox/.config"):
+                    env["XDG_CONFIG_HOME"] = "/sandbox/.config"
+        else:
+            if os.path.exists("/sandbox/.config"):
+                env["XDG_CONFIG_HOME"] = "/sandbox/.config"
+
+        cmd = [
+            self.link_cli_path,
+            "spend-request",
+            "retrieve",
+            request.link_spend_request_id,
+            "--format",
+            "json",
+        ]
+        if self.test_mode:
+            cmd += ["--test"]
+
+        max_attempts = 150  # 5 minutes at 2-second intervals
+        attempts = 0
+        terminal_status = None
+
+        logger.info("Background polling started for spend request %s", request.spend_id)
+
+        while attempts < max_attempts:
+            attempts += 1
+            try:
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10, env=env)
+            except FileNotFoundError:
+                logger.error("link-cli executable not found at %s", self.link_cli_path)
+                terminal_status = "release_failed"
+                break
+
+            if proc.returncode == 0:
+                try:
+                    payload = json.loads(proc.stdout)
+                    if isinstance(payload, list) and len(payload) > 0:
+                        payload = payload[0]
+                    if isinstance(payload, dict):
+                        status = payload.get("status")
+                        if status == "approved":
+                            terminal_status = "purchase_approved"
+                            break
+                        elif status == "denied":
+                            terminal_status = "purchase_denied"
+                            break
+                        elif status == "expired":
+                            terminal_status = "purchase_expired"
+                            break
+                except Exception as e:
+                    logger.debug("Failed to parse poll response for %s: %s", request.spend_id, e)
+            else:
+                logger.debug("Retrieve command failed for %s: %s", request.spend_id, proc.stderr)
+            time.sleep(2)
+
+        if not terminal_status:
+            terminal_status = "purchase_expired"  # Timeout fallback
+
+        # Process outcome
+        if terminal_status == "purchase_approved":
+            request.status = "released"
+            logger.info("Spend request %s APPROVED on phone", request.spend_id)
+        else:
+            request.status = "blocked"
+            logger.warning("Spend request %s failed/denied/expired (status: %s)", request.spend_id, terminal_status)
+
+        # Log decision
+        self._log_decision(
+            {
+                "action_id": action_id,
+                "spend_id": request.spend_id,
+                "stage": "hold",
+                "action_type": terminal_status,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "operator": operator_id or "operator",
+                "details": {
+                    "outcome": "approved" if terminal_status == "purchase_approved" else "failed_or_denied",
+                    "link_spend_request_id": request.link_spend_request_id,
+                    "attempts": attempts,
+                },
+            }
+        )
