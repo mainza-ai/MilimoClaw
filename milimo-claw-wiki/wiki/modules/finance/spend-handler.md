@@ -6,7 +6,7 @@
 - `milimo-core/src/milimo_core/finance/spend_handler.py`
 - `milimo-blueprint/orchestrator/finance/spend_warroom_bridge.py`
 
-**Last updated**: 2026-06-30
+**Last updated**: 2026-07-02
 
 **Tags**: #module #finance #spend #stripe #approval
 
@@ -77,6 +77,33 @@ Charge completes or is denied/timed out
 
 ---
 
+## Robust JSON List Parsing
+
+`link-cli spend-request create --format json` returns a JSON **array** of objects, not a single object. `handle_hold_release` extracts the first element before accessing `.get("id")` to avoid `AttributeError`:
+
+```python
+payload = json.loads(stdout)
+if isinstance(payload, list):
+    payload = payload[0]
+request_id = payload.get("id")
+```
+
+This prevents crashes when `link-cli` wraps its response in an array due to multi-item results or version differences.
+
+---
+
+## Daemon Restart / State Recovery
+
+`SpendApprovalHandler` survives orchestrator restarts without losing spend state. A private `_get_request(spend_id)` method:
+
+1. Checks the in-memory `self._requests` cache first
+2. If missing (e.g., after a daemon restart), loads `logs/decisions.log`
+3. Reconstructs a `SpendRequest` and replays all subsequent states (`approve`, `block`, `release`, `cancel`) from the log
+
+All direct `self._requests[...]` accesses were replaced with `_get_request(spend_id)`, so no restart can trigger a `KeyError` on a valid spend ID.
+
+---
+
 ## Spend War Room Bridge
 
 `SpendWarRoomBridge` connects `SpendApprovalHandler` to the existing `SoloWarRoom` action queue. Claws call the bridge instead of touching `SpendApprovalHandler` or `link-cli` directly:
@@ -138,6 +165,7 @@ finance:
 - [[approval-thresholds]] — REVIEW/HOLD/AUTO rules
 - [[war-room]] — TUI for pending actions
 - [[message-contracts]] — Message types
+- [[test-spend-flow]] — Automated tests for JSON parsing, state recovery, and bridge fallback
 
 ---
 
@@ -146,3 +174,4 @@ finance:
 - `milimo-core/src/milimo_core/finance/spend_handler.py` — Implementation
 - `milimo-blueprint/orchestrator/finance/spend_warroom_bridge.py` — War Room bridge
 - `milimo-blueprint/templates/solo-founder.yaml` — Approval mode config
+- `milimo-blueprint/tests/test_spend_flow.py` — Tests for JSON parsing, state recovery, and bridge fallback

@@ -7,7 +7,7 @@
 - `milimo-blueprint/orchestrator/finance/spend_handler.py`
 - `milimo-blueprint/templates/solo-founder.yaml`
 
-**Last updated**: 2026-07-01
+**Last updated**: 2026-07-02
 
 **Tags**: #module #finance #warroom #spend #bridge #approvals
 
@@ -75,6 +75,19 @@ Operator presses `B` — kills the request at either stage.
 
 ---
 
+## State Recovery After Restart
+
+`SpendWarRoomBridge` maintains two in-memory mapping dicts:
+
+- `_review_actions: dict[str, str]` — War Room action ID → internal spend action ID
+- `_hold_actions: dict[str, str]` — War Room action ID → internal spend action ID
+
+If the orchestrator restarts, these mappings are lost. `_find_action_payload(warroom_action_id)` queries `SoloWarRoom`'s current queue and processed lists to recover the payload, then extracts the internal spend action ID from it.
+
+All bridge methods (`approve_review`, `block_review`, `release_hold`, `cancel_hold`) call `_find_action_payload` as a fallback when the in-memory lookup returns `None`. This prevents duplicate notifications and `KeyError` crashes after daemon restarts.
+
+---
+
 ## Usage
 
 ```python
@@ -124,12 +137,13 @@ finance:
 
 ## Related Pages
 
-- [[spend-handler]] — SpendApprovalHandler two-stage gate and per-operator isolation
+- [[spend-handler]] — SpendApprovalHandler two-stage gate, robust JSON parsing, and per-operator isolation
 - [[finance-claw]] — Finance Claw entry point
 - [[war-room]] — TUI and HTMX dashboard for pending actions
 - [[approval-thresholds]] — REVIEW/HOLD/AUTO configuration
 - [[link-cli-setup]] — Stripe Link CLI auth, device flow, and token locations
 - [[message-contracts]] — `spend_request`, `spend_review_decision`, `spend_hold_decision` schemas
+- [[test-spend-flow]] — Automated tests for JSON parsing, state recovery, and bridge fallback
 
 ---
 

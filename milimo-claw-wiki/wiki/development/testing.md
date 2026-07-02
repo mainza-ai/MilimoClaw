@@ -50,6 +50,7 @@ Location: `milimo-blueprint/tests/`
 | `test_finance_mvr_integration.py` | Finance Claw integration |
 | `test_build_mvr_integration.py` | Build Claw integration |
 | `test_analytics_integration.py` | Analytics Claw integration |
+| `test_spend_flow.py` | Stripe Link spend flow: JSON parsing, state recovery, bridge fallback |
 
 ### TypeScript Tests
 

@@ -124,6 +124,7 @@ Development conventions and guides.
 |------|-------------|--------|
 | [[conventions]] | Code style and project conventions | ✓ |
 | [[testing]] | Test structure and coverage | ✓ |
+| [[test-spend-flow]] | Stripe Link spend flow robustness tests | ✓ |
 | [[debugging]] | Debugging guide and tools | ✓ |
 | [[sandbox-file-sharing]] | Accessing and extracting claw-generated files | ✓ |
 
@@ -303,6 +304,8 @@ See [[log]] for complete operation history.
 
 | Date | Change | Pages Affected |
 |------|--------|----------------|
+| 2026-07-02 | Stripe Link spend flow robustness: robust JSON list parsing in handle_hold_release, SpendApprovalHandler state recovery via _get_request() from decisions.log, SpendWarRoomBridge _find_action_payload fallback, new test_spend_flow.py (3 tests) | spend-handler.md, spend-warroom-bridge.md, test-spend-flow.md, testing.md, link-cli-setup.md, network-egress.md |
+| 2026-07-01 | Wiki multi-user link-cli isolation + HTMX war room + key binding fix: per-operator XDG_CONFIG_HOME, Dockerfile .bashrc/.profile hook, handle_hold_release operator_id propagation, operator-aware env; war-room HTMX server docs, context-sensitive R key; new spend-warroom-bridge page | link-cli-setup.md, war-room.md, spend-warroom-bridge.md, finance-claw.md, index.md |
 | 2026-06-30 | Phase E7: Gateway daemon sandbox resilience (socat forwarder, .bashrc/.profile hooks), CI build context fixes, gh CLI, milimo_core.build git fix | hermes-profile.md, implementation-plan.md, log.md, index.md |
 | 2026-06-30 | Nous Portal login fix, policy preset format, `inference-api.nousresearch.com` added to nous-portal preset | hermes-profile.md, README.md, network-egress.md, log.md, index.md |
 | 2026-06-30 | Hermes file sync: `claw_layouts.py` centralized layouts, `milimo_paths.py` Hermes-native paths, `hermes-sync.sh` CLI, `hermes-inventory.py`, Dockerfile claw dirs at build time | sandbox-file-sharing.md, development-scripts.md, log.md, index.md |
