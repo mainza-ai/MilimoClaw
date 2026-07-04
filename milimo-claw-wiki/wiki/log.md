@@ -8,6 +8,36 @@
 
 ---
 
+### 2026-07-04 — Missing `milimo_spend` Tool Causes Agent sudo Prompt in Hermes Chat
+
+**Pages**: `milimo-hermes-plugin/milimo_hermes_plugin/tools.py`, `wiki/troubleshooting/common-issues.md`, `README.md`
+
+**Source**: Live Hermes chat session — agent unable to run Finance Claw Stripe Link spend flow; ended with sudo password prompt after filesystem fallback
+
+**Changes**:
+- `milimo-hermes-plugin/milimo_hermes_plugin/tools.py`:
+  - Added `MILIMO_SPEND_SCHEMA` with actions `queue_review`, `approve_review`, `block_review`, `release_hold`, `cancel_hold`, `status`
+  - Added `handle_milimo_spend()` routing to `SpendApprovalHandler`
+  - Added `_get_spend_handler()` lazy init with `MILIMO_SPEND_TEST_MODE=true` default
+  - Registered `milimo_spend` in `register_core_tools()`
+  - Added `set_spend_handler()` global setter
+- `milimo-hermes-sandbox/.../tools.py`: mirrored
+- `wiki/troubleshooting/common-issues.md`: added Hermes sudo-prompt / missing spend tool entry
+- `README.md`: added Agent-Initiated Spend missing-tool fix note
+
+**Root cause chain**:
+- `request_agent_spend` was declared in `finance_claw` capabilities but **no tool schema/handler existed**
+- `register_core_tools()` only registered 4 tools: `milimo_status`, `milimo_warroom`, `milimo_approve`, `milimo_veto`
+- Agent fell back to shell filesystem inspection → hit root-owned `/opt/milimo-core/src/`
+- Hermes auto-escalated to `sudo`; non-interactive TTY cannot answer → timeout
+
+**Verified**:
+- `docker exec -u sandbox <container> /opt/hermes/.venv/bin/python3 -c "from milimo_hermes_plugin.tools import MILIMO_SPEND_SCHEMA; print(MILIMO_SPEND_SCHEMA['name'])"` → `milimo_spend`
+- Schema actions: `['queue_review', 'approve_review', 'block_review', 'release_hold', 'cancel_hold', 'status']`
+- Handler: `handle_milimo_spend` wires to `SpendApprovalHandler.handle_hold_release()`
+
+---
+
 ### 2026-07-04 — Connect Hang / Relay Timeout Root Cause Identified: Expired Static Auth Token
 
 **Pages**: `wiki/troubleshooting/common-issues.md`, `wiki/architecture/hermes-profile.md`
