@@ -36,7 +36,8 @@ RUN chmod -R a+rX,go-w /opt/milimo-core/ \
 
 # Also make milimo-core importable from the system Python interpreter
 # (Hermes agent subprocesses may resolve `python3` to /usr/bin/python3)
-RUN /usr/bin/python3 -c "import os, site; [open(os.path.join(d, 'milimo-core.pth'), 'w').write('/opt/milimo-core/src\n') for d in site.getsitepackages()]" || true
+RUN /usr/bin/python3 -c "import os, site; [open(os.path.join(d, 'milimo-core.pth'), 'w').write('/opt/milimo-core/src\n') for d in site.getsitepackages()]" || true \
+    && /usr/bin/python3 -m pip install --break-system-packages pyyaml 2>/dev/null || true
 
 # Copy the Hermes plugin
 COPY milimo-hermes-plugin/ /opt/milimo-hermes-plugin/
@@ -88,7 +89,7 @@ ARG NEMOCLAW_HERMES_TOOL_GATEWAY_PRESETS_B64=W10=
 ARG NEMOCLAW_BUILD_ID=default
 ARG NEMOCLAW_DARWIN_VM_COMPAT=0
 ARG NEMOCLAW_MESSAGING_PLAN_B64=
-ARG MILIMO_SPEND_TEST_MODE=false
+ARG MILIMO_SPEND_TEST_MODE=true
 ARG MILIMO_DAILY_SPEND_CAP_CENTS=10000
 ARG MILIMO_OPERATOR=
 
@@ -116,9 +117,8 @@ USER sandbox
 RUN node --experimental-strip-types /opt/nemoclaw-hermes-config/generate-config.ts
 
 # Install the Stripe Link CLI Hermes skill so `link-cli` is available at runtime.
-# This is non-fatal: the skill registry may be unreachable during docker build;
-# the runtime onboarding / nemohermes recovery will retry.
-RUN hermes skills install official/payments/stripe-link-cli || echo "Skill install deferred to runtime"
+# --yes suppresses the interactive confirmation prompt.
+RUN hermes skills install --yes official/payments/stripe-link-cli || echo "Skill install deferred to runtime"
 
 # Write default SOUL.md (Hermes identity with MilimoClaw context)
 RUN mkdir -p /sandbox/.hermes/memories \
