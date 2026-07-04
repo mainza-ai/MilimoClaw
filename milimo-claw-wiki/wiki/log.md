@@ -8,6 +8,33 @@
 
 ---
 
+### 2026-07-04 — Connect Hang / Relay Timeout Root Cause Identified: Expired Static Auth Token
+
+**Pages**: `wiki/troubleshooting/common-issues.md`, `wiki/architecture/hermes-profile.md`
+
+**Source**: Live investigation of `nemohermes milimo-hermes connect` hang after sandbox idle period — `relay open timed out` on every `exec`/`connect`/`sessions` command
+
+**Changes**:
+- `wiki/troubleshooting/common-issues.md`: added `nemohermes <name> connect` Hangs / `relay open timed out` entry with root-cause, log evidence, and destroy+re-onboard remediation; added `recover` stale shields-transition-lock entry
+- `wiki/architecture/hermes-profile.md`: added Known Issue documenting expired static token lifecycle, distinction from NemoClaw #3986 idle-daemon bug, and re-onboard remediation
+
+**Root cause confirmed**:
+- Sandbox auth token is **baked as a static file** at Docker build time (`source=File`)
+- When the token expires, the running sandbox cannot rebootstrap: `RefreshSandboxToken returned Unauthenticated; static token sources cannot rebootstrap automatically source=File`
+- `gateway restart` and `recover` restart the gateway *process* but cannot rotate the static token
+- The `openshell-gateway` daemon (PID 82731) was alive on `127.0.0.1:8080` — confirming this is **not** the #3986 idle-daemon-death bug
+- Only remediation: destroy + re-onboard (bakes fresh token)
+
+**Verified fix** (re-onboard completed):
+- `nemohermes milimo-hermes exec -- echo ok` → `ok`
+- `nemohermes milimo-hermes gateway-token` → returns fresh token
+- `nemohermes milimo-hermes connect --probe-only` → `Probe complete`
+- Post-fix logs: no `ExpiredSignature` errors; healthy relay open/close cycles
+
+**Operational note**: This will recur after the new token's TTL elapses. The only permanent fix is NemoClaw support for automatic static-token rotation. Until then, expect to re-onboard periodically.
+
+---
+
 ### 2026-07-04 — Post-Rebuild Fixes: link-cli, PyYAML, orchestrator import, test-mode default + architecture docs
 
 **Pages**: `wiki/architecture/hermes-profile.md`, `wiki/scripts/installation-scripts.md`, `README.md`

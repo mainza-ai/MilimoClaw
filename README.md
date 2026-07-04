@@ -300,6 +300,31 @@ nemohermes milimo-hermes exec -- link-cli auth login
 
 > **Two-container conflict**: `nemohermes onboard` may create a plain Hermes sandbox (`openshell` container) before `install-hermes.sh` creates `milimo-hermes`. If you see port conflicts, destroy the plain Hermes sandbox first: `nemohermes openshell destroy`.
 
+##### Troubleshooting: `connect` Hangs / `relay open timed out`
+
+If `nemohermes milimo-hermes connect` hangs or every command returns `relay open timed out`, the baked sandbox auth token has expired.
+
+**Quick triage**:
+```bash
+# 1. Try recover first
+nemohermes milimo-hermes recover
+
+# 2. If still failing, destroy and re-onboard
+nemohermes milimo-hermes destroy --cleanup-gateway --yes
+nemohermes onboard \
+  --name milimo-hermes \
+  --from ./milimo-hermes-sandbox/Dockerfile \
+  --non-interactive \
+  --yes \
+  --yes-i-accept-third-party-software \
+  --fresh \
+  --recreate-sandbox
+```
+
+**Root cause**: The static auth token baked at build time expires. `gateway restart` and `recover` restart the gateway *process* but cannot rotate a static baked token. This will recur periodically until NemoClaw supports automatic token rotation for baked tokens.
+
+**See also**: [[common-issues]] — `relay open timed out` entry
+
 ### Day-to-Day Operations
 
 Once the Hermes sandbox is running, use these commands:
