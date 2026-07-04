@@ -2,7 +2,7 @@
 
 **Summary**: Append-only record of all wiki operations.
 
-**Last updated**: 2026-07-03
+**Last updated**: 2026-07-04
 
 **Tags**: #log #meta
 
@@ -1480,3 +1480,25 @@ Each entry follows this format:
 **Pages updated**:
 - `wiki/coordination/war-room.md` — startup command, URL, endpoint table
 - `README.md` — View War Room section (port + path corrected)
+
+---
+
+### 2026-07-04 — Post-Audit Bugfix Cycle: Finance Spend + War Room Hardening
+
+**Commits**: `8f9b37a`, `8c8f6a0`, `0b75dd9`, `10fabfc`, `6d6b2f2`, `8e6dbf1`, `02ba504`, `20bfa4b`
+
+**Pages**: `wiki/production-readiness-audit-2026-07-03.md`, `wiki/coordination/war-room.md`, `wiki/coordination/war-room-security.md`, `wiki/claws/finance-claw.md`, `wiki/modules/finance/spend-handler.md`, `wiki/log.md`
+
+**Source**: MilimoClaw main branch commit cycle (2026-07-03/04)
+
+**Changes**:
+- `production-readiness-audit-2026-07-03.md` — All Phase 1 (C-1, H-6, I-2) and Phase 2 (C-2 through L-4, I-1) findings moved to `✓ Fixed`; post-audit refinements added (queue-state cap bug, recovery over-eager loading, SIGTERM deadlock, port 9090); latest bugfix findings documented
+- `war-room.md` — Updated Sources, Last updated, architecture diagram; HTMX server section rewritten for production state: port 9090, Bearer auth env var, Origin CSRF check, action_id regex validation, graceful SIGTERM shutdown, queue persistence behavior, endpoint table with auth column
+- `war-room-security.md` — Phase 1 and Phase 2 marked `✓ Fixed` (completion); status table updated to "Production-ready"; post-audit refinements table added; verification checklist checked off
+- `finance-claw.md` — Added `--test` flag restrictions (only valid on `create`); justification >=100 char validation; `MILIMO_DAILY_SPEND_CAP_CENTS` env-driven cap; queue persistence in `agent-spend.log`; queue-state entries excluded from daily cap aggregate
+- `spend-handler.md` — Background polling thread updated to non-daemon; `--test` restrictions documented; Queue State Persistence section added; Post-Audit Refinements section added
+
+**Verification**:
+- ✅ Full test suite passes: 1265 passed, 1 skipped
+- ✅ `war-room.md`, `war-room-security.md`, `finance-claw.md`, `spend-handler.md` conform to CLAUDE.md template
+- ✅ `production-readiness-audit-2026-07-03.md` reflects current code state
