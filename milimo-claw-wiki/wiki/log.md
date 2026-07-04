@@ -1502,3 +1502,22 @@ Each entry follows this format:
 - ✅ Full test suite passes: 1265 passed, 1 skipped
 - ✅ `war-room.md`, `war-room-security.md`, `finance-claw.md`, `spend-handler.md` conform to CLAUDE.md template
 - ✅ `production-readiness-audit-2026-07-03.md` reflects current code state
+
+### 2026-07-04 — Finance Spend Flow Phase 3·6·7: queue log, thread join, docs audit
+
+**Commits**: `420190b`.
+
+**Pages**: `wiki/modules/finance/spend-handler.md`, `wiki/modules/finance/link-cli-setup.md`, `wiki/index.md`, `.agents/AGENTS.md`, `wiki/production-readiness-audit-2026-07-03.md`
+
+**Source**: Deep-dive audit continuation — Phases 3/6/7 of the Finance Spend Flow remediation plan (2026-07-04)
+
+**Changes**:
+- `spend-handler.md` — Last updated → 2026-07-04; marked F-9/F-11/F-14 fixed; added `agent-queue.log` description, `close()` shutdown pattern, `_lsrq_index` description
+- `link-cli-setup.md` — Last updated → 2026-07-04; replaced outdated blocking code example with correct non-blocking two-call flow; documented `request-approval` headless exit codes, retry behavior, and status outcome table
+- `index.md` — Finance claw module list corrected: added `[[spend-handler]]`, removed duplicate `[[link-cli-setup]]`
+- `AGENTS.md` — Stage 2 HOLD release section documents `approval_pending` status and explains why raw `create --request-approval` in shell causes duplicate notifications
+- `production-readiness-audit-2026-07-03.md` — SA3-3b updated (`agent-spend.log` → `agent-queue.log`); SA3-4 updated (`_get_daily_spend_aggregate` no longer filters `queue_state`); Phase 3, 4, 5, 6, 7 implementation tables added
+
+**Verification**:
+- ✅ Full test suite passes: 1265 passed, 1 skipped
+- ✅ Pyright: 0 errors in milimo-blueprint
