@@ -8,6 +8,47 @@
 
 ---
 
+### 2026-07-04 — Post-Rebuild Fixes: link-cli, PyYAML, orchestrator import, test-mode default + architecture docs
+
+**Pages**: `wiki/architecture/hermes-profile.md`, `wiki/scripts/installation-scripts.md`, `README.md`
+
+**Source**: Live rebuild investigation of `milimo-hermes` sandbox — 5 root-cause fixes; architecture docs updated
+
+**Changes**:
+- `milimo-hermes-sandbox/Dockerfile`:
+  - Added `RUN npm install -g @stripe/link-cli@0.8.2` so `link-cli` binary is present after build
+  - Added `RUN /usr/bin/python3 -m pip install --break-system-packages pyyaml` so `milimo_core.bridge_cli` imports from system Python
+  - Added `RUN /usr/bin/python3 -c ".../milimo-core.pth"` write for `/opt/nemoclaw-blueprint` so `orchestrator` is importable from system Python
+  - Changed `ARG MILIMO_SPEND_TEST_MODE=true` (was `false`) so test-mode spend flow works out of the box
+  - Added `--yes` to `hermes skills install official/payments/stripe-link-cli` for non-interactive Docker builds
+- `milimo-hermes-sandbox/install-hermes.sh`: passes new `MILIMO_*` build args + exports them for `generate-config.ts`
+- `warroom/server.py`: `/opt/nemoclaw-blueprint` added to `_BLUEPRINTS` so template resolution works from system Python
+- `wiki/architecture/hermes-profile.md`: added Known Issues #6 (NEMOCLAW_MESSAGING_PLAN_B64), #7 (post-rebuild Dockerfile fixes), #8 (two-container conflict + NEMOCLAW_RECREATE_WITHOUT_BACKUP), #9 (port forwarding requirements); updated Dockerfile and Install Script sections
+- `wiki/scripts/installation-scripts.md`: added new Generated Dockerfile Pattern section with Hermes-profile additions; expanded Environment Variables table with `MILIMO_SPEND_*` and `NEMOCLAW_MESSAGING_PLAN_B64`
+- `README.md`: documented `link-cli` binary availability post-rebuild, test-mode default, post-onboarding manual steps (`link-cli auth login`, add test payment method), two-container avoidance, port forwarding ports
+
+**Fixed root causes**:
+| Symptom | Root cause | Fix |
+|---|---|---|
+| `link-cli: command not found` | Hermes skill only installs `SKILL.md` wrapper; actual Node binary needs `npm install -g` | `npm install -g @stripe/link-cli@0.8.2` in Dockerfile |
+| `ModuleNotFoundError: No module named 'yaml'` | System Python lacks PyYAML; `milimo_core.bridge_cli` imports `yaml` at top-level | `pip install pyyaml` for system Python in Dockerfile |
+| `No module named 'orchestrator'` | `bridge_cli.py` imports `orchestrator.milimo_paths`; `/opt/nemoclaw-blueprint` not on sys.path | Write `/opt/nemoclaw-blueprint.pth` to system site-packages; added to `_BLUEPRINTS` in `server.py` |
+| `MILIMO_SPEND_TEST_MODE` unset | Dockerfile ARG defaulted to `false`; install script didn't read user's `.env` | Changed default to `true`; `install-hermes.sh` exports from env |
+| `hermes skills install` hangs in CI | Interactive TTY prompt for skill confirmation | Added `--yes` flag: `hermes skills install --yes official/payments/stripe-link-cli` |
+| State backup abort on rebuild | Shields-up seal makes files unreadable to sandbox-user backup | Use `NEMOCLAW_RECREATE_WITHOUT_BACKUP=1` for clean rebuilds |
+| Two containers (openshell + milimo-hermes) | `nemohermes onboard` creates plain Hermes sandbox; `install-hermes.sh` creates second | Destroy plain Hermes sandbox first |
+| Port conflicts between containers | Both containers attempt to bind same ports | `nemohermes` handles port mapping (18789, 18790, 8642) automatically |
+| Missing `ARG NEMOCLAW_MESSAGING_PLAN_B64` | NemoClaw setup manager patches Dockerfile during onboarding | Declared in Hermes Dockerfile |
+
+**Verification** (inside rebuilt container):
+- `link-cli --version` → `0.8.2`
+- `python3 -c "import milimo_core"` → OK
+- `python3 -c "from milimo_core.bridge_cli import handle_collect_health"` → OK
+- `python3 -c "from milimo_core.finance.spend_handler import SpendApprovalHandler"` → OK
+- `.env` contains `MILIMO_SPEND_TEST_MODE=true` and `MILIMO_DAILY_SPEND_CAP_CENTS=10000`
+- War Room `server.py` resolves `/opt/nemoclaw-blueprint` templates in system Python subprocesses
+
+
 ---
 
 ### 2026-06-30 — Stripe Link Spend Integration (Hackathon)
