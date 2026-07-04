@@ -111,15 +111,18 @@ ENV NEMOCLAW_MODEL=${NEMOCLAW_MODEL} \
     MILIMO_OPERATOR=${MILIMO_OPERATOR}
 
 WORKDIR /sandbox
-USER sandbox
+USER root
 
 # Generate Hermes config.yaml and .env from build args
 RUN node --experimental-strip-types /opt/nemoclaw-hermes-config/generate-config.ts
 
 # Install the link-cli Node.js binary globally so the spend handler can invoke it.
-# This is non-fatal: npm registry may be unreachable during docker build;
-# the runtime onboarding / nemohermes recovery can retry.
-RUN npm install -g @stripe/link-cli@0.8.2 2>/dev/null || echo "link-cli npm install deferred to runtime"
+# Runs as root so the global node_modules destination is writable.
+USER root
+RUN npm install -g @stripe/link-cli@0.8.2
+
+# Drop back to sandbox user for runtime.
+USER sandbox
 
 # Write default SOUL.md (Hermes identity with MilimoClaw context)
 RUN mkdir -p /sandbox/.hermes/memories \
