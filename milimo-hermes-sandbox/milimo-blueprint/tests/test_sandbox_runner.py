@@ -291,3 +291,62 @@ class TestBacktestResult:
                 # Assert our secret is NOT in the passed environment dictionary
                 assert "STRIPE_API_KEY" not in passed_env
                 assert passed_env.get("HOME") is not None
+
+    def test_sandbox_runner_containment_checking(self) -> None:
+        """Verify SandboxRunner builds the command correctly when bwrap or docker are present."""
+        import shutil
+        from unittest.mock import patch, MagicMock
+
+        runner = SandboxRunner()
+
+        # 1. Test when bwrap is available
+        with patch("shutil.which", side_effect=lambda name: "/usr/bin/bwrap" if name == "bwrap" else None), \
+             patch("subprocess.run") as mock_sub_run:
+            mock_res = MagicMock()
+            mock_res.returncode = 0
+            mock_res.stdout = '{"tool_name": "test", "improvement_pct": 10.0}'
+            mock_sub_run.return_value = mock_res
+
+            runner.backtest(
+                VALID_TOOL_CODE,
+                [{"metrics": {"approval_rate": 0.7}}],
+                "approval_rate",
+                0.7,
+            )
+
+            assert mock_sub_run.called
+            args = mock_sub_run.call_args[0][0]
+            assert args[0] == "/usr/bin/bwrap"
+            assert "--unshare-all" in args
+
+        # 2. Test when bwrap is not available, but docker is available and active
+        def which_side_effect(name: str) -> str | None:
+            if name == "docker":
+                return "/usr/bin/docker"
+            return None
+
+        with patch("shutil.which", side_effect=which_side_effect), \
+             patch("subprocess.run") as mock_sub_run:
+            # We mock the first call to subprocess.run (the docker ps daemon check) to return 0
+            mock_check_res = MagicMock()
+            mock_check_res.returncode = 0
+
+            mock_run_res = MagicMock()
+            mock_run_res.returncode = 0
+            mock_run_res.stdout = '{"tool_name": "test", "improvement_pct": 10.0}'
+
+            mock_sub_run.side_effect = [mock_check_res, mock_run_res]
+
+            runner.backtest(
+                VALID_TOOL_CODE,
+                [{"metrics": {"approval_rate": 0.7}}],
+                "approval_rate",
+                0.7,
+            )
+
+            assert mock_sub_run.call_count == 2
+            # Second call should be the docker run
+            args = mock_sub_run.call_args_list[1][0][0]
+            assert args[0] == "/usr/bin/docker"
+            assert "run" in args
+            assert "--net=none" in args
