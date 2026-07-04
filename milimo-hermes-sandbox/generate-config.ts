@@ -246,6 +246,11 @@ function main(): void {
   envLines.push(`NEMOCLAW_MODEL=${settings.model}`);
   envLines.push(`NEMOCLAW_INFERENCE_BASE_URL=${settings.baseUrl}`);
 
+  // Milimo-specific runtime defaults (can be overridden at build time)
+  envLines.push(`MILIMO_SPEND_TEST_MODE=${process.env.MILIMO_SPEND_TEST_MODE || "false"}`);
+  envLines.push(`MILIMO_DAILY_SPEND_CAP_CENTS=${process.env.MILIMO_DAILY_SPEND_CAP_CENTS || "10000"}`);
+  envLines.push(`MILIMO_OPERATOR=${process.env.MILIMO_OPERATOR || ""}`);
+
   const result = writeConfigFiles(config, envLines);
   console.log(`Generated ${result.configPath} and ${result.envPath}`);
 }

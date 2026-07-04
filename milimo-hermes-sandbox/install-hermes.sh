@@ -433,6 +433,9 @@ build_docker_image() {
   docker_args+=(--build-arg "NEMOCLAW_BUILD_ID=${NEMOCLAW_BUILD_ID}")
   docker_args+=(--build-arg "NEMOCLAW_DARWIN_VM_COMPAT=${NEMOCLAW_DARWIN_VM_COMPAT}")
   docker_args+=(--build-arg "NEMOCLAW_MESSAGING_PLAN_B64=${NEMOCLAW_MESSAGING_PLAN_B64}")
+  docker_args+=(--build-arg "MILIMO_SPEND_TEST_MODE=${MILIMO_SPEND_TEST_MODE:-false}")
+  docker_args+=(--build-arg "MILIMO_DAILY_SPEND_CAP_CENTS=${MILIMO_DAILY_SPEND_CAP_CENTS:-10000}")
+  docker_args+=(--build-arg "MILIMO_OPERATOR=${MILIMO_OPERATOR:-}")
 
   if [[ -n "$SLACK_CHANNELS" ]]; then
     local slack_json
@@ -547,6 +550,9 @@ main() {
   export NEMOCLAW_BUILD_ID="${NEMOCLAW_BUILD_ID:-default}"
   export NEMOCLAW_DARWIN_VM_COMPAT="${NEMOCLAW_DARWIN_VM_COMPAT:-0}"
   export NEMOCLAW_MESSAGING_PLAN_B64="${NEMOCLAW_MESSAGING_PLAN_B64:-}"
+  export MILIMO_SPEND_TEST_MODE="${MILIMO_SPEND_TEST_MODE:-false}"
+  export MILIMO_DAILY_SPEND_CAP_CENTS="${MILIMO_DAILY_SPEND_CAP_CENTS:-10000}"
+  export MILIMO_OPERATOR="${MILIMO_OPERATOR:-}"
 
   if [[ -n "$SLACK_CHANNELS" ]]; then
     # Convert comma-separated to JSON array, then base64
