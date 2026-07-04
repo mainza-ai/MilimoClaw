@@ -408,6 +408,46 @@ NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 nemohermes milimo-hermes rebuild
 
 **Root cause**: The `nemohermes` backup binary cannot read files protected by the shields-up seal. This is an upstream issue in `nemohermes`; the workaround skips backup entirely.
 
+#### `nemohermes connect` Hangs / `relay open timed out` After Idle Period
+After a period of inactivity, `nemohermes milimo-hermes connect` may appear to hang after printing:
+```
+Connecting to sandbox 'milimo-hermes'
+Inside the sandbox, run `hermes` to start chatting with the agent.
+```
+
+Every `exec`, `sessions`, and `logs` command fails with:
+```
+Error: code: 'Deadline expired before operation could complete', message: "relay open timed out"
+```
+
+**Root cause**: The sandbox's static auth token (baked into the Docker image at build time) expires. Logs show:
+```
+RefreshSandboxToken returned Unauthenticated; static token sources cannot rebootstrap automatically source=File
+```
+
+The token is a static file (`source=File`), not session-managed. The running gateway process itself (PID 82731) is alive and listening on `127.0.0.1:8080`, and `nemohermes milimo-hermes recover` succeeds — but it cannot rotate the static baked token.
+
+**This is NOT NemoClaw #3986** (idle-daemon death). In #3986, the `openshell-gateway` daemon itself dies and leaves a stale PID file. Here, the daemon is alive; only the sandbox auth token is expired.
+
+**Fix** (reliable): Destroy and re-onboard to bake a fresh token:
+```bash
+nemohermes milimo-hermes destroy --cleanup-gateway --yes
+nemohermes onboard \
+  --name milimo-hermes \
+  --from ./milimo-hermes-sandbox/Dockerfile \
+  --non-interactive \
+  --yes \
+  --yes-i-accept-third-party-software \
+  --fresh \
+  --recreate-sandbox
+```
+
+**Quick triage**:
+1. Run `nemohermes milimo-hermes recover` — if that doesn't fix `exec`, proceed to step 2
+2. Destroy + re-onboard as above
+
+**Upstream issue**: Tracked in NemoClaw issue #3986 class (static token lifecycle). The permanent fix requires NemoClaw to support token rotation for baked tokens. Until then, re-onboarding is the only remediation.
+
 #### `pull_claw_files.sh` Is OpenClaw-Only
 The sync script `scripts/pull_claw_files.sh` expects container names matching `openshell-my-assistant` and paths under `/sandbox/.openclaw/milimo/claws/<role>/`. Neither convention exists on the Hermes profile. The script should not be used with Hermes sandboxes.
 

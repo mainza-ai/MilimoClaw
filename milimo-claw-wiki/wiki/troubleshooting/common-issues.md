@@ -335,6 +335,70 @@ OCI runtime exec failed: exec failed: unable to start container process: exec: "
 
 ---
 
+## Hermes Profile Issues
+
+### `nemohermes <name> connect` Hangs / `relay open timed out`
+
+**Symptom**:
+```
+Hermes Agent gateway is not running inside the sandbox (sandbox likely restarted).
+  Recovering...
+  Confirming the gateway stays responsive (~25s)...
+  ✓ Hermes Agent gateway restarted inside sandbox.
+
+$ nemohermes milimo-hermes exec -- echo ok
+Error: code: 'Deadline expired before operation could complete', message: "relay open timed out"
+```
+
+**Cause**: The sandbox's static auth token (baked into the Docker image at build time) has expired. Logs show:
+```
+RefreshSandboxToken returned Unauthenticated; static token sources cannot rebootstrap automatically source=File
+```
+
+The token is served from a static file source (`source=File`). Unlike dynamic tokens, it cannot be rotated or refreshed by the running sandbox. All SSH relay operations (`exec`, `connect`, `sessions`, `logs`) fail with `relay open timed out` because the relay rejects the expired credential before any command executes.
+
+**Not this bug**: NemoClaw #3986 (`openshell-docker-gateway` idle-daemon death). That bug shows a stale PID file and dead `openshell-gateway` daemon. Here, PID 82731 is alive and listening on `127.0.0.1:8080`.
+
+**Fix** (reliable): Destroy and re-onboard to bake a fresh token:
+```bash
+nemohermes milimo-hermes destroy --cleanup-gateway --yes
+nemohermes onboard \
+  --name milimo-hermes \
+  --from ./milimo-hermes-sandbox/Dockerfile \
+  --non-interactive \
+  --yes \
+  --yes-i-accept-third-party-software \
+  --fresh \
+  --recreate-sandbox
+```
+
+**First move when `connect` hangs**: Run `nemohermes milimo-hermes recover` first. If `recover` succeeds but `exec`/`connect` still fail with `relay open timed out`, it's token expiry — proceed to destroy + re-onboard.
+
+**Preventive workaround** (upstream bug in NemoClaw): Expect this to recur after some idle period. The only permanent fix is a token-rotation feature in NemoClaw itself. Until then, re-onboarding replaces the expired token.
+
+**See also**: [[hermes-profile]] — Sandbox token lifecycle
+
+---
+
+### `nemohermes <name> recover` Fails: Stale Shields Transition Lock
+
+**Symptom**:
+```
+Error: Timed out after 30000ms waiting for shields transition lock
+'.../shields-transition-lock-milimo-hermes.json':
+recorded owner PID 10743 is not running (gateway process recovery)
+```
+
+**Cause**: A previous `recover` or gateway-process operation crashed while holding the shields transition lock, leaving a stale JSON lock file whose recorded owner PID no longer exists.
+
+**Fix**: Remove the stale lock file and retry:
+```bash
+rm ~/.nemoclaw/state/shields-transition-lock-<sandbox-name>.json
+nemohermes <name> recover
+```
+
+---
+
 ## Related Pages
 
 - [[issues-and-fixes]] — Complete audit
