@@ -6,7 +6,7 @@
 
 **Sources**: `install.sh`, [Install OpenClaw Plugins (official)](https://docs.nvidia.com/nemoclaw/latest/deployment/install-openclaw-plugins.html)
 
-**Last updated**: 2026-05-02
+**Last updated**: 2026-07-04
 
 **Tags**: #scripts #installation #deployment
 
@@ -177,6 +177,15 @@ nemoclaw onboard --from <build-dir>/Dockerfile --name <sandbox-name>
 ```
 
 Per [official docs](https://docs.nvidia.com/nemoclaw/latest/reference/commands.html), `--from` requires `--name` in non-interactive mode to avoid silently clobbering the default `my-assistant` sandbox.
+
+**Required Dockerfile ARG for onboarding**: NemoClaw's setup manager patches the staged Dockerfile during onboarding to apply messaging channel plans. The Dockerfile MUST declare:
+```dockerfile
+ARG NEMOCLAW_MESSAGING_PLAN_B64=
+ENV NEMOCLAW_MESSAGING_PLAN_B64=${NEMOCLAW_MESSAGING_PLAN_B64}
+```
+Without this declaration, onboarding fails with: `Error: Dockerfile is missing ARG NEMOCLAW_MESSAGING_PLAN_B64; cannot apply messaging plan.`
+
+The `install-hermes.sh` `build_docker_image()` function now passes this through automatically (defaults to empty if no messaging plan is configured).
 
 ---
 
