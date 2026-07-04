@@ -189,6 +189,17 @@ link-cli spend-request request-approval lsrq_1ToFQOK2MJSohSIrORocpMZM
 
 This sends the push notification to the user's phone. The `approval_url` is not returned by `create` when using `--no-request-approval`; construct it manually as `https://app.link.com/activity/approve/<id>` if needed.
 
+> **Headless behavior**: `request-approval` blocks for up to 30 seconds waiting for an active Link app session. In CI/test-mode environments where no Link app session is present, it exits non-zero. `SpendApprovalHandler` treats this as `approval_pending` (not `blocked`) and continues background polling, because the `lsrq_*` session was successfully created and may still be approved manually.
+
+### request-approval Return Codes
+
+| Exit code | Meaning | Handler response |
+|-----------|---------|------------------|
+| `0` | Notification sent successfully | `status = "released"`, polling starts |
+| `1` (timeout, no session) | No active Link app — notification not sent | `status = "approval_pending"`, polling starts |
+| `1` (`UNKNOWN flag`) | Invalid flag passed (e.g. `--test`) | Hard failure — do not retry |
+| Other | Network or auth error | `status = "approval_pending"`, polling starts; retried once after 5s |
+
 ### The Approval URL
 
 The `https://app.link.com/activity/approve/{id}` URL is the **second human gate**.

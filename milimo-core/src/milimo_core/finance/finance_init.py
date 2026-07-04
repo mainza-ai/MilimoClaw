@@ -215,10 +215,14 @@ class FinanceOperationalLog:
             self.log_path.touch()
 
     def append(self, entry: FinanceLogEntry) -> None:
+        import os
+
         with open(self.log_path, "a") as f:
             fcntl.flock(f.fileno(), fcntl.LOCK_EX)
             try:
                 f.write(json.dumps(entry.to_dict()) + "\n")
+                f.flush()
+                os.fsync(f.fileno())
             finally:
                 fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 

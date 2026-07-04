@@ -208,8 +208,35 @@ This keeps the TUI and inter-claw gateway responsive for the entire approval win
 | **SA3-1** | Critical | **Fixed (2026-07-04)** | Idempotency lock added at `spend_handler.py:352-389` (`O_CREAT|O_EXCL` + PID + stale cleanup). Duplicate `R` press no longer creates duplicate Link sessions. |
 | **SA3-2** | Critical | **Fixed (2026-07-04)** | Daily spend cap now reads rolling 24h aggregate from `agent-spend.log` via `_get_daily_spend_aggregate()` with `fcntl.LOCK_SH` at `spend_handler.py:188-189`. Sub-cap repeated charges are now blocked. |
 | **SA3-3** | Medium | **Fixed (2026-07-04)** | `_log_decision()` at `spend_handler.py:670-682` now calls `f.flush()` + `os.fsync()` after every write. Crash durability confirmed. |
+| **F-1** | High | **Fixed (2026-07-04)** | `handle_hold_release` no longer marks requests `blocked` when `request-approval` fails. Status is `approval_pending` and polling still starts. |
+| **F-2** | High | **Fixed (2026-07-04)** | `_find_prior_release()` checks `decisions.log` before `create` to prevent duplicate `lsrq_*` sessions after crashes. |
+| **F-3** | High | **Fixed (2026-07-04)** | `request-approval` retried once after 5s on transient failure; permanent failures (e.g. `UNKNOWN flag`) are not retried. |
+| **F-8** | Medium | **Fixed (2026-07-04)** | `_get_request` reconstructs from `hold/queued` and `hold/release` entries, not just `review/queued`. |
+| **F-10** | Medium | **Fixed (2026-07-04)** | `FinanceOperationalLog.append` now calls `f.flush()` + `os.fsync()` for crash durability. |
+| **F-12** | Low | **Fixed (2026-07-04)** | War Room server argparse default changed from `8080` to `9090`. |
 
 ---
+
+## Status Vocabulary
+
+| Status | Meaning |
+|--------|---------|
+| `pending_review` | Queued in War Room REVIEW, awaiting operator |
+| `held` | REVIEW approved, moved to HOLD queue |
+| `released` | `create` AND `request-approval` both succeeded; polling started |
+| `approval_pending` | `create` succeeded but `request-approval` failed; `lsrq_*` session exists and polling is active |
+| `blocked` | `create` failed, cap exceeded, or operator blocked |
+| `cancelled` | Operator cancelled from HOLD |
+
+## Idempotency and Recovery
+
+`handle_hold_release` is safe to call multiple times:
+
+1. **Crash-safe create**: Before running `create`, `_find_prior_release()` scans `decisions.log`. If a prior `release_initiated` entry with a valid `lsrq_*` exists, the handler returns immediately with `status = "released"`.
+2. **Notify retry**: If a prior `notify_failed` entry exists with a valid `lsrq_*`, the handler skips `create` and retries `request-approval`.
+3. **Atomic lock**: `O_CREAT|O_EXCL` file lock prevents concurrent releases for the same `spend_id`. Stale locks (dead PID) are cleaned up automatically.
+
+This means the operator can press `R` multiple times, or the daemon can restart mid-release, without creating duplicate Link charge sessions.
 
 ## Self-Healing Startup Recovery
 

@@ -41,6 +41,7 @@ import json
 import logging
 import os
 import subprocess
+import time
 
 logger = logging.getLogger("milimo.spend_handler")
 
@@ -62,7 +63,7 @@ class SpendRequest:
     justification: str  # one sentence: what + why
     payment_method_id: str | None = None
     credential_type: Literal["card", "shared_payment_token"] = "card"
-    status: Literal["pending_review", "held", "released", "blocked", "cancelled"] = (
+    status: Literal["pending_review", "held", "released", "blocked", "cancelled", "approval_pending"] = (
         "pending_review"
     )
     created_at: str = field(
@@ -118,6 +119,7 @@ class SpendApprovalHandler:
         )
         self.test_mode = test_mode
         self._requests: dict[str, SpendRequest] = {}
+        self._lsrq_index: dict[str, str] = {}  # lsrq_* -> spend_id
         self._recover_and_resume_polling()
 
     def _get_request(self, spend_id: str) -> SpendRequest:
@@ -125,7 +127,8 @@ class SpendApprovalHandler:
         if spend_id in self._requests:
             return self._requests[spend_id]
 
-        # Reconstruct request from decisions.log
+        # Reconstruct request from decisions.log — accept any stage/action_type
+        # that carries the originating spend details.
         if self.decisions_path.exists():
             try:
                 with open(self.decisions_path, "r", encoding="utf-8") as f:
@@ -133,12 +136,12 @@ class SpendApprovalHandler:
                         if not line.strip():
                             continue
                         dec = json.loads(line)
-                        if (
-                            dec.get("spend_id") == spend_id
-                            and dec.get("stage") == "review"
-                            and dec.get("action_type") == "queued"
-                        ):
-                            details = dec.get("details", {})
+                        if dec.get("spend_id") != spend_id:
+                            continue
+                        stage = dec.get("stage")
+                        action_type = dec.get("action_type")
+                        details = dec.get("details", {})
+                        if stage == "review" and action_type == "queued":
                             req = SpendRequest(
                                 spend_id=spend_id,
                                 claw=details.get("claw", ""),
@@ -151,6 +154,25 @@ class SpendApprovalHandler:
                                 credential_type=details.get("credential_type", "card"),
                             )
                             self._requests[spend_id] = req
+                            break
+                        elif stage == "hold" and action_type == "queued":
+                            req = SpendRequest(
+                                spend_id=spend_id,
+                                claw=details.get("claw", details.get("requesting_claw", "")),
+                                merchant_name=details.get("merchant_name", ""),
+                                merchant_url=details.get("merchant_url", ""),
+                                amount_cents=details.get("amount_cents", 0),
+                                currency=details.get("currency", "USD"),
+                                justification="",
+                                payment_method_id=None,
+                                credential_type="card",
+                            )
+                            self._requests[spend_id] = req
+                            break
+                        elif stage == "hold" and action_type == "release":
+                            lsrq = details.get("link_spend_request_id")
+                            if lsrq:
+                                self._lsrq_index[lsrq] = spend_id
             except Exception as e:
                 logger.error("Failed to recover request %s from log: %s", spend_id, e)
 
@@ -163,22 +185,25 @@ class SpendApprovalHandler:
                         if not line.strip():
                             continue
                         dec = json.loads(line)
-                        if dec.get("spend_id") == spend_id:
-                            action_type = dec.get("action_type")
-                            stage = dec.get("stage")
-                            if stage == "review" and action_type == "approve":
-                                req.status = "held"
-                            elif stage == "review" and action_type == "block":
-                                req.status = "blocked"
-                            if stage == "hold" and action_type == "release":
-                                req.status = "released"
-                                req.link_spend_request_id = dec.get("details", {}).get("link_spend_request_id")
-                            elif stage == "hold" and action_type == "purchase_approved":
-                                req.status = "released"
-                            elif stage == "hold" and action_type in ("purchase_denied", "purchase_expired", "release_failed"):
-                                req.status = "blocked"
-                            elif stage == "hold" and action_type == "cancel":
-                                req.status = "cancelled"
+                        if dec.get("spend_id") != spend_id:
+                            continue
+                        action_type = dec.get("action_type")
+                        stage = dec.get("stage")
+                        if stage == "review" and action_type == "approve":
+                            req.status = "held"
+                        elif stage == "review" and action_type == "block":
+                            req.status = "blocked"
+                        if stage == "hold" and action_type == "release":
+                            req.status = "released"
+                            req.link_spend_request_id = dec.get("details", {}).get("link_spend_request_id")
+                        elif stage == "hold" and action_type == "purchase_approved":
+                            req.status = "released"
+                        elif stage == "hold" and action_type in ("purchase_denied", "purchase_expired", "release_failed"):
+                            req.status = "blocked"
+                        elif stage == "hold" and action_type == "cancel":
+                            req.status = "cancelled"
+                        elif stage == "hold" and action_type == "release" and not req.link_spend_request_id:
+                            req.link_spend_request_id = dec.get("details", {}).get("link_spend_request_id")
             except Exception as e:
                 logger.error("Failed to replay states for request %s: %s", spend_id, e)
             return req
@@ -347,25 +372,57 @@ class SpendApprovalHandler:
         )
         return action_id
 
+    def _find_prior_release(self, spend_id: str) -> dict | None:
+        """Return the most recent release-related decision for spend_id, or None."""
+        if not self.decisions_path.exists():
+            return None
+        last = None
+        with open(self.decisions_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    dec = json.loads(line)
+                except Exception:
+                    continue
+                if dec.get("spend_id") != spend_id:
+                    continue
+                stage = dec.get("stage")
+                action_type = dec.get("action_type")
+                if stage == "hold" and action_type in (
+                    "release",
+                    "release_failed",
+                    "purchase_approved",
+                    "purchase_denied",
+                    "purchase_expired",
+                    "cancel",
+                ):
+                    last = dec
+        return last
+
     def handle_hold_release(
         self, action_id: str, operator_id: str | None = None, *args: Any, **kwargs: Any
     ) -> SpendRequest:
         """
-        HOLD release -> THIS SPENDS (pending the user's Link app tap).
+        HOLD release -> creates a Link spend request and fires the approval
+        notification.
 
-        Shells out to `link-cli spend-request create --request-approval`.
-        That call blocks until the user approves/denies in the Link app
-        or it times out — Hermes cannot self-approve that step either.
-        Exit code != 0 (deny/timeout) is treated as a failed release and
-        does not mark the request released.
+        Non-blocking: runs ``link-cli spend-request create
+        --no-request-approval`` to create the session (returns the ``lsrq_*``
+        ID), then fires a separate ``link-cli spend-request
+        request-approval <lsrq_id>`` to push the approval notification to
+        the user's phone, and starts a background polling thread to wait
+        for the final Link app decision.
+
+        If ``request-approval`` fails (e.g. no active Link app session in
+        headless CI), the request is marked ``approval_pending`` and the
+        polling thread still starts. Only a ``create`` failure or missing
+        ``lsrq_*`` ID is treated as a hard block.
         """
         spend_id = action_id.replace("spend-hold-", "")
         request = self._get_request(spend_id)
         _validate_justification(request)
 
-        import os
-        import json
-        import subprocess
         from datetime import datetime, timezone
 
         # 1. Acquire atomic filesystem lock
@@ -408,19 +465,18 @@ class SpendApprovalHandler:
                 lock_file.flush()
                 os.fsync(lock_file.fileno())
 
-            # 2. Check decisions.log to verify this spend_id has not already been successfully released
-            if self.decisions_path.exists():
-                with open(self.decisions_path, "r", encoding="utf-8") as f:
-                    for line in f:
-                        if not line.strip():
-                            continue
-                        try:
-                            dec = json.loads(line)
-                            if dec.get("spend_id") == spend_id and dec.get("action_type") in ("released", "purchase_approved", "release"):
-                                request.status = "released"
-                                return request
-                        except Exception:
-                            pass
+            # 2. Idempotency: check if this spend_id already has a release decision
+            prior = self._find_prior_release(spend_id)
+            if prior:
+                prior_outcome = prior.get("details", {}).get("outcome", "")
+                prior_lsrq = prior.get("details", {}).get("link_spend_request_id")
+                if prior_outcome == "release_initiated" and prior_lsrq:
+                    request.status = "released"
+                    request.link_spend_request_id = prior_lsrq
+                    return request
+                if prior_outcome == "notify_failed" and prior_lsrq:
+                    request.link_spend_request_id = prior_lsrq
+                    # Fall through to retry request-approval
 
             # 3. Calculate daily spend cap aggregate check
             daily_spent = self._get_daily_spend_aggregate()
@@ -514,6 +570,8 @@ class SpendApprovalHandler:
                     payload = payload[0]
                 if isinstance(payload, dict):
                     request.link_spend_request_id = payload.get("id")
+                    if request.link_spend_request_id:
+                        self._lsrq_index[request.link_spend_request_id] = spend_id
             except (ValueError, AttributeError, IndexError):
                 logger.exception("Failed to parse spend request ID from link-cli output")
             except Exception:
@@ -536,6 +594,9 @@ class SpendApprovalHandler:
                 )
                 return request
 
+            # Log the spend attempt immediately — the charge session exists
+            self._append_spend_log(request)
+
             # Request Approval (triggers app notification, returns immediately)
             cmd_req = [
                 self.link_cli_path,
@@ -548,27 +609,34 @@ class SpendApprovalHandler:
             proc_req = subprocess.run(cmd_req, capture_output=True, text=True, timeout=30, env=env)
 
             if proc_req.returncode != 0:
-                request.status = "blocked"
-                self._log_decision(
-                    {
-                        "action_id": action_id,
-                        "spend_id": spend_id,
-                        "stage": "hold",
-                        "action_type": "release_failed",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                        "operator": operator_id or "operator",
-                        "details": {
-                            "outcome": "request_approval_failed",
-                            "stderr": proc_req.stderr[-500:],
-                        },
-                    }
-                )
-                return request
+                stderr_text = (proc_req.stderr or "").lower()
+                is_permanent = "unknown flag" in stderr_text or "no such command" in stderr_text
+                if not is_permanent:
+                    time.sleep(5)
+                    proc_req = subprocess.run(cmd_req, capture_output=True, text=True, timeout=30, env=env)
+
+                if proc_req.returncode != 0:
+                    request.status = "approval_pending"
+                    self._log_decision(
+                        {
+                            "action_id": action_id,
+                            "spend_id": spend_id,
+                            "stage": "hold",
+                            "action_type": "release",
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "operator": operator_id or "operator",
+                            "details": {
+                                "outcome": "notify_failed",
+                                "link_spend_request_id": request.link_spend_request_id,
+                                "stderr": proc_req.stderr[-500:],
+                            },
+                        }
+                    )
+                    self._start_polling_thread(request, action_id, operator_id)
+                    return request
 
             # Transition status to released and log decision
             request.status = "released"
-            self._append_spend_log(request)
-
             self._log_decision(
                 {
                     "action_id": action_id,
@@ -745,7 +813,8 @@ class SpendApprovalHandler:
         if not self.decisions_path.exists():
             return
 
-        released_requests = {}
+        pending_releases: dict[str, dict] = {}
+        unindexed_lsrqs: dict[str, str] = {}  # lsrq_* -> spend_id
         try:
             with open(self.decisions_path, "r", encoding="utf-8") as f:
                 for line in f:
@@ -757,21 +826,32 @@ class SpendApprovalHandler:
                         continue
                     action_type = dec.get("action_type")
                     stage = dec.get("stage")
+                    details = dec.get("details", {})
                     if stage == "hold":
                         if action_type == "release":
-                            released_requests[spend_id] = {
-                                "action_id": dec.get("action_id"),
-                                "link_spend_request_id": dec.get("details", {}).get("link_spend_request_id"),
-                                "operator_id": dec.get("operator"),
-                            }
-                        elif action_type in ("purchase_approved", "purchase_denied", "purchase_expired", "release_failed", "cancel"):
-                            if spend_id in released_requests:
-                                del released_requests[spend_id]
+                            outcome = details.get("outcome", "release_initiated")
+                            lsrq = details.get("link_spend_request_id")
+                            if outcome in ("release_initiated", "notify_failed") and lsrq:
+                                pending_releases[spend_id] = {
+                                    "action_id": dec.get("action_id"),
+                                    "link_spend_request_id": lsrq,
+                                    "operator_id": dec.get("operator"),
+                                }
+                                unindexed_lsrqs[lsrq] = spend_id
+                        elif action_type in ("purchase_approved", "purchase_denied", "purchase_expired", "cancel"):
+                            if spend_id in pending_releases:
+                                del pending_releases[spend_id]
+                        elif action_type == "release_failed":
+                            if spend_id in pending_releases:
+                                del pending_releases[spend_id]
         except Exception as e:
             logger.error("Failed to scan pending spend requests for recovery: %s", e)
             return
 
-        for spend_id, info in released_requests.items():
+        # Merge any unindexed lsrq ids into the in-memory index
+        self._lsrq_index.update(unindexed_lsrqs)
+
+        for spend_id, info in pending_releases.items():
             link_id = info.get("link_spend_request_id")
             if not link_id:
                 continue
@@ -793,8 +873,6 @@ class SpendApprovalHandler:
 
     def _poll_spend_request(self, request: SpendRequest, action_id: str, operator_id: str | None) -> None:
         """Background thread logic to poll link-cli retrieve status."""
-        import time
-        import os
 
         # Set environment with correct isolation
         env = {**os.environ}
