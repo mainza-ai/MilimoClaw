@@ -226,6 +226,36 @@ class TestInvoiceManagerTwoStageApproval:
         approved_path = fs.get_invoice_path("approved", invoice.invoice_id)
         assert not approved_path.exists()
 
+    def test_stage2_hold_release_retry_guard(self, invoice_manager, fs):
+        """Verify that handle_stage2_hold_release does not recreate Stripe invoices on retry if stripe_invoice_id is present."""
+        invoice = invoice_manager.generate_invoice(
+            project_id="proj-123",
+            client_id="client-456",
+            delivered_at="2026-03-21",
+        )
+
+        invoice_manager.handle_stage1_approve(invoice.invoice_id)
+
+        # Pre-set a stripe_invoice_id on the approved invoice file
+        approved_path = fs.get_invoice_path("approved", invoice.invoice_id)
+        invoice_data = json.loads(approved_path.read_text())
+        invoice_data["stripe_invoice_id"] = "existing_invoice_xyz"
+        approved_path.write_text(json.dumps(invoice_data, indent=2))
+
+        stripe_client = MockStripeClient()
+
+        sent_invoice = invoice_manager.handle_stage2_hold_release(
+            invoice.invoice_id, stripe_client
+        )
+
+        assert sent_invoice.status == "sent"
+        assert sent_invoice.stripe_invoice_id == "existing_invoice_xyz"
+
+        # Verify that create_invoice was NOT called (so only 1 call to send_invoice exists)
+        assert len(stripe_client.calls) == 1
+        assert stripe_client.calls[0]["method"] == "send"
+        assert stripe_client.calls[0]["invoice_id"] == "existing_invoice_xyz"
+
     def test_stage2_raises_if_not_approved(self, invoice_manager, fs):
         """handle_stage2 raises if invoice not in approved/ status."""
         invoice = invoice_manager.generate_invoice(

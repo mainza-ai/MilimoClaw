@@ -81,13 +81,16 @@ class StripeClient:
         if not self._check_cli():
             return None
 
-        cmd = ["stripe", *args, "--api-key", self.api_key, "--format", "json"]
+        cmd = ["stripe", *args, "--format", "json"]
         try:
+            import os
+            env = {**os.environ, "STRIPE_API_KEY": self.api_key}
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 timeout=30,
+                env=env,
             )
             if result.returncode != 0:
                 logger.error("Stripe CLI error: %s", result.stderr.strip())

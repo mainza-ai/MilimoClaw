@@ -263,6 +263,164 @@ class TestZeroKnowledgeSecretProxy(unittest.TestCase):
         self.assertIn("/v9/projects/*", deny_paths)
         self.assertIn("/v6/domains", deny_paths)
 
+    def test_native_warroom_server_endpoints(self) -> None:
+        """Verify that bridge_server.py RPCHandler returns valid HTML for warroom endpoints."""
+        import threading
+        import urllib.request
+        from http.server import HTTPServer
+        from orchestrator.bridge_server import RPCHandler
+        import socket
+
+        # Find a free port
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(('127.0.0.1', 0))
+        port = s.getsockname()[1]
+        s.close()
+
+        server = HTTPServer(("127.0.0.1", port), RPCHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        try:
+            # Query /v1/warroom/hold-queue
+            url = f"http://127.0.0.1:{port}/v1/warroom/hold-queue"
+            with urllib.request.urlopen(url) as response:
+                self.assertEqual(response.status, 200)
+                html = response.read().decode("utf-8")
+                self.assertIn("No pending actions", html)
+
+            # Query /warroom.html
+            url_html = f"http://127.0.0.1:{port}/warroom.html"
+            with urllib.request.urlopen(url_html) as response:
+                self.assertEqual(response.status, 200)
+                html = response.read().decode("utf-8")
+                self.assertIn("MilimoClaw War Room", html)
+
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+    def test_prometheus_metrics_route(self) -> None:
+        """Verify that bridge_server.py RPCHandler returns Prometheus-formatted text metrics."""
+        import threading
+        import urllib.request
+        from http.server import HTTPServer
+        from orchestrator.bridge_server import RPCHandler
+        import socket
+
+        # Find a free port
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(('127.0.0.1', 0))
+        port = s.getsockname()[1]
+        s.close()
+
+        server = HTTPServer(("127.0.0.1", port), RPCHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        try:
+            # Query /metrics
+            url = f"http://127.0.0.1:{port}/metrics"
+            with urllib.request.urlopen(url) as response:
+                self.assertEqual(response.status, 200)
+                metrics = response.read().decode("utf-8")
+                self.assertIn("# HELP milimo_messages_processed_total", metrics)
+                self.assertIn("# TYPE milimo_messages_processed_total counter", metrics)
+                self.assertIn('milimo_messages_processed_total{claw="content"}', metrics)
+
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+    def test_bridge_cli_approvals(self) -> None:
+        """Verify that bridge_cli approve and veto commands work as expected."""
+        import tempfile
+        import shutil
+        import json
+        from pathlib import Path
+        from orchestrator.bridge_cli import handle_approve_action, handle_veto_action
+
+        tmp_dir = tempfile.mkdtemp(prefix="milimo-cli-approval-test-")
+
+        # Patch orchestrator.milimo_paths.mesh_dir to return our temp directory
+        with patch("orchestrator.milimo_paths.mesh_dir", return_value=Path(tmp_dir)):
+            try:
+                warroom_inbox = Path(tmp_dir) / "inbox" / "war_room"
+                warroom_inbox.mkdir(parents=True, exist_ok=True)
+
+                # 1. Create a mock pending action message in warroom inbox
+                msg_id = "test-action-123"
+                msg_data = {
+                    "message_id": msg_id,
+                    "sender_role": "finance",
+                    "recipient_role": "ops",
+                    "message_type": "spend_request",
+                    "payload": {"merchant_name": "Stripe", "amount_cents": 1000},
+                    "timestamp": "2026-07-03T18-43-59Z"
+                }
+                msg_file = warroom_inbox / f"2026-07-03T18-43-59Z_{msg_id}.json"
+                msg_file.write_text(json.dumps(msg_data))
+
+                # Test approve via handle_approve_action
+                result = handle_approve_action({"action_id": msg_id})
+                self.assertTrue(result["success"])
+
+                # File should be moved to inbox/ops
+                ops_inbox = Path(tmp_dir) / "inbox" / "ops"
+                self.assertTrue((ops_inbox / msg_file.name).exists())
+                self.assertFalse(msg_file.exists())
+
+                # 2. Test veto via handle_veto_action
+                # Re-create the message in warroom inbox
+                msg_file.write_text(json.dumps(msg_data))
+                result = handle_veto_action({"action_id": msg_id})
+                self.assertTrue(result["success"])
+
+                # File should be moved to rejected/
+                rejected_dir = Path(tmp_dir) / "rejected"
+                self.assertTrue((rejected_dir / msg_file.name).exists())
+                self.assertFalse(msg_file.exists())
+
+            finally:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    def test_mesh_initializes_with_region_detector(self) -> None:
+        """Verify that MeshCoordinator initializes with RegionDetector and logs optimal region."""
+        import tempfile
+        import shutil
+        import os
+        from pathlib import Path
+        from orchestrator.mesh import MeshCoordinator
+        from orchestrator.contracts import ContractValidator
+
+        tmp_dir = tempfile.mkdtemp(prefix="milimo-region-test-")
+        orig_region = os.environ.get("MILIMO_REGION")
+
+        # Set manual region to avoid triggering real geolocation/latency network calls
+        os.environ["MILIMO_REGION"] = "us-east-1"
+
+        try:
+            # Wire up validator
+            config_path = Path(__file__).parent.parent / "mesh_config.yaml"
+            validator = ContractValidator.from_config_file(config_path)
+
+            # Start mesh coordinator
+            mesh = MeshCoordinator(validator=validator, squad_id="test-squad", mesh_dir=tmp_dir)
+
+            # Assert that self._detected_region is not None
+            self.assertIsNotNone(mesh._detected_region)
+            self.assertEqual(mesh._detected_region.region_id, "us-east-1")
+
+            mesh.close()
+        finally:
+            if orig_region is None:
+                os.environ.pop("MILIMO_REGION", None)
+            else:
+                os.environ["MILIMO_REGION"] = orig_region
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()

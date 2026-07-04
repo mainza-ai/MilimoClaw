@@ -46,3 +46,20 @@ markers = [
 filterwarnings = [
     "ignore:orchestrator\\..*is deprecated; use milimo_core:DeprecationWarning",
 ]
+
+[tool.coverage.run]
+source = ["orchestrator"]
+omit = [
+    "**/tests/*",
+    "**/test/*",
+    "**/mocks/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]

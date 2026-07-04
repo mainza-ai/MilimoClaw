@@ -68,6 +68,7 @@ class GatewayConfig:
     timeout_ms: int = 5000
     reconnect_attempts: int = 3
     reconnect_delay_ms: int = 1000
+    validator: Any = None
 
 
 @dataclass
@@ -120,6 +121,47 @@ class GatewayAdapter(ABC):
         self.state = ConnectionState.DISCONNECTED
         self._last_message_time: Optional[datetime] = None
         self._error_count = 0
+
+    def _validate_message(self, message: dict[str, Any]) -> tuple[bool, Optional[str]]:
+        """Validate outbound/inbound message against contracts.py rules."""
+        try:
+            from orchestrator.contracts import ContractValidator, ClawMessage
+
+            validator = getattr(self.config, "validator", None)
+            if not validator:
+                config_paths = [
+                    Path(__file__).parent.parent / "mesh_config.yaml",
+                    Path("/sandbox/.openclaw/milimo/milimo-blueprint/mesh_config.yaml"),
+                    Path.home() / ".openclaw/milimo/milimo-blueprint/mesh_config.yaml",
+                    Path("./milimo-blueprint/mesh_config.yaml"),
+                ]
+                config_path = next((p for p in config_paths if p.exists()), None)
+                if config_path:
+                    validator = ContractValidator.from_config_file(config_path)
+                else:
+                    sender = message.get("sender_role", self.config.role)
+                    recipient = message.get("recipient_role", "unknown")
+                    msg_type = message.get("message_type", "unknown")
+                    basic_raw = {
+                        "message_matrix": {sender: {recipient: [msg_type]}},
+                        "message_types": {},
+                    }
+                    validator = ContractValidator.from_dict(basic_raw)
+
+            claw_msg = ClawMessage(
+                sender_role=message.get("sender_role", self.config.role),
+                recipient_role=message.get("recipient_role", "unknown"),
+                message_type=message.get("message_type", "unknown"),
+                payload=message.get("payload", {}),
+                message_id=message.get("message_id", ""),
+                timestamp=message.get("timestamp", ""),
+                squad_id=getattr(self.config, "squad_id", ""),
+            )
+            result = validator.validate(claw_msg)
+            return result.valid, result.reason
+        except Exception as e:
+            logger.error("Transport contract validation error: %s", e)
+            return True, None
 
     @abstractmethod
     def connect(self) -> bool:
@@ -249,6 +291,15 @@ class UnixSocketGateway(GatewayAdapter):
                 error_message="Gateway not connected",
             )
 
+        valid, reason = self._validate_message(message)
+        if not valid:
+            logger.error("Transport send validation failed: %s", reason)
+            return SendResult(
+                success=False,
+                error_code="CONTRACT_VIOLATION",
+                error_message=f"Contract validation failed: {reason}",
+            )
+
         gateway_msg = GatewayMessage(
             method="SEND",
             params={"recipient": message.get("recipient_role"), "message": message},
@@ -293,9 +344,19 @@ class UnixSocketGateway(GatewayAdapter):
             return []
 
         messages = response.data.get("messages", [])
-        if messages:
+        valid_messages = []
+        for msg in messages:
+            valid, reason = self._validate_message(msg)
+            if valid:
+                valid_messages.append(msg)
+            else:
+                logger.error(
+                    "Transport receive validation failed: %s. Dropping message.", reason
+                )
+
+        if valid_messages:
             self._last_message_time = datetime.now(timezone.utc)
-        return messages
+        return valid_messages
 
     def close(self) -> None:
         """Close Unix socket connection."""
@@ -389,7 +450,7 @@ class WebSocketGateway(GatewayAdapter):
             return False
 
         try:
-            self._ws = websocket.WebSocketApp(
+            self._ws = websocket.WebSocketApp(  # type: ignore
                 ws_url,
                 on_open=self._on_open,
                 on_message=self._on_message,
@@ -468,6 +529,15 @@ class WebSocketGateway(GatewayAdapter):
                 error_message="Gateway not connected",
             )
 
+        valid, reason = self._validate_message(message)
+        if not valid:
+            logger.error("Transport send validation failed: %s", reason)
+            return SendResult(
+                success=False,
+                error_code="CONTRACT_VIOLATION",
+                error_message=f"Contract validation failed: {reason}",
+            )
+
         self._request_id += 1
         request_id = f"req-{self._request_id}"
 
@@ -527,7 +597,14 @@ class WebSocketGateway(GatewayAdapter):
         for _ in range(limit):
             try:
                 msg = self._message_queue.get_nowait()
-                messages.append(msg)
+                valid, reason = self._validate_message(msg)
+                if valid:
+                    messages.append(msg)
+                else:
+                    logger.error(
+                        "Transport receive validation failed: %s. Dropping message.",
+                        reason,
+                    )
             except queue.Empty:
                 break
 
@@ -622,6 +699,15 @@ class FileBasedGateway(GatewayAdapter):
                 error_message="Gateway not connected",
             )
 
+        valid, reason = self._validate_message(message)
+        if not valid:
+            logger.error("Transport send validation failed: %s", reason)
+            return SendResult(
+                success=False,
+                error_code="CONTRACT_VIOLATION",
+                error_message=f"Contract validation failed: {reason}",
+            )
+
         recipient = message.get("recipient_role", "")
         if not recipient:
             return SendResult(
@@ -673,7 +759,15 @@ class FileBasedGateway(GatewayAdapter):
             for msg_file in sorted(self._inbox.glob("*.json"))[:limit]:
                 try:
                     content = msg_file.read_text()
-                    messages.append(json.loads(content))
+                    msg = json.loads(content)
+                    valid, reason = self._validate_message(msg)
+                    if valid:
+                        messages.append(msg)
+                    else:
+                        logger.error(
+                            "Transport receive validation failed: %s. Dropping message.",
+                            reason,
+                        )
                 except (json.JSONDecodeError, OSError) as e:
                     logger.warning("Failed to read message %s: %s", msg_file, e)
 

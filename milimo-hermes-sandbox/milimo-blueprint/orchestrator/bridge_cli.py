@@ -1201,9 +1201,41 @@ def handle_generate_sprint_plan(args: dict[str, Any]) -> dict[str, Any]:
     plan_file = sprint_dir / "sprint-plan-request.json"
     plan_file.write_text(json.dumps(plan_request, indent=2))
     result["plan_path"] = str(plan_file)
-    result["status"] = "request_written"
-
     return result
+
+
+def handle_approve_sprint_plan(args: dict[str, Any]) -> dict[str, Any]:
+    """Approve a pending sprint plan and update current-plan.json."""
+    from orchestrator.build.build_init import BuildFilesystemInit
+    from orchestrator.build.build_init import BuildOperationalLog
+    from orchestrator.build.approval_handler import (
+        BuildApprovalHandler,
+        PRActivityLog,
+        DeployActivityLog,
+    )
+    from orchestrator.build.issue_manager import IssueManager
+
+    plan_id = args.get("plan_id")
+    if not plan_id:
+        return {"status": "error", "error": "Missing plan_id"}
+
+    build_base = claw_base("build")
+    fs = BuildFilesystemInit(build_base)
+    op_log = BuildOperationalLog(build_base / "logs/operational.log")
+    pr_log = PRActivityLog(build_base / "logs/pr-activity.log")
+    dep_log = DeployActivityLog(build_base / "logs/deploy-activity.log")
+
+    approval = BuildApprovalHandler(fs, op_log, pr_log, dep_log)
+    manager = IssueManager(fs, None, None, None, approval, op_log)
+
+    result = manager.handle_sprint_plan_approved(plan_id)
+    if result:
+        return {"status": "approved", "first_issue": result}
+    else:
+        return {
+            "status": "error",
+            "error": f"Failed to approve plan {plan_id} (not found or already approved)",
+        }
 
 
 def handle_run_opportunity_scoring(args: dict[str, Any]) -> dict[str, Any]:
@@ -1977,7 +2009,77 @@ def handle_milimo_status(args: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _find_hold_message(action_id: str) -> tuple[Path, dict[str, Any]]:
+    from orchestrator.milimo_paths import mesh_dir as milimo_mesh_dir
+
+    mesh_dir = milimo_mesh_dir()
+    warroom_inbox = mesh_dir / "inbox" / "war_room"
+
+    if not warroom_inbox.exists():
+        raise RuntimeError("War Room inbox directory does not exist")
+
+    # Search for files
+    candidates = list(warroom_inbox.glob("*.json"))
+    for file in candidates:
+        if (
+            file.name == action_id
+            or file.stem == action_id
+            or file.stem.endswith(f"_{action_id}")
+            or action_id in file.name
+        ):
+            try:
+                data = json.loads(file.read_text(encoding="utf-8"))
+                return file, data
+            except Exception as e:
+                logger.warning("Failed to parse message file %s: %s", file, e)
+
+    raise RuntimeError(f"Action '{action_id}' not found in War Room hold queue")
+
+
+def handle_approve_action(args: dict[str, Any]) -> dict[str, Any]:
+    """Approve a pending action from the hold queue."""
+    action_id = args.get("action_id")
+    if not action_id:
+        raise RuntimeError("action_id is required")
+
+    file_path, msg_data = _find_hold_message(action_id)
+
+    # Move to the recipient's inbox
+    from orchestrator.milimo_paths import mesh_dir as milimo_mesh_dir
+
+    mesh_dir = milimo_mesh_dir()
+    recipient = msg_data.get("recipient_role", "finance")
+    target_dir = mesh_dir / "inbox" / recipient
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    file_path.rename(target_dir / file_path.name)
+    logger.info("Approved action %s: moved to %s", action_id, recipient)
+    return {"success": True, "message": f"Approved and routed to {recipient}"}
+
+
+def handle_veto_action(args: dict[str, Any]) -> dict[str, Any]:
+    """Veto/reject a pending action from the hold queue."""
+    action_id = args.get("action_id")
+    if not action_id:
+        raise RuntimeError("action_id is required")
+
+    file_path, msg_data = _find_hold_message(action_id)
+
+    # Move to rejected queue
+    from orchestrator.milimo_paths import mesh_dir as milimo_mesh_dir
+
+    mesh_dir = milimo_mesh_dir()
+    rejected_dir = mesh_dir / "rejected"
+    rejected_dir.mkdir(parents=True, exist_ok=True)
+
+    file_path.rename(rejected_dir / file_path.name)
+    logger.info("Vetoed action %s: moved to rejected queue", action_id)
+    return {"success": True, "message": "Vetoed action successfully"}
+
+
 COMMAND_HANDLERS: dict[str, Any] = {
+    "approve_action": handle_approve_action,
+    "veto_action": handle_veto_action,
     "evolution_status": handle_evolution_status,
     "blueprint_info": handle_blueprint_info,
     "blueprint_list": handle_blueprint_list,
@@ -2007,6 +2109,7 @@ COMMAND_HANDLERS: dict[str, Any] = {
     "build_open_prs": handle_build_open_prs,
     "analytics_latest_report_summary": handle_analytics_latest_report_summary,
     "generate_sprint_plan": handle_generate_sprint_plan,
+    "approve_sprint_plan": handle_approve_sprint_plan,
     "run_opportunity_scoring": handle_run_opportunity_scoring,
     "generate_weekly_report": handle_generate_weekly_report,
     "check_all_deadlines": handle_check_all_deadlines,
@@ -2022,6 +2125,16 @@ COMMAND_HANDLERS: dict[str, Any] = {
     "launcher_status": handle_launcher_status,
     "milimo_status": handle_milimo_status,
 }
+
+
+def handle_command(
+    command: str, args: dict[str, Any], blueprint_dir: str = ""
+) -> dict[str, Any]:
+    """Helper to dispatch commands programmatically (used by RPC server)."""
+    if command not in COMMAND_HANDLERS:
+        raise ValueError(f"Unknown command: {command}")
+    handler = COMMAND_HANDLERS[command]
+    return handler(args)
 
 
 # ---------------------------------------------------------------------------

@@ -185,7 +185,8 @@ class SpendApprovalHandler:
         action_id = f"spend-review-{request.spend_id}"
         self._requests[request.spend_id] = request
 
-        if request.amount_cents > self.daily_spend_cap_cents:
+        daily_spent = self._get_daily_spend_aggregate()
+        if daily_spent + request.amount_cents > self.daily_spend_cap_cents:
             request.status = "blocked"
             self._log_decision(
                 {
@@ -198,6 +199,7 @@ class SpendApprovalHandler:
                     "details": {
                         "reason": "exceeds_daily_spend_cap",
                         "amount_cents": request.amount_cents,
+                        "daily_spent_cents": daily_spent,
                         "cap_cents": self.daily_spend_cap_cents,
                     },
                 }
@@ -224,7 +226,7 @@ class SpendApprovalHandler:
         self._log_decision(review_entry)
         return action_id
 
-    def handle_review_approve(self, action_id: str) -> str:
+    def handle_review_approve(self, action_id: str, *args: Any, **kwargs: Any) -> str:
         """
         REVIEW approve -> queues HOLD (stage 2). Does NOT spend yet.
         Returns the new hold action_id.
@@ -249,7 +251,7 @@ class SpendApprovalHandler:
         return hold_action_id
 
     def handle_review_edit(
-        self, action_id: str, amount_cents: int, justification: str
+        self, action_id: str, amount_cents: int, justification: str, *args: Any, **kwargs: Any
     ) -> None:
         """REVIEW edit -> re-queues REVIEW with the corrected amount/reason."""
         spend_id = action_id.replace("spend-review-", "")
@@ -272,7 +274,7 @@ class SpendApprovalHandler:
             }
         )
 
-    def handle_review_block(self, action_id: str, reason: str) -> None:
+    def handle_review_block(self, action_id: str, reason: str, *args: Any, **kwargs: Any) -> None:
         """REVIEW block -> purchase never happens."""
         spend_id = action_id.replace("spend-review-", "")
         self._get_request(spend_id).status = "blocked"
@@ -326,7 +328,9 @@ class SpendApprovalHandler:
         )
         return action_id
 
-    def handle_hold_release(self, action_id: str, operator_id: str | None = None) -> SpendRequest:
+    def handle_hold_release(
+        self, action_id: str, operator_id: str | None = None, *args: Any, **kwargs: Any
+    ) -> SpendRequest:
         """
         HOLD release -> THIS SPENDS (pending the user's Link app tap).
 
@@ -340,153 +344,238 @@ class SpendApprovalHandler:
         request = self._get_request(spend_id)
 
         import os
-        env = {**os.environ}
-        if operator_id:
-            safe_op_id = "".join(c for c in operator_id if c.isalnum() or c in ("-", "_")).strip()
-            if safe_op_id and safe_op_id not in ("system", "operator", "sandbox"):
-                base_config_dir = "/sandbox/.config" if os.path.exists("/sandbox") else os.path.expanduser("~/.config")
-                user_config_dir = f"{base_config_dir}/users/{safe_op_id}"
-                env["XDG_CONFIG_HOME"] = user_config_dir
-                logger.info("Isolating link-cli XDG_CONFIG_HOME for operator %s to %s", safe_op_id, user_config_dir)
+        import json
+        import subprocess
+        from datetime import datetime, timezone
+
+        # 1. Acquire atomic filesystem lock
+        lock_path = self.spend_log_path.parent / f".spend_lock_{spend_id}"
+        lock_fd = None
+        try:
+            lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            # Check if stale lock
+            try:
+                with open(lock_path, "r") as lf:
+                    lock_data = json.loads(lf.read().strip())
+                pid = lock_data.get("pid")
+                pid_exists = False
+                if pid:
+                    try:
+                        os.kill(pid, 0)
+                        pid_exists = True
+                    except OSError:
+                        pass
+
+                if not pid_exists:
+                    try:
+                        os.unlink(lock_path)
+                        lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                    except Exception:
+                        raise ValueError(f"Spend request {spend_id} is locked by dead process {pid}, but lock file cleanup failed.")
+                else:
+                    raise ValueError(f"Spend request {spend_id} is already being processed by active process {pid}.")
+            except Exception as le:
+                raise ValueError(f"Spend request {spend_id} is locked: {le}")
+
+        try:
+            # Write PID and timestamp to lock
+            with os.fdopen(lock_fd, 'w') as lock_file:
+                lock_file.write(json.dumps({
+                    "pid": os.getpid(),
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }))
+                lock_file.flush()
+                os.fsync(lock_file.fileno())
+
+            # 2. Check decisions.log to verify this spend_id has not already been successfully released
+            if self.decisions_path.exists():
+                with open(self.decisions_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if not line.strip():
+                            continue
+                        try:
+                            dec = json.loads(line)
+                            if dec.get("spend_id") == spend_id and dec.get("action_type") in ("released", "purchase_approved", "release"):
+                                request.status = "released"
+                                return request
+                        except Exception:
+                            pass
+
+            # 3. Calculate daily spend cap aggregate check
+            daily_spent = self._get_daily_spend_aggregate()
+            if daily_spent + request.amount_cents > self.daily_spend_cap_cents:
+                request.status = "blocked"
+                self._log_decision(
+                    {
+                        "action_id": action_id,
+                        "spend_id": spend_id,
+                        "stage": "hold",
+                        "action_type": "release_failed",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "operator": operator_id or "operator",
+                        "details": {
+                            "outcome": "exceeds_daily_spend_cap",
+                            "daily_spent_cents": daily_spent,
+                            "request_cents": request.amount_cents,
+                            "cap_cents": self.daily_spend_cap_cents,
+                        },
+                    }
+                )
+                return request
+
+            env = {**os.environ}
+            if operator_id:
+                safe_op_id = "".join(c for c in operator_id if c.isalnum() or c in ("-", "_")).strip()
+                if safe_op_id and safe_op_id not in ("system", "operator", "sandbox"):
+                    base_config_dir = "/sandbox/.config" if os.path.exists("/sandbox") else os.path.expanduser("~/.config")
+                    user_config_dir = f"{base_config_dir}/users/{safe_op_id}"
+                    env["XDG_CONFIG_HOME"] = user_config_dir
+                    logger.info("Isolating link-cli XDG_CONFIG_HOME for operator %s to %s", safe_op_id, user_config_dir)
+                else:
+                    if os.path.exists("/sandbox/.config"):
+                        env["XDG_CONFIG_HOME"] = "/sandbox/.config"
+                        logger.info("Setting default sandbox XDG_CONFIG_HOME to /sandbox/.config")
             else:
                 if os.path.exists("/sandbox/.config"):
                     env["XDG_CONFIG_HOME"] = "/sandbox/.config"
                     logger.info("Setting default sandbox XDG_CONFIG_HOME to /sandbox/.config")
-        else:
-            if os.path.exists("/sandbox/.config"):
-                env["XDG_CONFIG_HOME"] = "/sandbox/.config"
-                logger.info("Setting default sandbox XDG_CONFIG_HOME to /sandbox/.config")
 
-        cmd_create = [
-            self.link_cli_path,
-            "spend-request",
-            "create",
-            "--merchant-name",
-            request.merchant_name,
-            "--merchant-url",
-            request.merchant_url,
-            "--context",
-            request.justification,
-            "--amount",
-            str(request.amount_cents),
-            "--total",
-            f"type:total,display_text:Total,amount:{request.amount_cents}",
-            "--no-request-approval",
-            "--format",
-            "json",
-        ]
-        if request.payment_method_id:
-            cmd_create += ["--payment-method-id", request.payment_method_id]
-        if request.credential_type == "shared_payment_token":
-            cmd_create += ["--credential-type", "shared_payment_token"]
-        if self.test_mode:
-            cmd_create += ["--test"]
+            cmd_create = [
+                self.link_cli_path,
+                "spend-request",
+                "create",
+                "--merchant-name",
+                request.merchant_name,
+                "--merchant-url",
+                request.merchant_url,
+                "--context",
+                request.justification,
+                "--amount",
+                str(request.amount_cents),
+                "--total",
+                f"type:total,display_text:Total,amount:{request.amount_cents}",
+                "--no-request-approval",
+                "--format",
+                "json",
+            ]
+            if request.payment_method_id:
+                cmd_create += ["--payment-method-id", request.payment_method_id]
+            if request.credential_type == "shared_payment_token":
+                cmd_create += ["--credential-type", "shared_payment_token"]
+            if self.test_mode:
+                cmd_create += ["--test"]
 
-        # Run Create Command (non-blocking, returns immediately)
-        proc_create = subprocess.run(cmd_create, capture_output=True, text=True, timeout=30, env=env)
+            # Run Create Command (non-blocking, returns immediately)
+            proc_create = subprocess.run(cmd_create, capture_output=True, text=True, timeout=30, env=env)
 
-        if proc_create.returncode != 0:
-            request.status = "blocked"
+            if proc_create.returncode != 0:
+                request.status = "blocked"
+                self._log_decision(
+                    {
+                        "action_id": action_id,
+                        "spend_id": spend_id,
+                        "stage": "hold",
+                        "action_type": "release_failed",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "operator": operator_id or "operator",
+                        "details": {
+                            "outcome": "create_failed",
+                            "stderr": proc_create.stderr[-500:],
+                        },
+                    }
+                )
+                return request
+
+            # Parse ID
+            try:
+                payload = self._parse_json_stdout(proc_create.stdout)
+                if isinstance(payload, list) and len(payload) > 0:
+                    payload = payload[0]
+                if isinstance(payload, dict):
+                    request.link_spend_request_id = payload.get("id")
+            except (ValueError, AttributeError, IndexError, Exception):
+                pass
+
+            if not request.link_spend_request_id:
+                request.status = "blocked"
+                self._log_decision(
+                    {
+                        "action_id": action_id,
+                        "spend_id": spend_id,
+                        "stage": "hold",
+                        "action_type": "release_failed",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "operator": operator_id or "operator",
+                        "details": {
+                            "outcome": "missing_spend_request_id",
+                        },
+                    }
+                )
+                return request
+
+            # Request Approval (triggers app notification, returns immediately)
+            cmd_req = [
+                self.link_cli_path,
+                "spend-request",
+                "request-approval",
+                request.link_spend_request_id,
+                "--format",
+                "json",
+            ]
+            if self.test_mode:
+                cmd_req += ["--test"]
+
+            proc_req = subprocess.run(cmd_req, capture_output=True, text=True, timeout=30, env=env)
+
+            if proc_req.returncode != 0:
+                request.status = "blocked"
+                self._log_decision(
+                    {
+                        "action_id": action_id,
+                        "spend_id": spend_id,
+                        "stage": "hold",
+                        "action_type": "release_failed",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "operator": operator_id or "operator",
+                        "details": {
+                            "outcome": "request_approval_failed",
+                            "stderr": proc_req.stderr[-500:],
+                        },
+                    }
+                )
+                return request
+
+            # Transition status to released and log decision
+            request.status = "released"
+            self._append_spend_log(request)
+
             self._log_decision(
                 {
                     "action_id": action_id,
                     "spend_id": spend_id,
                     "stage": "hold",
-                    "action_type": "release_failed",
+                    "action_type": "release",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "operator": operator_id or "operator",
                     "details": {
-                        "outcome": "create_failed",
-                        "stderr": proc_create.stderr[-500:],
+                        "outcome": "release_initiated",
+                        "link_spend_request_id": request.link_spend_request_id,
                     },
                 }
             )
+
+            # Start background polling thread
+            self._start_polling_thread(request, action_id, operator_id)
+
             return request
+        finally:
+            try:
+                os.unlink(lock_path)
+            except Exception:
+                pass
 
-        # Parse ID
-        try:
-            payload = json.loads(proc_create.stdout)
-            if isinstance(payload, list) and len(payload) > 0:
-                payload = payload[0]
-            if isinstance(payload, dict):
-                request.link_spend_request_id = payload.get("id")
-        except (json.JSONDecodeError, AttributeError, IndexError):
-            pass
-
-        if not request.link_spend_request_id:
-            request.status = "blocked"
-            self._log_decision(
-                {
-                    "action_id": action_id,
-                    "spend_id": spend_id,
-                    "stage": "hold",
-                    "action_type": "release_failed",
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "operator": operator_id or "operator",
-                    "details": {
-                        "outcome": "missing_spend_request_id",
-                    },
-                }
-            )
-            return request
-
-        # Request Approval (triggers app notification, returns immediately)
-        cmd_req = [
-            self.link_cli_path,
-            "spend-request",
-            "request-approval",
-            request.link_spend_request_id,
-            "--format",
-            "json",
-        ]
-        if self.test_mode:
-            cmd_req += ["--test"]
-
-        proc_req = subprocess.run(cmd_req, capture_output=True, text=True, timeout=30, env=env)
-
-        if proc_req.returncode != 0:
-            request.status = "blocked"
-            self._log_decision(
-                {
-                    "action_id": action_id,
-                    "spend_id": spend_id,
-                    "stage": "hold",
-                    "action_type": "release_failed",
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "operator": operator_id or "operator",
-                    "details": {
-                        "outcome": "request_approval_failed",
-                        "stderr": proc_req.stderr[-500:],
-                    },
-                }
-            )
-            return request
-
-        # Transition status to released and log decision
-        request.status = "released"
-        self._append_spend_log(request)
-
-        self._log_decision(
-            {
-                "action_id": action_id,
-                "spend_id": spend_id,
-                "stage": "hold",
-                "action_type": "release",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "operator": operator_id or "operator",
-                "details": {
-                    "outcome": "release_initiated",
-                    "link_spend_request_id": request.link_spend_request_id,
-                },
-            }
-        )
-
-        # Start background polling thread
-        self._start_polling_thread(request, action_id, operator_id)
-
-        return request
-
-    def handle_hold_cancel(self, action_id: str, reason: str = "") -> None:
+    def handle_hold_cancel(self, action_id: str, reason: str = "", *args: Any, **kwargs: Any) -> None:
         """Cancel the HOLD — purchase never made, request stays logged."""
         spend_id = action_id.replace("spend-hold-", "")
         self._get_request(spend_id).status = "cancelled"
@@ -503,12 +592,57 @@ class SpendApprovalHandler:
             }
         )
 
-    # ------------------------------------------------------------------
-    # Internal
-    # ------------------------------------------------------------------
+    def _parse_json_stdout(self, stdout: str) -> Any:
+        import re
+        import json
+        text = stdout.strip()
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+
+        # Match outermost list [...] or object {...}
+        match = re.search(r'(\{.*\}|\[.*\])', text, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except json.JSONDecodeError:
+                pass
+        raise ValueError(f"No valid JSON structure found in output: {stdout}")
+
+    def _get_daily_spend_aggregate(self) -> int:
+        """Calculate the sum of all spends in the last 24 hours from agent-spend.log."""
+        import fcntl
+        from datetime import timedelta
+        if not self.spend_log_path.exists():
+            return 0
+
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+        total = 0
+
+        with open(self.spend_log_path, "r") as f:
+            fcntl.flock(f.fileno(), fcntl.LOCK_SH)
+            try:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                        ts_str = entry.get("timestamp")
+                        if ts_str:
+                            ts = datetime.fromisoformat(ts_str)
+                            if ts >= cutoff:
+                                total += entry.get("amount_cents", 0)
+                    except Exception:
+                        pass
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        return total
 
     def _append_spend_log(self, request: SpendRequest) -> None:
         import fcntl
+        import os
 
         self.spend_log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.spend_log_path, "a") as f:
@@ -528,17 +662,22 @@ class SpendApprovalHandler:
                     )
                     + "\n"
                 )
+                f.flush()
+                os.fsync(f.fileno())
             finally:
                 fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
     def _log_decision(self, decision: dict) -> None:
         import fcntl
+        import os
 
         self.decisions_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.decisions_path, "a") as f:
             fcntl.flock(f.fileno(), fcntl.LOCK_EX)
             try:
                 f.write(json.dumps(decision) + "\n")
+                f.flush()
+                os.fsync(f.fileno())
             finally:
                 fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
@@ -652,7 +791,7 @@ class SpendApprovalHandler:
 
             if proc.returncode == 0:
                 try:
-                    payload = json.loads(proc.stdout)
+                    payload = self._parse_json_stdout(proc.stdout)
                     if isinstance(payload, list) and len(payload) > 0:
                         payload = payload[0]
                     if isinstance(payload, dict):

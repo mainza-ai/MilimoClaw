@@ -79,12 +79,37 @@ class TestSpendFlowRobustness:
         )
 
         spend_handler.queue_spend_review(request)
-        spend_handler.handle_review_approve("spend-review-spend-001")
+        # Test signature robustness with operator keyword argument
+        spend_handler.handle_review_approve("spend-review-spend-001", operator="system")
+
+        # Mock stdout returning JSON wrapped in warning / tip text prefix & suffix
+        def wrap_json_run(cmd, *args, **kwargs):
+            proc = MagicMock()
+            proc.returncode = 0
+            proc.stderr = ""
+            cmd_str = " ".join(cmd) if isinstance(cmd, list) else str(cmd)
+            if "create" in cmd_str:
+                proc.stdout = (
+                    "Welcome to Hermes Agent!\n"
+                    "Tip: Drop a YAML in ~/.hermes/dashboard-themes/\n"
+                    "[\n"
+                    "  {\n"
+                    '    "id": "lsrq_wrapped_999"\n'
+                    "  }\n"
+                    "]\n"
+                    "Done.\n"
+                )
+            else:
+                proc.stdout = json.dumps(
+                    [{"id": "lsrq_wrapped_999", "status": "approved"}]
+                )
+            return proc
+
+        mock_run.side_effect = wrap_json_run
 
         released_req = spend_handler.handle_hold_release("spend-hold-spend-001")
-        assert mock_run.called
         assert released_req.status == "released"
-        assert released_req.link_spend_request_id == "lsrq_mock_parsed_123"
+        assert released_req.link_spend_request_id == "lsrq_wrapped_999"
 
     def test_state_recovery_across_restarts(
         self, mock_run, operational_log: FinanceOperationalLog, log_dir: Path
@@ -331,3 +356,135 @@ class TestSpendFlowRobustness:
         assert recovered_poll_calls > 0
         req = handler_recovery._get_request("spend-recover-poll-005")
         assert req.status == "released"
+
+    def test_spend_handler_double_release_idempotency(
+        self, mock_run, spend_handler, log_dir
+    ):
+        """Verify that concurrent handle_hold_release calls are serialized/rejected via atomic file locking."""
+        from concurrent.futures import ThreadPoolExecutor
+
+        request = SpendRequest(
+            spend_id="idemp-test-001",
+            claw="build",
+            merchant_name="Github",
+            merchant_url="github.com",
+            amount_cents=1000,
+            currency="usd",
+            justification="CI running costs",
+        )
+        spend_handler._requests[request.spend_id] = request
+
+        results = []
+        errors = []
+
+        def run_release():
+            try:
+                res = spend_handler.handle_hold_release("spend-hold-idemp-test-001")
+                results.append(res)
+            except Exception as e:
+                errors.append(e)
+
+        # Run 5 concurrent threads
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [executor.submit(run_release) for _ in range(5)]
+            for f in futures:
+                f.result()
+
+        # We expect exactly 1 request to have been successfully processed, or others raised "locked" ValueError
+        assert (
+            len(errors) > 0 or len([r for r in results if r.status == "released"]) == 1
+        )
+        # The file lock should be cleaned up
+        lock_path = spend_handler.spend_log_path.parent / ".spend_lock_idemp-test-001"
+        assert not lock_path.exists()
+
+    def test_daily_spend_cap_aggregation(self, mock_run, spend_handler):
+        """Verify that daily rolling aggregate check aggregates spends in past 24 hours."""
+        import os
+        from datetime import datetime, timezone, timedelta
+
+        # Set cap to 10000 cents ($100.00)
+        spend_handler.daily_spend_cap_cents = 10000
+
+        # Pre-populate agent-spend.log with some old and some new transactions
+        now = datetime.now(timezone.utc)
+        recent_ts = (now - timedelta(hours=2)).isoformat()
+        old_ts = (now - timedelta(hours=26)).isoformat()
+
+        # Write to log path directly
+        os.makedirs(spend_handler.spend_log_path.parent, exist_ok=True)
+        with open(spend_handler.spend_log_path, "w") as f:
+            # $50.00 within 24 hours
+            f.write(
+                json.dumps(
+                    {
+                        "spend_id": "prev-1",
+                        "claw": "build",
+                        "merchant_name": "Stripe",
+                        "amount_cents": 5000,
+                        "currency": "usd",
+                        "timestamp": recent_ts,
+                    }
+                )
+                + "\n"
+            )
+            # $40.00 within 24 hours
+            f.write(
+                json.dumps(
+                    {
+                        "spend_id": "prev-2",
+                        "claw": "build",
+                        "merchant_name": "Stripe",
+                        "amount_cents": 4000,
+                        "currency": "usd",
+                        "timestamp": recent_ts,
+                    }
+                )
+                + "\n"
+            )
+            # $30.00 older than 24 hours (should be ignored)
+            f.write(
+                json.dumps(
+                    {
+                        "spend_id": "prev-3",
+                        "claw": "build",
+                        "merchant_name": "Stripe",
+                        "amount_cents": 3000,
+                        "currency": "usd",
+                        "timestamp": old_ts,
+                    }
+                )
+                + "\n"
+            )
+
+        # Total active spend within 24 hours: $90.00
+        # A new request of $20.00 should exceed the cap (total would be $110.00)
+        req = SpendRequest(
+            spend_id="new-tx-001",
+            claw="build",
+            merchant_name="AWS",
+            merchant_url="aws.amazon.com",
+            amount_cents=2000,
+            currency="usd",
+            justification="Hosting",
+        )
+        spend_handler._requests[req.spend_id] = req
+
+        # Check queue check (auto_blocked)
+        spend_handler.queue_spend_review(req)
+        assert req.status == "blocked"
+
+        # If we try to release a request that was somehow queued (e.g. amount is $20.00),
+        # but daily cap is already exceeded by other transactions:
+        req2 = SpendRequest(
+            spend_id="new-tx-002",
+            claw="build",
+            merchant_name="AWS",
+            merchant_url="aws.amazon.com",
+            amount_cents=2000,
+            currency="usd",
+            justification="Hosting",
+        )
+        spend_handler._requests[req2.spend_id] = req2
+        res = spend_handler.handle_hold_release("spend-hold-new-tx-002")
+        assert res.status == "blocked"

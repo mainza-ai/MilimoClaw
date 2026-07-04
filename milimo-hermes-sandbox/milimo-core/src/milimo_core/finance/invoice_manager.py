@@ -442,14 +442,21 @@ class InvoiceManager:
             return invoice
 
         try:
-            stripe_result = stripe_client.create_invoice(
-                customer_id=invoice.client_id,
-                amount=invoice.total,
-                currency=invoice.currency,
-                description=f"Invoice {invoice_id} - {invoice.project_id}",
-                due_date=invoice.due_date,
-            )
-            stripe_invoice_id = stripe_result.get("id", "")
+            stripe_invoice_id = invoice.stripe_invoice_id
+            if not stripe_invoice_id:
+                stripe_result = stripe_client.create_invoice(
+                    customer_id=invoice.client_id,
+                    amount=invoice.total,
+                    currency=invoice.currency,
+                    description=f"Invoice {invoice_id} - {invoice.project_id}",
+                    due_date=invoice.due_date,
+                )
+                stripe_invoice_id = stripe_result.get("id", "")
+
+                # Persist stripe_invoice_id immediately to guard against subsequent network errors
+                invoice.stripe_invoice_id = stripe_invoice_id
+                approved_path = self.fs.get_invoice_path("approved", invoice_id)
+                approved_path.write_text(json.dumps(invoice.to_dict(), indent=2))
 
             stripe_client.send_invoice(stripe_invoice_id)
 

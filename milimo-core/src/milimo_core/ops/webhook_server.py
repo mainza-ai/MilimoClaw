@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 from datetime import datetime, timezone
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -43,6 +44,60 @@ class _WebhookHandler(BaseHTTPRequestHandler):
         """Suppress default stderr logging."""
         logger.debug("Webhook: %s", format % args)
 
+    def _verify_sentry_signature(self, body_bytes: bytes) -> bool:
+        secret = os.environ.get("SENTRY_WEBHOOK_SECRET")
+        if not secret:
+            logger.warning("SENTRY_WEBHOOK_SECRET not set, bypassing verification")
+            return True
+        signature = self.headers.get("sentry-hook-signature")
+        if not signature:
+            return False
+        import hmac, hashlib
+        computed = hmac.new(
+            secret.encode("utf-8"),
+            body_bytes,
+            hashlib.sha256
+        ).hexdigest()
+        return hmac.compare_digest(computed, signature)
+
+    def _verify_vercel_signature(self, body_bytes: bytes) -> bool:
+        secret = os.environ.get("VERCEL_WEBHOOK_SECRET")
+        if not secret:
+            logger.warning("VERCEL_WEBHOOK_SECRET not set, bypassing verification")
+            return True
+        sig_256 = self.headers.get("x-vercel-signature-sha256")
+        if sig_256:
+            import hmac, hashlib
+            computed = hmac.new(
+                secret.encode("utf-8"),
+                body_bytes,
+                hashlib.sha256
+            ).hexdigest()
+            return hmac.compare_digest(computed, sig_256)
+        sig_1 = self.headers.get("x-vercel-signature")
+        if sig_1:
+            import hmac, hashlib
+            computed = hmac.new(
+                secret.encode("utf-8"),
+                body_bytes,
+                hashlib.sha1
+            ).hexdigest()
+            return hmac.compare_digest(computed, sig_1)
+        return False
+
+    def _verify_generic_signature(self, body_bytes: bytes) -> bool:
+        secret = os.environ.get("MILIMO_WEBHOOK_SECRET")
+        if not secret:
+            logger.warning("MILIMO_WEBHOOK_SECRET not set, bypassing verification")
+            return True
+        token = self.headers.get("x-webhook-secret") or self.headers.get("Authorization")
+        if not token:
+            return False
+        if token.startswith("Bearer "):
+            token = token[7:]
+        import hmac
+        return hmac.compare_digest(token, secret)
+
     def do_GET(self) -> None:
         if self.path == "/health":
             self._send_json(
@@ -57,11 +112,22 @@ class _WebhookHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         content_length = int(self.headers.get("Content-Length", 0))
-        body = (
-            self.rfile.read(content_length).decode("utf-8")
-            if content_length > 0
-            else "{}"
-        )
+        body_bytes = self.rfile.read(content_length) if content_length > 0 else b"{}"
+        body = body_bytes.decode("utf-8")
+
+        # Verify signature/HMAC based on endpoint path
+        if self.path == "/webhook/sentry":
+            if not self._verify_sentry_signature(body_bytes):
+                self._send_json(401, {"error": "Invalid signature"})
+                return
+        elif self.path == "/webhook/vercel":
+            if not self._verify_vercel_signature(body_bytes):
+                self._send_json(401, {"error": "Invalid signature"})
+                return
+        elif self.path in ("/webhook/uptime", "/webhook/generic"):
+            if not self._verify_generic_signature(body_bytes):
+                self._send_json(401, {"error": "Invalid signature"})
+                return
 
         try:
             payload = json.loads(body)
@@ -86,17 +152,27 @@ class _WebhookHandler(BaseHTTPRequestHandler):
             self.alert_buffer.append(alert)
 
         # Forward to ops_claw for full analysis + remediation pipeline
+        dispatch_success = True
+        error_msg = ""
         if self.ops_claw and hasattr(self.ops_claw, "handle_incident"):
             try:
                 self.ops_claw.handle_incident(alert)
             except Exception as e:
                 logger.error("Failed to dispatch alert to ops claw: %s", e)
+                dispatch_success = False
+                error_msg = str(e)
         elif self.dispatcher and hasattr(self.dispatcher, "handle_incident"):
             # Fallback: just log via dispatcher
             try:
                 self.dispatcher.handle_incident(alert)
             except Exception as e:
                 logger.error("Failed to dispatch alert: %s", e)
+                dispatch_success = False
+                error_msg = str(e)
+
+        if not dispatch_success:
+            self._send_json(500, {"error": f"Failed to dispatch alert: {error_msg}"})
+            return
 
         self._send_json(200, {"status": "received", "alert_id": alert.get("alert_id")})
 
