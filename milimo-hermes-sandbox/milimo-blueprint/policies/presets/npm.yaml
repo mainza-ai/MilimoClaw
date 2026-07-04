@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Mainza Kangombe. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# npm registry access preset for Milimo Claw.
+#
+# Enables runtime npm installs (e.g. self-healing link-cli fallback) and
+# npm-based post-deploy dependency updates. Adds npmjs.org and yarnpkg.com
+# registry egress and whitelists node/npm binaries.
+
+preset:
+  name: npm
+  description: "npm registry access for runtime dependency installs"
+
+network_policies:
+  npm_registry:
+    name: npm_registry
+    endpoints:
+      - host: registry.npmjs.org
+        port: 443
+        access: full
+        tls: skip
+      - host: registry.yarnpkg.com
+        port: 443
+        access: full
+        tls: skip
+
+    binaries:
+      - { path: /usr/local/bin/node }
+      - { path: /usr/local/bin/npm }

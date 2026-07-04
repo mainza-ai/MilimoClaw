@@ -204,6 +204,28 @@ class FinanceClaw:
         except ImportError:
             pass
 
+        try:
+            from milimo_hermes_plugin.tools import _check_link_cli_auth
+            _auth_err = _check_link_cli_auth()
+            if _auth_err:
+                _warroom_notifier = None
+                try:
+                    from milimo_core import init_warroom_notifier
+                    _warroom_notifier = init_warroom_notifier()
+                except Exception:
+                    pass
+                if _warroom_notifier:
+                    _warroom_notifier.notify_generic(
+                        title="Finance Claw: link-cli auth required",
+                        message=_auth_err.get(
+                            "action_required",
+                            "Run 'link-cli auth login' to enable spend flows.",
+                        ),
+                        level="warning",
+                    )
+        except Exception:
+            pass
+
         revenue_tracker = RevenueTracker(
             fs=fs,
             inference_client=self.inference_client,

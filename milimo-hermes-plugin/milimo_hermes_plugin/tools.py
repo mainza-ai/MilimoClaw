@@ -14,7 +14,12 @@ Registers the following tools:
 """
 
 from typing import Any, Optional
+import logging
+import os
+import shutil
 import subprocess
+
+logger = logging.getLogger("milimo.hermes.tools")
 
 from milimo_core.protocols.delegation import ClawTask, ClawResult
 from milimo_core.ops.approval_handler import OpsApprovalHandler, OpsApprovalAction
@@ -412,7 +417,106 @@ def _extract_device_url(text: str) -> str | None:
     return None
 
 
+_LINK_CLI_PREFIX = "/sandbox/.npm-global"
+_HAVE_LINK_CLI: bool | None = None
+
+
+def _ensure_link_cli() -> dict | None:
+    """Resolve the ``link-cli`` binary path.
+
+    Checks the default ``shutil.which`` lookup first and returns ``None`` when
+    the binary is available. Otherwise attempts a one-shot self-healing
+    install into ``/sandbox/.npm-global`` — a sandbox-user-writable prefix
+    that is unaffected by the root-owned npm global directory — prepends the
+    resulting ``bin`` directory to PATH, and re-checks.  The result is cached
+    in ``_HAVE_LINK_CLI`` so repeated spend calls do not retry the install.
+    """
+    global _HAVE_LINK_CLI
+    if _HAVE_LINK_CLI is not None:
+        return None if _HAVE_LINK_CLI else {
+            "error": "link_cli_not_available",
+            "action_required": "link-cli binary is not installed and runtime install failed.",
+        }
+
+    resolved = shutil.which("link-cli")
+    if resolved:
+        _HAVE_LINK_CLI = True
+        return None
+
+    try:
+        prefix = _LINK_CLI_PREFIX
+        os.makedirs(prefix, exist_ok=True)
+        install_cmd = [
+            "npm", "install", "-g",
+            "@stripe/link-cli@0.8.2",
+            "--prefix", prefix,
+        ]
+        result = subprocess.run(install_cmd, capture_output=True, text=True, timeout=120)
+        if result.returncode == 0 and os.path.exists(os.path.join(prefix, "bin", "link-cli")):
+            bin_dir = os.path.join(prefix, "bin")
+            if bin_dir not in os.environ.get("PATH", ""):
+                os.environ["PATH"] = bin_dir + os.pathsep + os.environ.get("PATH", "")
+            resolved = shutil.which("link-cli")
+            if resolved:
+                _HAVE_LINK_CLI = True
+                return None
+    except Exception as exc:
+        logger.debug("link-cli self-healing install failed: %s", exc)
+
+    _HAVE_LINK_CLI = False
+    return {
+        "error": "link_cli_not_available",
+        "action_required": (
+            "link-cli is not installed. "
+            "Rebuild the sandbox image or run: "
+            f"npm install -g @stripe/link-cli@0.8.2 --prefix {_LINK_CLI_PREFIX}"
+        ),
+    }
+
+
 def _check_link_cli_auth() -> dict | None:
+    missing = _ensure_link_cli()
+    if missing:
+        return missing
+
+    HEADLESS_AUTH_MODES = ("headless_service_account", "ci")
+    headless = os.environ.get("MILIMO_LINK_CLI_AUTH_MODE", "").lower()
+    if headless in HEADLESS_AUTH_MODES:
+        try:
+            proc = subprocess.run(
+                ["link-cli", "auth", "status"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except FileNotFoundError:
+            return {
+                "error": "link_cli_not_available",
+                "action_required": "link-cli binary is not installed or not on PATH.",
+            }
+        except subprocess.TimeoutExpired:
+            return {
+                "error": "link_cli_auth_check_timeout",
+                "action_required": "link-cli auth status timed out. Check network and retry.",
+            }
+
+        if proc.returncode != 0 or "authenticated" not in (proc.stdout or "").lower():
+            label = {
+                "ci": "CI environment",
+                "headless_service_account": "headless service account",
+            }.get(headless, headless)
+            return {
+                "error": "link_cli_not_authenticated",
+                "stdout": proc.stdout,
+                "stderr": proc.stderr,
+                "action_required": (
+                    f"[{label}] link-cli is not authenticated. "
+                    "Set up service-account credentials or set "
+                    "MILIMO_LINK_CLI_AUTH_MODE=environment to skip."
+                ),
+            }
+        return None
+
     try:
         proc = subprocess.run(
             ["link-cli", "auth", "status"],
@@ -476,6 +580,9 @@ async def handle_milimo_spend(ctx: Any, action: str, spend_id: Optional[str] = N
       cancel_hold    → cancel/release HOLD without spending
       status         → query spend request state by spend_id
     """
+    missing = _ensure_link_cli()
+    if missing:
+        return missing
     auth_error = _check_link_cli_auth()
     if auth_error:
         return auth_error

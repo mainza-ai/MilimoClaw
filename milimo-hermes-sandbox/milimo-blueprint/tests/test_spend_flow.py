@@ -3,9 +3,10 @@
 """Tests for Stripe Link spend flow robustness and recovery."""
 
 import json
+import os
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 
@@ -491,3 +492,150 @@ class TestSpendFlowRobustness:
         spend_handler._requests[req2.spend_id] = req2
         res = spend_handler.handle_hold_release("spend-hold-new-tx-002")
         assert res.status == "blocked"
+
+
+class TestLinkCliProductionReadiness:
+    """P1–P6 production-readiness tests for link-cli install/auth flow and
+    shared SpendApprovalHandler.
+
+    Covers:
+    - P2: runtime self-healing fallback when link-cli is absent
+    - P3: headless auth mode (ci / headless_service_account) error messages
+    - P4: FinanceClaw startup emits a War Room warning when link-cli is not authenticated
+    """
+
+    @patch("milimo_hermes_plugin.tools.logger")
+    def test_ensure_link_cli_cache_hit(self, mock_logger):
+        """_ensure_link_cli returns cached result without running npm."""
+        import milimo_hermes_plugin.tools as _tools
+
+        _tools._HAVE_LINK_CLI = False
+        result = _tools._ensure_link_cli()
+        assert result is not None
+        assert result["error"] == "link_cli_not_available"
+        mock_logger.debug.assert_not_called()
+
+    @patch("milimo_hermes_plugin.tools.subprocess.run")
+    @patch("milimo_hermes_plugin.tools.shutil.which")
+    @patch("milimo_hermes_plugin.tools.os.makedirs")
+    def test_ensure_link_cli_installs_to_writable_prefix(
+        self, mock_makedirs, mock_which, mock_run
+    ):
+        """When link-cli is absent, _ensure_link_cli installs to /sandbox/.npm-global."""
+        import milimo_hermes_plugin.tools as _tools
+
+        _tools._HAVE_LINK_CLI = None
+        mock_which.side_effect = lambda name: None if name == "link-cli" else "/usr/bin/" + name
+        mock_run.return_value = MagicMock(returncode=0)
+        fake_prefix = _tools._LINK_CLI_PREFIX
+        mock_makedirs.return_value = None
+
+        with patch(
+            "milimo_hermes_plugin.tools._LINK_CLI_PREFIX",
+            "/tmp/test-npm-global",
+        ), patch(
+            "os.path.exists",
+            return_value=True,
+        ), patch(
+            "milimo_hermes_plugin.tools.os.path.join",
+            side_effect=os.path.join,
+        ):
+            result = _tools._ensure_link_cli()
+
+        mock_run.assert_called_once()
+        install_cmd = mock_run.call_args[0][0]
+        assert install_cmd[0] == "npm"
+        assert install_cmd[-1] == "/tmp/test-npm-global"
+
+        if result is None:
+            assert _tools._HAVE_LINK_CLI is True
+
+    @patch("milimo_hermes_plugin.tools.subprocess.run")
+    @patch("milimo_hermes_plugin.tools.shutil.which", return_value=None)
+    def test_ensure_link_cli_returns_error_on_install_failure(
+        self, mock_which, mock_run
+    ):
+        """When npm install fails, _ensure_link_cli returns actionable error dict."""
+        import milimo_hermes_plugin.tools as _tools
+
+        _tools._HAVE_LINK_CLI = None
+        mock_run.return_value = MagicMock(returncode=1, stderr="EACCES")
+
+        with patch(
+            "milimo_hermes_plugin.tools._LINK_CLI_PREFIX",
+            "/tmp/test-npm-global-fail",
+        ), patch(
+            "os.makedirs"
+        ), patch(
+            "os.path.exists",
+            return_value=False,
+        ):
+            result = _tools._ensure_link_cli()
+
+        assert result is not None
+        assert result["error"] == "link_cli_not_available"
+        assert "npm install" in result["action_required"]
+        assert _tools._HAVE_LINK_CLI is False
+
+    @patch("milimo_hermes_plugin.tools.subprocess.run")
+    def test_check_link_cli_auth_headless_ci_mode(self, mock_run):
+        """In MILIMO_LINK_CLI_AUTH_MODE=ci, returns non-interactive error."""
+        import milimo_hermes_plugin.tools as _tools
+        from unittest.mock import patch as _patch
+
+        _tools._HAVE_LINK_CLI = True
+        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="not authenticated")
+
+        with _patch.dict(os.environ, {"MILIMO_LINK_CLI_AUTH_MODE": "ci"}):
+            result = _tools._check_link_cli_auth()
+
+        assert result is not None
+        assert result["error"] == "link_cli_not_authenticated"
+        assert "CI environment" in result["action_required"]
+        assert "approval_url" not in result
+
+    @patch("milimo_hermes_plugin.tools.subprocess.run")
+    def test_check_link_cli_auth_headless_service_account_mode(self, mock_run):
+        """In MILIMO_LINK_CLI_AUTH_MODE=headless_service_account, returns service-account error."""
+        import milimo_hermes_plugin.tools as _tools
+        from unittest.mock import patch as _patch
+
+        _tools._HAVE_LINK_CLI = True
+        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="not authenticated")
+
+        with _patch.dict(
+            os.environ, {"MILIMO_LINK_CLI_AUTH_MODE": "headless_service_account"}
+        ):
+            result = _tools._check_link_cli_auth()
+
+        assert result is not None
+        assert result["error"] == "link_cli_not_authenticated"
+        assert "headless service account" in result["action_required"]
+
+    @patch("milimo_hermes_plugin.tools._ensure_link_cli")
+    @patch("milimo_hermes_plugin.tools.subprocess.run")
+    def test_handle_milimo_spend_returns_install_error_when_binary_missing(
+        self, mock_run, mock_ensure
+    ):
+        """When link-cli cannot be resolved or installed, milimo_spend returns
+        the actionable error before attempting any auth check."""
+        import asyncio
+        import milimo_hermes_plugin.tools as _tools
+        from unittest.mock import patch as _patch
+
+        mock_ensure.return_value = {
+            "error": "link_cli_not_available",
+            "action_required": "Rebuild the sandbox image or install link-cli.",
+        }
+
+        async def _run():
+            with _patch.dict(os.environ, {}, clear=True):
+                return await _tools.handle_milimo_spend(
+                    ctx=None, action="queue_review",
+                    claw="build", merchant_name="Acme", merchant_url="https://acme.com",
+                    amount_cents=1000, justification="x" * 120, payment_method_id="pm_1",
+                )
+
+        result = asyncio.get_event_loop().run_until_complete(_run())
+        assert result["error"] == "link_cli_not_available"
+        mock_run.assert_not_called()
