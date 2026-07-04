@@ -432,9 +432,7 @@ The original Dockerfile attempted to extend the NousResearch upstream image dire
 - Full test suite verified: 1265 passed, 1 skipped
 
 **Remaining**:
-- Phase 4: `link-cli` auth UX fix (non-blocking `auth status` pre-check)
-- Phase 5: remove duplicate `stripe-link-cli` Hermes skill from Dockerfile
-- Phase 6: production test matrix for auth flow + shared handler
+- Phase 6 — production test matrix for auth flow + shared handler
 
 **See**: [[hermes-skill-factory-remediation-2026-07-04]] for complete investigation report, sub-component capability map, exact code snippets, and test matrix.
 
