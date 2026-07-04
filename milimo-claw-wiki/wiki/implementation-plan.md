@@ -433,6 +433,7 @@ The original Dockerfile attempted to extend the NousResearch upstream image dire
 
 **Remaining**:
 - Phase 6 — production test matrix for auth flow + shared handler
+- Link-cli install/auth production-readiness gaps and phased fix plan: see [[link-cli-install-production-readiness-2026-07-04]]
 
 **See**: [[hermes-skill-factory-remediation-2026-07-04]] for complete investigation report, sub-component capability map, exact code snippets, and test matrix.
 

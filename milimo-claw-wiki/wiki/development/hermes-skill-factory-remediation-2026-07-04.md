@@ -671,6 +671,7 @@ Pick up at Phase 6. All code changes are complete; remaining work is validation/
 
 - [[implementation-plan]] — broader Hermes dual-track plan
 - [[production-readiness-audit-2026-07-03]] — warroom hardening and spend flow fixes
+- [[link-cli-install-production-readiness-2026-07-04]] — npm install path gaps, auth UX production issues, implementation plan
 - [[common-issues]] — Finance Claw missing spend tool / sudo prompt (legacy symptom)
 - [[claw-silent-responses]] — debugging claw non-responses
 - [[test-spend-flow]] — Stripe Link spend flow tests

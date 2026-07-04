@@ -126,6 +126,7 @@ Development conventions and guides.
 | [[testing]] | Test structure and coverage | ✓ |
 | [[test-spend-flow]] | Stripe Link spend flow robustness tests | ✓ |
 | [[hermes-skill-factory-remediation-2026-07-04]] | Skill factory + claw capability dispatch remediation plan | ✓ |
+| [[link-cli-install-production-readiness-2026-07-04]] | link-cli runtime install path + auth UX production gaps | ✓ |
 | [[debugging]] | Debugging guide and tools | ✓ |
 | [[sandbox-file-sharing]] | Accessing and extracting claw-generated files | ✓ |
 
