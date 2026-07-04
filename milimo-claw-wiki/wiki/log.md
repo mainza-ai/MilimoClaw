@@ -2,7 +2,7 @@
 
 **Summary**: Append-only record of all wiki operations.
 
-**Last updated**: 2026-07-01
+**Last updated**: 2026-07-03
 
 **Tags**: #log #meta
 
@@ -1370,3 +1370,99 @@ Each entry follows this format:
 - ✅ 1,239 tests pass in `milimo-blueprint/tests/` (0 warnings, 0 issues)
 - ✅ All edited wiki pages follow CLAUDE.md format template
 - ✅ No hallucinated findings retained; all cited with file:line references
+
+---
+
+### 2026-07-04 — Remediation Commit Cycle: 9 Audit Findings Closed
+
+**Commits**: `455de10`, `6024ca9`, `cc5d523`, `9c68aec`, `fa48ed4`, `3d670e8`, `0c86b7b`
+**Source**: `WARROOM_PRODUCTION_READINESS.md` (code-verified post-commit audit, 2026-07-04)
+
+**Pages updated**: `wiki/modules/finance/spend-handler.md`, `wiki/modules/finance/stripe-client.md`, `wiki/modules/finance/finance-claw.md`, `wiki/modules/finance/spend-warroom-bridge.md`, `wiki/modules/evolution/sandbox-runner.md`, `wiki/security/sandbox-hardening.md`, `wiki/modules/infrastructure/bridge-cli.md`, `wiki/index.md`, `wiki/log.md`
+
+**Findings closed**:
+
+| Finding | Severity | File:Line Fix |
+|---|---|---|
+| **SA3-1** | Critical | `spend_handler.py:352-389` — `O_CREAT|O_EXCL` idempotency lock + PID + stale cleanup |
+| **SA3-2** | Critical | `spend_handler.py:188-189` — rolling 24h aggregate from `agent-spend.log` with `LOCK_SH` |
+| **SA3-3** | Medium | `spend_handler.py:670-682` — `fcntl.flock` + `f.flush()` + `os.fsync()` on every write |
+| **F5-1** | Critical | `stripe_client.py:87` — `env={"STRIPE_API_KEY": ...}`, no `--api-key` in cmdline |
+| **SA-7.1** | High | `webhook_server.py:47-99,174` — HMAC sig verification; returns HTTP 500 on dispatch failure |
+| **SA-7.2** | Medium | `bridge_server.py:355-472` — `/metrics` endpoint with Prometheus text format |
+| **SA-4.3** | Critical | `containment.py` + `sandbox_runner.py:190-201` — bwrap/docker containment wrapper |
+| **SA-1.4** | Medium | `finance_claw.py:190-199` (core + sandbox) — `test_mode` from `MILIMO_SPEND_TEST_MODE` env |
+| **SA-1.3** | High | `bridge_cli.py:2039-2082` — `handle_approve_action` + `handle_veto_action` added |
+| **M-1** | Medium | `bridge_server.py:344-348` — `GET /health` on RPC server (port 19999) |
+
+**Note**: M-1 fix applies to the **RPC bridge server** (port 19999). The **War Room HTMX server** (`milimo-hermes-plugin/warroom/server.py`) still has no `/health` endpoint — this remains open.
+
+**Findings still open** (unchanged from previous audit):
+- C-1: `test_mode=True` default in `SpendApprovalHandler.__init__` (`spend_handler.py:93`)
+- C-2/C-3/C-4/C-5: War Room server auth, path traversal, hardcoded sys.path, 500 htmx swap
+- H-1/H-2/H-3/H-4/H-5/H-6: War Room server LFD, CSRF, SIGTERM, CORS, path leak, bare except
+- I-2: Daemon polling thread (`spend_handler.py:742`)
+- I-4: `milimo-mcp.yaml` hardcoded venv paths
+- SA2-1: Sprint pipeline stall (unwired `handle_sprint_plan_approved`)
+- SA-4.1/SA-4.2: Mesh plaintext fallback + missing outbox
+- SA-6.1: `RegionDetector` orphaned
+- SA-6.2: Tenant isolation header-only
+
+**Audit report status**: `milimo-audit-report.md` executive summary still reads "PRODUCTION-READY (REMEDIATED & VERIFIED)" — this is now stale. Remaining CRITICAL/HIGH findings in `server.py` and `spend_handler.py` prevent a production-ready verdict.
+
+---
+
+### 2026-07-03 — Production-Readiness Implementation (Phases 1 & 2)
+
+**Pages**: `wiki/production-readiness-audit-2026-07-03.md`, `wiki/index.md`
+
+**Source**: `WARROOM_PRODUCTION_READINESS.md`, `milimo-core/`, `milimo-hermes-plugin/warroom/`, `milimo-blueprint/orchestrator/`
+
+**Changes**:
+- Created `wiki/production-readiness-audit-2026-07-03.md` — full audit findings register with two-phase implementation plan, all findings cross-referenced to exact file:line
+- `wiki/index.md` — added `[[production-readiness-audit-2026-07-03]]` to Audit & Production-Readiness section
+
+**Phase 1 — milimo-core (3 findings closed):**
+
+| Finding | Severity | Change |
+|---|---|---|
+| C-1 | Medium | `spend_handler.py:93` — `test_mode` class default `True` → `False`; `finance_claw.py:197` (core + sandbox) env default `"true"` → `"false"` (explicit opt-in for test mode) |
+| H-6 | Medium | `spend_handler.py:497` — replaced bare `except (..., Exception)` with `except (ValueError, AttributeError, IndexError)` + explicit `logger.exception` for unexpected errors |
+| I-2 | Medium | `spend_handler.py:742` — removed `daemon=True` from `threading.Thread()`; polling thread now completes on process shutdown |
+
+**Phase 2 — milimo-hermes-plugin/warroom (15 findings closed):**
+
+| Finding | Severity | Change |
+|---|---|---|
+| C-2 | Critical | New `WARROOM_AUTH_TOKEN` Bearer auth in `server.py`; fail-closed: auth mandatory when env var set |
+| C-3 | High | `_safe_action_id()` — `os.path.basename` + explicit `.`/`..`/slash rejection before `Path` construction |
+| C-4 | High | `sys.path` resolved from `MILIMO_CORE_PATH` env + `Path(__file__)` relative fallback, not hardcoded-only |
+| C-5 | High | All five error f-strings now use `html_mod.escape(str(e))` — no raw `{e}` injection into HTML |
+| H-1 | High | Removed `super().do_GET()` (LFD); only `warroom.html` + `/health` served on GET |
+| H-2 | High | `Origin` header checked on every POST; cross-origin requests return HTTP 403 |
+| H-3 | Medium | `signal.signal(signal.SIGTERM, ...)` handler calls `server.shutdown()` for graceful exit |
+| H-4 | Medium | `X-Content-Type-Options: nosniff` + `X-Frame-Options: DENY` on every response |
+| H-5 | Medium | Covered by C-5 fix — exception tracebacks and file paths HTML-escaped before output |
+| M-1 | Low | `GET /health` returns `200 OK` with `{"status":"ok"}` JSON body |
+| M-2 | Low | `uuid.uuid4()` request ID generated per request; included in log lines and `X-Request-ID` header |
+| M-4 | Medium | Empty health dict returns explicit `<div class="empty">Health data unavailable</div>` instead of silent idle grid |
+| M-5 | Low | `hx-on::after-request` on all HTMX polling divs — backs off to 30s/60s/120s on HTTP 5xx, restores normal interval on recovery |
+| L-2 | Low | `VALID_ROLES` imported from `milimo_core.contracts`; hardcoded list replaced |
+| L-3 | Low | `Cache-Control: no-store` on every response (static, HTML, JSON) |
+| L-4 | Low | `.error` CSS class added (red text, `#f85149`); server uses `<div class="error">` for all 500 responses |
+| I-1 | High | New `warroom_bridge.py` module — `approve_hold_message`, `veto_hold_message`, `resolve_mesh_dir`; `VALID_RECIPIENTS` enforced |
+
+**Files changed**:
+- `milimo-core/src/milimo_core/finance/spend_handler.py` (C-1, H-6, I-2)
+- `milimo-core/src/milimo_core/finance/finance_claw.py` (C-1 env default)
+- `milimo-hermes-sandbox/milimo-core/src/milimo_core/finance/finance_claw.py` (C-1 env default)
+- `milimo-hermes-plugin/warroom/server.py` (rewrite — 243 → 458 lines)
+- `milimo-hermes-plugin/warroom/warroom_bridge.py` (new file)
+- `milimo-hermes-plugin/warroom/warroom.html` (L-4, M-5)
+- `milimo-claw-wiki/wiki/production-readiness-audit-2026-07-03.md` (new page)
+- `milimo-claw-wiki/wiki/index.md` (link added)
+
+**Open findings after this implementation**:
+- C-1,H-6,I-2 in milimo-core: **closed**
+- All 15 findings in warroom/server.py: **closed**
+- Remaining: SA-4.1 mesh plaintext fallback, SA-4.2 mesh outbox missing, SA-6.1 RegionDetector orphaned, SA-6.2 tenant isolation header-only, SA2-1 sprint pipeline stall, I-4 milimo-mcp.yaml hardcoded paths — all outside warroom scope, documented in WARROOM_PRODUCTION_READINESS.md

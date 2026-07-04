@@ -90,7 +90,7 @@ class SpendApprovalHandler:
         spend_log_path: Path | None = None,
         link_cli_path: str = "link-cli",
         daily_spend_cap_cents: int = 10_000,
-        test_mode: bool = True,
+        test_mode: bool = False,
     ):
         self.operational_log = operational_log
         self.decisions_path = (
@@ -494,8 +494,10 @@ class SpendApprovalHandler:
                     payload = payload[0]
                 if isinstance(payload, dict):
                     request.link_spend_request_id = payload.get("id")
-            except (ValueError, AttributeError, IndexError, Exception):
-                pass
+            except (ValueError, AttributeError, IndexError):
+                logger.exception("Failed to parse spend request ID from link-cli output")
+            except Exception:
+                logger.exception("Unexpected error parsing spend request ID")
 
             if not request.link_spend_request_id:
                 request.status = "blocked"
@@ -739,7 +741,6 @@ class SpendApprovalHandler:
         thread = threading.Thread(
             target=self._poll_spend_request,
             args=(request, action_id, operator_id),
-            daemon=True,
         )
         thread.start()
 
