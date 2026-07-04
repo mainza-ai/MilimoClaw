@@ -1201,9 +1201,34 @@ def handle_generate_sprint_plan(args: dict[str, Any]) -> dict[str, Any]:
     plan_file = sprint_dir / "sprint-plan-request.json"
     plan_file.write_text(json.dumps(plan_request, indent=2))
     result["plan_path"] = str(plan_file)
-    result["status"] = "request_written"
-
     return result
+
+
+def handle_approve_sprint_plan(args: dict[str, Any]) -> dict[str, Any]:
+    """Approve a pending sprint plan and update current-plan.json."""
+    from orchestrator.build.build_init import BuildFilesystemInit
+    from orchestrator.build.build_init import BuildOperationalLog
+    from orchestrator.build.approval_handler import BuildApprovalHandler, PRActivityLog, DeployActivityLog
+    from orchestrator.build.issue_manager import IssueManager
+
+    plan_id = args.get("plan_id")
+    if not plan_id:
+        return {"status": "error", "error": "Missing plan_id"}
+
+    build_base = claw_base("build")
+    fs = BuildFilesystemInit(build_base)
+    op_log = BuildOperationalLog(build_base / "logs/operational.log")
+    pr_log = PRActivityLog(build_base / "logs/pr-activity.log")
+    dep_log = DeployActivityLog(build_base / "logs/deploy-activity.log")
+
+    approval = BuildApprovalHandler(fs, op_log, pr_log, dep_log)
+    manager = IssueManager(fs, None, None, None, approval, op_log)
+
+    result = manager.handle_sprint_plan_approved(plan_id)
+    if result:
+        return {"status": "approved", "first_issue": result}
+    else:
+        return {"status": "error", "error": f"Failed to approve plan {plan_id} (not found or already approved)"}
 
 
 def handle_run_opportunity_scoring(args: dict[str, Any]) -> dict[str, Any]:
@@ -2007,6 +2032,7 @@ COMMAND_HANDLERS: dict[str, Any] = {
     "build_open_prs": handle_build_open_prs,
     "analytics_latest_report_summary": handle_analytics_latest_report_summary,
     "generate_sprint_plan": handle_generate_sprint_plan,
+    "approve_sprint_plan": handle_approve_sprint_plan,
     "run_opportunity_scoring": handle_run_opportunity_scoring,
     "generate_weekly_report": handle_generate_weekly_report,
     "check_all_deadlines": handle_check_all_deadlines,
@@ -2022,6 +2048,14 @@ COMMAND_HANDLERS: dict[str, Any] = {
     "launcher_status": handle_launcher_status,
     "milimo_status": handle_milimo_status,
 }
+
+
+def handle_command(command: str, args: dict[str, Any], blueprint_dir: str = "") -> dict[str, Any]:
+    """Helper to dispatch commands programmatically (used by RPC server)."""
+    if command not in COMMAND_HANDLERS:
+        raise ValueError(f"Unknown command: {command}")
+    handler = COMMAND_HANDLERS[command]
+    return handler(args)
 
 
 # ---------------------------------------------------------------------------

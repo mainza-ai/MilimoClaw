@@ -194,6 +194,8 @@ class FinanceClaw:
             daily_spend_cap_cents=int(
                 _os.environ.get("MILIMO_DAILY_SPEND_CAP_CENTS", "10000")
             ),
+            test_mode=_os.environ.get("MILIMO_SPEND_TEST_MODE", "true").lower()
+            == "true",
         )
 
         revenue_tracker = RevenueTracker(

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MilimoClaw War Room</title>
+    <script src="https://unpkg.com/htmx.org@2.x"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Monospace', monospace; background: #0d1117; color: #e6edf3; line-height: 1.5; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        header { border-bottom: 1px solid #30363d; padding-bottom: 16px; margin-bottom: 24px; }
+        h1 { font-size: 1.5rem; color: #f0f6fc; }
+        .subtitle { color: #8b949e; font-size: 0.875rem; margin-top: 4px; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
+        .card h2 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: #8b949e; margin-bottom: 12px; }
+
+        .claw { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #21262d; }
+        .claw:last-child { border-bottom: none; }
+        .claw-name { font-weight: 600; }
+        .claw-status { padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .status-ready { background: #1a7f37; color: #7ee787; }
+        .status-busy { background: #9e6a03; color: #d29922; }
+        .status-error { background: #8b1a1a; color: #f85149; }
+
+        .hold-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #161b22; border: 1px solid #30363d; border-radius: 6px; margin-bottom: 8px; }
+        .hold-info { flex: 1; }
+        .hold-id { font-family: monospace; font-size: 0.875rem; color: #d29922; }
+        .hold-claw { color: #8b949e; font-size: 0.75rem; margin-top: 2px; }
+        .hold-actions { display: flex; gap: 8px; }
+        .btn { padding: 6px 12px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; font-size: 0.75rem; }
+        .btn-approve { background: #1a7f37; color: #7ee787; }
+        .btn-veto { background: #8b1a1a; color: #f85149; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .cost-guard { display: flex; flex-direction: column; gap: 8px; }
+        .cost-bar { height: 8px; background: #21262d; border-radius: 4px; overflow: hidden; }
+        .cost-fill { height: 100%; background: linear-gradient(90deg, #7ee787 0%, #d29922 70%, #f85149 100%); transition: width 0.3s; }
+        .cost-text { display: flex; justify-content: space-between; font-size: 0.875rem; }
+
+        .empty { color: #8b949e; font-style: italic; text-align: center; padding: 24px; }
+
+        .last-updated { color: #8b949e; font-size: 0.75rem; text-align: right; margin-top: 16px; }
+
+        /* htmx loading indicators */
+        .htmx-indicator { opacity: 0; transition: opacity 200ms; }
+        .htmx-request .htmx-indicator { opacity: 1; }
+        .htmx-request.htmx-indicator { opacity: 1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>MilimoClaw War Room</h1>
+            <div class="subtitle">Real-time claw status, HOLD queue & cost guard</div>
+        </header>
+
+        <div class="grid">
+            <!-- Claw Status - auto-refreshes every 5s via htmx -->
+            <div class="card">
+                <h2>Claw Status <span class="htmx-indicator">⟳</span></h2>
+                <div hx-get="/v1/warroom/claw-status"
+                     hx-trigger="every 5s"
+                     hx-swap="innerHTML"
+                     id="claw-status">
+                    <div class="empty">Loading...</div>
+                </div>
+            </div>
+
+            <!-- HOLD Queue - auto-refreshes every 5s via htmx -->
+            <div class="card">
+                <h2>HOLD Queue <span class="htmx-indicator">⟳</span></h2>
+                <div hx-get="/v1/warroom/hold-queue"
+                     hx-trigger="every 5s"
+                     hx-swap="innerHTML"
+                     id="hold-queue">
+                    <div class="empty">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Cost Guard - auto-refreshes every 10s via htmx -->
+            <div class="card">
+                <h2>Cost Guard (Daily) <span class="htmx-indicator">⟳</span></h2>
+                <div hx-get="/v1/warroom/cost-guard"
+                     hx-trigger="every 10s"
+                     hx-swap="innerHTML"
+                     id="cost-guard">
+                    <div class="empty">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="last-updated">Last updated: <span id="last-updated" hx-get="/v1/warroom/last-updated" hx-trigger="every 30s" hx-swap="innerHTML">Never</span></div>
+    </div>
+</body>
+</html>

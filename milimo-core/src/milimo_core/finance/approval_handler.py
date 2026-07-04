@@ -117,7 +117,7 @@ class FinanceApprovalHandler:
 
         return action_id
 
-    def handle_review_approve(self, action_id: str) -> None:
+    def handle_review_approve(self, action_id: str, *args: Any, **kwargs: Any) -> None:
         """
         Handle REVIEW approve.
 
@@ -148,6 +148,8 @@ class FinanceApprovalHandler:
         action_id: str,
         edited_line_items: list[dict],
         edited_total: float,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """
         Handle REVIEW edit.
@@ -176,7 +178,7 @@ class FinanceApprovalHandler:
         }
         self._log_decision(decision)
 
-    def handle_review_block(self, action_id: str, reason: str) -> None:
+    def handle_review_block(self, action_id: str, reason: str, *args: Any, **kwargs: Any) -> None:
         """
         Handle REVIEW block.
 
@@ -198,7 +200,7 @@ class FinanceApprovalHandler:
         }
         self._log_decision(decision)
 
-    def handle_hold_release(self, action_id: str, stripe_client) -> None:
+    def handle_hold_release(self, action_id: str, stripe_client, *args: Any, **kwargs: Any) -> None:
         """
         Handle HOLD release.
 
@@ -221,7 +223,7 @@ class FinanceApprovalHandler:
         }
         self._log_decision(decision)
 
-    def handle_hold_cancel(self, action_id: str) -> None:
+    def handle_hold_cancel(self, action_id: str, *args: Any, **kwargs: Any) -> None:
         """
         Handle HOLD cancel.
 

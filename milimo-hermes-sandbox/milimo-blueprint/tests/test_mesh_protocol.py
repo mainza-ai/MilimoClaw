@@ -15,6 +15,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -181,6 +182,7 @@ class TestMeshCoordinator(unittest.TestCase):
         )
 
     def tearDown(self):
+        self.mesh.close()
         shutil.rmtree(self.tmp_dir, ignore_errors=True)
 
     def _msg(self, sender, recipient, msg_type, payload=None):
@@ -274,6 +276,7 @@ class TestMeshCoordinator(unittest.TestCase):
         self.mesh.register_claw("ops", "local://ops")
         # Use _msg without payload override to get proper defaults
         self.mesh.send_message(self._msg("ops", "content", "brief"))
+        self.mesh.drain_outbox()
         pending = self.mesh.get_pending_messages("content")
         self.assertEqual(len(pending), 1)
         self.assertEqual(pending[0]["message_type"], "brief")
@@ -329,6 +332,219 @@ class TestMeshCoordinator(unittest.TestCase):
         rejected_dir = Path(self.tmp_dir) / "rejected"
         rejected_files = list(rejected_dir.glob("*.json"))
         self.assertGreater(len(rejected_files), 0)
+
+
+class TestTransportContractVerification(unittest.TestCase):
+    """Test message contract verification inside transport adapters."""
+
+    @patch("orchestrator.gateway_adapter.mesh_dir")
+    def test_file_based_gateway_contract_verification(self, mock_mesh_dir):
+        import tempfile
+        import shutil
+        from unittest.mock import patch
+        from orchestrator.gateway_adapter import FileBasedGateway, GatewayConfig
+
+        # Set up isolated temp directory
+        tmp_dir = Path(tempfile.mkdtemp(prefix="milimo-gateway-test-"))
+        mock_mesh_dir.return_value = tmp_dir
+
+        try:
+            # Load validator
+            validator = ContractValidator.from_config_file(CONFIG_PATH)
+
+            config = GatewayConfig(
+                endpoint="file://",
+                mesh_secret="test-secret",
+                squad_id="test-squad",
+                role="ops",
+                validator=validator,
+            )
+
+            gateway = FileBasedGateway(config)
+            gateway.connect()
+
+            # 1. Send invalid message type (should be rejected/dropped on send)
+            invalid_msg = {
+                "message_id": "msg-invalid-type",
+                "sender_role": "ops",
+                "recipient_role": "content",
+                "message_type": "invalid_type_name_xyz",
+                "payload": {},
+                "timestamp": "2026-07-03T18:00:00Z",
+            }
+            res = gateway.send(invalid_msg)
+            self.assertFalse(res.success)
+            self.assertEqual(res.error_code, "CONTRACT_VIOLATION")
+
+            # 2. Send unauthorized route: content -> finance brief (should be rejected)
+            unauth_msg = {
+                "message_id": "msg-unauth-route",
+                "sender_role": "content",
+                "recipient_role": "finance",
+                "message_type": "brief",
+                "payload": {
+                    "client_id": "client-456",
+                    "project_id": "proj-123",
+                    "brief_text": "hello",
+                    "deadline": "2026-07-10",
+                    "tone_requirements": "casual",
+                    "platform_targets": ["twitter"]
+                },
+                "timestamp": "2026-07-03T18:00:00Z",
+            }
+            res = gateway.send(unauth_msg)
+            self.assertFalse(res.success)
+            self.assertEqual(res.error_code, "CONTRACT_VIOLATION")
+
+            # 3. Simulate receiving an invalid/unauthorized message in inbox
+            # Write directly to inbox file
+            inbox_dir = gateway._inbox
+            self.assertIsNotNone(inbox_dir)
+            invalid_inbox_file = inbox_dir / "2026-07-03T18-00-00Z_msg-unauth-route.json"
+
+            # Write unauth_msg dict to file
+            invalid_inbox_file.write_text(json.dumps(unauth_msg))
+
+            # receive should drop/ignore the invalid message
+            messages = gateway.receive(limit=10)
+            self.assertEqual(len(messages), 0)
+
+            # Clean up
+            gateway.close()
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    def test_mesh_secret_production_block(self):
+        """Verify that MeshCoordinator blocks startup in non-dev env if mesh_secret is empty."""
+        import os
+        from orchestrator.mesh import MeshConfig
+
+        # Save original env
+        orig_env = os.environ.get("MILIMO_ENV")
+
+        try:
+            # Set environment to production
+            os.environ["MILIMO_ENV"] = "production"
+
+            # Setup config with empty secret
+            config = MeshConfig(mesh_secret="")
+            validator = ContractValidator.from_dict({"message_matrix": {}, "message_types": {}})
+
+            with self.assertRaises(ValueError) as ctx:
+                MeshCoordinator(validator=validator, mesh_config=config)
+
+            self.assertIn("mesh_secret", str(ctx.exception))
+            self.assertIn("production environment", str(ctx.exception))
+
+            # Should succeed if environment is set to development/dev
+            os.environ["MILIMO_ENV"] = "development"
+            mesh = MeshCoordinator(validator=validator, mesh_config=config)
+            self.assertIsNotNone(mesh)
+
+        finally:
+            # Restore environment
+            if orig_env is None:
+                os.environ.pop("MILIMO_ENV", None)
+            else:
+                os.environ["MILIMO_ENV"] = orig_env
+
+    def _msg(self, sender, recipient, msg_type, payload=None):
+        default_payloads = {
+            "brief": {
+                "client_id": "client-001",
+                "project_id": "proj-001",
+                "brief_text": "Test brief content",
+                "deadline": "2026-04-01",
+                "tone_requirements": "professional",
+                "platform_targets": ["linkedin"],
+            },
+        }
+        if payload is None:
+            payload = default_payloads.get(msg_type, {})
+        return ClawMessage(
+            sender_role=sender,
+            recipient_role=recipient,
+            message_type=msg_type,
+            payload=payload,
+            squad_id="test-squad",
+        )
+
+    def test_outbox_queue_drain_on_reconnect(self):
+        """Verify that the background outbox processor queues messages when gateway is down, and drains them when gateway is restored."""
+        import tempfile
+        import shutil
+        import time
+        from unittest.mock import MagicMock
+        from orchestrator.gateway_adapter import ConnectionState, SendResult
+
+        tmp_dir = Path(tempfile.mkdtemp(prefix="milimo-outbox-test-"))
+        try:
+            # 1. Setup MeshCoordinator with a custom mock gateway
+            validator = ContractValidator.from_config_file(CONFIG_PATH)
+            mesh = MeshCoordinator(validator=validator, squad_id="test-squad", mesh_dir=tmp_dir)
+
+            # Create mock gateway
+            mock_gateway = MagicMock()
+            mock_gateway.state = ConnectionState.CONNECTED
+
+            # Initially, gateway returns failure/error
+            mock_gateway.send.return_value = SendResult(
+                success=False, error_code="E500", error_message="Network Down"
+            )
+            mesh._gateway = mock_gateway
+
+            # Register claws
+            mesh.register_claw("content", "local://content")
+            mesh.register_claw("ops", "local://ops")
+
+            # 2. Send message while gateway is failing
+            msg = self._msg("ops", "content", "brief")
+            result = mesh.send_message(msg)
+            self.assertTrue(result.delivered)  # True because it queued in outbox successfully
+
+            # Check that it exists in outbox folder
+            time.sleep(0.1)
+            outbox_files = list(mesh._outbox_dir.glob("*.json"))
+            self.assertEqual(len(outbox_files), 1)
+
+            # 3. Restore gateway: now it returns success
+            mock_gateway.send.return_value = SendResult(
+                success=True, message_id=msg.message_id, requires_approval=False
+            )
+
+            # Wait/drain the outbox
+            mesh.drain_outbox()
+
+            # Outbox should be completely empty now!
+            outbox_files = list(mesh._outbox_dir.glob("*.json"))
+            self.assertEqual(len(outbox_files), 0)
+
+            # Verify gateway was called
+            self.assertTrue(mock_gateway.send.called)
+
+            mesh.close()
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    def test_parallel_execution_pool(self) -> None:
+        """Verify that sessions_spawn processes multiple tasks concurrently."""
+        from orchestrator.mesh import sessions_spawn
+        from milimo_core.protocols.delegation import ClawTask
+
+        tasks = [
+            ClawTask(claw="content", goal="Generate a blog post about Antigravity"),
+            ClawTask(claw="ops", goal="Analyze deadline risks for active sprints"),
+            ClawTask(claw="build", goal="Run dependency audit on current workspace"),
+        ]
+
+        results = sessions_spawn(tasks, max_workers=3)
+
+        self.assertEqual(len(results), 3)
+        for res in results:
+            self.assertTrue(res.success)
+            self.assertIsNotNone(res.output)
+            self.assertEqual(res.output["claw"], res.claw)
+            self.assertIn("Successfully completed goal", res.output["response"])
 
 
 if __name__ == "__main__":

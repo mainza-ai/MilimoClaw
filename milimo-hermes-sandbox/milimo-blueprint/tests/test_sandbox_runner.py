@@ -259,3 +259,35 @@ class TestBacktestResult:
         assert result.tool_name == "test_tool"
         assert result.improvement_pct == 15.5
         assert result.passed is True
+
+    def test_sandbox_runner_environment_isolation(self) -> None:
+        """Verify that SandboxRunner subprocesses execute with sanitized environments and mocked paths."""
+        import os
+        from unittest.mock import patch, MagicMock
+
+        # Temporarily mock os.environ to contain a simulated secret
+        with patch.dict(os.environ, {"STRIPE_API_KEY": "sk_test_mocked"}):
+            runner = SandboxRunner()
+            with patch("subprocess.run") as mock_sub_run:
+                mock_sub_run.returncode = 0
+                mock_sub_run.stdout = "{}"
+
+                mock_res = MagicMock()
+                mock_res.returncode = 0
+                mock_res.stdout = '{"tool_name": "test", "improvement_pct": 10.0}'
+                mock_sub_run.return_value = mock_res
+
+                runner.backtest(
+                    VALID_TOOL_CODE,
+                    [{"metrics": {"approval_rate": 0.7}}],
+                    "approval_rate",
+                    0.7,
+                )
+
+                assert mock_sub_run.called
+                args, kwargs = mock_sub_run.call_args
+                passed_env = kwargs.get("env", {})
+
+                # Assert our secret is NOT in the passed environment dictionary
+                assert "STRIPE_API_KEY" not in passed_env
+                assert passed_env.get("HOME") is not None

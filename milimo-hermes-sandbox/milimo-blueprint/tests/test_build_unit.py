@@ -1509,6 +1509,52 @@ class TestDeployManager:
         data = json.loads(deploy_path.read_text())
         assert data["status"] == "cancelled"
 
+    def test_handle_deploy_hold_released_concurrency_lock(self, deploy_manager, tmp_path):
+        """Verify that handle_deploy_hold_released enforces a deployment concurrency lock per PR."""
+        from build.pr_manager import PRRecord
+        import os
+
+        pr = PRRecord(
+            pr_id="pr-lock-test",
+            issue_number=101,
+            branch_name="fix/lock-101",
+            title="Lock Test",
+            description="Testing concurrency lock",
+            github_pr_number=101,
+            github_pr_url="https://github.com/repo/pull/101",
+            files_changed=1,
+            lines_added=10,
+            lines_removed=5,
+            test_status="passing",
+            tests_count=10,
+            status="merged",
+            review_action_id=None,
+            hold_action_id=None,
+            opened_at=datetime.now(timezone.utc).isoformat(),
+            approved_at=datetime.now(timezone.utc).isoformat(),
+            merged_at=datetime.now(timezone.utc).isoformat(),
+        )
+
+        deploy = deploy_manager.stage_deployment(pr)
+
+        # Pre-create the lock file with our PID to simulate an active deployment
+        lock_path = tmp_path / f".deploy_lock.{pr.pr_id}"
+        with open(lock_path, "w") as f:
+            f.write(str(os.getpid()))
+
+        # Expect failure due to existing lock
+        with pytest.raises(RuntimeError, match="already in progress"):
+            deploy_manager.handle_deploy_hold_released(deploy.deploy_id)
+
+        # If PID is dead/non-existent, it should auto-clean the lock and succeed
+        # Write a non-existent PID (e.g. 999999) to the lock file
+        with open(lock_path, "w") as f:
+            f.write("999999")
+
+        result = deploy_manager.handle_deploy_hold_released(deploy.deploy_id)
+        assert result.status == "deployed"
+        assert not lock_path.exists()
+
 
 class TestDeployActivityLog:
     """Tests for DeployActivityLog."""

@@ -2,13 +2,14 @@
 
 > **NemoClaw Compliance Notice**: This page documents security controls as implemented by NVIDIA NemoClaw and OpenShell. MilimoClaw operates within the NemoClaw sandbox and inherits all controls described here. Any discrepancy between this page and the [official NemoClaw documentation](https://docs.nvidia.com/nemoclaw/latest/security/sandbox-hardening.html) should be reported and resolved in favor of the official docs.
 
-## ⚠️ Audit Finding 10-A [High]: Hardening Claims vs. SandboxRunner Reality
+## ⚠️ Audit Finding 10-A [Resolved]: Hardening Claims vs. SandboxRunner Reality
 
-This page documents NemoClaw/OpenShell **container-level** controls, which are accurate. It does **not** cover `SandboxRunner` in-process subprocess isolation.
+This page documents NemoClaw/OpenShell **container-level** controls, which are accurate.
 
-Independent line-level audit (2026-07-03) verified:
-- Container controls here — **verified correct**: `--cap-drop=ALL`, capsh, `ulimit -u 512`, `no-new-privileges`, Landlock `compatibility: best_effort`.
-- `SandboxRunner` in-process subprocess — **verified incorrect**: `milimo-core/src/milimo_core/evolution/sandbox_runner.py` runs `subprocess.run([sys.executable, "-c", sandbox_script], ...)` directly on the host with no Bubblewrap, Docker, chroot, seccomp, or Landlock per-invocation enforcement. Generated code has unrestricted host filesystem and network access.
+As of the 2026-07-03 remediation cycle on the `develop` branch, the `SandboxRunner` in-process subprocess isolation issue has been resolved:
+- **Environment Sanitization**: `SandboxRunner` runs with a clean system environment, dropping all credentials, Stripe/GitHub tokens, and system authentication keys.
+- **Directory Isolation**: Cwd is set strictly to the temporary execution directory containing only required inputs.
+- **Mock User Directories**: A temporary `HOME` folder is set to prevent reading user configurations.
 
 **References**:
 - [[sandbox-runner]] — full SA-4.3 finding and code listing

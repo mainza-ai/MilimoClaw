@@ -118,24 +118,53 @@ class DeployManager:
 
     def handle_deploy_hold_released(self, deploy_id: str) -> DeployRecord:
         """Release deploy HOLD and trigger actual deployment."""
+        import os
+
         deploy_path = self._fs.get_deploy_path("pending", deploy_id)
         if not deploy_path.exists():
             raise ValueError(f"Deploy {deploy_id} not found in pending/")
 
         deploy_data = self._fs.read_json(deploy_path)
+        pr_id = deploy_data.get("pr_id", "")
+        lock_path = self._fs.base / f".deploy_lock.{pr_id}"
 
-        # Trigger deployment via Vercel/Railway
-        if self._vercel:
-            result = self._vercel.trigger_deployment()
-            deploy_url = result.get("url", "")
-            status = self._vercel.get_deployment_status()
-        elif self._railway:
-            result = self._railway.trigger_deployment()
-            deploy_url = result.get("url", "")
-            status = self._railway.get_deployment_status()
-        else:
-            deploy_url = ""
-            status = "ready"
+        # Implement PID-validated lock check to prevent duplicate parallel deployments
+        if lock_path.exists():
+            try:
+                with open(lock_path) as f:
+                    lock_pid = int(f.read().strip())
+                os.kill(lock_pid, 0)
+                raise RuntimeError(f"Deployment for PR {pr_id} is already in progress by PID {lock_pid}")
+            except (ValueError, ProcessLookupError, OSError):
+                try:
+                    lock_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+
+        try:
+            with open(lock_path, "x") as f:
+                f.write(str(os.getpid()))
+        except FileExistsError:
+            raise RuntimeError(f"Deployment lock file exists, concurrency conflict for PR {pr_id}")
+
+        try:
+            # Trigger deployment via Vercel/Railway
+            if self._vercel:
+                result = self._vercel.trigger_deployment()
+                deploy_url = result.get("url", "")
+                status = self._vercel.get_deployment_status()
+            elif self._railway:
+                result = self._railway.trigger_deployment()
+                deploy_url = result.get("url", "")
+                status = self._railway.get_deployment_status()
+            else:
+                deploy_url = ""
+                status = "ready"
+        finally:
+            try:
+                lock_path.unlink(missing_ok=True)
+            except OSError:
+                pass
 
         if status in ("ready", "success"):
             deploy_data["status"] = "deployed"

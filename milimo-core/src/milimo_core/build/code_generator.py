@@ -238,6 +238,15 @@ Provide the implementation with file paths and content."""
     def run_tests(self) -> tuple[str, int, int]:
         """Run tests and return (status, passing, failing)."""
         import subprocess
+        import os
+
+        # Sanitize environment variables to prevent test code accessing credentials/secrets
+        clean_env = {}
+        for k in ["PATH", "LANG", "LC_ALL", "PYTHONIOENCODING", "PYTHONPATH"]:
+            if k in os.environ:
+                clean_env[k] = os.environ[k]
+        # Set a mocked/empty HOME to prevent reading user configurations
+        clean_env["HOME"] = str(self._repo_path)
 
         # Try running pytest in the repo directory
         try:
@@ -255,6 +264,7 @@ Provide the implementation with file paths and content."""
                 capture_output=True,
                 text=True,
                 timeout=300,
+                env=clean_env,
             )
 
             if result.returncode == 0:
@@ -291,6 +301,7 @@ Provide the implementation with file paths and content."""
                     capture_output=True,
                     text=True,
                     timeout=300,
+                    env=clean_env,
                 )
                 if result.returncode == 0:
                     return ("passing", 0, 0)

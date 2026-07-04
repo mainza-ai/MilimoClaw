@@ -5,6 +5,9 @@
 Shared test configuration and global fixtures.
 """
 
+import os
+os.environ.setdefault("MILIMO_ENV", "development")
+
 import sys
 import importlib
 import pytest

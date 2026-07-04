@@ -184,13 +184,23 @@ class SandboxRunner:
             tool_code, data_file, target_metric, baseline_value
         )
 
-        # Run in subprocess with resource limits
+        # Run in subprocess with resource limits and clean environment
         try:
+            import os
+            clean_env = {}
+            for k in ["PATH", "LANG", "LC_ALL", "PYTHONIOENCODING", "PYTHONPATH"]:
+                if k in os.environ:
+                    clean_env[k] = os.environ[k]
+            # Set a mocked/empty HOME to prevent reading user files
+            clean_env["HOME"] = str(Path(data_file).parent)
+
             result = subprocess.run(
                 [sys.executable, "-c", sandbox_script],
                 capture_output=True,
                 text=True,
                 timeout=self._config.timeout_seconds,
+                env=clean_env,
+                cwd=str(Path(data_file).parent),
             )
 
             if result.returncode != 0:
