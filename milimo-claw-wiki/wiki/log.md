@@ -1466,3 +1466,17 @@ Each entry follows this format:
 - C-1,H-6,I-2 in milimo-core: **closed**
 - All 15 findings in warroom/server.py: **closed**
 - Remaining: SA-4.1 mesh plaintext fallback, SA-4.2 mesh outbox missing, SA-6.1 RegionDetector orphaned, SA-6.2 tenant isolation header-only, SA2-1 sprint pipeline stall, I-4 milimo-mcp.yaml hardcoded paths — all outside warroom scope, documented in WARROOM_PRODUCTION_READINESS.md
+
+---
+
+### 2026-07-04 — Port conflict: War Room server moved from 8080 to 9090
+
+**Reason**: `openshell` (OpenClaw/OpenShell gateway) occupies `127.0.0.1:8080` and returns 404 for all warroom paths, causing a blank page at `http://localhost:8080/warroom.html`.
+
+**Port assignments**:
+- `8080` — reserved for `openshell` gateway
+- `9090` — HTMX War Room server (`milimo-hermes-plugin/warroom/server.py`)
+
+**Pages updated**:
+- `wiki/coordination/war-room.md` — startup command, URL, endpoint table
+- `README.md` — View War Room section (port + path corrected)

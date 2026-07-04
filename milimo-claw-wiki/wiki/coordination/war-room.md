@@ -85,20 +85,24 @@ Location: `milimo-hermes-plugin/warroom/server.py`
 Dynamic HTTP server that replaces the static `python3 -m http.server`. Serves the static `warroom.html` dashboard and handles dynamic `/v1/warroom/...` HTMX endpoints. Approvals route directly into the inter-claw gateway mailboxes.
 
 ```bash
-# Start the HTMX War Room dashboard
-python3 /opt/hermes/warroom/server.py
-# → http://localhost:8080/v1/warroom/
+# Start the HTMX War Room dashboard (default port 9090 to avoid
+# conflicts with the OpenClaw/OpenShell gateway on 8080)
+python3 milimo-hermes-plugin/warroom/server.py
+# → http://localhost:9090/warroom.html
 ```
 
 Key endpoints:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/v1/warroom/` | GET | Dashboard shell (HTMX partials) |
-| `/v1/warroom/queue` | GET | Live action queue |
-| `/v1/warroom/approve/{action_id}` | POST | Approve a REVIEW or release a HOLD |
-| `/v1/warroom/block/{action_id}` | POST | Block an action |
-| `/v1/warroom/hold/{action_id}` | POST | Move to HOLD queue |
+| `/health` | GET | Server liveness check |
+| `/warroom.html` | GET | Full dashboard shell |
+| `/v1/warroom/claw-status` | GET | Live claw status (auto-refresh 5s) |
+| `/v1/warroom/hold-queue` | GET | Live action queue (auto-refresh 5s) |
+| `/v1/warroom/cost-guard` | GET | Daily token usage (auto-refresh 10s) |
+| `/v1/warroom/last-updated` | GET | Server timestamp (auto-refresh 30s) |
+| `/v1/warroom/hold-queue/{action_id}/approve` | POST | Approve a REVIEW or release a HOLD |
+| `/v1/warroom/hold-queue/{action_id}/veto` | POST | Veto / block an action |
 
 The server scopes approval sessions per operator (by `MILIMO_OPERATOR`), so concurrent operators do not interfere with each other's queue state.
 

@@ -297,11 +297,15 @@ $ nemohermes milimo-hermes status
 ```
 
 #### View War Room
-The War Room is a static HTML dashboard at `/opt/hermes/warroom/warroom.html` inside the sandbox:
+
+The War Room is a static HTML dashboard at `milimo-hermes-plugin/warroom/warroom.html`:
+
 ```console
-$ nemohermes milimo-hermes exec -- python3 /opt/hermes/warroom/server.py 8080
-# Then open http://localhost:8080/warroom.html
+$ python3 milimo-hermes-plugin/warroom/server.py 9090
+# Then open http://localhost:9090/warroom.html
 ```
+
+> **Note**: Port `9090` is the default for the HTMX War Room server. Port `8080` is reserved for the OpenClaw/OpenShell gateway.
 
 #### Check Sandbox Logs
 ```console
