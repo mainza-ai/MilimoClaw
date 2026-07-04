@@ -1455,6 +1455,10 @@ TUIENVEOF
 hermes() {
   case "$1" in
     setup|doctor)
+      if [ "$1" = "setup" ] && [ "$2" = "--portal" ]; then
+        command hermes "$@"
+        return $?
+      fi
       echo "Error: 'hermes $1' cannot modify config inside the sandbox." >&2
       echo "NemoClaw manages sandbox config from the host for integrity checks." >&2
       echo "" >&2

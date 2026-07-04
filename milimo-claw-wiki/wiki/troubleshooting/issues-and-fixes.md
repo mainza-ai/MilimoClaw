@@ -255,6 +255,18 @@ Modified the static file server path resolver in [server.py](file:///Users/mck/D
 
 ---
 
+## Issue 15: Config configure-guard Intercepting `hermes setup --portal` (HIGH)
+
+### Problem
+
+Running `nemohermes milimo-hermes exec --tty -- hermes setup --portal` inside the sandbox fails with `Error: 'hermes setup' cannot modify config inside the sandbox.` This occurs because the NemoClaw shell configure-guard function (`hermes()`) defined in `start.sh` (which writes to `/tmp/nemoclaw-proxy-env.sh`) unconditionally intercepts all `setup` subcommands, including the authorized interactive OAuth login flow for Nous Portal.
+
+### Fix
+
+Modified the `hermes()` shell function definition inside [start.sh](file:///Users/mck/Desktop/MilimoClaw/milimo-hermes-sandbox/scripts/start.sh) to check if the subcommand is `setup` and the second argument is `--portal`. If matched, it bypasses the config block and executes the real binary via `command hermes "$@"`.
+
+---
+
 ## Verification Checklist
 
 1. All claws have assistant handlers: `grep -c "assistant" /sandbox/.milimo/blueprints/0.1.0/orchestrator/*/claw.py`
