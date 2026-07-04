@@ -4,6 +4,7 @@ import json
 import html as html_mod
 import logging
 import signal
+import threading
 import uuid
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -69,10 +70,11 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 # Graceful shutdown helpers
 # ---------------------------------------------------------------------------
 _httpd: HTTPServer | None = None
+_server_thread: threading.Thread | None = None  # type: ignore[name-defined]
 
 
 def _handle_sigterm(signum, _frame):
-    logger.info("SIGTERM received — shutting down gracefully")
+    logger.info("SIGTERM/SIGINT received — shutting down gracefully")
     if _httpd is not None:
         _httpd.shutdown()
 
@@ -438,8 +440,8 @@ class WarRoomHTMXHandler(BaseHTTPRequestHandler):
 # ---------------------------------------------------------------------------
 # Server entry point
 # ---------------------------------------------------------------------------
-def run(port: int = 8080):
-    global _httpd
+def run(port: int = 9090):
+    global _httpd, _server_thread
     server = HTTPServer(("0.0.0.0", port), WarRoomHTMXHandler)
     _httpd = server
 
@@ -455,12 +457,22 @@ def run(port: int = 8080):
     logger.info(
         "Milimo War Room Server running on http://localhost:%d/warroom.html", port
     )
+
+    _server_thread = threading.Thread(
+        target=server.serve_forever, name="warroom-http", daemon=False
+    )
+    _server_thread.start()
+
     try:
-        server.serve_forever()
-    except Exception:
-        logger.info("Server stopped")
+        _server_thread.join()
+    except KeyboardInterrupt:
+        pass
     finally:
+        logger.info("Stopping HTTP server...")
+        server.shutdown()
+        _server_thread.join(timeout=5)
         server.server_close()
+        logger.info("Server stopped cleanly")
 
 
 if __name__ == "__main__":
