@@ -600,7 +600,7 @@ def assess_risk(self, payment_event: dict) -> dict:
 
 3. **In `install-hermes.sh`**: Add a post-onboarding step that runs `link-cli auth login` in the background, captures the device URL to a well-known file, and the operator completes auth once during setup.
 
-**Resumes from**: Hermes surfacing a structured "auth required" message instead of blocking 300s.
+**Resumes from**: Hermes surfacing a structured "auth required" message instead of blocking 300s. ✅ Complete.
 
 ---
 
@@ -610,7 +610,7 @@ def assess_risk(self, payment_event: dict) -> dict:
 
 **Decision**: Keep Python `SpendApprovalHandler` as canonical. Remove `hermes skills install official/payments/stripe-link-cli` from `milimo-hermes-sandbox/Dockerfile` (line 121). The `npm install -g @stripe/link-cli@0.8.2` stays, because `SpendApprovalHandler` shells out to the binary.
 
-**Resumes from**: One auth state, one CLI invocation path.
+**Resumes from**: One auth state, one CLI invocation path. ✅ Complete.
 
 ---
 
@@ -641,24 +641,29 @@ def assess_risk(self, payment_event: dict) -> dict:
 | `milimo-hermes-plugin/milimo_hermes_plugin/tools.py` | 68–86 | Check registry before lazy-init spend handler |
 | `milimo-hermes-plugin/milimo_hermes_plugin/__init__.py` | 196–198 | Unify test_mode default to `"true"` |
 | `milimo-hermes-sandbox/Dockerfile` | 121 | Remove `hermes skills install official/payments/stripe-link-cli` |
+| `milimo-hermes-plugin/milimo_hermes_plugin/tools.py` | 16, 407–443 | Add `import subprocess`, `_extract_device_url()`, `_check_link_cli_auth()` |
+| `milimo-hermes-sandbox/milimo-hermes-plugin/milimo_hermes_plugin/tools.py` | 16, 407–443 | Mirror: `import subprocess`, `_extract_device_url()`, `_check_link_cli_auth()` |
+| `milimo-hermes-sandbox/install-hermes.sh` | 370–414, 644 | Add `setup_link_cli_auth()` + post-onboarding call |
 
 ---
 
 ## 6. Current State & Resumption Point
 
 ### Completed
-- ✅ Full investigation of all 6 claw skill factories
-- ✅ Sub-component capability map for all 45 declared capabilities
-- ✅ Wiki page created documenting all findings and plan
+- ✅ Fix `create_*_claw` factories in `milimo-hermes-plugin/__init__.py` (Phase 1)
+- ✅ Add top-level capability methods to all 6 `*Claw` classes (Phase 2)
+- ✅ Wire shared `SpendApprovalHandler` + unify `MILIMO_SPEND_TEST_MODE` default (Phase 3)
+- ✅ Pre-flight `link-cli auth status` check + non-blocking Hermes TTY (Phase 4)
+- ✅ Post-onboarding `link-cli auth login` step in `install-hermes.sh` (Phase 4b)
+- ✅ Remove duplicate `stripe-link-cli` Hermes skill from Dockerfile (Phase 5)
+- ✅ Mirror all changes to `milimo-hermes-sandbox/` copies
+- ✅ Full test suite verified: 1265 passed, 1 skipped
 
-### Next Step (Blocking Everything Else)
-1. Fix `create_*_claw` factories in `milimo-hermes-plugin/__init__.py` (Phase 1)
-2. Add top-level capability methods to all 6 `*Claw` classes (Phase 2)
-3. Mirror both sets of changes to `milimo-hermes-sandbox/` copies
-4. Run production test matrix
+### Remaining
+- Phase 6 — Production test matrix (auth flow, shared handler, stale bytecode, test-mode parity)
 
 ### After Resume
-Pick up at Phase 1, file `milimo-hermes-plugin/milimo_hermes_plugin/__init__.py`. The implementation plan above contains the exact code changes for each factory.
+Pick up at Phase 6. All code changes are complete; remaining work is validation/monitoring.
 
 ---
 
