@@ -323,9 +323,12 @@ Stage 1 — REVIEW:
   Approving Stage 1 does NOT spend. Moves to HOLD only.
 
 Stage 2 — HOLD release:
-  Invokes `link-cli spend-request create --request-approval`.
-  This blocks on an independent second approval in the user's Stripe Link app.
-  Hermes cannot self-approve the payment.
+  Calls `SpendApprovalHandler.handle_hold_release(hold_action_id, operator_id=...)`,
+  which runs `link-cli spend-request create --no-request-approval` to create the
+  session (returns immediately with the `lsrq_*` ID), then fires a separate
+  `link-cli spend-request request-approval <lsrq_id>` to push the notification
+  to the user's phone, and finally starts a background polling thread.
+  None of these steps blocks the War Room TUI or the inter-claw gateway.
 
 If Stage 2 release triggers the charge without Link app confirmation: NOT A BUG
 (the Link app is the final gate — the charge only completes if the user taps approve).
