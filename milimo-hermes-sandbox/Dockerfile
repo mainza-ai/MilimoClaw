@@ -116,11 +116,7 @@ USER sandbox
 # Generate Hermes config.yaml and .env from build args
 RUN node --experimental-strip-types /opt/nemoclaw-hermes-config/generate-config.ts
 
-# Install the Stripe Link CLI Hermes skill so `link-cli` is available at runtime.
-# --yes suppresses the interactive confirmation prompt.
-RUN hermes skills install --yes official/payments/stripe-link-cli || echo "Skill install deferred to runtime"
-
-# Install the link-cli Node.js binary globally so the skill can invoke it.
+# Install the link-cli Node.js binary globally so the spend handler can invoke it.
 # This is non-fatal: npm registry may be unreachable during docker build;
 # the runtime onboarding / nemohermes recovery can retry.
 RUN npm install -g @stripe/link-cli@0.8.2 2>/dev/null || echo "link-cli npm install deferred to runtime"

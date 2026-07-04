@@ -14,6 +14,7 @@ Registers the following tools:
 """
 
 from typing import Any, Optional
+import subprocess
 
 from milimo_core.protocols.delegation import ClawTask, ClawResult
 from milimo_core.ops.approval_handler import OpsApprovalHandler, OpsApprovalAction
@@ -403,6 +404,49 @@ async def handle_milimo_veto(ctx: Any, item_id: str, reason: str) -> dict:
     }
 
 
+def _extract_device_url(text: str) -> str | None:
+    for line in (text or "").splitlines():
+        line = line.strip()
+        if line.startswith("http://") or line.startswith("https://"):
+            return line
+    return None
+
+
+def _check_link_cli_auth() -> dict | None:
+    try:
+        proc = subprocess.run(
+            ["link-cli", "auth", "status"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except FileNotFoundError:
+        return {
+            "error": "link_cli_not_available",
+            "action_required": "link-cli binary is not installed or not on PATH.",
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "error": "link_cli_auth_check_timeout",
+            "action_required": "link-cli auth status timed out. Check network and retry.",
+        }
+
+    if proc.returncode != 0 or "authenticated" not in (proc.stdout or "").lower():
+        device_url = _extract_device_url(proc.stdout) or _extract_device_url(proc.stderr)
+        return {
+            "error": "link_cli_not_authenticated",
+            "approval_url": device_url,
+            "stdout": proc.stdout,
+            "stderr": proc.stderr,
+            "action_required": (
+                "Visit the URL above and approve in your Link app, then retry."
+                if device_url
+                else "Run 'link-cli auth login' in an interactive shell, then retry."
+            ),
+        }
+    return None
+
+
 def _auto_spend_id(prefix: str = "spend") -> str:
     """Generate a short unique spend request ID."""
     import uuid
@@ -432,6 +476,10 @@ async def handle_milimo_spend(ctx: Any, action: str, spend_id: Optional[str] = N
       cancel_hold    → cancel/release HOLD without spending
       status         → query spend request state by spend_id
     """
+    auth_error = _check_link_cli_auth()
+    if auth_error:
+        return auth_error
+
     handler = _get_spend_handler()
 
     if action == "queue_review":

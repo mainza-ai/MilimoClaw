@@ -367,6 +367,55 @@ prompt_model_router() {
   fi
 }
 
+setup_link_cli_auth() {
+  if [[ "$NON_INTERACTIVE" == "true" ]]; then
+    log_info "Skipping interactive link-cli auth in non-interactive mode"
+    log_info "Authenticate later with: nemohermes $SANDBOX_NAME exec --tty -- link-cli auth login"
+    return 0
+  fi
+
+  log_info "Configuring Stripe Link CLI authentication..."
+
+  local auth_log="/tmp/link-cli-auth-${SANDBOX_NAME}.log"
+  local url_file="/tmp/link-cli-device-url.txt"
+
+  if ! command -v nemohermes &>/dev/null; then
+    log_warn "nemohermes CLI not found; skipping automated link-cli auth"
+    log_info "Authenticate manually: link-cli auth login"
+    return 0
+  fi
+
+  # Start auth login in background; it prints the device URL immediately,
+  # then polls until approval or timeout. We capture the URL and detach.
+  nohup nemohermes "$SANDBOX_NAME" exec -- link-cli auth login --timeout 300 \
+    >"$auth_log" 2>&1 &
+  local auth_pid=$!
+
+  # Wait briefly for the device URL to appear in the log
+  local device_url=""
+  for _i in 1 2 3 4 5 6 7 8 9 10; do
+    if [[ -s "$auth_log" ]]; then
+      device_url=$(grep -oE 'https?://[^ ]+' "$auth_log" | head -1)
+      [[ -n "$device_url" ]] && break
+    fi
+    sleep 1
+  done
+
+  if [[ -n "$device_url" ]]; then
+    echo "$device_url" >"$url_file"
+    log_success "Stripe Link device URL: $device_url"
+    log_info "Complete authentication in your Stripe Link app."
+    log_info "Background auth process continuing (PID: $auth_pid)."
+    log_info "To check later: nemohermes $SANDBOX_NAME exec -- link-cli auth status"
+  else
+    log_warn "Could not capture device URL automatically."
+    log_info "Authenticate manually after connecting:"
+    log_info "  nemohermes $SANDBOX_NAME exec --tty -- link-cli auth login"
+    kill "$auth_pid" 2>/dev/null || true
+    wait "$auth_pid" 2>/dev/null || true
+  fi
+}
+
 prepare_build_context() {
   log_info "Preparing build context..."
 
@@ -594,6 +643,8 @@ main() {
         log_warn "Some presets may not have applied. Check 'nemohermes $SANDBOX_NAME policy-list'."
       fi
     fi
+
+    setup_link_cli_auth
 
     log_info "Next steps:"
     log_info "  1. Connect: nemohermes $SANDBOX_NAME connect"
