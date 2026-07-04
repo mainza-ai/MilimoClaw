@@ -42,6 +42,9 @@
 
         .empty { color: #8b949e; font-style: italic; text-align: center; padding: 24px; }
 
+        .error { color: #f85149; text-align: center; padding: 24px; font-weight: 600; }
+        .error-detail { color: #8b949e; font-weight: normal; font-size: 0.75rem; margin-top: 8px; }
+
         .last-updated { color: #8b949e; font-size: 0.75rem; text-align: right; margin-top: 16px; }
 
         /* htmx loading indicators */
@@ -54,45 +57,72 @@
     <div class="container">
         <header>
             <h1>MilimoClaw War Room</h1>
-            <div class="subtitle">Real-time claw status, HOLD queue & cost guard</div>
+            <div class="subtitle">Real-time claw status, HOLD queue &amp; cost guard</div>
         </header>
 
         <div class="grid">
-            <!-- Claw Status - auto-refreshes every 5s via htmx -->
             <div class="card">
-                <h2>Claw Status <span class="htmx-indicator">⟳</span></h2>
-                <div hx-get="/v1/warroom/claw-status"
+                <h2>Claw Status <span class="htmx-indicator">&#x27F3;</span></h2>
+                <div id="claw-status"
+                     hx-get="/v1/warroom/claw-status"
                      hx-trigger="every 5s"
-                     hx-swap="innerHTML"
-                     id="claw-status">
+                     hx-on::after-request="
+                       if(event.detail.xhr.status >= 500) {
+                         this.setAttribute('hx-trigger', 'every 30s');
+                       } else {
+                         this.setAttribute('hx-trigger', 'every 5s');
+                       }"
+                     hx-swap="innerHTML">
                     <div class="empty">Loading...</div>
                 </div>
             </div>
 
-            <!-- HOLD Queue - auto-refreshes every 5s via htmx -->
             <div class="card">
-                <h2>HOLD Queue <span class="htmx-indicator">⟳</span></h2>
-                <div hx-get="/v1/warroom/hold-queue"
+                <h2>HOLD Queue <span class="htmx-indicator">&#x27F3;</span></h2>
+                <div id="hold-queue"
+                     hx-get="/v1/warroom/hold-queue"
                      hx-trigger="every 5s"
-                     hx-swap="innerHTML"
-                     id="hold-queue">
+                     hx-on::after-request="
+                       if(event.detail.xhr.status >= 500) {
+                         this.setAttribute('hx-trigger', 'every 30s');
+                       } else {
+                         this.setAttribute('hx-trigger', 'every 5s');
+                       }"
+                     hx-swap="innerHTML">
                     <div class="empty">Loading...</div>
                 </div>
             </div>
 
-            <!-- Cost Guard - auto-refreshes every 10s via htmx -->
             <div class="card">
-                <h2>Cost Guard (Daily) <span class="htmx-indicator">⟳</span></h2>
-                <div hx-get="/v1/warroom/cost-guard"
+                <h2>Cost Guard (Daily) <span class="htmx-indicator">&#x27F3;</span></h2>
+                <div id="cost-guard"
+                     hx-get="/v1/warroom/cost-guard"
                      hx-trigger="every 10s"
-                     hx-swap="innerHTML"
-                     id="cost-guard">
+                     hx-on::after-request="
+                       if(event.detail.xhr.status >= 500) {
+                         this.setAttribute('hx-trigger', 'every 60s');
+                       } else {
+                         this.setAttribute('hx-trigger', 'every 10s');
+                       }"
+                     hx-swap="innerHTML">
                     <div class="empty">Loading...</div>
                 </div>
             </div>
         </div>
 
-        <div class="last-updated">Last updated: <span id="last-updated" hx-get="/v1/warroom/last-updated" hx-trigger="every 30s" hx-swap="innerHTML">Never</span></div>
+        <div class="last-updated">
+            Last updated:
+            <span id="last-updated"
+                  hx-get="/v1/warroom/last-updated"
+                  hx-trigger="every 30s"
+                  hx-on::after-request="
+                    if(event.detail.xhr.status >= 500) {
+                      this.setAttribute('hx-trigger', 'every 120s');
+                    } else {
+                      this.setAttribute('hx-trigger', 'every 30s');
+                    }"
+                  hx-swap="innerHTML">Never</span>
+        </div>
     </div>
 </body>
 </html>
