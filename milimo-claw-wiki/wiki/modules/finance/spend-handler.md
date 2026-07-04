@@ -92,8 +92,10 @@ The flow is **non-blocking** after the operator presses `R`. The TUI and inter-c
 
 `handle_hold_release` no longer blocks on `link-cli` during the approval push. It makes two quick sequential calls:
 
-1. `link-cli spend-request create --no-request-approval ... --test --format json`
+1. `link-cli spend-request create --no-request-approval ... --format json`
 2. `link-cli spend-request request-approval <id>`
+
+The `--test` flag is only valid on `create`; passing it to `request-approval` or `retrieve` returns an UNKNOWN flag error.
 
 The first call creates the transaction immediately and returns the `lsrq_*` ID. The second call fires the push notification to the user's phone. Neither call waits for the user to approve — control returns to the War Room instantly.
 
@@ -119,6 +121,12 @@ subprocess.run(approval_cmd, capture_output=True, text=True, timeout=30, env=env
 # 3. Hand off to background polling thread
 self._start_polling_thread(spend_id)
 ```
+
+## Queue State Persistence
+
+`queue_spend_review()` and `queue_spend_hold()` call `_persist_queue_state()` to write a `queue_state` event to `agent-spend.log` (using the same `fcntl.flock` + `os.fsync` pattern as `_append_spend_log`). On restart, `_recover_and_resume_polling()` restores pending REVIEW and HOLD entries by replaying `decisions.log`.
+
+Key behavior: `_get_daily_spend_aggregate()` skips `queue_state` events so they do not inflate the daily cap calculation. Only actual spend entries (from `_append_spend_log`) count toward the cap.
 
 ---
 
@@ -152,7 +160,7 @@ All direct `self._requests[...]` accesses were replaced with `_get_request(spend
 
 ## Background Polling Thread
 
-After firing the approval notification, `handle_hold_release` starts a background daemon thread via `_start_polling_thread(spend_id)`. The thread:
+After firing the approval notification, `handle_hold_release` starts a background non-daemon thread via `_start_polling_thread(spend_id)`. The thread:
 
 - Calls `link-cli spend-request retrieve <id>` every 2 seconds
 - Updates the in-memory spend state on each poll
@@ -167,7 +175,6 @@ def _start_polling_thread(self, spend_id: str) -> None:
     thread = threading.Thread(
         target=self._poll_spend_request,
         args=(spend_id,),
-        daemon=True,
     )
     thread.start()
 

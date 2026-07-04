@@ -6,7 +6,7 @@
 - `raw/FINANCE_CLAW_SPEC.md`
 - `milimo-blueprint/roles/finance-claw.yaml`
 
-**Last updated**: 2026-06-30
+**Last updated**: 2026-07-04
 
 **Tags**: #claw #finance
 
@@ -36,6 +36,10 @@ The Finance Claw is the **financial nervous system** of MilimoClaw. It tracks ev
 - Prepares quarterly tax summaries on quarter start dates
 - **Manages agent-initiated purchases** via Stripe Link CLI (double-gated: War Room release → Link app approval)
 - Supports per-operator Link isolation (`MILIMO_OPERATOR`) — each operator's spend routes to their own Link account and approval phone
+- `link-cli --test` flag is only valid on the `create` subcommand; `request-approval` and `retrieve` do not accept it
+- Spend justifications must be >= 100 chars (required by `link-cli --context`); validated before any side effects in `SpendApprovalHandler`
+- Daily spend cap configurable via `MILIMO_DAILY_SPEND_CAP_CENTS` env var (default 10000 cents = $100); measures rolling 24-hour aggregate from `agent-spend.log`
+- Pending REVIEW and HOLD entries survive daemon restarts — persisted to `agent-spend.log` as `queue_state` events and recovered on init
 
 ## What It Cannot Do
 

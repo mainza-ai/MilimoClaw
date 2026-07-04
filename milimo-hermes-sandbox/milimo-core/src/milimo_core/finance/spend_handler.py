@@ -630,7 +630,7 @@ class SpendApprovalHandler:
         raise ValueError(f"No valid JSON structure found in output: {stdout}")
 
     def _get_daily_spend_aggregate(self) -> int:
-        """Calculate the sum of all spends in the last 24 hours from agent-spend.log."""
+        """Calculate the sum of all actual spends in the last 24 hours from agent-spend.log."""
         import fcntl
         from datetime import timedelta
         if not self.spend_log_path.exists():
@@ -648,6 +648,8 @@ class SpendApprovalHandler:
                         continue
                     try:
                         entry = json.loads(line)
+                        if entry.get("event") == "queue_state":
+                            continue
                         ts_str = entry.get("timestamp")
                         if ts_str:
                             ts = datetime.fromisoformat(ts_str)
@@ -744,7 +746,6 @@ class SpendApprovalHandler:
             return
 
         released_requests = {}
-        queued_spend_ids = set()
         try:
             with open(self.decisions_path, "r", encoding="utf-8") as f:
                 for line in f:
@@ -766,20 +767,9 @@ class SpendApprovalHandler:
                         elif action_type in ("purchase_approved", "purchase_denied", "purchase_expired", "release_failed", "cancel"):
                             if spend_id in released_requests:
                                 del released_requests[spend_id]
-                    if stage in ("review", "hold") and action_type in ("queued", "approve", "edit"):
-                        queued_spend_ids.add(spend_id)
         except Exception as e:
             logger.error("Failed to scan pending spend requests for recovery: %s", e)
             return
-
-        for spend_id in queued_spend_ids:
-            if spend_id in self._requests:
-                continue
-            try:
-                self._get_request(spend_id)
-                logger.info("Recovered queued spend request %s from decisions.log", spend_id)
-            except Exception as e:
-                logger.debug("Could not recover queued request %s: %s", spend_id, e)
 
         for spend_id, info in released_requests.items():
             link_id = info.get("link_spend_request_id")

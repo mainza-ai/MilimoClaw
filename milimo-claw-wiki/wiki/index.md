@@ -2,7 +2,7 @@
 
 **Summary**: Master table of contents for the MilimoClaw knowledge base.
 
-**Last updated**: 2026-06-30
+**Last updated**: 2026-07-04
 
 > Note: After onboarding, the sandbox is already running. Use `nemohermes milimo-hermes connect` to start a chat session, not `nemoclaw start`.
 
@@ -263,7 +263,7 @@ Sandbox security controls, credential management, image hardening, and OpenClaw 
 | [[credential-storage]] | OpenShell gateway credential storage, no-disk-persistence | ✓ |
 | [[openclaw-controls]] | OpenClaw application-layer security beyond NemoClaw's scope | ✓ |
 | [[sandbox-hardening]] | Sandbox image hardening, capability drops, filesystem policy | ✓ |
-| [[production-readiness-audit-2026-07-03]] | Open findings (C/H/I/M/L codes) and two-phase implementation plan | ✓ |
+| [[production-readiness-audit-2026-07-03]] | Open findings (C/H/I/M/L codes) and two-phase implementation plan — all Phase 1+2 findings now closed ✓ | ✓ |
 
 ---
 
@@ -328,6 +328,7 @@ See [[log]] for complete operation history.
 
 | Date | Change | Pages Affected |
 |------|--------|----------------|
+| 2026-07-04 | Post-audit bugfix cycle: finance spend queue persistence + cap bug fix, war room hardening, production-readiness audit closed findings | war-room.md, war-room-security.md, finance-claw.md, spend-handler.md, production-readiness-audit-2026-07-03.md, log.md |
 | 2026-07-04 | Remediation commit cycle (`455de10`–`0c86b7b`): SA3-1 spend idempotency lock, SA3-2 daily aggregate spend cap, SA3-3 decisions.log fsync, F5-1 Stripe API key env injection, SA-7.1 webhook HMAC + HTTP 500, SA-7.2 /metrics endpoint, SA-4.3 containment via bwrap/docker, SA-1.4 test_mode drift sync, SA-1.3 bridge_cli approve/veto actions, M-1 RPC /health — wiki updated to reflect fixes | spend-handler.md, stripe-client.md, webhook-server.md, sandbox-runner.md, sandbox-hardening.md, finance-claw.md, spend-warroom-bridge.md, bridge-cli.md, bridge-server.md |
 | 2026-07-03 | Line-level audit completed and wiki updated: F5-1 Stripe API key CLI leak, SA-4.3 SandboxRunner un-jailed execution, SA-1.4 sandbox finance_claw.py test_mode copy-drift, SA3-1 spend idempotency gap, SA3-2 daily spend cap per-transaction not aggregate, SA3-3 decisions.log fsync missing, SA3-5 duplicate invoice on retry, SA-4.2 mesh outbox missing, SA-4.1 plaintext mesh fallback, SA-6.1 RegionDetector orphaned, SA-7.1 webhook silent failure, SA-1.1 War Room Hermes-only, SA-1.3 Bridge CLI missing approval subcommands, SA2-1 sprint pipeline stall | stripe-client.md, sandbox-runner.md, sandbox-hardening.md, spend-handler.md, spend-warroom-bridge.md, invoice-manager.md, finance-claw.md, mesh-coordinator.md, sequencing-rules.md, bridge-cli.md, system-overview.md |
 | 2026-07-03 | Stripe Link non-blocking spend release: replaced blocking --request-approval with --no-request-approval + separate request-approval call, background polling thread every 2s, self-healing _recover_and_resume_polling() on init, test_background_polling_and_restart_recovery added (4 tests total) | spend-handler.md, spend-warroom-bridge.md, link-cli-setup.md, test-spend-flow.md |

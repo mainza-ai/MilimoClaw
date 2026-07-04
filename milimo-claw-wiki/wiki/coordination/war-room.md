@@ -3,10 +3,12 @@
 **Summary**: Terminal UI for viewing all pending actions from every claw. Also includes the dynamic HTMX server for a web-based War Room dashboard with per-operator approval routing.
 
 **Sources**:
-- `milimo/src/warroom/warroom-tui.ts`
+- `milimo-hermes-plugin/warroom/server.py`
+- `milimo-hermes-plugin/warroom/warroom.html`
+- `milimo-hermes-plugin/warroom/warroom_bridge.py`
 - `raw/AGENTS.md`
 
-**Last updated**: 2026-04-23
+**Last updated**: 2026-07-04
 
 **Tags**: #coordination #warroom #tui
 
@@ -36,91 +38,76 @@ The War Room surfaces every pending action from every claw in one prioritized qu
 │   ├─ Health score calculated - Ops Claw                         │
 │   └─ Daily report generated - Analytics Claw                    │
 └─────────────────────────────────────────────────────────────────┘
+         ↕ HTTPS (HTMX polling)
+┌─────────────────────────────────────────────────────────────────┐
+│ HTMX WAR ROOM SERVER (port 9090)                                 │
+│   POST /v1/warroom/hold-queue/{id}/approve  →  Bearer auth req  │
+│   POST /v1/warroom/hold-queue/{id}/veto     →  Origin check    │
+│   GET  /health                              →  {"status":"ok"}  │
+│   GET  /warroom.html                        →  Dashboard shell  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Components
 
 ### War Room TUI
 
-Location: `milimo/src/warroom/warroom-tui.ts`
-
-Terminal UI built with blessed.
-
-```typescript
-class WarRoomTUI {
-  // Main entry point
-  start(): void;
-
-  // Render queue
-  renderQueue(): void;
-
-  // Handle keyboard input
-  handleInput(key: string): void;
-}
-```
-
-### Approval Engine
-
-Location: `milimo/src/warroom/approval.ts`
-
-Handles REVIEW/HOLD/AUTO decisions.
-
-```typescript
-class ApprovalEngine {
-  // Process approval decision
-  processApproval(itemId: string, decision: 'approve' | 'block'): void;
-
-  // Release HOLD
-  releaseHold(itemId: string): void;
-
-  // Queue new action
-  queueAction(action: PendingAction): void;
-}
-```
+The terminal UI for the War Room is provided by the [[solo-warroom]] module. It surfaces every pending action from every claw in one prioritized queue.
 
 ### HTMX War Room Server
 
 Location: `milimo-hermes-plugin/warroom/server.py`
 
-Dynamic HTTP server that replaces the static `python3 -m http.server`. Serves the static `warroom.html` dashboard and handles dynamic `/v1/warroom/...` HTMX endpoints. Approvals route directly into the inter-claw gateway mailboxes.
+Dynamic HTTP server that serves the static `warroom.html` dashboard and handles dynamic `/v1/warroom/...` HTMX endpoints. Approvals route directly into the inter-claw gateway mailboxes. The server is hardened for production use: Bearer auth, path traversal protection, graceful SIGTERM shutdown, security headers, and per-operator isolation.
 
 ```bash
-# Start the HTMX War Room dashboard (default port 9090 to avoid
-# conflicts with the OpenClaw/OpenShell gateway on 8080)
+# Start the HTMX War Room dashboard (port 9090; 8080 is reserved for
+# the OpenShell gateway)
 python3 milimo-hermes-plugin/warroom/server.py
 # → http://localhost:9090/warroom.html
 ```
 
+**Environment variables**:
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `WARROOM_AUTH_TOKEN` | Bearer token required for all POST endpoints | unset (server starts but POSTs return 500) |
+| `MILIMO_CORE_PATH` | Override path to `milimo_core` package | resolved relative to `server.py` |
+
 Key endpoints:
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Server liveness check |
-| `/warroom.html` | GET | Full dashboard shell |
-| `/v1/warroom/claw-status` | GET | Live claw status (auto-refresh 5s) |
-| `/v1/warroom/hold-queue` | GET | Live action queue (auto-refresh 5s) |
-| `/v1/warroom/cost-guard` | GET | Daily token usage (auto-refresh 10s) |
-| `/v1/warroom/last-updated` | GET | Server timestamp (auto-refresh 30s) |
-| `/v1/warroom/hold-queue/{action_id}/approve` | POST | Approve a REVIEW or release a HOLD |
-| `/v1/warroom/hold-queue/{action_id}/veto` | POST | Veto / block an action |
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/health` | GET | No | Server liveness check — returns `{"status": "ok"}` |
+| `/warroom.html` | GET | No | Full dashboard shell |
+| `/v1/warroom/claw-status` | GET | No | Live claw status (auto-refresh 5s) |
+| `/v1/warroom/hold-queue` | GET | No | Live action queue (auto-refresh 5s) |
+| `/v1/warroom/cost-guard` | GET | No | Daily token usage (auto-refresh 10s) |
+| `/v1/warroom/last-updated` | GET | No | Server timestamp (auto-refresh 30s) |
+| `/v1/warroom/hold-queue/{action_id}/approve` | POST | Bearer | Approve a REVIEW or release a HOLD |
+| `/v1/warroom/hold-queue/{action_id}/veto` | POST | Bearer | Veto / block an action |
 
-The server scopes approval sessions per operator (by `MILIMO_OPERATOR`), so concurrent operators do not interfere with each other's queue state.
+**Security**:
+- All POST endpoints require `Authorization: Bearer <WARROOM_AUTH_TOKEN>`.
+- `Origin` header is checked on POST; cross-origin requests are rejected with 403.
+- `action_id` is validated against `^[a-zA-Z0-9_-]+$`; path traversal payloads return 400.
+- Responses include `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Cache-Control: no-store`.
+
+**Graceful shutdown**: `SIGTERM` and `SIGINT` trigger `server.shutdown()` from a signal handler, allowing in-flight approvals to complete cleanly. Shutdown completes in ~0.5s.
+
+### War Room Bridge
+
+Location: `milimo-hermes-plugin/warroom/warroom_bridge.py`
+
+`SpendWarRoomBridge` connects `SpendApprovalHandler` to the existing `SoloWarRoom` action queue. Claws call the bridge instead of touching `SpendApprovalHandler` directly. See [[spend-warroom-bridge]] for details.
 
 ### Audit Trail
 
-Location: `milimo/src/warroom/audit.ts`
+Location: `milimo-hermes-plugin/warroom/` (shared with [[spend-handler]])
 
-Logs all approval decisions.
+All approval decisions are logged to `decisions.log` (same format as `FinanceApprovalHandler`), with stage vocabulary (`review`, `hold`) and action types (`queued`, `approve`, `block`, `release`, `cancel`, `purchase_approved`, `purchase_denied`).
 
-```typescript
-class AuditTrail {
-  // Log approval decision
-  logDecision(decision: ApprovalDecision): void;
-
-  // Get audit history
-  getHistory(filters: AuditFilters): AuditEntry[];
-}
-```
+Queue state is persisted to `agent-spend.log` so that pending REVIEW and HOLD entries survive process restarts.
 
 ## Keyboard Shortcuts
 
