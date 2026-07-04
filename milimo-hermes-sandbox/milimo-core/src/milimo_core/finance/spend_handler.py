@@ -36,7 +36,7 @@ alongside invoices.
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Any
 import json
 import logging
 import subprocess
