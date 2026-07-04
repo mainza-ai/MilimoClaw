@@ -17,6 +17,7 @@ filesystem_policy:
   - /etc
   - /var/log
   - /sandbox/.openclaw-data/milimo/claws/analytics/reports
+  - /sandbox/.config
   read_write:
   - /sandbox/.openclaw-data/milimo/claws/finance
   - /tmp
@@ -126,7 +127,26 @@ network_policies:
         protocol: rest
         enforcement: enforce
         tls: terminate
-        rules:
-          - allow: { method: POST, path: "/graphql/public" }
+    rules:
+      - allow: { method: POST, path: "/graphql/public" }
     binaries:
       - { path: /usr/bin/python3 }
+
+  # ── Stripe Link CLI (SA-5.2 Parity) ──────────────────────────────────
+  stripe_link:
+    name: stripe_link
+    endpoints:
+      - host: api.link.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+      - host: login.link.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /usr/local/bin/node }
+      - { path: /usr/local/bin/link-cli }
