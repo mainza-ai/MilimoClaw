@@ -11,7 +11,7 @@ Enforces two-stage invoice approval.
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Any
 import json
 
 from ..milimo_paths import claw_base
