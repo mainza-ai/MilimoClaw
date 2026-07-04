@@ -147,6 +147,24 @@ The `LucyAssistant` class in `milimo-blueprint/orchestrator/assistant/lucy.py` i
 
 **Silent Response & Diagnostics Handling**: When a claw returns an empty or None response, Lucy returns a diagnostic dict with `status`, `role`, and `message_type` fields instead of propagating silence. In diagnostic inquiry mode, she formats and displays worker queue lengths and recent logs.
 
+## Hermes Skill Capabilities (2026-07-04)
+
+When running under the Hermes profile, the Assistant Claw (Lucy) skill exposes these
+capabilities as direct methods on the instantiated skill object:
+
+| Capability | Method | Notes |
+|------------|--------|-------|
+| `answer_questions` | `answer_questions(query_text, target_roles)` | Dispatches `assistant_query` via `dispatch_query()` |
+| `route_to_claw` | `route_to_claw(target_role, message)` | Dispatches query to single target role |
+| `handle_pending_queries` | `handle_pending_queries()` | Calls `cleanup_expired()` and returns count |
+| `provide_status` | `provide_status()` | Routes `"status"` through `process_operator_message()` |
+
+**Skill factory** (`create_assistant_claw` in `milimo-hermes-plugin/__init__.py`) now instantiates `LucyAssistant` with:
+- `squad_id` from `MILIMO_SQUAD_ID` env (default `"default"`)
+- `mesh_gateway` via `_get_mesh_gateway()` mock if Hermes runtime unavailable
+
+---
+
 ### System Prompt
 
 Located at: `milimo-blueprint/orchestrator/templates/assistant_system_prompt.md`

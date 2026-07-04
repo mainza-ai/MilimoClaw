@@ -110,6 +110,26 @@ pricing_query → pricing_response → project_brief
 - [[ops-scheduler]] — Scheduled tasks (deadline checks, health scores)
 - [[signal-dispatcher]] — Inter-claw message sending
 
+## Hermes Skill Capabilities (2026-07-04)
+
+When running under the Hermes profile, the Ops Claw skill exposes these
+capabilities as direct methods on the instantiated skill object:
+
+| Capability | Method | Sub-Component |
+|------------|--------|---------------|
+| `create_incident` | `handle_incident(alert)` | `IncidentAnalyzer.analyze_incident()` + `RunbookExecutor` |
+| `manage_project` | `manage_project(project_id, action)` | `ProjectManager.update_project_status()` |
+| `score_client_health` | `score_client_health(client_id)` | `ClientHealthScorer.to_dict()` |
+| `track_scope` | `track_scope(message)` | `ScopeMonitor.check_message()` |
+| `run_runbook` | `run_runbook(name, alert)` | `RunbookExecutor.execute_runbook()` |
+| `handle_webhook` | `handle_webhook(alert)` | Delegates to `handle_incident()` |
+
+**Skill factory** (`create_ops_claw` in `milimo-hermes-plugin/__init__.py`) now instantiates `OpsClaw` with:
+- `squad_id` from `MILIMO_SQUAD_ID` env (default `"default"`)
+- `mesh_gateway` via `_get_mesh_gateway()` mock if Hermes runtime unavailable
+
+---
+
 ## Evolution Tools
 
 Tools that emerge autonomously over time:

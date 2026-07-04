@@ -134,6 +134,33 @@ If Stage 1 approval triggers transmission: CRITICAL BUG.
 - [[signal-dispatcher]] — Inter-claw message sending
 - [[finance-scheduler]] — Scheduled tasks
 
+## Hermes Skill Capabilities (2026-07-04)
+
+When running under the Hermes profile, the Finance Claw skill exposes these
+capabilities as direct methods on the instantiated skill object:
+
+| Capability | Method | Sub-Component |
+|------------|--------|---------------|
+| `create_invoice` | `create_invoice(invoice_data)` | `InvoiceManager.generate_invoice()` |
+| `track_payments` | `track_payments()` | `PaymentMonitor` |
+| `monitor_stripe` | `monitor_stripe()` | `StripeClient` protocol |
+| `calculate_pricing` | `calculate_pricing(pricing_query)` | `PricingEngine.handle_pricing_query()` |
+| `track_revenue` | `track_revenue()` | `RevenueTracker` |
+| `track_expenses` | `track_expenses()` | `ExpenseTracker` |
+| `assess_risk` | `assess_risk(payment_event)` | `PaymentRiskScorer` |
+| `request_agent_spend` | `request_agent_spend(spend_request)` | `SpendApprovalHandler.queue_spend_review()` |
+
+**Skill factory** (`create_finance_claw` in `milimo-hermes-plugin/__init__.py`) now instantiates `FinanceClaw` with:
+- `squad_id` from `MILIMO_SQUAD_ID` env (default `"default"`)
+- `stripe_client` via safe fallback constructor
+- `gateway` via `_get_mesh_gateway()` mock if Hermes runtime unavailable
+
+**Shared handler**: `FinanceClaw.startup()` calls `set_spend_handler()` after creating `SpendApprovalHandler`, so the tool layer and the claw share a single instance.
+
+**Test mode**: `MILIMO_SPEND_TEST_MODE` unified to default `"true"` in both `finance_claw.py` and `tools.py`.
+
+---
+
 ## Evolution Tools
 
 Tools that emerge autonomously over time:

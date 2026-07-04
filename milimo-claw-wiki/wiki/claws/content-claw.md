@@ -87,6 +87,28 @@ The Content Claw is the **creative department** of MilimoClaw. It generates all 
 - [[performance-monitor]] — Post-publication performance tracking
 - [[approval-handler]] — War Room approval processing
 
+## Hermes Skill Capabilities (2026-07-04)
+
+When running under the Hermes profile, the Content Claw skill exposes these
+capabilities as direct methods on the instantiated skill object:
+
+| Capability | Method | Sub-Component |
+|------------|--------|---------------|
+| `generate_content` | `generate_content(brief)` | `ContentGenerator._build_prompt()` |
+| `schedule_content` | `schedule_content(item)` | `ContentScheduler.trigger_morning_planning()` |
+| `publish_to_twitter` | `publish_to_twitter(content)` | `PlatformPublisher.publish()` |
+| `publish_to_linkedin` | `publish_to_linkedin(content)` | `PlatformPublisher.publish()` |
+| `publish_to_tiktok` | `publish_to_tiktok(content)` | `PlatformPublisher.publish()` |
+| `manage_brand_voice` | `manage_brand_voice(client_id, content)` | `BrandVoiceManager.load_profile()` + `apply_voice()` |
+| `track_performance` | `track_performance(post_id)` | `PerformanceMonitor.collect_performance()` |
+
+**Skill factory** (`create_content_claw` in `milimo-hermes-plugin/__init__.py`) now instantiates `ContentClaw` with:
+- `squad_id` from `MILIMO_SQUAD_ID` env (default `"default"`)
+- `privacy_router` from global registry
+- `mesh_sender` via `_get_mesh_sender()` callable
+
+---
+
 ## Evolution Tools
 
 Tools that emerge autonomously over time:
