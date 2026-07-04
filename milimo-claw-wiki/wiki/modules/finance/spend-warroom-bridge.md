@@ -54,7 +54,7 @@ link-cli uses the scoped config for the correct Link account
 |---|---|---|
 | **SA-1.1** [Critical] | War Room operator surface absent from OpenClaw (NemoClaw profile); Hermes HTMX server in `server.py:L42-76` is the only human-approval UI | **Verified Correct** |
 | **SA-1.3** [High] | Bridge CLI lacks `approve-action` / `veto-action` subcommands; operators forced to use Hermes HTMX UI | **Verified Correct** |
-| **SA3-1** [Critical] | `handle_hold_release()` has no idempotency lock; duplicate `R` press → duplicate Link sessions → duplicate charges | **Verified Correct** |
+| **SA3-1** [Critical] | `handle_hold_release()` now includes idempotency lock (`O_CREAT|O_EXCL` + PID + stale cleanup at `spend_handler.py:352-389`); duplicate `R` press no longer creates duplicate Link sessions | **Fixed 2026-07-04** |
 
 ### SA-1.1: OpenClaw (NemoClaw) Has No Native War Room Operator UI
 

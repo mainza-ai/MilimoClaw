@@ -83,12 +83,14 @@ proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_secon
 ```
 
 > [!WARNING]
-> **Audit Finding F5-1 [Critical]**: Passing the Stripe secret key on the command line as `--api-key` exposes it to all local users via `/proc/*/cmdline` and `ps aux`. The key should be passed via the `STRIPE_API_KEY` environment variable instead of as an argument:
+> **Audit Finding F5-1 [Critical] — FIXED 2026-07-04**: `stripe_client.py:L84` previously passed the Stripe secret key as `--api-key` on the subprocess command line, exposing it to all local users via `/proc/*/cmdline` and `ps aux`. This was remediated: the key is now passed via the `STRIPE_API_KEY` environment variable instead. The command line no longer contains the key.
 > ```python
 > cmd = ["stripe", *args, "--format", "json"]
 > env = {**os.environ, "STRIPE_API_KEY": self.api_key}
 > proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds, env=env)
 > ```
+>
+> Source: `milimo-core/src/milimo_core/finance/stripe_client.py:84-94`. Verified at HEAD `0c86b7b`.
 
 Source: `milimo-core/src/milimo_core/finance/stripe_client.py:L84`.
 
@@ -117,9 +119,9 @@ Manual verification:
 3. Verify HMAC-SHA256 signature
 
 > [!WARNING]
-> **Audit Finding SA-7.1 [High]**: `webhook_server.py:L89-98` catches all exceptions in inbound handlers, logs the error, and always returns HTTP 200. A malformed or spoofed webhook will be silently dropped rather than causing a visible 5xx, masking delivery failures. Returns should be HTTP 500 when internal execution fails.
-
-Source: `milimo-core/src/milimo_core/ops/webhook_server.py:L89-98`.
+> **Audit Finding SA-7.1 [High] — FIXED 2026-07-04**: `webhook_server.py:L89-98` previously caught all exceptions in inbound handlers, logged the error, and always returned HTTP 200. This was remediated: webhook handlers now return HTTP 500 when internal dispatch fails, and all inbound webhook endpoints verify HMAC signatures before processing.
+>
+> Source: `milimo-core/src/milimo_core/ops/webhook_server.py:47-99, 173-174`. Verified at HEAD `0c86b7b`.
 
 When Stripe CLI unavailable:
 ```python

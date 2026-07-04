@@ -76,20 +76,18 @@ If not configured, Finance Claw uses a mock Stripe client with a warning logged.
 
 ---
 
-## ⚠️ Audit Finding SA-1.4 [Medium]: Copy-Drift Between Core and Sandbox
-
-Verified copy-drift between `milimo-core` and `milimo-hermes-sandbox`:
+## ⚠️ Audit Finding SA-1.4 [Medium]: Copy-Drift Between Core and Sandbox — FIXED 2026-07-04
 
 | File | `test_mode` prop passed to `SpendApprovalHandler`? |
 |---|---|
 | `milimo-core/src/milimo_core/finance/finance_claw.py:L197-198` | ✅ Yes: `test_mode=_os.environ.get("MILIMO_SPEND_TEST_MODE", "true").lower() == "true"` |
-| `milimo-hermes-sandbox/milimo-core/src/milimo_core/finance/finance_claw.py:L190-197` | ❌ No: `test_mode` parameter entirely omitted |
+| `milimo-hermes-sandbox/milimo-core/src/milimo_core/finance/finance_claw.py:L190-197` | ✅ **Fixed**: now matches core — passes `test_mode` from `MILIMO_SPEND_TEST_MODE` env var |
 
-**Impact**: The sandbox copy forces `SpendApprovalHandler` to use its default (`test_mode=True`) regardless of the `MILIMO_SPEND_TEST_MODE` environment variable. **Real-payment flows can never be enabled in the sandbox, even when `MILIMO_SPEND_TEST_MODE=false` is set.** This is a parity/configuration bug — the operator believes test mode is off while the handler stays in test mode.
+**Impact (pre-fix)**: The sandbox copy forced `SpendApprovalHandler` to use its default (`test_mode=True`) regardless of the `MILIMO_SPEND_TEST_MODE` environment variable. Real-payment flows could never be enabled in the sandbox.
 
-**Fix**: Sync `finance_claw.py` from `milimo-core/` to `milimo-hermes-sandbox/`, including the `test_mode=_os.environ.get(...)` line. Use `docker cp` to propagate changes to the running container.
+**Fix applied**: Synced `finance_claw.py` from `milimo-core/` to `milimo-hermes-sandbox/`. Both copies now read `test_mode` from the `MILIMO_SPEND_TEST_MODE` environment variable.
 
-Source: `milimo-audit-report.md`, Finding SA-1.4.
+Source: `milimo-audit-report.md`, Finding SA-1.4. Verified at HEAD `0c86b7b`.
 
 ---
 
