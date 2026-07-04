@@ -1014,10 +1014,11 @@ class TestCodeGenerator:
         from unittest.mock import patch, MagicMock
 
         # Mock subprocess.run to verify the command arguments passed to it
-        with patch("subprocess.run") as mock_run, \
-             patch("shutil.which", return_value="/usr/bin/bwrap"), \
-             patch("os.path.exists", return_value=True):
-
+        with (
+            patch("subprocess.run") as mock_run,
+            patch("shutil.which", return_value="/usr/bin/bwrap"),
+            patch("os.path.exists", return_value=True),
+        ):
             mock_res = MagicMock()
             mock_res.returncode = 0
             mock_run.return_value = mock_res

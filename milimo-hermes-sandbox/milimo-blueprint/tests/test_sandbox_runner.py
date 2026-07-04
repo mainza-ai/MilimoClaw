@@ -294,14 +294,18 @@ class TestBacktestResult:
 
     def test_sandbox_runner_containment_checking(self) -> None:
         """Verify SandboxRunner builds the command correctly when bwrap or docker are present."""
-        import shutil
         from unittest.mock import patch, MagicMock
 
         runner = SandboxRunner()
 
         # 1. Test when bwrap is available
-        with patch("shutil.which", side_effect=lambda name: "/usr/bin/bwrap" if name == "bwrap" else None), \
-             patch("subprocess.run") as mock_sub_run:
+        with (
+            patch(
+                "shutil.which",
+                side_effect=lambda name: "/usr/bin/bwrap" if name == "bwrap" else None,
+            ),
+            patch("subprocess.run") as mock_sub_run,
+        ):
             mock_res = MagicMock()
             mock_res.returncode = 0
             mock_res.stdout = '{"tool_name": "test", "improvement_pct": 10.0}'
@@ -325,8 +329,10 @@ class TestBacktestResult:
                 return "/usr/bin/docker"
             return None
 
-        with patch("shutil.which", side_effect=which_side_effect), \
-             patch("subprocess.run") as mock_sub_run:
+        with (
+            patch("shutil.which", side_effect=which_side_effect),
+            patch("subprocess.run") as mock_sub_run,
+        ):
             # We mock the first call to subprocess.run (the docker ps daemon check) to return 0
             mock_check_res = MagicMock()
             mock_check_res.returncode = 0

@@ -18,7 +18,7 @@ def test_bridge_approve_sprint_plan(tmp_path):
     plan_data = {
         "plan_id": "plan_12345",
         "status": "pending_review",
-        "issues": [{"issue_number": 42, "title": "Implement SA2-1"}]
+        "issues": [{"issue_number": 42, "title": "Implement SA2-1"}],
     }
     plan_file = sprint_dir / "current-plan.json"
     plan_file.write_text(json.dumps(plan_data))
@@ -30,10 +30,14 @@ def test_bridge_approve_sprint_plan(tmp_path):
     (build_base / "logs/deploy-activity.log").touch()
 
     # Patch claw_base to point to our mock build base inside the bridge_cli modules
-    with patch("orchestrator.bridge_cli.claw_base", return_value=build_base), \
-         patch("milimo_core.bridge_cli.claw_base", return_value=build_base):
+    with (
+        patch("orchestrator.bridge_cli.claw_base", return_value=build_base),
+        patch("milimo_core.bridge_cli.claw_base", return_value=build_base),
+    ):
         # Run command
-        res = handle_command("approve_sprint_plan", {"plan_id": "plan_12345"}, str(tmp_path))
+        res = handle_command(
+            "approve_sprint_plan", {"plan_id": "plan_12345"}, str(tmp_path)
+        )
 
         # Verify response
         assert res["status"] == "approved"

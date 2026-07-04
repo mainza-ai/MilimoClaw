@@ -100,7 +100,9 @@ def test_webhook_error_bubbling(webhook_server):
     body = json.dumps(payload).encode("utf-8")
 
     # Force dispatcher to raise an error
-    webhook_server.dispatcher.handle_incident.side_effect = Exception("Database is down")
+    webhook_server.dispatcher.handle_incident.side_effect = Exception(
+        "Database is down"
+    )
 
     req = urllib.request.Request(url, data=body, method="POST")
     req.add_header("Content-Type", "application/json")

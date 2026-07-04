@@ -228,6 +228,30 @@ Integration testing of multi-agent tasks resulted in message drops due to contra
 
 ---
 
+## Issue 13: Sandbox Onboarding Secret-Boundary Check Failure (HIGH)
+
+### Problem
+
+The onboarding or recovery check of the `milimo-hermes` sandbox fails with `Secret-boundary check did not complete cleanly` / `SUPERVISOR_REBUILD_REQUIRED`. The validator script `validate-env-secret-boundary.py` flags `OPENSHELL_SANDBOX_TOKEN_FILE` (injected automatically by the newer NemoClaw supervisor into the container process environment) as a raw secret violation.
+
+### Fix
+
+Safelisted `OPENSHELL_SANDBOX_TOKEN_FILE` in `RUNTIME_ALLOWED_NONSECRET_KEYS` within [validate-env-secret-boundary.py](file:///Users/mck/Desktop/MilimoClaw/milimo-hermes-sandbox/scripts/validate-env-secret-boundary.py). Re-computed the cryptographic hash [NEMOCLAW_HERMES_VALIDATOR_SHA256](file:///Users/mck/Desktop/MilimoClaw/milimo-hermes-sandbox/Dockerfile#L337) and updated it in the `Dockerfile`.
+
+---
+
+## Issue 14: War Room HTTP Static Path Resolution Bug (MEDIUM)
+
+### Problem
+
+Accessing the War Room server via `localhost:9090/warroom.html` from the host results in a blank page or `warroom.html not found`. The Python server resolved static file candidates using relative paths (`Path(name).exists()`) evaluated against the host's current working directory, which does not contain the static HTML files when run from the repository root.
+
+### Fix
+
+Modified the static file server path resolver in [server.py](file:///Users/mck/Desktop/MilimoClaw/milimo-hermes-plugin/warroom/server.py#L235-L245) to resolve static files absolute relative to `_HERE` (the script's directory).
+
+---
+
 ## Verification Checklist
 
 1. All claws have assistant handlers: `grep -c "assistant" /sandbox/.milimo/blueprints/0.1.0/orchestrator/*/claw.py`

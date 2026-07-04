@@ -2,9 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """Tests for StripeClient CLI argument isolation and direct API fallback."""
 
-import os
-import subprocess
-import pytest
 from unittest.mock import patch, MagicMock
 from orchestrator.finance.stripe_client import StripeClient
 
@@ -52,7 +49,9 @@ def test_stripe_client_direct_api_fallback():
             mock_resp.read.return_value = b'{"id": "cust_abc", "object": "customer"}'
             mock_urlopen.return_value.__enter__.return_value = mock_resp
 
-            res = client._stripe_api("POST", "/customers", data={"email": "test@example.com"})
+            res = client._stripe_api(
+                "POST", "/customers", data={"email": "test@example.com"}
+            )
 
             assert res == {"id": "cust_abc", "object": "customer"}
             assert mock_urlopen.call_count == 1

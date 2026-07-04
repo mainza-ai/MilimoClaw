@@ -341,7 +341,6 @@ class TestTransportContractVerification(unittest.TestCase):
     def test_file_based_gateway_contract_verification(self, mock_mesh_dir):
         import tempfile
         import shutil
-        from unittest.mock import patch
         from orchestrator.gateway_adapter import FileBasedGateway, GatewayConfig
 
         # Set up isolated temp directory
@@ -388,7 +387,7 @@ class TestTransportContractVerification(unittest.TestCase):
                     "brief_text": "hello",
                     "deadline": "2026-07-10",
                     "tone_requirements": "casual",
-                    "platform_targets": ["twitter"]
+                    "platform_targets": ["twitter"],
                 },
                 "timestamp": "2026-07-03T18:00:00Z",
             }
@@ -400,7 +399,9 @@ class TestTransportContractVerification(unittest.TestCase):
             # Write directly to inbox file
             inbox_dir = gateway._inbox
             self.assertIsNotNone(inbox_dir)
-            invalid_inbox_file = inbox_dir / "2026-07-03T18-00-00Z_msg-unauth-route.json"
+            invalid_inbox_file = (
+                inbox_dir / "2026-07-03T18-00-00Z_msg-unauth-route.json"
+            )
 
             # Write unauth_msg dict to file
             invalid_inbox_file.write_text(json.dumps(unauth_msg))
@@ -428,7 +429,9 @@ class TestTransportContractVerification(unittest.TestCase):
 
             # Setup config with empty secret
             config = MeshConfig(mesh_secret="")
-            validator = ContractValidator.from_dict({"message_matrix": {}, "message_types": {}})
+            validator = ContractValidator.from_dict(
+                {"message_matrix": {}, "message_types": {}}
+            )
 
             with self.assertRaises(ValueError) as ctx:
                 MeshCoordinator(validator=validator, mesh_config=config)
@@ -481,7 +484,9 @@ class TestTransportContractVerification(unittest.TestCase):
         try:
             # 1. Setup MeshCoordinator with a custom mock gateway
             validator = ContractValidator.from_config_file(CONFIG_PATH)
-            mesh = MeshCoordinator(validator=validator, squad_id="test-squad", mesh_dir=tmp_dir)
+            mesh = MeshCoordinator(
+                validator=validator, squad_id="test-squad", mesh_dir=tmp_dir
+            )
 
             # Create mock gateway
             mock_gateway = MagicMock()
@@ -500,7 +505,9 @@ class TestTransportContractVerification(unittest.TestCase):
             # 2. Send message while gateway is failing
             msg = self._msg("ops", "content", "brief")
             result = mesh.send_message(msg)
-            self.assertTrue(result.delivered)  # True because it queued in outbox successfully
+            self.assertTrue(
+                result.delivered
+            )  # True because it queued in outbox successfully
 
             # Check that it exists in outbox folder
             time.sleep(0.1)
