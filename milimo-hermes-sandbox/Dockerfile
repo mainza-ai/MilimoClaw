@@ -51,6 +51,20 @@ RUN mkdir -p /sandbox/.hermes/plugins/milimo-hermes \
     && chown -R sandbox:sandbox /sandbox/.hermes/plugins/milimo-hermes \
     && chmod -R a+rX /sandbox/.hermes/plugins/milimo-hermes
 
+# Ensure the sandbox user can read the editable-install source trees at
+# runtime. sys.path contains /opt/milimo-core/src and the editable
+# finder for milimo_hermes_plugin originally points to /opt/milimo-hermes-plugin/;
+# the chowns below make both trees world-readable, then we reinstall the
+# milimo-hermes-plugin editable install so its .pth finder points at the
+# sandbox-owned copy under /sandbox/.hermes/plugins/milimo-hermes/.
+RUN chown -R sandbox:sandbox /opt/milimo-core \
+    && chmod -R a+rX /opt/milimo-core \
+    && chown -R sandbox:sandbox /opt/milimo-hermes-plugin \
+    && chmod -R a+rX /opt/milimo-hermes-plugin \
+    && rm -f /opt/hermes/.venv/lib/python3.13/site-packages/__editable__.milimo_hermes_plugin-0.2.0.pth \
+         /opt/hermes/.venv/lib/python3.13/site-packages/__editable___milimo_hermes_plugin_0_2_0_finder.py \
+    && uv pip install --no-cache-dir --no-deps -e /sandbox/.hermes/plugins/milimo-hermes/
+
 # Copy War Room static assets
 COPY milimo-hermes-plugin/warroom/ /opt/hermes/warroom/
 RUN chmod -R a+rX,go-w /opt/hermes/warroom/
@@ -114,7 +128,10 @@ WORKDIR /sandbox
 USER root
 
 # Generate Hermes config.yaml and .env from build args
-RUN node --experimental-strip-types /opt/nemoclaw-hermes-config/generate-config.ts
+# The generator uses os.homedir(), which returns /root when run as USER root.
+# We need the files at /sandbox/.hermes/ for the rest of this Dockerfile,
+# so we set HOME=/sandbox only for this step.
+RUN HOME=/sandbox node --experimental-strip-types /opt/nemoclaw-hermes-config/generate-config.ts
 
 # Install the link-cli Node.js binary globally so the spend handler can invoke it.
 # Runs as root so the global node_modules destination is writable.

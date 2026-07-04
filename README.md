@@ -323,6 +323,26 @@ nemohermes onboard \
 
 **Root cause**: The static auth token baked at build time expires. `gateway restart` and `recover` restart the gateway *process* but cannot rotate a static baked token. This will recur periodically until NemoClaw supports automatic token rotation for baked tokens.
 
+##### Troubleshooting: `milimo_status` / Milimo tools not appearing in chat
+
+**Symptom**: Inside Hermes chat, agent falls back to shell, reports `plugin dependency milimo_core is not installed`, or no `milimo_*` tools appear at all.
+
+**Root cause (two bugs)**:
+1. `milimo-hermes-sandbox/milimo-blueprint/policies/presets/npm.yaml` used `preset.name: npm`, which collides with a built-in nemohermes preset. `nemohermes policy-add --from-dir presets/` aborts on collision, silently skipping every preset that comes after `npm.yaml` in directory order — including `nous-portal`, `sentry`, `stripe`, `stripe-link`, and `vercel`.
+2. `install-hermes.sh` wrapped the batch `policy-add --from-dir` in a single `if/then/else`, so one failure killed the entire preset load.
+
+**Fixed**: `preset.name` in `npm.yaml` renamed to `milimo-npm`; `install-hermes.sh` now applies each preset individually so one failure cannot block the rest.
+
+**Quick recovery for a running sandbox** (apply each preset file individually):
+```bash
+for f in milimo-hermes-sandbox/milimo-blueprint/policies/presets/*.yaml; do
+  nemohermes milimo-hermes policy-add --from-file "$f" --yes 2>&1 || true
+done
+nemohermes milimo-hermes policy-explain | grep -A2 "nous-portal"
+# must show status: verified
+```
+```
+
 ### Agent-Initiated Spend (Stripe Link CLI) —missing tool wiring fix
 
 **Symptom**: Inside Hermes chat, agent ends with `I’m blocked on step 4: the specific Finance Claw micro-layer (SpendApprovalHandler / SpendWarRoomBridge) is not exposed in this sandbox`, and a `sudo` password prompt appears.

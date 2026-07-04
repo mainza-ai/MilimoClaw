@@ -35,6 +35,7 @@ SLACK_CHANNELS="${SLACK_CHANNELS:-}"
 CHAT_UI_URL="${CHAT_UI_URL:-}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-false}"
 DRY_RUN="${DRY_RUN:-false}"
+SKIP_SYNC_CHECK="${SKIP_SYNC_CHECK:-false}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -66,6 +67,7 @@ OPTIONS:
     --chat-ui-url URL        Remote dashboard URL for headless deployments
     --non-interactive        Non-interactive mode (requires all env vars set)
     --dry-run                Show commands without executing
+    --skip-sync-check        Do not check root ↔ sandbox plugin/core sync before build
     --help                   Show this help
 
 ENVIRONMENT VARIABLES (for non-interactive mode):
@@ -81,6 +83,7 @@ ENVIRONMENT VARIABLES (for non-interactive mode):
     NEMOCLAW_ACCEPT_THIRD_PARTY 1 to accept third-party software
     NEMOCLAW_NON_INTERACTIVE     1 for non-interactive mode
     NEMOCLAW_MODEL_ROUTER_PYTHON Python path for Model Router
+    MILIMO_SKIP_SYNC_CHECK       1 to skip the root ↔ sandbox plugin/core sync guard
 
 EXAMPLES:
     # Interactive install with defaults
@@ -144,6 +147,10 @@ parse_args() {
         ;;
       --dry-run)
         DRY_RUN=true
+        shift
+        ;;
+      --skip-sync-check)
+        SKIP_SYNC_CHECK=true
         shift
         ;;
       --help)
@@ -612,6 +619,25 @@ main() {
     export NEMOCLAW_SLACK_CONFIG_B64="$slack_b64"
   fi
 
+  local project_root
+  project_root="$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")"
+
+  if [[ "${MILIMO_SKIP_SYNC_CHECK:-${SKIP_SYNC_CHECK:-false}}" != "true" ]]; then
+    log_info "Checking root ↔ sandbox plugin/core sync..."
+    local sync_script="$project_root/scripts/check-plugin-sync.sh"
+    if [[ -x "$sync_script" ]]; then
+      if ! "$sync_script"; then
+        if [[ "$NON_INTERACTIVE" == "true" ]]; then
+          log_error "Plugin sync check failed in non-interactive mode — aborting."
+          exit 1
+        fi
+        log_warn "Proceeding anyway (interactive mode — run 'make sync' or --skip-sync-check to silence)."
+      fi
+    fi
+  else
+    log_info "Skipping root ↔ sandbox plugin/core sync check (MILIMO_SKIP_SYNC_CHECK=true)"
+  fi
+
   prepare_build_context
   build_docker_image
 
@@ -632,13 +658,25 @@ main() {
     echo ""
 
     # Apply network policy presets from the blueprint's presets/ directory.
-    # The nemohermes CLI supports --from-dir to load custom preset YAML files
-    # (OpenShell policy preset format: preset.name + network_policies.*).
+    # The nemohermes CLI supports --from-file and --from-dir to load custom
+    # preset YAML files (OpenShell policy preset format: preset.name + network_policies.*).
+    # Apply each preset individually so one failure doesn't abort the whole batch.
     local preset_dir="$sandbox_dir/milimo-blueprint/policies/presets"
     if [[ -d "$preset_dir" ]]; then
       log_info "Applying network policy presets from $preset_dir..."
-      if nemohermes "$SANDBOX_NAME" policy-add --from-dir "$preset_dir" --yes 2>&1; then
-        log_success "Network policy presets applied!"
+      local preset_failed=0
+      for preset_file in "$preset_dir"/*.yaml; do
+        [[ -f "$preset_file" ]] || continue
+        local preset_name
+        preset_name=$(basename "$preset_file" .yaml)
+        log_info "Applying preset: $preset_name"
+        if ! nemohermes "$SANDBOX_NAME" policy-add --from-file "$preset_file" --yes 2>&1; then
+          log_warn "Preset $preset_name did not apply (collision or invalid). Check 'nemohermes $SANDBOX_NAME policy-list'."
+          preset_failed=1
+        fi
+      done
+      if [[ "$preset_failed" -eq 0 ]]; then
+        log_success "All network policy presets applied!"
       else
         log_warn "Some presets may not have applied. Check 'nemohermes $SANDBOX_NAME policy-list'."
       fi
