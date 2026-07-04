@@ -96,54 +96,54 @@ This is the only supported path per [Install OpenClaw Plugins](https://docs.nvid
 
 No running sandbox is required — `nemoclaw onboard --from` creates one.
 
-### Generated Dockerfile Pattern
+### Generated Dockerfile Pattern (Hermes Profile)
+
+The Hermes profile Dockerfile (`milimo-hermes-sandbox/Dockerfile`) follows the NemoHermes pattern with critical post-rebuild additions:
 
 ```dockerfile
-FROM ghcr.io/nvidia/nemoclaw/sandbox-base:latest
+FROM ghcr.io/nvidia/nemoclaw/hermes-sandbox-base@sha256:8dad3b989a9ed1e601743310b97be21be5f59f89f7913a47d04f3ec3c40b8ce6
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Copy Milimo plugin (pre-built dist/ + node_modules/ on host)
-COPY milimo/ /opt/milimo/
-WORKDIR /opt/milimo
+# Required ARG for nemohermes onboarding (messaging plan injection)
+ARG NEMOCLAW_MESSAGING_PLAN_B64=
+ENV NEMOCLAW_MESSAGING_PLAN_B64=${NEMOCLAW_MESSAGING_PLAN_B64}
 
-# Install production node_modules (devDeps already stripped by --omit=dev on host)
-RUN npm install --omit=dev --ignore-scripts --legacy-peer-deps 2>&1 | tail -5
+# Milimo configuration (passed from install-hermes.sh)
+ARG MILIMO_SPEND_TEST_MODE=true
+ARG MILIMO_DAILY_SPEND_CAP_CENTS=10000
+ARG MILIMO_OPERATOR=
+ENV MILIMO_SPEND_TEST_MODE=${MILIMO_SPEND_TEST_MODE}
+ENV MILIMO_DAILY_SPEND_CAP_CENTS=${MILIMO_DAILY_SPEND_CAP_CENTS}
+ENV MILIMO_OPERATOR=${MILIMO_OPERATOR}
 
-# Install plugin with --force (idempotent) — FAIL BUILD if this fails
-RUN openclaw plugins install --force /opt/milimo \
-    && echo "PLUGIN_INSTALL_OK" \
-    || (echo "PLUGIN_INSTALL_FAILED" && exit 1)
+COPY milimo-core/ /opt/milimo-core/
+COPY milimo-hermes-plugin/ /opt/milimo-hermes-plugin/
+COPY milimo-blueprint/ /opt/milimo-blueprint/
+COPY warroom/ /opt/hermes/warroom/
 
-# Verify plugin is registered before continuing
-RUN openclaw plugins list 2>&1 | grep -q "milimo" \
-    && echo "PLUGIN_VERIFIED" \
-    || (echo "PLUGIN_VERIFICATION_FAILED" && exit 1)
+# Install link-cli binary (Hermes skill only provides SKILL.md wrapper)
+RUN npm install -g @stripe/link-cli@0.8.2
 
-# Copy Milimo blueprint
-COPY milimo-blueprint/ /sandbox/.openclaw/milimo/milimo-blueprint/
+# Install milimo-core into Hermes venv
+RUN cd /opt/milimo-core && uv pip install --python /opt/hermes/.venv/bin/python -e .
 
-# Create claw data directories
-RUN BASE="/sandbox/.openclaw/milimo/claws" \
-    && mkdir -p "$BASE/ops/clients/active" "$BASE/ops/clients/archived" ...
+# Install milimo-hermes-plugin into Hermes venv
+RUN cd /opt/milimo-hermes-plugin && uv pip install --python /opt/hermes/.venv/bin/python -e .
 
-# Install Python dependencies
-RUN pip3 install --target /sandbox/.local/lib/python3.11/site-packages ...
+# Install PyYAML for system Python (bridge_cli.py imports yaml at top-level)
+RUN /usr/bin/python3 -m pip install --break-system-packages pyyaml
 
-# Install GitHub CLI and add to PATH via /etc/profile.d/ (survives Landlock)
-RUN ARCH=$(uname -m) \
-    && GH_ARCH=$([ "$ARCH" = "aarch64" ] && echo "arm64" || echo "amd64") \
-    && GH_VERSION="2.67.0" \
-    && GH_URL="https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz" \
-    && cd /tmp && curl -sL "$GH_URL" -o gh.tar.gz && tar xzf gh.tar.gz \
-    && mkdir -p /sandbox/.openclaw/milimo/bin \
-    && cp gh_*_linux_${GH_ARCH}/bin/gh /sandbox/.openclaw/milimo/bin/gh \
-    && chmod +x /sandbox/.openclaw/milimo/bin/gh \
-    && rm -rf /tmp/gh* \
-    && echo 'export PATH="/sandbox/.openclaw/milimo/bin:$PATH"' > /etc/profile.d/milimo.sh \
-    && echo "gh CLI installed at /sandbox/.openclaw/milimo/bin/gh"
+# Add /opt/nemoclaw-blueprint to system Python sys.path (for orchestrator imports)
+RUN /usr/bin/python3 -c "import site; print(site.getsitepackages()[0])" | xargs -I{} sh -c 'echo "/opt/nemoclaw-blueprint" > {}/nemoclaw-blueprint.pth'
 
-WORKDIR /opt/nemoclaw
+# Install stripe-link-cli skill (non-interactive for Docker builds)
+RUN hermes skills install --yes official/payments/stripe-link-cli
+
+# Generate Hermes config + .env at build time
+RUN npx tsx /opt/milimo-hermes-sandbox/generate-config.ts
+
+# ... rest of standard Hermes Dockerfile pattern ...
 ```
 
 Key changes from older pattern:
@@ -252,15 +252,31 @@ See mode-specific sections above.
 
 ## Environment Variables
 
-| Variable | Purpose | Storage |
-|----------|---------|---------|
-| `NVIDIA_API_KEY` | Inference API | OpenShell gateway (via `nemoclaw onboard`) |
-| `GITHUB_TOKEN` | GitHub operations | OpenShell gateway or `gh auth login` |
-| `STRIPE_SECRET_KEY` | Payment processing | Session-only (`/etc/environment`) |
-| `VERCEL_TOKEN` | Deployments | Session-only |
-| `SENTRY_AUTH_TOKEN` | Error monitoring | Session-only |
+| Variable | Purpose | Default | Storage |
+|----------|---------|---------|---------|
+| `NVIDIA_API_KEY` | Inference API | _(required)_ | OpenShell gateway (via `nemoclaw onboard`) |
+| `GITHUB_TOKEN` | GitHub operations | _(required)_ | OpenShell gateway or `gh auth login` |
+| `MILIMO_SPEND_TEST_MODE` | Enable demo spend flow (uses Stripe test cards) | `true` | `.env` (baked at build time) |
+| `MILIMO_DAILY_SPEND_CAP_Cents` | Daily spend cap in cents | `10000` ($100) | `.env` (baked at build time) |
+| `MILIMO_OPERATOR` | Operator name for spend approvals | _(empty)_ | `.env` (baked at build time) |
+| `NEMOCLAW_MESSAGING_PLAN_B64` | Base64 messaging plan for nemohermes onboarding | _(empty)_ | Docker build ARG |
+| `STRIPE_SECRET_KEY` | Payment processing | _(optional)_ | Session-only (`/etc/environment`) |
+| `VERCEL_TOKEN` | Deployments | _(optional)_ | Session-only |
+| `SENTRY_AUTH_TOKEN` | Error monitoring | _(optional)_ | Session-only |
+
+**Dockerfile ARG variables** (set via `--build-arg` or env):
+| ARG | Purpose | Default |
+|-----|---------|---------|
+| `MILIMO_SPEND_TEST_MODE` | Demo spend flow | `true` |
+| `MILIMO_DAILY_SPEND_CAP_CENTS` | Daily spend cap | `10000` |
+| `MILIMO_OPERATOR` | Operator name | _(empty)_ |
+| `NEMOCLAW_MESSAGING_PLAN_B64` | Messaging plan for onboarding | _(empty)_ |
+| `NEMOCLAW_MODEL` | Default inference model | _(empty — set via `nemohermes inference set`)_ |
+| `NEMOCLAW_AUTH_MODE` | Auth mode: `api_key` or `nous_oauth` | `api_key` |
 
 Per [Credential Storage](https://docs.nvidia.com/nemoclaw/latest/security/credential-storage.html), provider credentials live in the OpenShell gateway store — not on host disk. Environment variables take precedence over gateway-stored values. Session-only env vars in `/etc/environment` do **not** survive `nemoclaw <name> rebuild`.
+
+The `MILIMO_SPEND_*` variables are baked into `.env` at build time via `generate-config.ts` (reads from `process.env`). Set them as environment variables before running `install-hermes.sh` to persist them in the sandbox image.
 
 ---
 

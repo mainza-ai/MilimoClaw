@@ -351,6 +351,63 @@ ENV NEMOCLAW_MESSAGING_PLAN_B64=${NEMOCLAW_MESSAGING_PLAN_B64}
 ```
 Without this declaration, onboarding fails with: `Error: Dockerfile is missing ARG NEMOCLAW_MESSAGING_PLAN_B64; cannot apply messaging plan.`
 
+#### Dockerfile Requires `ARG NEMOCLAW_MESSAGING_PLAN_B64` for Onboarding
+NemoClaw's setup manager patches the staged Dockerfile during onboarding to inject messaging channel config. It expects:
+```dockerfile
+ARG NEMOCLAW_MESSAGING_PLAN_B64=
+ENV NEMOCLAW_MESSAGING_PLAN_B64=${NEMOCLAW_MESSAGING_PLAN_B64}
+```
+Without this declaration, onboarding fails with: `Error: Dockerfile is missing ARG NEMOCLAW_MESSAGING_PLAN_B64; cannot apply messaging plan.`
+
+The `milimo-hermes-sandbox/install-hermes.sh` `build_docker_image()` function passes this through automatically (defaults to empty if no messaging plan is configured).
+
+#### Post-Rebuild Fixes: link-cli, PyYAML, orchestrator import, test-mode default
+Live rebuild investigation of `milimo-hermes` sandbox identified 5 root-cause fixes baked into `milimo-hermes-sandbox/Dockerfile`:
+
+| Symptom | Root cause | Fix |
+|---|---|---|
+| `link-cli: command not found` | Hermes skill only installs `SKILL.md` wrapper; actual Node binary needs `npm install -g` | `RUN npm install -g @stripe/link-cli@0.8.2` in Dockerfile |
+| `ModuleNotFoundError: No module named 'yaml'` | System Python lacks PyYAML; `milimo_core.bridge_cli` imports `yaml` at top-level | `RUN /usr/bin/python3 -m pip install --break-system-packages pyyaml` for system Python |
+| `No module named 'orchestrator'` | `bridge_cli.py` imports `orchestrator.milimo_paths`; `/opt/nemoclaw-blueprint` not on sys.path | `RUN /usr/bin/python3 -c "import site; ..."` writes `/opt/nemoclaw-blueprint.pth` to system site-packages |
+| `MILIMO_SPEND_TEST_MODE` unset | Dockerfile ARG defaulted to `false`; install script didn't read user's `.env` | `ARG MILIMO_SPEND_TEST_MODE=true` (was `false`); `install-hermes.sh` exports from env |
+| `hermes skills install` hangs in CI | Interactive TTY prompt for skill confirmation | Added `--yes` flag: `hermes skills install --yes official/payments/stripe-link-cli` |
+
+**Verification** (inside rebuilt container):
+- `link-cli --version` → `0.8.2`
+- `python3 -c "import milimo_core"` → OK
+- `python3 -c "from milimo_core.bridge_cli import handle_collect_health"` → OK
+- `python3 -c "from milimo_core.finance.spend_handler import SpendApprovalHandler"` → OK
+- `.env` contains `MILIMO_SPEND_TEST_MODE=true` and `MILIMO_DAILY_SPEND_CAP_CENTS=10000`
+
+#### Two-Container Conflict: openshell + milimo-hermes
+`nemohermes onboard` creates its own plain Hermes sandbox (`openshell` container) as a side effect of the Hermes profile onboarding flow. Running `install-hermes.sh` afterwards creates a second `milimo-hermes` container. Both containers may attempt to bind ports, causing bind-failures.
+
+**How to avoid**:
+1. If a plain Hermes sandbox was created accidentally, destroy it first:
+   ```bash
+   nemohermes openshell destroy   # or: nemohermes my-assistant destroy
+   ```
+2. Then run `install-hermes.sh` (or `nemohermes onboard`) to create only `milimo-hermes`.
+
+**Port forwarding requirements** (host → sandbox):
+| Port | Purpose |
+|------|---------|
+| `18789` | NemoClaw internal gateway/proxy (mapped automatically by `nemohermes`) |
+| `18790` | Hermes web dashboard (mapped automatically by `nemohermes`) |
+| `8642` | OpenAI-compatible API (mapped automatically by `nemohermes`) |
+
+The `nemohermes` CLI handles port mapping automatically; no manual `-p` flags are needed when using `nemohermes onboard --from`.
+
+#### `NEMOCLAW_RECREATE_WITHOUT_BACKUP=1` Required for Clean Rebuilds
+When rebuilding the sandbox image, nemohermes attempts to backup sandbox state before destroying the container. If a shields-up seal is active on sandbox files, the backup fails and the build aborts.
+
+**Workaround**: Set the env var before rebuilding:
+```bash
+NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 nemohermes milimo-hermes rebuild
+```
+
+**Root cause**: The `nemohermes` backup binary cannot read files protected by the shields-up seal. This is an upstream issue in `nemohermes`; the workaround skips backup entirely.
+
 #### `pull_claw_files.sh` Is OpenClaw-Only
 The sync script `scripts/pull_claw_files.sh` expects container names matching `openshell-my-assistant` and paths under `/sandbox/.openclaw/milimo/claws/<role>/`. Neither convention exists on the Hermes profile. The script should not be used with Hermes sandboxes.
 
@@ -368,6 +425,15 @@ The sync script `scripts/pull_claw_files.sh` expects container names matching `o
 - `gateway-daemon.sh` supervises both the Hermes gateway and a socat forwarder (`0.0.0.0:8642 → 127.0.0.1:18642`) for the health probe port
 - `ENV NEMOCLAW_SANDBOX_NAME=milimo-hermes`
 - `ENV NEMOCLAW_POLICY_PRESETS=restricted,github`
+- **Post-rebuild Dockerfile additions** (2026-07-04):
+  - `ARG NEMOCLAW_MESSAGING_PLAN_B64=` + `ENV NEMOCLAW_MESSAGING_PLAN_B64=...` — required for nemohermes onboarding patch
+  - `ARG MILIMO_SPEND_TEST_MODE=true` — default to demo spend flow (was `false`)
+  - `ARG MILIMO_DAILY_SPEND_CAP_CENTS=10000` — daily spend cap in cents
+  - `ARG MILIMO_OPERATOR=` — operator name baked at build time
+  - `RUN npm install -g @stripe/link-cli@0.8.2` — `link-cli` binary available in sandbox PATH
+  - `RUN /usr/bin/python3 -m pip install --break-system-packages pyyaml` — satisfies `milimo_core.bridge_cli` top-level `import yaml` in system Python
+  - `RUN /usr/bin/python3 -c "..."` — writes `/opt/nemoclaw-blueprint.pth` to system site-packages so `orchestrator` is importable from system Python subprocesses
+  - `RUN hermes skills install --yes official/payments/stripe-link-cli` — non-interactive skill install for CI/Docker builds
 
 ### Install Script (`milimo-hermes-sandbox/install-hermes.sh`)
 - Interactive + non-interactive modes
@@ -383,6 +449,9 @@ The sync script `scripts/pull_claw_files.sh` expects container names matching `o
 - `build_onboard_command()` now called by `main()` (was dead code — `main()` used inline command without `--fresh`/`--recreate-sandbox`)
 - Post-onboarding: applies network policy presets from `milimo-blueprint/policies/presets/` via `nemohermes policy-add --from-dir`, including `nous-portal`
 - Model default: `stepfun-ai/step-3.7-flash` (set via `NEMOCLAW_MODEL` env var, passed as Docker build arg)
+- **Post-rebuild additions** (2026-07-04):
+  - Passes `MILIMO_SPEND_TEST_MODE`, `MILIMO_DAILY_SPEND_CAP_CENTS`, `MILIMO_OPERATOR` as Docker build args
+  - Exports defaults for `generate-config.ts` if not set in environment
 
 ---
 

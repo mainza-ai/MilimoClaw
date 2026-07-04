@@ -120,13 +120,14 @@ Claws can request to buy things through the Finance Claw using the Hermes `strip
 3. **Link App Approval**: The charge only completes when you tap **Approve** in the Link app. Hermes cannot self-approve at any step.
 
 ```console
-# Install the skill (Hermes sandbox)
-$ hermes skills install official/payments/stripe-link-cli
+# Install the skill (Hermes sandbox) — --yes for non-interactive/Docker builds
+$ hermes skills install --yes official/payments/stripe-link-cli
 
 # Set daily spend cap (default $100)
 $ export MILIMO_DAILY_SPEND_CAP_CENTS=10000
 
-# Trigger a spend from any claw (Finance Claw handles the approval flow)
+# Link CLI is baked into the Docker image at v0.8.2
+# Test mode is enabled by default (MILIMO_SPEND_TEST_MODE=true)
 ```
 
 #### Demo / Test Mode Spend Flow
@@ -278,11 +279,26 @@ $ # Or manually onboard using the Dockerfile
 $ nemohermes onboard --name milimo-hermes --from ./milimo-hermes-sandbox/Dockerfile
 ```
 
+**Post-onboarding manual steps** (run inside the sandbox):
+```bash
+# Login to Stripe Link CLI (required before first spend request)
+nemohermes milimo-hermes exec -- link-cli auth login
+
+# Add a test payment method at app.link.com/wallet
+# (card: 4242 4242 4242 4242, any future expiry, any CVC)
+```
+
 **Result:**
 - Web Dashboard: `http://localhost:18790/`
 - OpenAI-compatible API: `http://localhost:8642/v1`
+- War Room: `/opt/hermes/warroom/warroom.html` inside sandbox (served externally via `python3 milimo-hermes-plugin/warroom/server.py 9090`)
+- Headless: SSH tunnel `ssh -L 18790:127.0.0.1:18790 user@host` or set `CHAT_UI_URL=http://localhost:18790`
 
-> Note: Hermes dashboard uses port `18790`. Use `CHAT_UI_URL` for remote access and non-interactive CI deployments.
+> **Note**: Port `9090` is the default for the external HTMX War Room server. Port `8080` is reserved for the OpenClaw/OpenShell gateway.
+
+> **Port forwarding**: `nemohermes onboard` maps ports `18789` (internal gateway), `18790` (dashboard), and `8642` (API) automatically. No manual `-p` flags are needed.
+
+> **Two-container conflict**: `nemohermes onboard` may create a plain Hermes sandbox (`openshell` container) before `install-hermes.sh` creates `milimo-hermes`. If you see port conflicts, destroy the plain Hermes sandbox first: `nemohermes openshell destroy`.
 
 ### Day-to-Day Operations
 
@@ -300,7 +316,7 @@ $ nemohermes milimo-hermes status
 
 #### View War Room
 
-The War Room is a static HTML dashboard at `milimo-hermes-plugin/warroom/warroom.html`:
+The War Room is a static HTML dashboard at `milimo-hermes-plugin/warroom/warroom.html`. The server resolves templates from both the milimo-core venv and `/opt/nemoclaw-blueprint` for system Python subprocess compatibility:
 
 ```console
 $ python3 milimo-hermes-plugin/warroom/server.py 9090
