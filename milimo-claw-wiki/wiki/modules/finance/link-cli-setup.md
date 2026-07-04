@@ -251,28 +251,45 @@ The sandbox supports **multiple operators with isolated Link accounts**. Isolati
 
 ### Operator-Aware Spend Release
 
+`SpendApprovalHandler.handle_hold_release()` reads `MILIMO_OPERATOR` from the runtime environment and propagates it through the release flow. Each operator has an isolated Link account, isolated approval phone, and isolated spend log — no shared state.
+
+The release is **non-blocking**: `handle_hold_release` runs two quick sequential `link-cli` calls and returns immediately.
+
 ```python
-# spend_handler.py
-def handle_hold_release(self, action_id: str, operator_id: str) -> SpendRequest:
-    spend_id = action_id.replace("spend-hold-", "")
-    request = self._get_request(spend_id)
+# 1. Create without blocking on approval (returns lsrq_* ID immediately)
+create_cmd = [
+    self.link_cli_path,
+    "spend-request", "create",
+    "--merchant-name", request.merchant_name,
+    "--merchant-url", request.merchant_url,
+    "--context", request.justification,         # ≥100 chars required
+    "--amount", str(request.amount_cents),
+    "--no-request-approval",
+    "--format", "json",
+]
+if self.test_mode:
+    create_cmd += ["--test"]                  # --test ONLY valid on create
+proc_create = subprocess.run(create_cmd, capture_output=True, text=True, timeout=30)
+lsrq_id = parse_id(proc_create.stdout)
 
-    env = os.environ.copy()
-    if operator_id and operator_id not in ("system", "operator", "sandbox", ""):
-        env["XDG_CONFIG_HOME"] = f"/sandbox/.config/users/{operator_id}"
-    else:
-        env["XDG_CONFIG_HOME"] = "/sandbox/.config"
-
-    cmd = [
-        self.link_cli_path,
-        "spend-request",
-        "create",
-        ...
-        "--test",
-        "--format", "json",
-    ]
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=310, env=env)
+# 2. Fire notification (may fail without active Link app session — non-fatal)
+req_cmd = [self.link_cli_path, "spend-request", "request-approval", lsrq_id, "--format", "json"]
+proc_req = subprocess.run(req_cmd, capture_output=True, text=True, timeout=30)
+# --test is NOT valid here: passing it returns UNKNOWN flag error
 ```
+
+**`request-approval` headless behavior:**
+- With active Link app session → exits 0 immediately, notification delivered
+- Without active session (headless CI, sandbox, terminal) → blocks ~30s, exits 1 with timeout error
+- Handler treats exit 1 as `approval_pending` (not `blocked`); polling thread still starts
+- Transient failures are retried once after 5s; permanent errors (`UNKNOWN flag`, `no such command`) are not retried
+
+**Status outcomes after `handle_hold_release` returns:**
+| Status | Meaning |
+|---|---|
+| `released` | `create` succeeded, `request-approval` succeeded, polling started |
+| `approval_pending` | `create` succeeded, `request-approval` failed, polling started anyway |
+| `blocked` | `create` failed, `lsrq_*` missing, or daily cap exceeded |
 
 ### Default / System Operator Fallback
 

@@ -330,6 +330,14 @@ Stage 2 — HOLD release:
   to the user's phone, and finally starts a background polling thread.
   None of these steps blocks the War Room TUI or the inter-claw gateway.
 
+  If the user has no active Link app session (common in headless CI / sandbox
+  environments), `request-approval` may block ~30s then exit non-zero.
+  The handler treats this as `approval_pending` (not `blocked`): the polling
+  thread still starts and will pick up the final Link app decision if the user
+  approves out-of-band. Only a `create` failure or missing `lsrq_*` ID is a hard
+  block. Running `create --request-approval` directly in shell bypasses this
+  logic and fires duplicate notifications — always use `handle_hold_release`.
+
 If Stage 2 release triggers the charge without Link app confirmation: NOT A BUG
 (the Link app is the final gate — the charge only completes if the user taps approve).
 ```

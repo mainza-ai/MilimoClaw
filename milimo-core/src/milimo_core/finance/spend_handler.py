@@ -41,6 +41,7 @@ import json
 import logging
 import os
 import subprocess
+import threading
 import time
 
 logger = logging.getLogger("milimo.spend_handler")
@@ -112,6 +113,9 @@ class SpendApprovalHandler:
         self.spend_log_path = (
             spend_log_path or claw_base("finance") / "logs/agent-spend.log"
         )
+        self.queue_log_path = (
+            claw_base("finance") / "logs/agent-queue.log"
+        )
         self.link_cli_path = link_cli_path
         self.daily_spend_cap_cents = (
             daily_spend_cap_cents
@@ -120,6 +124,8 @@ class SpendApprovalHandler:
         self.test_mode = test_mode
         self._requests: dict[str, SpendRequest] = {}
         self._lsrq_index: dict[str, str] = {}  # lsrq_* -> spend_id
+        self._active_poll_threads: list[threading.Thread] = []
+        self._shutdown_event = threading.Event()
         self._recover_and_resume_polling()
 
     def _get_request(self, spend_id: str) -> SpendRequest:
@@ -716,8 +722,6 @@ class SpendApprovalHandler:
                         continue
                     try:
                         entry = json.loads(line)
-                        if entry.get("event") == "queue_state":
-                            continue
                         ts_str = entry.get("timestamp")
                         if ts_str:
                             ts = datetime.fromisoformat(ts_str)
@@ -759,8 +763,8 @@ class SpendApprovalHandler:
     def _persist_queue_state(self, request: SpendRequest, stage: str, action_id: str) -> None:
         import fcntl
 
-        self.spend_log_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.spend_log_path, "a") as f:
+        self.queue_log_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.queue_log_path, "a") as f:
             fcntl.flock(f.fileno(), fcntl.LOCK_EX)
             try:
                 f.write(
@@ -809,7 +813,7 @@ class SpendApprovalHandler:
         self.operational_log.append(entry)
 
     def _recover_and_resume_polling(self) -> None:
-        """Scan the decisions log for pending spend releases and resume polling threads."""
+        """Scan the decisions log and queue log for pending spend releases and resume polling threads."""
         if not self.decisions_path.exists():
             return
 
@@ -846,7 +850,28 @@ class SpendApprovalHandler:
                                 del pending_releases[spend_id]
         except Exception as e:
             logger.error("Failed to scan pending spend requests for recovery: %s", e)
-            return
+
+        # Also index any lsrq ids that left _lsrq_index stale after a crash
+        if self.queue_log_path.exists():
+            try:
+                with open(self.queue_log_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if not line.strip():
+                            continue
+                        entry = json.loads(line)
+                        lsrq = entry.get("link_spend_request_id")
+                        if lsrq and lsrq not in self._lsrq_index:
+                            sid = entry.get("spend_id")
+                            if sid:
+                                unindexed_lsrqs[lsrq] = sid
+                                if sid not in pending_releases:
+                                    pending_releases[sid] = {
+                                        "action_id": entry.get("action_id", ""),
+                                        "link_spend_request_id": lsrq,
+                                        "operator_id": None,
+                                    }
+            except Exception as e:
+                logger.error("Failed to scan queue log for recovery: %s", e)
 
         # Merge any unindexed lsrq ids into the in-memory index
         self._lsrq_index.update(unindexed_lsrqs)
@@ -864,12 +889,21 @@ class SpendApprovalHandler:
 
     def _start_polling_thread(self, request: SpendRequest, action_id: str, operator_id: str | None) -> None:
         """Start a background thread to poll the Link request status."""
-        import threading
         thread = threading.Thread(
             target=self._poll_spend_request,
             args=(request, action_id, operator_id),
         )
+        self._active_poll_threads.append(thread)
         thread.start()
+
+    def close(self) -> None:
+        """Signal all polling threads to stop and wait for them."""
+        self._shutdown_event.set()
+        for thread in list(self._active_poll_threads):
+            thread.join(timeout=10)
+        self._active_poll_threads = [
+            t for t in self._active_poll_threads if t.is_alive()
+        ]
 
     def _poll_spend_request(self, request: SpendRequest, action_id: str, operator_id: str | None) -> None:
         """Background thread logic to poll link-cli retrieve status."""
@@ -905,6 +939,9 @@ class SpendApprovalHandler:
         logger.info("Background polling started for spend request %s", request.spend_id)
 
         while attempts < max_attempts:
+            if self._shutdown_event.is_set():
+                terminal_status = "purchase_expired"
+                break
             attempts += 1
             try:
                 proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10, env=env)
