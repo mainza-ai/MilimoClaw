@@ -47,16 +47,6 @@ from ..milimo_paths import claw_base
 
 from .finance_init import FinanceOperationalLog, FinanceLogEntry
 
-_LINK_CLI_MIN_CONTEXT_LENGTH = 100
-
-
-def _validate_justification(request: SpendRequest) -> None:
-    if len(request.justification) < _LINK_CLI_MIN_CONTEXT_LENGTH:
-        raise ValueError(
-            f"justification must be at least {_LINK_CLI_MIN_CONTEXT_LENGTH} characters "
-            f"(got {len(request.justification)}): {request.justification[:40]!r}..."
-        )
-
 
 @dataclass
 class SpendRequest:
@@ -78,6 +68,17 @@ class SpendRequest:
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
     link_spend_request_id: str | None = None  # lsrq_... once created with link-cli
+
+
+_LINK_CLI_MIN_CONTEXT_LENGTH = 100
+
+
+def _validate_justification(request: SpendRequest) -> None:
+    if len(request.justification) < _LINK_CLI_MIN_CONTEXT_LENGTH:
+        raise ValueError(
+            f"justification must be at least {_LINK_CLI_MIN_CONTEXT_LENGTH} characters "
+            f"(got {len(request.justification)}): {request.justification[:40]!r}..."
+        )
 
 
 class SpendApprovalHandler:
