@@ -15,6 +15,7 @@ from pathlib import Path
 # so the server works outside a NemoClaw sandbox without hardcoded paths.
 # ---------------------------------------------------------------------------
 _MILIMO_CORE_PATH = os.environ.get("MILIMO_CORE_PATH")
+_MILIMO_BLUEPRINT_PATH = os.environ.get("MILIMO_BLUEPRINT_PATH")
 _HERE = Path(__file__).resolve().parent
 _REPO_ROOT = _HERE.parent.parent  # milimo-hermes-plugin/
 
@@ -26,6 +27,17 @@ _WANTED = [
 ]
 
 for _p in _WANTED:
+    if _p and os.path.isdir(_p) and _p not in sys.path:
+        sys.path.insert(0, _p)
+
+_BLUEPRINTS = [
+    _MILIMO_BLUEPRINT_PATH,
+    str(_REPO_ROOT / "milimo-blueprint"),
+    "/opt/milimo-blueprint",
+    "/sandbox/.openclaw/milimo/milimo-blueprint",
+]
+
+for _p in _BLUEPRINTS:
     if _p and os.path.isdir(_p) and _p not in sys.path:
         sys.path.insert(0, _p)
 
