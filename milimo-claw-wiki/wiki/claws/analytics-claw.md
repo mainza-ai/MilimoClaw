@@ -116,6 +116,27 @@ Log violations. Never timeout silently.
 - [[signal-dispatcher]] — Inter-claw message sending
 - [[analytics-scheduler]] — Scheduled tasks
 
+## Hermes Skill Capabilities (2026-07-04)
+
+When running under the Hermes profile, the Analytics Claw skill exposes these
+capabilities as direct methods on the instantiated skill object:
+
+| Capability | Method | Sub-Component |
+|------------|--------|---------------|
+| `process_signals` | `process_signals(message)` | `SignalProcessor.handle_performance_signal()` |
+| `detect_anomalies` | `detect_anomalies(message)` | `AnomalyDetector.check_content_signal()` |
+| `score_opportunities` | `score_opportunities(message)` | `OpportunityScorer.to_dict()` |
+| `generate_reports` | `generate_reports()` | `ReportGenerator` |
+| `query_analytics` | `query_analytics(message)` | `QueryHandler.handle()` |
+| `project_forecasts` | `project_forecasts()` | `ForwardProjector.project_all()` |
+| `manage_baselines` | `manage_baselines()` | `BaselineManager.load_content_baselines()` + `load_revenue_baseline()` |
+
+**Skill factory** (`create_analytics_claw` in `milimo-hermes-plugin/__init__.py`) now instantiates `AnalyticsClaw` with:
+- `squad_id` from `MILIMO_SQUAD_ID` env (default `"default"`)
+- `mesh_sender` via `_get_mesh_sender()` callable
+
+---
+
 ## Evolution Tools
 
 Tools that emerge autonomously over time:

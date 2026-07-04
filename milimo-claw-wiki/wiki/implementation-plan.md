@@ -409,6 +409,34 @@ The original Dockerfile attempted to extend the NousResearch upstream image dire
 - [[milimo-core-protocols]] — Extension points for third profiles
 - [[warroom-hermes]] — Standalone HTML + htmx implementation
 - [[adrs]] — All architectural decision records
+- [[hermes-skill-factory-remediation-2026-07-04]] — Skill factory + claw capability dispatch fixes
+
+---
+
+## Phase D: Hermes Skill Factory Remediation (2026-07-04, IN PROGRESS)
+
+**Triggered by**: Live Hermes chat session revealing two symptoms:
+1. `npx @stripe/link-cli auth login --timeout 300` blocks the Hermes TTY for the full timeout before surfacing the approval URL
+2. Agent reports "Finance Claw mesh is not installed" and falls back to raw `link-cli` shell commands
+
+**Root causes identified**:
+- All 6 `create_*_claw` factories in `milimo-hermes-plugin/__init__.py` crash on instantiation (`TypeError`: missing `squad_id`, unsupported `config`/`privacy_router` kwargs)
+- 0 of 45 declared capabilities exist as callable methods on any `*Claw` class
+- `MILIMO_SPEND_TEST_MODE` default drift between `tools.py` (`"true"`) and `finance_claw.py` (`"false"`)
+
+**Implemented**:
+- `milimo-hermes-plugin/milimo_hermes_plugin/__init__.py`: fixed all 6 factories, added mesh gateway/sender mocks, safe client constructors
+- `milimo-core/src/milimo_core/{build,content,ops,analytics,assistant,finance}/*_claw.py`: added 45 top-level capability dispatch methods
+- `milimo-core/src/milimo_core/finance/finance_claw.py`: unified test_mode default to `"true"`, wired `set_spend_handler()`
+- `milimo-hermes-sandbox/`: all changes mirrored
+- Full test suite verified: 1265 passed, 1 skipped
+
+**Remaining**:
+- Phase 4: `link-cli` auth UX fix (non-blocking `auth status` pre-check)
+- Phase 5: remove duplicate `stripe-link-cli` Hermes skill from Dockerfile
+- Phase 6: production test matrix for auth flow + shared handler
+
+**See**: [[hermes-skill-factory-remediation-2026-07-04]] for complete investigation report, sub-component capability map, exact code snippets, and test matrix.
 
 ---
 

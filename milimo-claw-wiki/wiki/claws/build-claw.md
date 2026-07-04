@@ -145,6 +145,28 @@ If `behavior_query_response` does not arrive within 5 minutes:
 - [[signal-dispatcher]] — Inter-claw message sending (10-min ack)
 - [[build-scheduler]] — Scheduled tasks
 
+## Hermes Skill Capabilities (2026-07-04)
+
+When running under the Hermes profile, the Build Claw skill exposes these
+capabilities as direct methods on the instantiated skill object:
+
+| Capability | Method | Sub-Component |
+|------------|--------|---------------|
+| `create_pr` | `create_pr(resolution)` | `PRManager.open_pr()` |
+| `deploy_to_vercel` | `deploy_to_vercel(deploy_id)` | `DeployManager.handle_deploy_hold_released()` |
+| `audit_dependencies` | `audit_dependencies(vulns)` | `DependencyAuditor.auto_draft_security_pr()` |
+| `monitor_errors` | `monitor_errors()` | `ErrorMonitor.run_monitoring_pass()` |
+| `monitor_costs` | `monitor_costs()` | `CostMonitor.run_daily_check()` |
+| `generate_docs` | `generate_docs(pr)` | `DocMaintainer.update_changelog()` |
+| `generate_code` | `generate_code(task_description)` | `CodeGenerator.resolve_issue()` |
+
+**Skill factory** (`create_build_claw` in `milimo-hermes-plugin/__init__.py`) now instantiates `BuildClaw` with:
+- `squad_id` from `MILIMO_SQUAD_ID` env (default `"default"`)
+- `github_client`, `sentry_client`, `vercel_client` via safe fallback constructors
+- `mesh_gateway` via `_get_mesh_gateway()` mock if Hermes runtime unavailable
+
+---
+
 ## Evolution Tools
 
 Tools that emerge autonomously over time:
