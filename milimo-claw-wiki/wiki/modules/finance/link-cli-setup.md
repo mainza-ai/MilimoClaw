@@ -7,7 +7,7 @@
 - `milimo-blueprint/policies/presets/stripe-link.yaml`
 - Hermes skill: `official/payments/stripe-link-cli`
 
-**Last updated**: 2026-07-03
+**Last updated**: 2026-07-04
 
 **Tags**: #module #finance #stripe #link-cli #oauth #setup #sandbox
 

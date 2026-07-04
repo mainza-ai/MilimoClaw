@@ -55,8 +55,8 @@ All MilimoClaw modules verified (`milimo-core`, `milimo-hermes-plugin/warroom`, 
 |----|---------|------|--------|
 | SA3-1b | Atomic filesystem lock (`O_CREAT|O_EXCL`) + stale-PID cleanup | spend_handler.py:371-399 | ✓ Fixed |
 | SA3-2b | `daily_spend_cap_cents` env-driven via `MILIMO_DAILY_SPEND_CAP_CENTS` | spend_handler.py:115-118 | ✓ Fixed |
-| SA3-3b | `_persist_queue_state()` writes queue events to `agent-spend.log` | spend_handler.py:689-715 | ✓ Fixed |
-| SA3-4 | `_get_daily_spend_aggregate()` skips `queue_state` events | spend_handler.py:648-650 | ✓ Fixed |
+| SA3-3b | `_persist_queue_state()` writes queue events to `agent-queue.log` | spend_handler.py:759-785 | ✓ Fixed |
+| SA3-4 | `_get_daily_spend_aggregate()` reads only `agent-spend.log` (no `queue_state` filter needed) | spend_handler.py:700-730 | ✓ Fixed |
 | C-1b | `_validate_justification()` enforces >=100 chars | spend_handler.py:77-82 | ✓ Fixed |
 | Issue 4 | `--test` removed from `request-approval` subcommand | spend_handler.py:540-548 | ✓ Fixed |
 | Issue 8 | `--test` removed from `retrieve` subcommand | spend_handler.py:824-831 | ✓ Fixed |
@@ -201,6 +201,46 @@ All 15 findings below are in `milimo-hermes-plugin/warroom/server.py` or `warroo
 | L-3 | Add `Cache-Control: no-store` header | server.py |
 | L-4 | Add `.error` CSS class distinct from `.empty`; use it in all 500 responses | warroom.html, server.py |
 | I-1 | Create `warroom_bridge.py` abstraction layer between `server.py` and mesh filesystem operations | milimo-hermes-plugin/warroom/ |
+
+### Phase 3: Queue log separation (COMPLETE)
+
+| ID | Action | File |
+|----|--------|------|
+| F-9 | `_persist_queue_state` now writes `queue_state` entries to `agent-queue.log` instead of `agent-spend.log` | `spend_handler.py:759-785` |
+| F-9 | `_get_daily_spend_aggregate` reads only `agent-spend.log` — no `event != queue_state` filter needed | `spend_handler.py:700-730` |
+| F-9 | `_recover_and_resume_polling` scans `agent-queue.log` for orphaned `lsrq_*` entries on startup | `spend_handler.py:811-853` |
+
+### Phase 4: Retry/backoff + operational log fsync (COMPLETE)
+
+| ID | Action | File |
+|----|--------|------|
+| F-10 | `FinanceOperationalLog.append` now calls `f.flush()` + `os.fsync()` for crash durability | `finance_init.py:217-227` |
+| F-13 | `request-approval` retried once after 5s on transient failure; permanent errors (`UNKNOWN flag`, `no such command`) are not retried | `spend_handler.py:609-636` |
+
+### Phase 5: Server port + bridge idempotency (COMPLETE)
+
+| ID | Action | File |
+|----|--------|------|
+| F-12 | War Room server argparse default port changed from `8080` to `9090` | `server.py:481` |
+| G-1 | `SpendWarRoomBridge.release_hold` checks `decisions.log` for existing `release` decision before calling `handle_hold_release` | `spend_warroom_bridge.py` |
+
+### Phase 6: Thread lifecycle + lsrq index (COMPLETE)
+
+| ID | Action | File |
+|----|--------|------|
+| F-11 | `SpendApprovalHandler.close()` signals all polling threads to stop and joins them with 10s timeout | `spend_handler.py` |
+| F-11 | `_poll_spend_request` checks `_shutdown_event.is_set()` each iteration for clean exit | `spend_handler.py:942+` |
+| F-11 | `_active_poll_threads: list[threading.Thread]` tracks live polling threads for shutdown | `spend_handler.py:123` |
+| F-14 | `_lsrq_index: dict[str, str]` added for O(1) `lsrq_*` → `spend_id` lookups; populated on every successful `create` | `spend_handler.py:122,574` |
+
+### Phase 7: Documentation audit (COMPLETE)
+
+| ID | Action | File |
+|----|--------|------|
+| D-1 | `.agents/AGENTS.md` updated — Stage 2 HOLD release section now documents `approval_pending` status and headless `request-approval` behavior | `.agents/AGENTS.md:319-335` |
+| D-2 | `README.md` demo prompt already correct — routes through `SpendApprovalHandler.handle_hold_release` | `README.md:119,163` |
+| D-3 | `link-cli-setup.md` replaced blocking code example with non-blocking two-call flow; documented `request-approval` exit codes, retry behavior, and status outcomes | `wiki/modules/finance/link-cli-setup.md` |
+| F-15 | `handle_hold_release` docstring already reflects actual non-blocking flow | `spend_handler.py:406-420` |
 
 ---
 
