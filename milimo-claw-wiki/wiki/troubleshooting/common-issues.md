@@ -400,7 +400,67 @@ After this fix, the agent can invoke the spend flow through the tool registry in
 
 **Verified live**: `tools.py` import resolves `MILIMO_SPEND_SCHEMA['name'] == 'milimo_spend'` inside the sandbox.
 
+**See also**: [[hermes-skill-factory-remediation-2026-07-04]] — systemic factory/capability gap analysis affecting all 6 claws
+
 ---
+
+### `link-cli auth login` Blocks Hermes TTY for Full Timeout
+
+**Symptom**:
+```
+npx @stripe/link-cli auth login --client-name "Hermes" --interval 5 --timeout 300
+# blocks for 300s; approval URL only appears after timeout or SIGINT
+```
+
+**Cause**: `auth login` is a polling command — it loops every `--interval` seconds for the full `--timeout` duration. The device-code URL is printed only on exit (timeout or SIGINT). Hermes invoked this as a subprocess in the agent TTY, stalling all subsequent steps for 300 seconds.
+
+**Fix**:
+1. Pre-flight check: run `link-cli auth status` before any spend-request subprocess.
+2. If unauthenticated, return structured Hermes message with the device URL. Do NOT call `auth login` in the Hermes TTY.
+3. Operator completes auth externally; agent retries `auth status` on next invocation.
+
+**Preventive**: Add `link-cli auth login` to `install-hermes.sh` as a post-onboarding step that writes the device URL to onboarding logs. Operator auths once during setup.
+
+---
+
+### All 6 Claw Skill Factories Crash on Instantiation
+
+**Symptom**: Each Hermes skill reports "mesh is not installed" when `delegate_task` tries to activate it. Hermes falls back to shell commands for every capability.
+
+**Cause**: Every `create_*_claw` factory in `milimo-hermes-plugin/__init__.py` either omits required positional args (`squad_id`), or passes kwargs not accepted by the target `__init__` (`config`, `privacy_router`). All 6 factories raise `TypeError`.
+
+```python
+# Example — broken factory
+def create_finance_claw(config=None):
+    return FinanceClaw(
+        inference_client=get_inference_client(),   # accepted
+        privacy_router=get_privacy_router(),        # TypeError: unexpected kwarg
+        config=config or {},                        # TypeError: unexpected kwarg
+    )
+    # squad_id missing — TypeError: missing required positional arg
+```
+
+**Fix**: Rewrite all 6 factories to pass only kwargs accepted by each `*Claw.__init__`, with explicit `squad_id` from env and protocol-shim fallbacks for `mesh_gateway`.
+
+**See also**: [[hermes-skill-factory-remediation-2026-07-04]] — full gap analysis, sub-component map, and phased implementation plan covering all 6 claws and 45 capabilities
+
+---
+
+### 0 of 45 Declared Capabilities Implemented as Methods on `*Claw` Classes
+
+**Symptom**: Even after fixing factories, `delegate_task` would fail because Hermes calls capabilities as methods on the instantiated skill object, and none of the 45 declared capabilities exist as methods on any `*Claw` class.
+
+**Cause**: All capabilities are implemented inside sub-components (e.g., `PRManager`, `ContentGenerator`, `SpendApprovalHandler`) accessed only via properties. The `*Claw` classes have no top-level method for any declared capability.
+
+**Fix**: Add one-line delegation methods to each `*Claw` class that forward to the corresponding sub-component property. See [[hermes-skill-factory-remediation-2026-07-04]] for exact method signatures per claw.
+
+---
+
+### `MILIMO_SPEND_TEST_MODE` Default Drift
+
+**Symptom**: Test-mode behavior is unpredictable — `tools.py` defaults to `"true"`, `finance_claw.py` defaults to `"false"`.
+
+**Fix**: Unify to `"true"` in `finance_claw.py:197` to match `tools.py:83`. Add CI test asserting both call sites read the same value.
 
 ### `nemohermes <name> recover` Fails: Stale Shields Transition Lock
 

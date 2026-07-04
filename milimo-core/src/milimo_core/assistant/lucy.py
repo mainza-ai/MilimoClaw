@@ -756,3 +756,18 @@ class LucyAssistant:
             self._emit_conversational_alert(
                 f"⚡ [Lucy Active Supervisor] SLA Self-Healing: Applied environment variable overrides for '{stalled_claw}'."
             )
+
+    def answer_questions(self, query_text: str, target_roles: list[str] = None) -> dict:
+        query_id = self.dispatch_query(query_text, target_roles)
+        return {"query_id": query_id, "status": "dispatched"}
+
+    def route_to_claw(self, target_role: str, message: str) -> dict:
+        query_id = self.dispatch_query(message, target_roles=[target_role])
+        return {"query_id": query_id, "target_role": target_role}
+
+    def handle_pending_queries(self) -> dict:
+        count = self.cleanup_expired()
+        return {"status": "processed", "cleaned": count}
+
+    def provide_status(self) -> dict:
+        return self.process_operator_message("status")

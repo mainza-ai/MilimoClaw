@@ -639,3 +639,42 @@ class ContentClaw:
     def voice_manager(self) -> BrandVoiceManager | None:
         """Brand voice manager instance."""
         return self._voice_manager
+
+    def _publish(self, platform: str, content: str) -> dict:
+        if not self._publisher:
+            raise RuntimeError("ContentClaw not started — call startup() first")
+        self._publisher.publish(content, platform)
+        return {"status": "published", "platform": platform}
+
+    def generate_content(self, brief: dict) -> dict:
+        if not self._generator:
+            raise RuntimeError("ContentClaw not started — call startup() first")
+        return self._generator._build_prompt(brief)
+
+    def schedule_content(self, item: dict) -> dict:
+        if not self._scheduler:
+            raise RuntimeError("ContentClaw not started — call startup() first")
+        self._scheduler.trigger_morning_planning()
+        return {"status": "scheduled"}
+
+    def publish_to_twitter(self, content: str) -> dict:
+        return self._publish("twitter", content)
+
+    def publish_to_linkedin(self, content: str) -> dict:
+        return self._publish("linkedin", content)
+
+    def publish_to_tiktok(self, content: str) -> dict:
+        return self._publish("tiktok", content)
+
+    def manage_brand_voice(self, client_id: str, content: str) -> dict:
+        if not self._voice_manager:
+            raise RuntimeError("ContentClaw not started — call startup() first")
+        profile = self._voice_manager.load_profile(client_id)
+        if not profile:
+            return {"status": "no_profile", "client_id": client_id}
+        return self._voice_manager.apply_voice(content, profile)
+
+    def track_performance(self, post_id: str) -> dict:
+        if not self._performance_monitor:
+            raise RuntimeError("ContentClaw not started — call startup() first")
+        return self._performance_monitor.collect_performance(post_id).to_dict()

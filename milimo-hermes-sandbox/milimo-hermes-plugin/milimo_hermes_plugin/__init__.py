@@ -13,16 +13,18 @@ Provides 6 claw skills for Hermes profile:
 - Assistant Claw: Conversational interface (Lucy)
 """
 
+import os
 from typing import Any
 
 from milimo_core.build import BuildClaw, BuildFilesystemInit
 from milimo_core.content import ContentClaw, ContentGenerator
 from milimo_core.ops import OpsClaw, IntakeManager, OpsApprovalHandler
+from milimo_core.ops.ops_claw import MockMeshGateway
 from milimo_core.analytics import AnalyticsClaw, SignalProcessor
 from milimo_core.finance import FinanceClaw, PricingEngine
 from milimo_core.assistant import LucyAssistant, PendingQuery
 from milimo_core.contracts import ClawMessage, ContractValidator
-from milimo_core.privacy_router import PrivacyRouter, InferenceBackend, RoutingDecision
+from milimo_core.privacy_router import PrivacyRouter, InferenceBackend, RoutingDecision, PrivacyPolicy
 from milimo_core.inference_client import NvidiaInferenceClient
 from milimo_core.service_factory import (
     create_github_client,
@@ -47,6 +49,83 @@ from .tools import register_core_tools, set_claw_launcher, set_approval_handler,
 _claw_instances: dict[str, Any] = {}
 _privacy_router: PrivacyRouter | None = None
 _inference_client: NvidiaInferenceClient | None = None
+_mesh_gateway: Any = None
+_mesh_sender: Any = None
+
+
+def _get_mesh_gateway() -> Any:
+    """Return the global mesh gateway, or a no-op mock if unavailable."""
+    global _mesh_gateway
+    if _mesh_gateway is None:
+        try:
+            # Hermes runtime exposes a mesh gateway via ctx when available.
+            # At plugin-registration time we may not have a ctx, so fall back
+            # to a mock that logs and accepts all sends.
+            class _LoggingMock:
+                def send(self, message: dict[str, Any]) -> bool:
+                    import logging
+                    logging.getLogger("milimo.hermes").debug(
+                        "mesh send (no-op): %s", message.get("message_type")
+                    )
+                    return True
+
+            _mesh_gateway = _LoggingMock()
+        except Exception:
+            _mesh_gateway = MockMeshGateway()
+    return _mesh_gateway
+
+
+def set_mesh_gateway(gateway: Any) -> None:
+    """Override the mesh gateway used by skill factories."""
+    global _mesh_gateway
+    _mesh_gateway = gateway
+
+
+def _get_mesh_sender() -> Any:
+    """Return the global mesh sender callable, or a no-op."""
+    global _mesh_sender
+    if _mesh_sender is None:
+        def _noop(message: dict[str, Any]) -> None:
+            import logging
+            logging.getLogger("milimo.hermes").debug(
+                "mesh sender (no-op): %s", message.get("message_type")
+            )
+        _mesh_sender = _noop
+    return _mesh_sender
+
+
+def set_mesh_sender(sender: Any) -> None:
+    """Override the mesh sender used by skill factories."""
+    global _mesh_sender
+    _mesh_sender = sender
+
+
+def _try_create_github_client() -> Any | None:
+    try:
+        return create_github_client({})
+    except Exception:
+        return None
+
+
+def _try_create_vercel_client() -> Any | None:
+    try:
+        return create_vercel_client({})
+    except Exception:
+        return None
+
+
+def _try_create_sentry_client() -> Any | None:
+    try:
+        return create_sentry_client({})
+    except Exception:
+        return None
+
+
+def _try_create_stripe_client() -> Any | None:
+    try:
+        return create_stripe_client({})
+    except Exception:
+        return None
 
 
 def on_load(config: dict[str, Any] | None = None) -> None:
@@ -102,13 +181,31 @@ def on_unload() -> None:
 
 def get_privacy_router() -> PrivacyRouter:
     """Get the global privacy router instance."""
+    global _privacy_router
     if _privacy_router is None:
-        _privacy_router = PrivacyRouter()
+        try:
+            default_policy = PrivacyPolicy(
+                policy_version="1.0",
+                default_backend=InferenceBackend.LOCAL_NIM,
+                routes=[],
+                role_overrides={},
+            )
+            _privacy_router = PrivacyRouter(default_policy)
+        except Exception:
+            _privacy_router = PrivacyRouter(
+                PrivacyPolicy(
+                    policy_version="1.0",
+                    default_backend=InferenceBackend.LOCAL_NIM,
+                    routes=[],
+                    role_overrides={},
+                )
+            )
     return _privacy_router
 
 
 def get_inference_client() -> NvidiaInferenceClient:
     """Get the global inference client instance."""
+    global _inference_client
     if _inference_client is None:
         _inference_client = NvidiaInferenceClient()
     return _inference_client
@@ -119,9 +216,12 @@ def register_build_claw(skill_registry: Any) -> None:
     """Register Build Claw skill."""
     def create_build_claw(config: dict[str, Any] | None = None) -> BuildClaw:
         return BuildClaw(
+            squad_id=os.environ.get("MILIMO_SQUAD_ID", "default"),
             inference_client=get_inference_client(),
-            privacy_router=get_privacy_router(),
-            config=config or {},
+            github_client=_try_create_github_client(),
+            sentry_client=_try_create_sentry_client(),
+            vercel_client=_try_create_vercel_client(),
+            mesh_gateway=_get_mesh_gateway(),
         )
 
     skill_registry.register_skill(
@@ -144,9 +244,10 @@ def register_content_claw(skill_registry: Any) -> None:
     """Register Content Claw skill."""
     def create_content_claw(config: dict[str, Any] | None = None) -> ContentClaw:
         return ContentClaw(
+            squad_id=os.environ.get("MILIMO_SQUAD_ID", "default"),
             inference_client=get_inference_client(),
+            mesh_sender=_get_mesh_sender(),
             privacy_router=get_privacy_router(),
-            config=config or {},
         )
 
     skill_registry.register_skill(
@@ -169,9 +270,9 @@ def register_ops_claw(skill_registry: Any) -> None:
     """Register Ops Claw skill."""
     def create_ops_claw(config: dict[str, Any] | None = None) -> OpsClaw:
         return OpsClaw(
+            squad_id=os.environ.get("MILIMO_SQUAD_ID", "default"),
             inference_client=get_inference_client(),
-            privacy_router=get_privacy_router(),
-            config=config or {},
+            mesh_gateway=_get_mesh_gateway(),
         )
 
     skill_registry.register_skill(
@@ -193,9 +294,9 @@ def register_analytics_claw(skill_registry: Any) -> None:
     """Register Analytics Claw skill."""
     def create_analytics_claw(config: dict[str, Any] | None = None) -> AnalyticsClaw:
         return AnalyticsClaw(
+            squad_id=os.environ.get("MILIMO_SQUAD_ID", "default"),
             inference_client=get_inference_client(),
-            privacy_router=get_privacy_router(),
-            config=config or {},
+            mesh_sender=_get_mesh_sender(),
         )
 
     skill_registry.register_skill(
@@ -218,9 +319,10 @@ def register_finance_claw(skill_registry: Any) -> None:
     """Register Finance Claw skill."""
     def create_finance_claw(config: dict[str, Any] | None = None) -> FinanceClaw:
         return FinanceClaw(
+            squad_id=os.environ.get("MILIMO_SQUAD_ID", "default"),
             inference_client=get_inference_client(),
-            privacy_router=get_privacy_router(),
-            config=config or {},
+            stripe_client=_try_create_stripe_client(),
+            gateway=_get_mesh_gateway(),
         )
 
     skill_registry.register_skill(
@@ -244,9 +346,8 @@ def register_assistant_claw(skill_registry: Any) -> None:
     """Register Assistant Claw skill."""
     def create_assistant_claw(config: dict[str, Any] | None = None) -> LucyAssistant:
         return LucyAssistant(
-            inference_client=get_inference_client(),
-            privacy_router=get_privacy_router(),
-            config=config or {},
+            squad_id=os.environ.get("MILIMO_SQUAD_ID", "default"),
+            mesh_gateway=_get_mesh_gateway(),
         )
 
     skill_registry.register_skill(

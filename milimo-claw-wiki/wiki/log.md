@@ -1635,3 +1635,42 @@ Each entry follows this format:
 - Updated `install-hermes.sh:build_docker_image()` to pass `NEMOCLAW_MESSAGING_PLAN_B64` via `--build-arg`
 - Added default export for `NEMOCLAW_MESSAGING_PLAN_B64` in `main()` (defaults to empty if unset)
 - Rebuilt sandbox image as `milimo-hermes-sandbox:latest` (2026-07-04 01:15 CDT)
+
+---
+
+### 2026-07-04 — Live Session Investigation: Skill Factories + Auth Block + Capability Gaps
+
+**Commits**: pending implementation.
+
+**Pages**: `wiki/development/hermes-skill-factory-remediation-2026-07-04`, `wiki/troubleshooting/common-issues.md`, `wiki/index.md`
+
+**Source**: Live Hermes chat session (2026-07-04) — two observable failures:
+1. `npx @stripe/link-cli auth login --timeout 300` blocked the Hermes TTY for 300s before surfacing the approval URL
+2. Agent reported "Finance Claw mesh is not installed" and fell back to raw `link-cli` shell commands
+
+**Changes**:
+- Created `wiki/development/hermes-skill-factory-remediation-2026-07-04.md` with:
+  - Complete investigation report: root causes for auth block and "mesh not installed"
+  - Sub-component capability map for all 45 declared capabilities across 6 claws
+  - Phased implementation plan (6 phases) with exact file paths and line references
+  - Exact code snippets for all 6 broken factory fixes and all 45 capability dispatch methods
+  - Shared `SpendApprovalHandler` wiring plan
+  - Production test matrix
+- `wiki/troubleshooting/common-issues.md`:
+  - Added `link-cli auth login` Blocks Hermes TTY entry with cause + fix
+  - Added All 6 Claw Skill Factories Crash on Instantiation entry with cause + fix
+  - Added 0 of 45 Declared Capabilities Implemented entry with cause + fix
+  - Added `MILIMO_SPEND_TEST_MODE` Default Drift entry
+  - Updated sudo-prompt entry with cross-reference to new remediation page
+- `wiki/index.md`: added `hermes-skill-factory-remediation-2026-07-04` to Development section
+
+**Investigation findings**:
+- ALL 6 `create_*_claw` factories in `milimo-hermes-plugin/__init__.py` are broken:
+  - All omit required `squad_id` positional arg
+  - All pass `privacy_router`/`config` kwargs not accepted by target `__init__`
+  - All raise `TypeError` on instantiation
+- 0 of 45 declared capabilities exist as callable methods on any `*Claw` class
+- `link-cli auth login --timeout 300` is a polling command that blocks TTY for full timeout; approval URL only appears on timeout/SIGINT
+- `MILIMO_SPEND_TEST_MODE` defaults: `"true"` in `tools.py:83`, `"false"` in `finance_claw.py:197`
+
+**Resumes from**: Phase 1 — fix all 6 skill factories in `milimo-hermes-plugin/__init__.py`
