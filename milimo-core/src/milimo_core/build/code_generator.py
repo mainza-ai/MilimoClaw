@@ -239,6 +239,7 @@ Provide the implementation with file paths and content."""
         """Run tests and return (status, passing, failing)."""
         import subprocess
         import os
+        from milimo_core.containment import get_contained_command
 
         # Sanitize environment variables to prevent test code accessing credentials/secrets
         clean_env = {}
@@ -248,18 +249,22 @@ Provide the implementation with file paths and content."""
         # Set a mocked/empty HOME to prevent reading user configurations
         clean_env["HOME"] = str(self._repo_path)
 
+        json_path = Path(self._repo_path) / "test_results.json"
+
         # Try running pytest in the repo directory
         try:
+            base_pytest_args = [
+                "python",
+                "-m",
+                "pytest",
+                "--tb=short",
+                "-q",
+                "--json",
+                f"--json-file={json_path}",
+            ]
+            cmd = get_contained_command(base_pytest_args, self._repo_path, clean_env)
             result = subprocess.run(
-                [
-                    "python",
-                    "-m",
-                    "pytest",
-                    "--tb=short",
-                    "-q",
-                    "--json",
-                    "--json-file=/tmp/test_results.json",
-                ],
+                cmd,
                 cwd=str(self._repo_path),
                 capture_output=True,
                 text=True,
@@ -272,9 +277,12 @@ Provide the implementation with file paths and content."""
                 try:
                     import json
 
-                    json_path = Path("/tmp/test_results.json")
                     if json_path.exists():
                         data = json.loads(json_path.read_text())
+                        try:
+                            json_path.unlink(missing_ok=True)
+                        except Exception:
+                            pass
                         summary = data.get("summary", {})
                         passing = summary.get("passed", 0)
                         failing = summary.get("failed", 0)
@@ -288,6 +296,11 @@ Provide the implementation with file paths and content."""
                 for line in result.stdout.split("\n") + result.stderr.split("\n"):
                     if "FAILED" in line or "ERROR" in line:
                         failing += 1
+                try:
+                    if json_path.exists():
+                        json_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
                 if failing == 0:
                     return ("skipped", 0, 0)
                 return ("failing", 0, failing)
@@ -295,8 +308,10 @@ Provide the implementation with file paths and content."""
         except FileNotFoundError:
             # pytest not installed — try running tests with unittest
             try:
+                base_unittest_args = ["python", "-m", "unittest", "discover", "-s", "test"]
+                cmd = get_contained_command(base_unittest_args, self._repo_path, clean_env)
                 result = subprocess.run(
-                    ["python", "-m", "unittest", "discover", "-s", "test"],
+                    cmd,
                     cwd=str(self._repo_path),
                     capture_output=True,
                     text=True,
@@ -313,6 +328,11 @@ Provide the implementation with file paths and content."""
 
         except subprocess.TimeoutExpired:
             logger.warning("Test execution timed out after 300 seconds")
+            try:
+                if json_path.exists():
+                    json_path.unlink(missing_ok=True)
+            except Exception:
+                pass
             return ("timeout", 0, 0)
 
         except Exception as e:

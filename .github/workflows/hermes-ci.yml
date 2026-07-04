@@ -65,6 +65,10 @@ jobs:
           pip install -e milimo-blueprint
           cd milimo-blueprint && PYTHONPATH=/home/runner/work/MilimoClaw/MilimoClaw/milimo-core/src:/home/runner/work/MilimoClaw/MilimoClaw/milimo-blueprint/orchestrator python -m pytest tests/ -v -k "not test_is_quarter_start"
 
+      - name: Run mirror drift check
+        run: |
+          python3 scripts/check-drift.py
+
   hermes-smoke:
     name: Hermes Smoke Test (Docker)
     runs-on: ubuntu-latest
