@@ -47,6 +47,16 @@ from ..milimo_paths import claw_base
 
 from .finance_init import FinanceOperationalLog, FinanceLogEntry
 
+_LINK_CLI_MIN_CONTEXT_LENGTH = 100
+
+
+def _validate_justification(request: SpendRequest) -> None:
+    if len(request.justification) < _LINK_CLI_MIN_CONTEXT_LENGTH:
+        raise ValueError(
+            f"justification must be at least {_LINK_CLI_MIN_CONTEXT_LENGTH} characters "
+            f"(got {len(request.justification)}): {request.justification[:40]!r}..."
+        )
+
 
 @dataclass
 class SpendRequest:
@@ -258,6 +268,7 @@ class SpendApprovalHandler:
         request = self._get_request(spend_id)
         request.amount_cents = amount_cents
         request.justification = justification
+        _validate_justification(request)
 
         self._log_decision(
             {
@@ -342,6 +353,7 @@ class SpendApprovalHandler:
         """
         spend_id = action_id.replace("spend-hold-", "")
         request = self._get_request(spend_id)
+        _validate_justification(request)
 
         import os
         import json
@@ -525,9 +537,6 @@ class SpendApprovalHandler:
                 "--format",
                 "json",
             ]
-            if self.test_mode:
-                cmd_req += ["--test"]
-
             proc_req = subprocess.run(cmd_req, capture_output=True, text=True, timeout=30, env=env)
 
             if proc_req.returncode != 0:
