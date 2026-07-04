@@ -42,7 +42,7 @@ RUN /usr/bin/python3 -c "import os, site; [open(os.path.join(d, 'milimo-core.pth
 # Copy the Hermes plugin
 COPY milimo-hermes-plugin/ /opt/milimo-hermes-plugin/
 RUN chmod -R a+rX,go-w /opt/milimo-hermes-plugin/
-RUN uv pip install --no-cache-dir -r /opt/milimo-hermes-plugin/requirements.txt \
+RUN uv pip install --no-cache-dir --no-deps -r /opt/milimo-hermes-plugin/requirements.txt \
     && uv pip install --no-cache-dir --no-deps -e /opt/milimo-hermes-plugin/
 
 # Install plugin into Hermes plugin directory (standard Hermes location)
