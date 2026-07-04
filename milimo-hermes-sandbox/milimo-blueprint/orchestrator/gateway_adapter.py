@@ -450,7 +450,7 @@ class WebSocketGateway(GatewayAdapter):
             return False
 
         try:
-            self._ws = websocket.WebSocketApp(
+            self._ws = websocket.WebSocketApp(  # type: ignore
                 ws_url,
                 on_open=self._on_open,
                 on_message=self._on_message,
