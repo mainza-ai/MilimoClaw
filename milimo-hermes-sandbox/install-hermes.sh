@@ -658,13 +658,25 @@ main() {
     echo ""
 
     # Apply network policy presets from the blueprint's presets/ directory.
-    # The nemohermes CLI supports --from-dir to load custom preset YAML files
-    # (OpenShell policy preset format: preset.name + network_policies.*).
+    # The nemohermes CLI supports --from-file and --from-dir to load custom
+    # preset YAML files (OpenShell policy preset format: preset.name + network_policies.*).
+    # Apply each preset individually so one failure doesn't abort the whole batch.
     local preset_dir="$sandbox_dir/milimo-blueprint/policies/presets"
     if [[ -d "$preset_dir" ]]; then
       log_info "Applying network policy presets from $preset_dir..."
-      if nemohermes "$SANDBOX_NAME" policy-add --from-dir "$preset_dir" --yes 2>&1; then
-        log_success "Network policy presets applied!"
+      local preset_failed=0
+      for preset_file in "$preset_dir"/*.yaml; do
+        [[ -f "$preset_file" ]] || continue
+        local preset_name
+        preset_name=$(basename "$preset_file" .yaml)
+        log_info "Applying preset: $preset_name"
+        if ! nemohermes "$SANDBOX_NAME" policy-add --from-file "$preset_file" --yes 2>&1; then
+          log_warn "Preset $preset_name did not apply (collision or invalid). Check 'nemohermes $SANDBOX_NAME policy-list'."
+          preset_failed=1
+        fi
+      done
+      if [[ "$preset_failed" -eq 0 ]]; then
+        log_success "All network policy presets applied!"
       else
         log_warn "Some presets may not have applied. Check 'nemohermes $SANDBOX_NAME policy-list'."
       fi

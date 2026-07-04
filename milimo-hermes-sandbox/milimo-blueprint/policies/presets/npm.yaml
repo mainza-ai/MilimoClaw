@@ -8,8 +8,8 @@
 # registry egress and whitelists node/npm binaries.
 
 preset:
-  name: npm
-  description: "npm registry access for runtime dependency installs"
+  name: milimo-npm
+  description: "npm and Yarn registry access for Milimo runtime dependency installs"
 
 network_policies:
   npm_registry:
