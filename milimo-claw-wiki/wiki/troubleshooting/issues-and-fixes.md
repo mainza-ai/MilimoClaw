@@ -238,6 +238,9 @@ The onboarding or recovery check of the `milimo-hermes` sandbox fails with `Secr
 
 Safelisted `OPENSHELL_SANDBOX_TOKEN_FILE` in `RUNTIME_ALLOWED_NONSECRET_KEYS` within [validate-env-secret-boundary.py](file:///Users/mck/Desktop/MilimoClaw/milimo-hermes-sandbox/scripts/validate-env-secret-boundary.py). Re-computed the cryptographic hash [NEMOCLAW_HERMES_VALIDATOR_SHA256](file:///Users/mck/Desktop/MilimoClaw/milimo-hermes-sandbox/Dockerfile#L337) and updated it in the `Dockerfile`.
 
+> [!IMPORTANT]
+> If manually patching the running container using `docker cp` instead of rebuilding, the file will preserve the host developer's UID. The NemoClaw supervisor requires all validator/helper scripts to be owned by `root:root` with permissions `755`. Run `docker exec <container> chown root:root /usr/local/lib/nemoclaw/validate-hermes-env-secret-boundary.py` to restore trust boundary compliance.
+
 ---
 
 ## Issue 14: War Room HTTP Static Path Resolution Bug (MEDIUM)
