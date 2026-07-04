@@ -187,7 +187,7 @@ class SandboxRunner:
         # Run in subprocess with resource limits and clean environment
         try:
             import os
-            import shutil
+            from milimo_core.containment import get_contained_command
             clean_env = {}
             for k in ["PATH", "LANG", "LC_ALL", "PYTHONIOENCODING", "PYTHONPATH"]:
                 if k in os.environ:
@@ -196,62 +196,9 @@ class SandboxRunner:
             parent_dir = str(Path(data_file).parent)
             clean_env["HOME"] = parent_dir
 
-            # Build command list based on containment availability
-            bwrap_path = shutil.which("bwrap")
-            docker_path = shutil.which("docker")
-
-            # Check if docker daemon is responsive
-            is_docker_active = False
-            if docker_path:
-                try:
-                    proc_check = subprocess.run(
-                        [docker_path, "ps"],
-                        capture_output=True,
-                        timeout=2,
-                        env=clean_env,
-                    )
-                    if proc_check.returncode == 0:
-                        is_docker_active = True
-                except Exception:
-                    pass
-
-            if bwrap_path:
-                cmd = [
-                    bwrap_path,
-                    "--unshare-all",
-                    "--proc", "/proc",
-                    "--dev", "/dev",
-                ]
-                # Bind-mount system binaries/libraries for python execution
-                for p in ["/usr", "/lib", "/lib64", "/bin", "/sbin", "/etc"]:
-                    if os.path.exists(p):
-                        cmd += ["--ro-bind", p, p]
-                # Bind-mount the temp directory for the data files
-                cmd += [
-                    "--bind", parent_dir, parent_dir,
-                    "--chdir", parent_dir,
-                    sys.executable,
-                    "-c",
-                    sandbox_script,
-                ]
-                logger.info("Executing tool backtest under bubblewrap sandbox")
-            elif is_docker_active and docker_path:
-                cmd = [
-                    docker_path,
-                    "run",
-                    "--rm",
-                    "--net=none",
-                    "-v", f"{parent_dir}:{parent_dir}",
-                    "-w", parent_dir,
-                    "python:3.11-slim",
-                    "python3",
-                    "-c",
-                    sandbox_script,
-                ]
-                logger.info("Executing tool backtest under Docker sandbox")
-            else:
-                cmd = [sys.executable, "-c", sandbox_script]
-                logger.warning("No bwrap or docker found; falling back to host subprocess execution")
+            # Build command using containment helper
+            base_cmd = [sys.executable, "-c", sandbox_script]
+            cmd = get_contained_command(base_cmd, parent_dir, clean_env)
 
             result = subprocess.run(
                 cmd,

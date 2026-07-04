@@ -1009,6 +1009,30 @@ class TestCodeGenerator:
             repo_path=repo_path,
         )
 
+    def test_run_tests_containment_routing(self, code_generator) -> None:
+        """Verify that CodeGenerator.run_tests routes command through containment utility."""
+        from unittest.mock import patch, MagicMock
+
+        # Mock subprocess.run to verify the command arguments passed to it
+        with (
+            patch("subprocess.run") as mock_run,
+            patch("shutil.which", return_value="/usr/bin/bwrap"),
+            patch("os.path.exists", return_value=True),
+        ):
+            mock_res = MagicMock()
+            mock_res.returncode = 0
+            mock_run.return_value = mock_res
+
+            # We trigger run_tests()
+            code_generator.run_tests()
+
+            # Assert subprocess.run was called
+            assert mock_run.called
+            args = mock_run.call_args[0][0]
+            # First element should be bwrap since bwrap_path is returned by which
+            assert args[0] == "/usr/bin/bwrap"
+            assert "--unshare-all" in args
+
     def test_resolve_issue_returns_ready_for_pr_on_passing_tests(
         self, code_generator, tmp_path
     ):

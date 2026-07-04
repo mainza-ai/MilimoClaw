@@ -30,6 +30,7 @@ build/
 # Keep plugin dist (compiled TypeScript)
 !milimo/dist/
 !milimo-blueprint/orchestrator/build/
+!milimo-hermes-sandbox/milimo-blueprint/orchestrator/build/
 # Keep milimo_core.build package (not a build artifact)
 !milimo-core/src/milimo_core/build/
 !milimo-hermes-sandbox/milimo-core/src/milimo_core/build/
