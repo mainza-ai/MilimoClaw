@@ -5,7 +5,6 @@
 Tests for containment.py - Process Containment Sandboxing
 """
 
-import sys
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
@@ -23,8 +22,10 @@ def test_get_contained_command_bwrap_available() -> None:
             return "/usr/bin/bwrap"
         return None
 
-    with patch("shutil.which", side_effect=mock_which), \
-         patch("os.path.exists", return_value=True):
+    with (
+        patch("shutil.which", side_effect=mock_which),
+        patch("os.path.exists", return_value=True),
+    ):
         cmd = get_contained_command(base_args, work_dir, clean_env)
 
         assert cmd[0] == "/usr/bin/bwrap"
@@ -47,8 +48,10 @@ def test_get_contained_command_docker_available_and_active() -> None:
             return "/usr/bin/docker"
         return None
 
-    with patch("shutil.which", side_effect=mock_which), \
-         patch("subprocess.run") as mock_run:
+    with (
+        patch("shutil.which", side_effect=mock_which),
+        patch("subprocess.run") as mock_run,
+    ):
         # Mock active docker daemon check
         mock_res = MagicMock()
         mock_res.returncode = 0
@@ -76,8 +79,10 @@ def test_get_contained_command_docker_available_but_inactive_falls_back() -> Non
             return "/usr/bin/docker"
         return None
 
-    with patch("shutil.which", side_effect=mock_which), \
-         patch("subprocess.run") as mock_run:
+    with (
+        patch("shutil.which", side_effect=mock_which),
+        patch("subprocess.run") as mock_run,
+    ):
         # Mock inactive/failed docker daemon check
         mock_res = MagicMock()
         mock_res.returncode = 1
