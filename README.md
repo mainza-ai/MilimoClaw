@@ -323,7 +323,20 @@ nemohermes onboard \
 
 **Root cause**: The static auth token baked at build time expires. `gateway restart` and `recover` restart the gateway *process* but cannot rotate a static baked token. This will recur periodically until NemoClaw supports automatic token rotation for baked tokens.
 
-**See also**: [[common-issues]] — `relay open timed out` entry
+### Agent-Initiated Spend (Stripe Link CLI) —missing tool wiring fix
+
+**Symptom**: Inside Hermes chat, agent ends with `I’m blocked on step 4: the specific Finance Claw micro-layer (SpendApprovalHandler / SpendWarRoomBridge) is not exposed in this sandbox`, and a `sudo` password prompt appears.
+
+**Root cause**: `milimo-hermes-plugin/milimo_hermes_plugin/tools.py` did not expose the Finance Claw spend flow. `register_core_tools()` registered only `milimo_status`, `milimo_warroom`, `milimo_approve`, `milimo_veto`, `delegate_task`. The capability string `request_agent_spend` was declared, but there was no `MILIMO_SPEND_SCHEMA` / `handle_milimo_spend` to invoke `SpendApprovalHandler`.
+
+When tool discovery failed, the agent fell back to shell filesystem inspection, hit root-owned paths under `/opt/milimo-core/src/`, and Hermes auto-escalated to `sudo`. In non-interactive chat that prompt cannot be answered, so it timed out.
+
+**Fixed**: Added `milimo_spend` tool to `tools.py`:
+- `MILIMO_SPEND_SCHEMA` with actions: `queue_review`, `approve_review`, `block_review`, `release_hold`, `cancel_hold`, `status`
+- `handle_milimo_spend()` routing to `SpendApprovalHandler`
+- Registration in `register_core_tools()`
+
+**See also**: [[common-issues]] — Hermes sudo-prompt / missing spend tool entry
 
 ### Day-to-Day Operations
 

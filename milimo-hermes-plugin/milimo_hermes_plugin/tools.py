@@ -9,16 +9,19 @@ Registers the following tools:
 - milimo_warroom: War Room dashboard - HOLD queue, claw status, cost guard
 - milimo_approve: Approve a pending item in HOLD queue
 - milimo_veto: Veto/reject a pending item in HOLD queue
+- milimo_spend: Finance Claw agent-initiated spend flow (Stage 1 REVIEW + Stage 2 HOLD)
 - delegate_task: Native Hermes delegation (wraps native capability)
 """
 
-from typing import Any
+from typing import Any, Optional
 
 from milimo_core.protocols.delegation import ClawTask, ClawResult
 from milimo_core.ops.approval_handler import OpsApprovalHandler, OpsApprovalAction
 from milimo_core.cost_guard import get_cost_guard
 from milimo_core.milimo_paths import CLAWS_DIR
 from milimo_core import WarRoomNotifier, get_warroom_notifier, init_warroom_notifier, NotificationPayload
+from milimo_core.finance.spend_handler import SpendApprovalHandler, SpendRequest
+from milimo_core.finance.finance_init import FinanceOperationalLog
 
 
 # Global references initialized by plugin
@@ -26,6 +29,7 @@ _claw_launcher = None
 _approval_handler: OpsApprovalHandler | None = None
 _cost_guard = None
 _warroom_notifier = None
+_spend_handler: SpendApprovalHandler | None = None
 
 
 def set_claw_launcher(launcher: Any) -> None:
@@ -53,6 +57,33 @@ def set_warroom_notifier(notifier: WarRoomNotifier | None = None) -> None:
         _warroom_notifier = notifier
     else:
         _warroom_notifier = init_warroom_notifier()
+
+
+def set_spend_handler(handler: SpendApprovalHandler | None = None) -> None:
+    """Set or initialize the Finance Claw spend handler."""
+    global _spend_handler
+    _spend_handler = handler
+
+
+def _get_spend_handler() -> SpendApprovalHandler:
+    """Lazy-init the spend handler from env/defaults."""
+    global _spend_handler
+    if _spend_handler is None:
+        import os as _os
+        operational_log = FinanceOperationalLog(
+            CLAWS_DIR / "finance" / "logs" / "operational.log"
+        )
+        _spend_handler = SpendApprovalHandler(
+            operational_log=operational_log,
+            decisions_path=CLAWS_DIR / "finance" / "logs" / "decisions.log",
+            spend_log_path=CLAWS_DIR / "finance" / "logs" / "agent-spend.log",
+            daily_spend_cap_cents=int(
+                _os.environ.get("MILIMO_DAILY_SPEND_CAP_CENTS", "10000")
+            ),
+            test_mode=_os.environ.get("MILIMO_SPEND_TEST_MODE", "true").lower()
+            == "true",
+        )
+    return _spend_handler
 
 
 # Tool schemas using shared types from milimo-core
@@ -126,6 +157,38 @@ MILIMO_VETO_SCHEMA = {
             "reason": {"type": "string", "description": "Veto reason"}
         },
         "required": ["item_id", "reason"]
+    }
+}
+
+MILIMO_SPEND_SCHEMA = {
+    "name": "milimo_spend",
+    "description": "Finance Claw agent-initiated spend flow via stripe-link-cli. Two-stage gate: Stage 1 REVIEW (is this purchase approved?), Stage 2 HOLD (ready to charge — creates Link spend request and pings user's phone).",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "action": {
+                "type": "string",
+                "enum": [
+                    "queue_review",
+                    "approve_review",
+                    "block_review",
+                    "release_hold",
+                    "cancel_hold",
+                    "status",
+                ],
+                "description": "Spend flow action to perform"
+            },
+            "spend_id": {"type": "string", "description": "Spend request ID to operate on (required for all actions except queue_review)"},
+            "claw": {"type": "string", "enum": ["build", "content", "ops", "analytics", "finance", "assistant"], "description": "Requesting claw (required for queue_review)"},
+            "merchant_name": {"type": "string", "description": "Merchant display name (required for queue_review)"},
+            "merchant_url": {"type": "string", "description": "Merchant URL (required for queue_review)"},
+            "amount_cents": {"type": "integer", "description": "Amount in cents (required for queue_review)"},
+            "justification": {"type": "string", "description": "Justification text — must be at least 100 characters (required for queue_review)"},
+            "payment_method_id": {"type": "string", "description": "Stripe Link payment method ID (required for queue_review)"},
+            "credential_type": {"type": "string", "enum": ["card", "shared_payment_token"], "default": "card", "description": "Payment credential type (required for queue_review)"},
+            "reason": {"type": "string", "description": "Reason for block/cancel actions"}
+        },
+        "required": ["action"]
     }
 }
 
@@ -340,6 +403,186 @@ async def handle_milimo_veto(ctx: Any, item_id: str, reason: str) -> dict:
     }
 
 
+def _auto_spend_id(prefix: str = "spend") -> str:
+    """Generate a short unique spend request ID."""
+    import uuid
+    return f"{prefix}-{uuid.uuid4().hex[:8]}"
+
+
+async def handle_milimo_spend(ctx: Any, action: str, spend_id: Optional[str] = None,
+                               claw: Optional[str] = None,
+                               merchant_name: Optional[str] = None,
+                               merchant_url: Optional[str] = None,
+                               amount_cents: Optional[int] = None,
+                               justification: Optional[str] = None,
+                               payment_method_id: Optional[str] = None,
+                               credential_type: str = "card",
+                               reason: Optional[str] = None) -> dict:
+    """
+    Finance Claw spend flow via stripe-link-cli.
+
+    Stage 1 — REVIEW:
+      queue_review   → add spend request to REVIEW queue
+      approve_review → move REVIEW → HOLD (does NOT spend yet)
+      block_review   → block/deny in REVIEW (purchase never happens)
+
+    Stage 2 — HOLD:
+      release_hold   → create Link spend-request, fire phone notification,
+                       start background polling for final app approval
+      cancel_hold    → cancel/release HOLD without spending
+      status         → query spend request state by spend_id
+    """
+    handler = _get_spend_handler()
+
+    if action == "queue_review":
+        missing = [f for f in ("claw", "merchant_name", "merchant_url", "amount_cents",
+                               "justification", "payment_method_id") if not locals().get(f)]
+        if missing:
+            return {"error": f"Missing required fields for queue_review: {', '.join(missing)}"}
+
+        if len(justification or "") < 100:
+            return {"error": "justification must be at least 100 characters"}
+
+        request = SpendRequest(
+            spend_id=_auto_spend_id(),
+            claw=claw,
+            merchant_name=merchant_name,
+            merchant_url=merchant_url,
+            amount_cents=amount_cents,
+            currency="USD",
+            justification=justification,
+            payment_method_id=payment_method_id,
+            credential_type=credential_type,
+        )
+        try:
+            action_id = handler.queue_spend_review(request)
+        except ValueError as ve:
+            return {"error": str(ve)}
+        return {
+            "action": "queue_review",
+            "spend_id": request.spend_id,
+            "action_id": action_id,
+            "status": "pending_review",
+        }
+
+    if action == "approve_review":
+        if not spend_id:
+            return {"error": "spend_id is required for approve_review"}
+        try:
+            spend = handler._get_request(spend_id)
+        except KeyError:
+            return {"error": f"Spend request {spend_id} not found"}
+        if spend.status not in ("pending_review",):
+            return {"error": f"Cannot approve spend in status: {spend.status}"}
+        try:
+            hold_action_id = handler.handle_review_approve(
+                f"spend-review-{spend_id}",
+            )
+        except ValueError as ve:
+            return {"error": str(ve)}
+        spend.status = "held"
+        return {
+            "action": "approve_review",
+            "spend_id": spend_id,
+            "status": "held",
+            "hold_action_id": hold_action_id,
+            "outcome": "moved_to_hold",
+        }
+
+    if action == "block_review":
+        if not spend_id:
+            return {"error": "spend_id is required for block_review"}
+        if not reason:
+            return {"error": "reason is required for block_review"}
+        try:
+            spend = handler._get_request(spend_id)
+        except KeyError:
+            return {"error": f"Spend request {spend_id} not found"}
+        spend.status = "blocked"
+        handler.handle_review_block(
+            f"spend-review-{spend_id}",
+            reason,
+        )
+        return {
+            "action": "block_review",
+            "spend_id": spend_id,
+            "status": "blocked",
+            "reason": reason,
+        }
+
+    if action == "release_hold":
+        if not spend_id:
+            return {"error": "spend_id is required for release_hold"}
+        try:
+            spend = handler._get_request(spend_id)
+        except KeyError:
+            return {"error": f"Spend request {spend_id} not found"}
+        try:
+            released = handler.handle_hold_release(
+                f"spend-hold-{spend_id}",
+                operator_id="system",
+            )
+        except ValueError as ve:
+            return {"error": str(ve)}
+        return {
+            "action": "release_hold",
+            "spend_id": spend_id,
+            "status": released.status,
+            "link_spend_request_id": released.link_spend_request_id,
+            "outcome": (
+                "release_initiated"
+                if released.status == "released"
+                else (
+                    "notify_failed"
+                    if released.status == "approval_pending"
+                    else "blocked"
+                )
+            ),
+        }
+
+    if action == "cancel_hold":
+        if not spend_id:
+            return {"error": "spend_id is required for cancel_hold"}
+        if not reason:
+            reason = "Cancelled by operator"
+        try:
+            spend = handler._get_request(spend_id)
+        except KeyError:
+            return {"error": f"Spend request {spend_id} not found"}
+        spend.status = "cancelled"
+        handler.handle_hold_cancel(
+            f"spend-hold-{spend_id}",
+            reason,
+        )
+        return {
+            "action": "cancel_hold",
+            "spend_id": spend_id,
+            "status": "cancelled",
+            "reason": reason,
+        }
+
+    if action == "status":
+        if not spend_id:
+            return {"error": "spend_id is required for status"}
+        try:
+            spend = handler._get_request(spend_id)
+        except KeyError:
+            return {"error": f"Spend request {spend_id} not found"}
+        return {
+            "action": "status",
+            "spend_id": spend_id,
+            "status": spend.status,
+            "link_spend_request_id": spend.link_spend_request_id,
+            "claw": spend.claw,
+            "merchant_name": spend.merchant_name,
+            "merchant_url": spend.merchant_url,
+            "amount_cents": spend.amount_cents,
+            "currency": spend.currency,
+        }
+
+    return {"error": f"Unknown spend action: {action}"}
+
+
 async def handle_delegate_task(ctx: Any, tasks: list[dict]) -> list[dict]:
     """
     Native Hermes delegate_task tool handler.
@@ -400,6 +643,13 @@ def register_core_tools(skill_registry: Any) -> None:
     )
 
     skill_registry.register_tool(
+        name="milimo_spend",
+        description=MILIMO_SPEND_SCHEMA["description"],
+        parameters=MILIMO_SPEND_SCHEMA["parameters"],
+        handler=handle_milimo_spend
+    )
+
+    skill_registry.register_tool(
         name="delegate_task",
         description=DELEGATE_TASK_SCHEMA["description"],
         parameters=DELEGATE_TASK_SCHEMA["parameters"],
@@ -413,13 +663,16 @@ __all__ = [
     "handle_milimo_warroom",
     "handle_milimo_approve",
     "handle_milimo_veto",
+    "handle_milimo_spend",
     "handle_delegate_task",
     "set_claw_launcher",
     "set_approval_handler",
     "set_cost_guard",
+    "set_spend_handler",
     "MILIMO_STATUS_SCHEMA",
     "MILIMO_WARROOM_SCHEMA",
     "MILIMO_APPROVE_SCHEMA",
     "MILIMO_VETO_SCHEMA",
+    "MILIMO_SPEND_SCHEMA",
     "DELEGATE_TASK_SCHEMA",
 ]

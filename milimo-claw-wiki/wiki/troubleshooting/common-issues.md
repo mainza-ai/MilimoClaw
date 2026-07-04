@@ -374,9 +374,31 @@ nemohermes onboard \
 
 **First move when `connect` hangs**: Run `nemohermes milimo-hermes recover` first. If `recover` succeeds but `exec`/`connect` still fail with `relay open timed out`, it's token expiry — proceed to destroy + re-onboard.
 
-**Preventive workaround** (upstream bug in NemoClaw): Expect this to recur after some idle period. The only permanent fix is a token-rotation feature in NemoClaw itself. Until then, re-onboarding replaces the expired token.
+**Preventive workaround** (upstream bug in NemoClaw): Expect this to recur after some idle period. The only permanent fix is NemoClaw support for automatic static-token rotation. Until then, re-onboarding replaces the expired token.
 
 **See also**: [[hermes-profile]] — Sandbox token lifecycle
+
+---
+
+### Hermes Chat Asks for `sudo` Password During Spend Flow
+
+**Symptom**: In a Hermes chat session, the agent ends blocked and shows:
+```
+Warning: tirith security scanner enabled but not available
+Timeout — continuing without sudo
+```
+or prompts for a hidden sudo password before timing out.
+
+**Root cause**: The Finance Claw spend tool wiring was missing. `register_core_tools()` only registered `milimo_status`, `milimo_warroom`, `milimo_approve`, `milimo_veto`, `delegate_task`. The capability `request_agent_spend` was declared in `finance_claw`, but no tool schema/handler was implemented. Because tool discovery failed, the agent fell back to shell filesystem inspection, hit root-owned paths under `/opt/milimo-core/src/`, and Hermes auto-escalated to `sudo`. In a non-interactive chat that prompt cannot be answered, so it timed out.
+
+**Fix** (implemented in `tools.py`):
+- Added `MILIMO_SPEND_SCHEMA` with actions: `queue_review`, `approve_review`, `block_review`, `release_hold`, `cancel_hold`, `status`
+- Added `handle_milimo_spend()` wiring to `SpendApprovalHandler`
+- Registered `milimo_spend` in `register_core_tools()`
+
+After this fix, the agent can invoke the spend flow through the tool registry instead of shelling out, avoiding the sudo/filesystem-fallback path entirely.
+
+**Verified live**: `tools.py` import resolves `MILIMO_SPEND_SCHEMA['name'] == 'milimo_spend'` inside the sandbox.
 
 ---
 
