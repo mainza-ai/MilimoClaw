@@ -782,8 +782,6 @@ class SpendApprovalHandler:
             "--format",
             "json",
         ]
-        if self.test_mode:
-            cmd += ["--test"]
 
         max_attempts = 150  # 5 minutes at 2-second intervals
         attempts = 0
