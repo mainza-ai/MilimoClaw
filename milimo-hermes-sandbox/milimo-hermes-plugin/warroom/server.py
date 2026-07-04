@@ -35,6 +35,7 @@ _BLUEPRINTS = [
     _MILIMO_BLUEPRINT_PATH,
     str(_REPO_ROOT / "milimo-blueprint"),
     "/opt/milimo-blueprint",
+    "/opt/nemoclaw-blueprint",
     "/sandbox/.openclaw/milimo/milimo-blueprint",
 ]
 
