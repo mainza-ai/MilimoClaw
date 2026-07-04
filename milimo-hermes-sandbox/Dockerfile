@@ -280,6 +280,79 @@ RUN set -eu; \
         ln -s "runtime/${name}" "/sandbox/.hermes/${name}"; \
     done
 
+# ── Gateway Control & Secret Boundary Scripts ────────────────────────────────
+# These must match the original NemoClaw Hermes sandbox structure and hashes,
+# allowing the host-side nemohermes / openshell supervisor to recover, status,
+# and validate the sandbox safely.
+RUN mkdir -p /usr/local/lib/nemoclaw
+
+COPY scripts/lib/sandbox-init.sh /usr/local/lib/nemoclaw/sandbox-init.sh
+COPY scripts/lib/gateway-supervisor.sh /usr/local/lib/nemoclaw/gateway-supervisor.sh
+COPY scripts/lib/sandbox-rlimits.sh /usr/local/lib/nemoclaw/sandbox-rlimits.sh
+COPY scripts/start.sh /usr/local/bin/nemoclaw-start
+COPY scripts/gateway-control.sh /usr/local/bin/nemoclaw-gateway-control
+COPY scripts/managed-gateway-control.py /usr/local/lib/nemoclaw/managed-gateway-control.py
+COPY scripts/validate-env-secret-boundary.py /usr/local/lib/nemoclaw/validate-hermes-env-secret-boundary.py
+COPY scripts/seed-dashboard-config.py /usr/local/lib/nemoclaw/seed-hermes-dashboard-config.py
+COPY scripts/runtime-config-guard.py /usr/local/lib/nemoclaw/hermes-runtime-config-guard.py
+COPY scripts/state-dir-guard.py /usr/local/lib/nemoclaw/state-dir-guard.py
+COPY scripts/preloads/*.js /usr/local/lib/nemoclaw/preloads/
+
+RUN chmod 755 /usr/local/bin/nemoclaw-start /usr/local/lib/nemoclaw/sandbox-init.sh /usr/local/lib/nemoclaw/validate-hermes-env-secret-boundary.py /usr/local/lib/nemoclaw/seed-hermes-dashboard-config.py /usr/local/lib/nemoclaw/hermes-runtime-config-guard.py \
+    && chown root:root /usr/local/bin/nemoclaw-gateway-control /usr/local/lib/nemoclaw/gateway-supervisor.sh /usr/local/lib/nemoclaw/state-dir-guard.py /usr/local/lib/nemoclaw/managed-gateway-control.py \
+    && chmod 700 /usr/local/bin/nemoclaw-gateway-control \
+    && chmod 500 /usr/local/lib/nemoclaw/state-dir-guard.py /usr/local/lib/nemoclaw/managed-gateway-control.py \
+    && chmod 444 /usr/local/lib/nemoclaw/gateway-supervisor.sh \
+    && if [ -d /usr/local/lib/nemoclaw/preloads ]; then \
+        chown -R 0:0 /usr/local/lib/nemoclaw/preloads \
+        && find /usr/local/lib/nemoclaw/preloads -type f -exec chmod 444 {} + \
+        && find /usr/local/lib/nemoclaw/preloads -type d -exec chmod 755 {} + \
+        ; \
+    fi \
+    && chmod 444 /usr/local/lib/nemoclaw/sandbox-rlimits.sh \
+    && mkdir -p /etc/profile.d \
+    && printf '%s\n' \
+        '# NemoClaw sandbox resource limits — see sandbox-rlimits.sh (#2173)' \
+        '[ -f /usr/local/lib/nemoclaw/sandbox-rlimits.sh ] && . /usr/local/lib/nemoclaw/sandbox-rlimits.sh && harden_resource_limits --quiet && verify_resource_limits --quiet || true' \
+        > /etc/profile.d/nemoclaw-rlimits.sh \
+    && chmod 444 /etc/profile.d/nemoclaw-rlimits.sh \
+    && (chmod 644 /etc/bash.bashrc 2>/dev/null || true) \
+    && { printf '%s\n' \
+          '# NemoClaw sandbox resource limits — see sandbox-rlimits.sh (#2173)' \
+          '[ -f /usr/local/lib/nemoclaw/sandbox-rlimits.sh ] && . /usr/local/lib/nemoclaw/sandbox-rlimits.sh && harden_resource_limits --quiet && verify_resource_limits --quiet || true' \
+          ''; \
+        if [ -f /etc/bash.bashrc ]; then \
+          grep -Ev 'NemoClaw sandbox resource limits|sandbox-rlimits[.]sh' /etc/bash.bashrc || true; \
+        fi; \
+      } > /etc/bash.bashrc.new \
+      && mv /etc/bash.bashrc.new /etc/bash.bashrc \
+      && chmod 444 /etc/bash.bashrc
+
+# Assert validator exists and is executable
+RUN test -x /usr/local/lib/nemoclaw/validate-hermes-env-secret-boundary.py \
+    || { echo "ERROR: validate-hermes-env-secret-boundary.py missing or not executable" >&2; exit 1; }
+
+# Cryptographic integrity check for validator and wrapper
+ARG NEMOCLAW_HERMES_WRAPPER_SHA256=03e0afbe00e352d0dfcf14b99ea1821f9fd29f87dad49ce19add2ec96d1941cc
+ARG NEMOCLAW_HERMES_VALIDATOR_SHA256=236194dcd21d8beeb988f662979249dbf47f52a95b0786bfc0d80e1b56a169b6
+RUN printf '%s  %s\n' \
+        "$NEMOCLAW_HERMES_VALIDATOR_SHA256" /usr/local/lib/nemoclaw/validate-hermes-env-secret-boundary.py \
+    | sha256sum -c - \
+    || { echo "ERROR: validate-hermes-env-secret-boundary.py hash mismatch (update NEMOCLAW_HERMES_VALIDATOR_SHA256)" >&2; exit 1; }
+
+COPY scripts/hermes-wrapper.py /usr/local/lib/nemoclaw/hermes-wrapper.py
+RUN test -x /usr/bin/python3 \
+    || { echo "ERROR: /usr/bin/python3 missing or not executable; hermes-wrapper shebang would ENOEXEC" >&2; exit 1; }
+RUN printf '%s  %s\n' \
+        "$NEMOCLAW_HERMES_WRAPPER_SHA256" /usr/local/lib/nemoclaw/hermes-wrapper.py \
+    | sha256sum -c - \
+    || { echo "ERROR: hermes-wrapper.py hash mismatch (update NEMOCLAW_HERMES_WRAPPER_SHA256)" >&2; exit 1; }
+
+RUN mv /usr/local/bin/hermes /usr/local/bin/hermes.real \
+    && install -m 0755 /usr/local/lib/nemoclaw/hermes-wrapper.py /usr/local/bin/hermes \
+    && chmod 755 /usr/local/bin/hermes.real \
+    && /usr/local/bin/hermes --version
+
 # ── File Sync Scripts ───────────────────────────────────────────────────────
 # In-sandbox claw file inventory tool used by host-side hermes-sync.sh.
 COPY scripts/hermes-inventory.py /opt/hermes/scripts/hermes-inventory.py

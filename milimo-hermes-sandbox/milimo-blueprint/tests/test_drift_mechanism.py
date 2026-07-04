@@ -14,7 +14,9 @@ from unittest.mock import patch
 
 # Dynamically import the check-drift.py script
 scripts_dir = Path(__file__).parent.parent.parent / "scripts"
-spec = importlib.util.spec_from_file_location("check_drift", str(scripts_dir / "check-drift.py"))
+spec = importlib.util.spec_from_file_location(
+    "check_drift", str(scripts_dir / "check-drift.py")
+)
 check_drift = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(check_drift)
 
@@ -76,8 +78,10 @@ def test_main_no_drift(temp_fixtures) -> None:
     (temp_fixtures["bp_src"] / "b.py").write_bytes(b"y = 2")
     (temp_fixtures["sandbox_bp_src"] / "b.py").write_bytes(b"y = 2")
 
-    with patch("pathlib.Path.parent", temp_fixtures["root"]), \
-         patch("sys.exit") as mock_exit:
+    with (
+        patch("pathlib.Path.parent", temp_fixtures["root"]),
+        patch("sys.exit") as mock_exit,
+    ):
         check_drift.main()
         mock_exit.assert_called_once_with(0)
 
@@ -86,8 +90,10 @@ def test_main_drift_file_missing_in_sandbox(temp_fixtures) -> None:
     """Verify main() exits 1 when a core file is missing from the sandbox mirror."""
     (temp_fixtures["core_src"] / "missing.py").write_bytes(b"x = 1")
 
-    with patch("pathlib.Path.parent", temp_fixtures["root"]), \
-         patch("sys.exit") as mock_exit:
+    with (
+        patch("pathlib.Path.parent", temp_fixtures["root"]),
+        patch("sys.exit") as mock_exit,
+    ):
         check_drift.main()
         mock_exit.assert_called_once_with(1)
 
@@ -97,7 +103,9 @@ def test_main_drift_file_content_mismatch(temp_fixtures) -> None:
     (temp_fixtures["core_src"] / "mismatch.py").write_bytes(b"x = 1")
     (temp_fixtures["sandbox_core_src"] / "mismatch.py").write_bytes(b"x = 2")
 
-    with patch("pathlib.Path.parent", temp_fixtures["root"]), \
-         patch("sys.exit") as mock_exit:
+    with (
+        patch("pathlib.Path.parent", temp_fixtures["root"]),
+        patch("sys.exit") as mock_exit,
+    ):
         check_drift.main()
         mock_exit.assert_called_once_with(1)

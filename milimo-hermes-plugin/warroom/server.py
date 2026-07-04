@@ -235,8 +235,9 @@ class WarRoomHTMXHandler(BaseHTTPRequestHandler):
         try:
             candidates = ["warroom.html", "index.html"]
             for name in candidates:
-                if Path(name).exists():
-                    with open(name, "rb") as fh:
+                target = _HERE / name
+                if target.exists():
+                    with open(target, "rb") as fh:
                         data = fh.read()
                     self.send_response(200)
                     self.send_header("Content-Type", "text/html; charset=utf-8")
