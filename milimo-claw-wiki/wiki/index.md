@@ -125,6 +125,7 @@ Development conventions and guides.
 | [[conventions]] | Code style and project conventions | ✓ |
 | [[testing]] | Test structure and coverage | ✓ |
 | [[test-spend-flow]] | Stripe Link spend flow robustness tests | ✓ |
+| [[hermes-skill-factory-remediation-2026-07-04]] | Skill factory + claw capability dispatch remediation plan | ✓ |
 | [[debugging]] | Debugging guide and tools | ✓ |
 | [[sandbox-file-sharing]] | Accessing and extracting claw-generated files | ✓ |
 

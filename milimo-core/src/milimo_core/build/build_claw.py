@@ -749,3 +749,47 @@ class BuildClaw:
         if self._scheduler is None:
             raise RuntimeError("BuildClaw not started — call startup() first")
         return self._scheduler
+
+    def create_pr(self, resolution: Any) -> dict:
+        if not self._pr_manager:
+            raise RuntimeError("BuildClaw not started — call startup() first")
+        return self._pr_manager.open_pr(resolution)
+
+    def deploy_to_vercel(self, deploy_id: str) -> dict:
+        if not self._deploy_manager:
+            raise RuntimeError("BuildClaw not started — call startup() first")
+        return self._deploy_manager.handle_deploy_hold_released(deploy_id)
+
+    def audit_dependencies(self, vulns: list[Any]) -> dict:
+        if not self._dependency_auditor:
+            raise RuntimeError("BuildClaw not started — call startup() first")
+        return self._dependency_auditor.auto_draft_security_pr(vulns)
+
+    def monitor_errors(self) -> dict:
+        if not self._error_monitor:
+            raise RuntimeError("BuildClaw not started — call startup() first")
+        return self._error_monitor.run_monitoring_pass()
+
+    def monitor_costs(self) -> dict:
+        if not self._cost_monitor:
+            raise RuntimeError("BuildClaw not started — call startup() first")
+        return self._cost_monitor.run_daily_check()
+
+    def generate_docs(self, pr: Any) -> dict:
+        if not self._doc_maintainer:
+            raise RuntimeError("BuildClaw not started — call startup() first")
+        return self._doc_maintainer.update_changelog(pr)
+
+    def generate_code(self, task_description: str) -> dict:
+        if not self._code_gen:
+            raise RuntimeError("BuildClaw not started — call startup() first")
+        from .issue_manager import ComplexityScore
+        score = ComplexityScore(
+            issue_number=9999,
+            issue_title=f"Assistant Task: {task_description[:60]}",
+            complexity_tier="M",
+            estimated_hours=8.0,
+            clarity_score="clear",
+        )
+        result = self._code_gen.resolve_issue(score, issue_body=task_description)
+        return {"status": result.status, "branch": result.branch_name}

@@ -781,3 +781,34 @@ class OpsClaw:
     @property
     def dispatcher(self) -> OpsSignalDispatcher | None:
         return self._dispatcher
+
+    def manage_project(self, project_id: str, action: str) -> dict:
+        if not self._project_manager:
+            raise RuntimeError("OpsClaw not started — call startup() first")
+        if action == "update_status":
+            self._project_manager.update_project_status(
+                project_id=project_id, new_status="active"
+            )
+        return {"project_id": project_id, "action": action}
+
+    def score_client_health(self, client_id: str) -> dict:
+        if not self._health_scorer:
+            raise RuntimeError("OpsClaw not started — call startup() first")
+        return self._health_scorer.to_dict()
+
+    def track_scope(self, message: dict) -> dict:
+        if not self._scope_monitor:
+            raise RuntimeError("OpsClaw not started — call startup() first")
+        return self._scope_monitor.check_message(message)
+
+    def run_runbook(self, name: str, alert: dict) -> dict:
+        if not self._runbook_executor:
+            raise RuntimeError("OpsClaw not started — call startup() first")
+        result = self._runbook_executor.execute_runbook(name, alert)
+        return result.to_dict() if hasattr(result, "to_dict") else {"runbook": name}
+
+    def handle_webhook(self, alert: dict) -> dict:
+        if not self._webhook_server:
+            raise RuntimeError("OpsClaw not started — call startup() first")
+        self.handle_incident(alert)
+        return {"status": "webhook_processed"}

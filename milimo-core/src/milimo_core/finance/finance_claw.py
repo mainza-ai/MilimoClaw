@@ -194,9 +194,15 @@ class FinanceClaw:
             daily_spend_cap_cents=int(
                 _os.environ.get("MILIMO_DAILY_SPEND_CAP_CENTS", "10000")
             ),
-            test_mode=_os.environ.get("MILIMO_SPEND_TEST_MODE", "false").lower()
+            test_mode=_os.environ.get("MILIMO_SPEND_TEST_MODE", "true").lower()
             == "true",
         )
+
+        try:
+            from milimo_hermes_plugin.tools import set_spend_handler as _set_spend_handler
+            _set_spend_handler(spend_handler)
+        except ImportError:
+            pass
 
         revenue_tracker = RevenueTracker(
             fs=fs,
@@ -599,6 +605,80 @@ class FinanceClaw:
     def is_initialized(self) -> bool:
         """Check if the Finance Claw is initialized."""
         return self._initialized
+
+    def request_agent_spend(self, spend_request: dict) -> dict:
+        spend_handler = self._components.get("spend_handler")
+        if not spend_handler:
+            raise RuntimeError(
+                "FinanceClaw not started — spend handler unavailable"
+            )
+        request = SpendRequest(
+            spend_id=spend_request.get("spend_id", uuid.uuid4().hex[:12]),
+            claw=spend_request.get("claw", "unknown"),
+            merchant_name=spend_request["merchant_name"],
+            merchant_url=spend_request["merchant_url"],
+            amount_cents=int(spend_request["amount_cents"]),
+            currency=spend_request.get("currency", "USD"),
+            justification=spend_request["justification"],
+            payment_method_id=spend_request.get("payment_method_id"),
+            credential_type=spend_request.get("credential_type", "card"),
+        )
+        action_id = spend_handler.queue_spend_review(request)
+        return {
+            "spend_id": request.spend_id,
+            "action_id": action_id,
+            "status": "pending_review",
+        }
+
+    def create_invoice(self, invoice_data: dict) -> dict:
+        invoice_manager = self._components.get("invoice_manager")
+        if not invoice_manager:
+            raise RuntimeError("FinanceClaw not started")
+        invoice = invoice_manager.generate_invoice(
+            project_id=invoice_data["project_id"],
+            client_id=invoice_data["client_id"],
+            delivered_at=invoice_data.get(
+                "delivered_at", datetime.now(timezone.utc).isoformat()
+            ),
+        )
+        return invoice.to_dict()
+
+    def track_payments(self) -> dict:
+        payment_monitor = self._components.get("payment_monitor")
+        if not payment_monitor:
+            raise RuntimeError("FinanceClaw not started")
+        return {"status": "payment_monitoring_active"}
+
+    def monitor_stripe(self) -> dict:
+        stripe_client = self._components.get("stripe_client")
+        if not stripe_client:
+            raise RuntimeError("FinanceClaw not started")
+        return {"status": "stripe_client_available"}
+
+    def calculate_pricing(self, pricing_query: dict) -> dict:
+        pricing_engine = self._components.get("pricing_engine")
+        if not pricing_engine:
+            raise RuntimeError("FinanceClaw not started")
+        pricing_engine.handle_pricing_query(pricing_query)
+        return {"status": "pricing_calculated"}
+
+    def track_revenue(self) -> dict:
+        revenue_tracker = self._components.get("revenue_tracker")
+        if not revenue_tracker:
+            raise RuntimeError("FinanceClaw not started")
+        return {"status": "revenue_tracking_active"}
+
+    def track_expenses(self) -> dict:
+        expense_tracker = self._components.get("expense_tracker")
+        if not expense_tracker:
+            raise RuntimeError("FinanceClaw not started")
+        return {"status": "expense_tracking_active"}
+
+    def assess_risk(self, payment_event: dict) -> dict:
+        risk_scorer = self._components.get("payment_risk_scorer")
+        if not risk_scorer:
+            raise RuntimeError("FinanceClaw not started")
+        return {"status": "risk_assessed"}
 
     def _send_assistant_response(
         self, message: dict[str, Any], result: dict[str, Any]

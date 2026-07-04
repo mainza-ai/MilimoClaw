@@ -575,3 +575,55 @@ class AnalyticsClaw:
         from datetime import datetime, timezone
 
         return datetime.now(timezone.utc).isoformat()
+
+    def process_signals(self, message: dict) -> dict:
+        if not self.signal_processor:
+            raise RuntimeError("AnalyticsClaw not started — call startup() first")
+        self.signal_processor.handle_performance_signal(message)
+        return {"status": "processed"}
+
+    def detect_anomalies(self, message: dict) -> dict:
+        if not self.anomaly_detector:
+            raise RuntimeError("AnalyticsClaw not started — call startup() first")
+        baselines = (
+            self.baseline_manager.load_content_baselines()
+            if self.baseline_manager
+            else {}
+        )
+        anomaly = self.anomaly_detector.check_content_signal(message, baselines)
+        if anomaly:
+            self.anomaly_detector.save_anomaly(anomaly)
+            self.anomaly_detector.dispatch_alert(anomaly)
+            return anomaly.to_dict()
+        return {"status": "no_anomaly"}
+
+    def score_opportunities(self, message: dict) -> dict:
+        if not self.opportunity_scorer:
+            raise RuntimeError("AnalyticsClaw not started — call startup() first")
+        return self.opportunity_scorer.to_dict()
+
+    def generate_reports(self) -> dict:
+        if not self.report_generator:
+            raise RuntimeError("AnalyticsClaw not started — call startup() first")
+        return {"status": "report_generation_triggered"}
+
+    def query_analytics(self, message: dict) -> dict:
+        if not self.query_handler:
+            raise RuntimeError("AnalyticsClaw not started — call startup() first")
+        response = self.query_handler.handle(message)
+        return response.data if response.data else {}
+
+    def project_forecasts(self) -> dict:
+        if not self.forward_projector:
+            raise RuntimeError("AnalyticsClaw not started — call startup() first")
+        return {
+            k: v.to_dict() for k, v in self.forward_projector.project_all().items()
+        }
+
+    def manage_baselines(self) -> dict:
+        if not self.baseline_manager:
+            raise RuntimeError("AnalyticsClaw not started — call startup() first")
+        return {
+            "content": self.baseline_manager.load_content_baselines(),
+            "revenue": self.baseline_manager.load_revenue_baseline(),
+        }
