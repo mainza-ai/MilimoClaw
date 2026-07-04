@@ -124,7 +124,7 @@ self._start_polling_thread(spend_id)
 
 ## Queue State Persistence
 
-`queue_spend_review()` and `queue_spend_hold()` call `_persist_queue_state()` to write a `queue_state` event to `agent-spend.log` (using the same `fcntl.flock` + `os.fsync` pattern as `_append_spend_log`). On restart, `_recover_and_resume_polling()` restores pending REVIEW and HOLD entries by replaying `decisions.log`.
+`queue_spend_review()` and `queue_spend_hold()` call `_persist_queue_state()` to write a `queue_state` event to `agent-queue.log` (dedicated file, separate from spend records). On restart, `_recover_and_resume_polling()` restores pending REVIEW and HOLD entries by replaying `decisions.log` and `agent-queue.log`.
 
 Key behavior: `_get_daily_spend_aggregate()` skips `queue_state` events so they do not inflate the daily cap calculation. Only actual spend entries (from `_append_spend_log`) count toward the cap.
 
@@ -170,16 +170,22 @@ After firing the approval notification, `handle_hold_release` starts a backgroun
   - `purchase_expired` / `purchase_failed` — terminal failure states
 - Catches `FileNotFoundError` safely to terminate if `link-cli` is missing (e.g., during tests)
 
-```python
-def _start_polling_thread(self, spend_id: str) -> None:
-    thread = threading.Thread(
-        target=self._poll_spend_request,
-        args=(spend_id,),
-    )
-    thread.start()
+The thread is a non-daemon thread so it survives incidental process exits, and responds to `handler.close()` for graceful shutdown:
 
+```python
+def close(self) -> None:
+    self._shutdown_event.set()
+    for thread in list(self._active_poll_threads):
+        thread.join(timeout=10)
+```
+
+The polling loop checks `self._shutdown_event.is_set()` at the top of each iteration and exits cleanly when FinanceClaw shuts down.
+
+```python
 def _poll_spend_request(self, spend_id: str) -> None:
     while True:
+        if self._shutdown_event.is_set():
+            break
         time.sleep(2)
         try:
             proc = subprocess.run(
@@ -212,8 +218,11 @@ This keeps the TUI and inter-claw gateway responsive for the entire approval win
 | **F-2** | High | **Fixed (2026-07-04)** | `_find_prior_release()` checks `decisions.log` before `create` to prevent duplicate `lsrq_*` sessions after crashes. |
 | **F-3** | High | **Fixed (2026-07-04)** | `request-approval` retried once after 5s on transient failure; permanent failures (e.g. `UNKNOWN flag`) are not retried. |
 | **F-8** | Medium | **Fixed (2026-07-04)** | `_get_request` reconstructs from `hold/queued` and `hold/release` entries, not just `review/queued`. |
+| **F-9** | Medium | **Fixed (2026-07-04)** | `_persist_queue_state` now writes to `agent-queue.log` (separate file). `_get_daily_spend_aggregate` no longer needs to filter `queue_state` events. |
 | **F-10** | Medium | **Fixed (2026-07-04)** | `FinanceOperationalLog.append` now calls `f.flush()` + `os.fsync()` for crash durability. |
+| **F-11** | Medium | **Fixed (2026-07-04)** | `SpendApprovalHandler.close()` signals all polling threads to stop and joins them with 10s timeout. |
 | **F-12** | Low | **Fixed (2026-07-04)** | War Room server argparse default changed from `8080` to `9090`. |
+| **F-14** | Low | **Fixed (2026-07-04)** | `_lsrq_index: dict[str, str]` added for O(1) `lsrq_*` → `spend_id` lookups; populated on every successful `create`. |
 
 ---
 
@@ -298,6 +307,8 @@ A dedicated `agent-spend.log` records completed purchase details:
 ```json
 {"spend_id": "abc123", "claw": "build", "merchant_name": "Neon", "amount_cents": 5000, ...}
 ```
+
+`agent-queue.log` records queue state transitions (review → hold → release stages):
 
 ---
 
