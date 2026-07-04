@@ -9,7 +9,7 @@
 - `milimo-hermes-sandbox/`
 - `docs/adr/001-subagent-isolation.md` through `005-delegation-asymmetry.md`
 
-**Last updated**: 2026-06-30 (E8)
+**Last updated**: 2026-07-04
 
 **Tags**: #architecture #hermes #profile #dual-track
 
@@ -342,6 +342,14 @@ There are two copies of the policy file:
 - `milimo-hermes-sandbox/milimo-blueprint/policies/milimo-mcp.yaml` (build context copy)
 
 `prepare_build_context()` in `install-hermes.sh` copies from repo root into the build context, so the sandbox copy is overwritten at build time. However, both copies should be kept in sync in git to avoid confusion.
+
+#### `ARG NEMOCLAW_MESSAGING_PLAN_B64` Is Required for Onboarding
+NemoClaw's setup manager patches the staged Dockerfile during onboarding to inject messaging channel config. It expects:
+```dockerfile
+ARG NEMOCLAW_MESSAGING_PLAN_B64=
+ENV NEMOCLAW_MESSAGING_PLAN_B64=${NEMOCLAW_MESSAGING_PLAN_B64}
+```
+Without this declaration, onboarding fails with: `Error: Dockerfile is missing ARG NEMOCLAW_MESSAGING_PLAN_B64; cannot apply messaging plan.`
 
 #### `pull_claw_files.sh` Is OpenClaw-Only
 The sync script `scripts/pull_claw_files.sh` expects container names matching `openshell-my-assistant` and paths under `/sandbox/.openclaw/milimo/claws/<role>/`. Neither convention exists on the Hermes profile. The script should not be used with Hermes sandboxes.

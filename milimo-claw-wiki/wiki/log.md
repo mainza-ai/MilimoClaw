@@ -1521,3 +1521,19 @@ Each entry follows this format:
 **Verification**:
 - ✅ Full test suite passes: 1265 passed, 1 skipped
 - ✅ Pyright: 0 errors in milimo-blueprint
+
+### 2026-07-04 — Onboarding fix: ARG NEMOCLAW_MESSAGING_PLAN_B64 missing
+
+**Commits**: rebuild after install-hermes.sh + Dockerfile fix.
+
+**Pages**: `installation-scripts.md`, `hermes-profile.md`, `log.md`
+
+**Source**: `milimo-hermes-sandbox/Dockerfile`, `milimo-hermes-sandbox/install-hermes.sh`
+
+**Problem**: `nemohermes onboard` failed with `Error: Dockerfile is missing ARG NEMOCLAW_MESSAGING_PLAN_B64; cannot apply messaging plan.` because the custom Dockerfile did not declare the messaging plan ARG that NemoClaw's setup manager injects during onboarding.
+
+**Fix**:
+- Added `ARG NEMOCLAW_MESSAGING_PLAN_B64=` + `ENV NEMOCLAW_MESSAGING_PLAN_B64=${NEMOCLAW_MESSAGING_PLAN_B64}` to `milimo-hermes-sandbox/Dockerfile`
+- Updated `install-hermes.sh:build_docker_image()` to pass `NEMOCLAW_MESSAGING_PLAN_B64` via `--build-arg`
+- Added default export for `NEMOCLAW_MESSAGING_PLAN_B64` in `main()` (defaults to empty if unset)
+- Rebuilt sandbox image as `milimo-hermes-sandbox:latest` (2026-07-04 01:15 CDT)
