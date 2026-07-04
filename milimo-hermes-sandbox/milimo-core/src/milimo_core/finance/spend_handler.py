@@ -39,6 +39,7 @@ from pathlib import Path
 from typing import Literal, Any
 import json
 import logging
+import os
 import subprocess
 
 logger = logging.getLogger("milimo.spend_handler")
@@ -100,7 +101,7 @@ class SpendApprovalHandler:
         decisions_path: Path | None = None,
         spend_log_path: Path | None = None,
         link_cli_path: str = "link-cli",
-        daily_spend_cap_cents: int = 10_000,
+        daily_spend_cap_cents: int | None = None,
         test_mode: bool = False,
     ):
         self.operational_log = operational_log
@@ -111,7 +112,10 @@ class SpendApprovalHandler:
             spend_log_path or claw_base("finance") / "logs/agent-spend.log"
         )
         self.link_cli_path = link_cli_path
-        self.daily_spend_cap_cents = daily_spend_cap_cents
+        self.daily_spend_cap_cents = (
+            daily_spend_cap_cents
+            or int(os.environ.get("MILIMO_DAILY_SPEND_CAP_CENTS", "10000"))
+        )
         self.test_mode = test_mode
         self._requests: dict[str, SpendRequest] = {}
         self._recover_and_resume_polling()
@@ -195,6 +199,7 @@ class SpendApprovalHandler:
         """
         action_id = f"spend-review-{request.spend_id}"
         self._requests[request.spend_id] = request
+        self._persist_queue_state(request, "review", action_id)
 
         daily_spent = self._get_daily_spend_aggregate()
         if daily_spent + request.amount_cents > self.daily_spend_cap_cents:
@@ -319,6 +324,8 @@ class SpendApprovalHandler:
         Available actions: RELEASE HOLD (spends), CANCEL
         """
         action_id = f"spend-hold-{request.spend_id}"
+        self._requests[request.spend_id] = request
+        self._persist_queue_state(request, "hold", action_id)
 
         self._log_decision(
             {
@@ -679,6 +686,34 @@ class SpendApprovalHandler:
             finally:
                 fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
+    def _persist_queue_state(self, request: SpendRequest, stage: str, action_id: str) -> None:
+        import fcntl
+
+        self.spend_log_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.spend_log_path, "a") as f:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            try:
+                f.write(
+                    json.dumps(
+                        {
+                            "event": "queue_state",
+                            "spend_id": request.spend_id,
+                            "claw": request.claw,
+                            "stage": stage,
+                            "status": request.status,
+                            "action_id": action_id,
+                            "merchant_name": request.merchant_name,
+                            "amount_cents": request.amount_cents,
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
+                    + "\n"
+                )
+                f.flush()
+                os.fsync(f.fileno())
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+
     def _log_decision(self, decision: dict) -> None:
         import fcntl
         import os
@@ -709,6 +744,7 @@ class SpendApprovalHandler:
             return
 
         released_requests = {}
+        queued_spend_ids = set()
         try:
             with open(self.decisions_path, "r", encoding="utf-8") as f:
                 for line in f:
@@ -730,9 +766,20 @@ class SpendApprovalHandler:
                         elif action_type in ("purchase_approved", "purchase_denied", "purchase_expired", "release_failed", "cancel"):
                             if spend_id in released_requests:
                                 del released_requests[spend_id]
+                    if stage in ("review", "hold") and action_type in ("queued", "approve", "edit"):
+                        queued_spend_ids.add(spend_id)
         except Exception as e:
             logger.error("Failed to scan pending spend requests for recovery: %s", e)
             return
+
+        for spend_id in queued_spend_ids:
+            if spend_id in self._requests:
+                continue
+            try:
+                self._get_request(spend_id)
+                logger.info("Recovered queued spend request %s from decisions.log", spend_id)
+            except Exception as e:
+                logger.debug("Could not recover queued request %s: %s", spend_id, e)
 
         for spend_id, info in released_requests.items():
             link_id = info.get("link_spend_request_id")
