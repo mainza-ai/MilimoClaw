@@ -74,7 +74,7 @@ class TestSpendFlowRobustness:
             merchant_url="https://vercel.com",
             amount_cents=1500,
             currency="USD",
-            justification="Test justification for Vercel provisioning",
+            justification="Test justification for Vercel provisioning" + "." * 58,
             payment_method_id="pm_123",
         )
 
@@ -129,7 +129,8 @@ class TestSpendFlowRobustness:
             merchant_url="https://openai.com",
             amount_cents=5000,
             currency="USD",
-            justification="API credits bundle purchase for content generation",
+            justification="API credits bundle purchase for content generation"
+            + "." * 50,
         )
         handler1.queue_spend_review(request)
         handler1.handle_review_approve("spend-review-spend-restart-002")
@@ -170,7 +171,8 @@ class TestSpendFlowRobustness:
             merchant_url="https://slack.com",
             amount_cents=3000,
             currency="USD",
-            justification="Upgrade test workspace to pro plan for integration logs",
+            justification="Upgrade test workspace to pro plan for integration logs"
+            + "." * 45,
         )
 
         # Submit request -> creates action in war room
@@ -220,7 +222,8 @@ class TestSpendFlowRobustness:
             merchant_url="https://sentry.io",
             amount_cents=2900,
             currency="USD",
-            justification="Upgrade team plan for error monitoring integrations",
+            justification="Upgrade team plan for error monitoring integrations"
+            + "." * 49,
         )
         handler.queue_spend_review(request)
         handler.handle_review_approve("spend-review-spend-poll-004")
@@ -288,7 +291,7 @@ class TestSpendFlowRobustness:
                             "merchant_url": "https://medium.com",
                             "amount_cents": 500,
                             "currency": "USD",
-                            "justification": "Premium account sign up",
+                            "justification": "Premium account sign up" + "." * 77,
                         },
                     }
                 )
@@ -370,7 +373,7 @@ class TestSpendFlowRobustness:
             merchant_url="github.com",
             amount_cents=1000,
             currency="usd",
-            justification="CI running costs",
+            justification="CI running costs" + "." * 84,
         )
         spend_handler._requests[request.spend_id] = request
 
@@ -466,7 +469,7 @@ class TestSpendFlowRobustness:
             merchant_url="aws.amazon.com",
             amount_cents=2000,
             currency="usd",
-            justification="Hosting",
+            justification="Hosting" + "." * 93,
         )
         spend_handler._requests[req.spend_id] = req
 
@@ -483,7 +486,7 @@ class TestSpendFlowRobustness:
             merchant_url="aws.amazon.com",
             amount_cents=2000,
             currency="usd",
-            justification="Hosting",
+            justification="Hosting" + "." * 93,
         )
         spend_handler._requests[req2.spend_id] = req2
         res = spend_handler.handle_hold_release("spend-hold-new-tx-002")

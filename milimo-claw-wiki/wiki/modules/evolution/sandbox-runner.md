@@ -1,6 +1,6 @@
 # Sandbox Runner
 
-**Summary**: Backtest execution in an isolated subprocess. ⚠️ **AUDIT FINDING SA-4.3 [Critical]**: The Python `SandboxRunner` executes code directly on the host shell via `subprocess.run([sys.executable, "-c", sandbox_script], ...)` with no Bubblewrap, Docker, or Landlock containment boundary. Any generated code has unrestricted filesystem and network access. The original Architecture doc and this page claimed strict isolation — this is **incorrect**.
+**Summary**: Backtest execution in an isolated subprocess. **FIXED 2026-07-04**: `SandboxRunner` now uses `milimo_core.containment.get_contained_command()` to wrap execution with Bubblewrap (`bwrap --unshare-all --ro-bind`) or Docker (`--net=none python:3.11-slim`) when available. Falls back to host subprocess with a logged warning if neither is present.
 
 **Sources**: `milimo-blueprint/orchestrator/evolution/sandbox_runner.py`
 
@@ -72,34 +72,26 @@ if result.improvement_pct >= 5.0:
 4. **Subprocess Execution** — Run with resource limits and timeout
 5. **Result Parsing** — Extract JSON output, calculate improvement
 
-## ⚠️ Known Limitation: No Process Isolation Boundary
+## ✅ Containment Fix (2026-07-04)
 
-**Audit Finding SA-4.3 [Critical]** confirms that `SandboxRunner` does not isolate execution:
+**Audit Finding SA-4.3 [Critical]** was remediated in commits `455de10`–`0c86b7b`:
 
 ```python
-result = subprocess.run(
-    [sys.executable, "-c", sandbox_script],
-    capture_output=True,
-    text=True,
-    timeout=self._config.timeout_seconds,
-)
+# sandbox_runner.py:L190-201 — now calls containment helper
+from milimo_core.containment import get_contained_command
+base_cmd = [sys.executable, "-c", sandbox_script]
+cmd = get_contained_command(base_cmd, parent_dir, clean_env)
+result = subprocess.run(cmd, capture_output=True, text=True, timeout=..., env=clean_env)
 ```
 
-The subprocess inherits the current user's full filesystem, network, and environment. The "SandboxConfig" parameters (`blocked_imports`, `read_only_paths`, memory limits) are **best-effort hints applied within the script itself** — a malicious LLM-generated tool can bypass them trivially (e.g., `importlib.import_module`, `ctypes`, raw HTTP requests without `requests`/`urllib`).
+`containment.py` wraps the command with:
+- **bwrap** (preferred): `--unshare-all --ro-bind /usr /lib /lib64 /bin /sbin /etc --bind <work_dir>`
+- **Docker** (fallback): `docker run --rm --net=none -v <work_dir> python:3.11-slim`
+- **Host** (last resort): logs warning and returns base_args unchanged
 
-**Current mitigations only**:
-- AST pre-scan blocks explicit imports of `subprocess`, `socket`, `eval`, etc.
-- Memory limit via `resource.setrlimit` (Linux only; silently skipped on macOS)
-- 30-second subprocess timeout
-- Read-only historical data passed via temp file
+Environment sanitization is also enforced: `HOME` is set to the temp work directory, and only `PATH`, `LANG`, `LC_ALL`, `PYTHONIOENCODING`, `PYTHONPATH` are propagated from the host environment.
 
-**What is missing**:
-- No `bwrap` (Bubblewrap) containment
-- No Docker container isolation
-- No Landlock per-invocation enforcement
-- No network namespace separation
-
-Source: `milimo-core/src/milimo_core/evolution/sandbox_runner.py` (verified 2026-07-03).
+Source: `milimo-core/src/milimo_core/evolution/sandbox_runner.py:188-210`, `milimo-core/src/milimo_core/containment.py:20-103`. Verified at HEAD `0c86b7b`.
 
 ## Security Features
 
