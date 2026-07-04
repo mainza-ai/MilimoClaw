@@ -336,6 +336,41 @@ class TestZeroKnowledgeSecretProxy(unittest.TestCase):
             server.server_close()
             thread.join(timeout=2)
 
+    def test_core_bridge_server_metrics_route(self) -> None:
+        """Verify that core bridge_server.py RPCHandler returns Prometheus-formatted text metrics."""
+        import threading
+        import urllib.request
+        from http.server import HTTPServer
+        from milimo_core.bridge_server import RPCHandler
+        import socket
+
+        # Find a free port
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+        s.close()
+
+        server = HTTPServer(("127.0.0.1", port), RPCHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        try:
+            # Query /metrics
+            url = f"http://127.0.0.1:{port}/metrics"
+            with urllib.request.urlopen(url) as response:
+                self.assertEqual(response.status, 200)
+                metrics = response.read().decode("utf-8")
+                self.assertIn("# HELP milimo_messages_processed_total", metrics)
+                self.assertIn("# TYPE milimo_messages_processed_total counter", metrics)
+                self.assertIn(
+                    'milimo_messages_processed_total{claw="content"}', metrics
+                )
+
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
     def test_bridge_cli_approvals(self) -> None:
         """Verify that bridge_cli approve and veto commands work as expected."""
         import tempfile

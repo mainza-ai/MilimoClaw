@@ -346,9 +346,129 @@ class RPCHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"status": "ok"}).encode())
+        elif self.path == "/metrics":
+            self._serve_metrics()
         else:
             self.send_response(404)
             self.end_headers()
+
+    def _serve_metrics(self) -> None:
+        try:
+            from milimo_core.metrics_collector import MetricsCollector
+
+            lines = []
+
+            # Add metric help and type headers
+            lines.append(
+                "# HELP milimo_messages_processed_total Total messages processed by the claw."
+            )
+            lines.append("# TYPE milimo_messages_processed_total counter")
+            lines.append(
+                "# HELP milimo_errors_total Total errors recorded by the claw."
+            )
+            lines.append("# TYPE milimo_errors_total counter")
+            lines.append(
+                "# HELP milimo_inference_calls_total Total inference API calls made by the claw."
+            )
+            lines.append("# TYPE milimo_inference_calls_total counter")
+            lines.append(
+                "# HELP milimo_inference_tokens_total Total tokens used by the claw in inference."
+            )
+            lines.append("# TYPE milimo_inference_tokens_total counter")
+            lines.append(
+                "# HELP milimo_sla_compliant_total Total SLA compliant messages."
+            )
+            lines.append("# TYPE milimo_sla_compliant_total counter")
+            lines.append("# HELP milimo_sla_violation_total Total SLA violations.")
+            lines.append("# TYPE milimo_sla_violation_total counter")
+
+            for role in [
+                "content",
+                "ops",
+                "analytics",
+                "finance",
+                "build",
+                "assistant",
+            ]:
+                try:
+                    collector = MetricsCollector(claw_role=role)
+                    summary = collector.get_summary(lookback_hours=168)
+                    counters = summary.get("counters", {})
+                    timings = summary.get("timings", {})
+
+                    # Global claw counters
+                    lines.append(
+                        f'milimo_messages_processed_total{{claw="{role}"}} {counters.get("messages_processed", 0)}'
+                    )
+                    lines.append(
+                        f'milimo_errors_total{{claw="{role}"}} {counters.get("errors", 0)}'
+                    )
+                    lines.append(
+                        f'milimo_inference_calls_total{{claw="{role}"}} {counters.get("inference_calls", 0)}'
+                    )
+                    lines.append(
+                        f'milimo_inference_tokens_total{{claw="{role}"}} {counters.get("inference_tokens", 0)}'
+                    )
+                    lines.append(
+                        f'milimo_sla_compliant_total{{claw="{role}"}} {counters.get("sla_compliant", 0)}'
+                    )
+                    lines.append(
+                        f'milimo_sla_violation_total{{claw="{role}"}} {counters.get("sla_violation", 0)}'
+                    )
+
+                    # Breakdown by type/key
+                    for key, val in counters.items():
+                        if key.startswith("messages."):
+                            msg_type = key[len("messages.") :]
+                            lines.append(
+                                f'milimo_messages_type_processed_total{{claw="{role}",message_type="{msg_type}"}} {val}'
+                            )
+                        elif key.startswith("errors."):
+                            err_type = key[len("errors.") :]
+                            lines.append(
+                                f'milimo_errors_type_total{{claw="{role}",error_type="{err_type}"}} {val}'
+                            )
+                        elif key.startswith("inference."):
+                            inf_type = key[len("inference.") :]
+                            lines.append(
+                                f'milimo_inference_type_calls_total{{claw="{role}",data_type="{inf_type}"}} {val}'
+                            )
+
+                    # Timing Gauges
+                    for key, val in timings.items():
+                        avg = val.get("avg_ms", 0.0)
+                        p95 = val.get("p95_ms", 0.0)
+                        if key.startswith("latency."):
+                            msg_type = key[len("latency.") :]
+                            lines.append(
+                                f'milimo_latency_avg_ms{{claw="{role}",message_type="{msg_type}"}} {avg}'
+                            )
+                            lines.append(
+                                f'milimo_latency_p95_ms{{claw="{role}",message_type="{msg_type}"}} {p95}'
+                            )
+                        elif key.startswith("inference_latency."):
+                            inf_type = key[len("inference_latency.") :]
+                            lines.append(
+                                f'milimo_inference_latency_avg_ms{{claw="{role}",data_type="{inf_type}"}} {avg}'
+                            )
+                            lines.append(
+                                f'milimo_inference_latency_p95_ms{{claw="{role}",data_type="{inf_type}"}} {p95}'
+                            )
+                except Exception as e:
+                    logger.warning(
+                        "Failed to collect metrics for claw role %s: %s", role, e
+                    )
+
+            response = "\n".join(lines) + "\n"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(response.encode())
+        except Exception as e:
+            logger.exception("Error serving metrics")
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(f"Internal server error: {e}".encode())
 
     def _send_result(self, result: Any, req_id: int) -> None:
         response = json.dumps({"jsonrpc": "2.0", "result": result, "id": req_id})

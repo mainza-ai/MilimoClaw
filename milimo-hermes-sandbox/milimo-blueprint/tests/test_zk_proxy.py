@@ -273,7 +273,7 @@ class TestZeroKnowledgeSecretProxy(unittest.TestCase):
 
         # Find a free port
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(('127.0.0.1', 0))
+        s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]
         s.close()
 
@@ -311,7 +311,7 @@ class TestZeroKnowledgeSecretProxy(unittest.TestCase):
 
         # Find a free port
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(('127.0.0.1', 0))
+        s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]
         s.close()
 
@@ -327,7 +327,44 @@ class TestZeroKnowledgeSecretProxy(unittest.TestCase):
                 metrics = response.read().decode("utf-8")
                 self.assertIn("# HELP milimo_messages_processed_total", metrics)
                 self.assertIn("# TYPE milimo_messages_processed_total counter", metrics)
-                self.assertIn('milimo_messages_processed_total{claw="content"}', metrics)
+                self.assertIn(
+                    'milimo_messages_processed_total{claw="content"}', metrics
+                )
+
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+    def test_core_bridge_server_metrics_route(self) -> None:
+        """Verify that core bridge_server.py RPCHandler returns Prometheus-formatted text metrics."""
+        import threading
+        import urllib.request
+        from http.server import HTTPServer
+        from milimo_core.bridge_server import RPCHandler
+        import socket
+
+        # Find a free port
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+        s.close()
+
+        server = HTTPServer(("127.0.0.1", port), RPCHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        try:
+            # Query /metrics
+            url = f"http://127.0.0.1:{port}/metrics"
+            with urllib.request.urlopen(url) as response:
+                self.assertEqual(response.status, 200)
+                metrics = response.read().decode("utf-8")
+                self.assertIn("# HELP milimo_messages_processed_total", metrics)
+                self.assertIn("# TYPE milimo_messages_processed_total counter", metrics)
+                self.assertIn(
+                    'milimo_messages_processed_total{claw="content"}', metrics
+                )
 
         finally:
             server.shutdown()
@@ -358,7 +395,7 @@ class TestZeroKnowledgeSecretProxy(unittest.TestCase):
                     "recipient_role": "ops",
                     "message_type": "spend_request",
                     "payload": {"merchant_name": "Stripe", "amount_cents": 1000},
-                    "timestamp": "2026-07-03T18-43-59Z"
+                    "timestamp": "2026-07-03T18-43-59Z",
                 }
                 msg_file = warroom_inbox / f"2026-07-03T18-43-59Z_{msg_id}.json"
                 msg_file.write_text(json.dumps(msg_data))
@@ -407,7 +444,9 @@ class TestZeroKnowledgeSecretProxy(unittest.TestCase):
             validator = ContractValidator.from_config_file(config_path)
 
             # Start mesh coordinator
-            mesh = MeshCoordinator(validator=validator, squad_id="test-squad", mesh_dir=tmp_dir)
+            mesh = MeshCoordinator(
+                validator=validator, squad_id="test-squad", mesh_dir=tmp_dir
+            )
 
             # Assert that self._detected_region is not None
             self.assertIsNotNone(mesh._detected_region)
