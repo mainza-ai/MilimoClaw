@@ -8,6 +8,26 @@
 
 ---
 
+### 2026-07-05 — Harden SOUL.md/HERMES_ENVIRONMENT_HINT to force verbatim approval_url surfacing
+
+**Pages**: `wiki/architecture/hermes-profile.md`, `wiki/log.md`, `wiki/index.md`
+
+**Source**: Live Hermes session — agent received `approval_url` from `_check_link_cli_auth` but paraphrased it into generic "please approve in the Link app" without the URL. Operator had to explicitly ask for the link.
+
+**Changes**:
+- `milimo-hermes-sandbox/Dockerfile`:
+  - SOUL.md `## Finance Claw Spend Flow` step 2 changed from soft suggestion to HARD RULE: "you MUST include the full URL verbatim in your response to the operator. Output the exact approval_url text. Do NOT paraphrase, summarize, omit, or replace it with a generic phrase... After surfacing it, STOP and WAIT."
+  - `ENV HERMES_ENVIRONMENT_HINT` appended: "CRITICAL: When milimo_spend or _check_link_cli_auth returns an approval_url, always output the full URL verbatim to the operator. Do not paraphrase, omit, or replace it with a generic statement. The operator cannot approve without the exact URL. Wait for operator confirmation before proceeding."
+- `wiki/architecture/hermes-profile.md`: documented HARD RULE in Known Issues section
+
+**Root cause**:
+- Agent treated approval_url as soft suggestion rather than mandatory output
+- LLM paraphrased away the URL, forcing operator to request it explicitly
+
+**Verification**:
+- Next sandbox rebuild/re-onboard will bake hardened SOUL.md
+- New Hermes chat session required to pick up updated prompt
+
 ### 2026-07-05 — Proxy fallback fix: `_discover_proxy_env()` for Hermes `execute_code` env gap
 
 **Pages**: `wiki/modules/finance/spend-handler.md`, `wiki/modules/finance/link-cli-setup.md`, `wiki/architecture/hermes-profile.md`, `wiki/log.md`, `wiki/index.md`
@@ -1769,3 +1789,27 @@ Each entry follows this format:
 - `wiki/log.md`: this entry
 
 **Resumes from**: full retest with rebuilt image to confirm agent invokes `milimo_spend` directly and surfaces device approval URL when unauthenticated
+
+---
+
+### 2026-07-05 — Harden SOUL.md/HERMES_ENVIRONMENT_HINT to force verbatim approval_url surfacing
+
+**Commit**: `pending`
+
+**Pages**: `wiki/architecture/hermes-profile.md`, `milimo-hermes-sandbox/Dockerfile`
+
+**Source**: Live Hermes session — agent received `approval_url` from `_check_link_cli_auth` but paraphrased it into generic "please approve in the Link app" without the URL. Operator had to explicitly ask for the link.
+
+**Changes**:
+- `milimo-hermes-sandbox/Dockerfile`:
+  - SOUL.md `## Finance Claw Spend Flow` step 2 changed from soft suggestion to HARD RULE: "you MUST include the full URL verbatim in your response to the operator. Output the exact approval_url text. Do NOT paraphrase, summarize, omit, or replace it with a generic phrase like 'please approve in the Link app' or 'I have started a background poll'. The operator cannot approve without the URL. After surfacing it, STOP and WAIT for the operator to confirm approval before calling any further tools. Do not proceed to `queue_review` or any other spend step until the operator explicitly confirms they have approved the device code."
+  - `ENV HERMES_ENVIRONMENT_HINT` appended: "CRITICAL: When milimo_spend or _check_link_cli_auth returns an approval_url, always output the full URL verbatim to the operator. Do not paraphrase, omit, or replace it with a generic statement. The operator cannot approve without the exact URL. Wait for operator confirmation before proceeding."
+- `wiki/architecture/hermes-profile.md`: documented HARD RULE in Known Issues section
+
+**Root cause**:
+- Agent treated approval_url as soft suggestion rather than mandatory output
+- LLM paraphrased away the URL, forcing operator to request it explicitly
+
+**Verification**:
+- Next sandbox rebuild/re-onboard will bake hardened SOUL.md
+- New Hermes chat session required to pick up updated prompt

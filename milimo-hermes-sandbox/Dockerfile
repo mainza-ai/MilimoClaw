@@ -165,8 +165,8 @@ RUN mkdir -p /sandbox/.hermes/memories \
     '## Finance Claw Spend Flow' \
     'When the operator asks for a spend flow demo or agent-initiated purchase:' \
     '1. Call milimo_spend with action=queue_review, claw=finance, merchant_name, merchant_url, amount_cents, justification (>=100 chars), payment_method_id (from link-cli payment-methods list), credential_type=card, test=true' \
-    '2. If link-cla is not authenticated, _check_link_cli_auth will return an approval_url -- surface it to the operator immediately: "Open this URL and approve the device code in your Link app: <url>". Wait for operator confirmation before proceeding.' \
-    '3. After operator approves the device, rerun the auth check, then proceed with the full flow through the registered tool (do not fall back to raw shell unless the tool is unavailable).' \
+    '2. HARD RULE: If _check_link_cli_auth returns an approval_url, you MUST include the full URL verbatim in your response to the operator. Output the exact approval_url text. Do NOT paraphrase, summarize, omit, or replace it with a generic phrase like "please approve in the Link app" or "I have started a background poll". The operator cannot approve without the URL. After surfacing it, STOP and WAIT for the operator to confirm approval before calling any further tools. Do not proceed to queue_review or any other spend step until the operator explicitly confirms they have approved the device code.' \
+    '3. After operator confirms approval, rerun the auth check, then proceed with the full flow through the registered tool (do not fall back to raw shell unless the tool is unavailable).' \
     '4. The spend flow runs in test mode by default (MILIMO_SPEND_TEST_MODE=true). No real money is charged.' \
     '5. Payment method ID is obtained via: link-cli payment-methods list --format json' '' \
     '## Environment' \
@@ -182,7 +182,7 @@ RUN mkdir -p /sandbox/.hermes/memories \
     > /sandbox/.hermes/SOUL.md
 
 # Describe execution environment via Hermes environment-hint mechanism
-ENV HERMES_ENVIRONMENT_HINT="MilimoClaw Hermes profile sandbox on NemoClaw. Six-agent business mesh: Content, Ops, Analytics, Finance, Build, Assistant (Lucy). Registered tools: milimo_status, milimo_warroom, milimo_approve, milimo_veto, milimo_spend (Finance Claw Stripe Link spend flow with --test mode), delegate_task. Plugin: /sandbox/.hermes/plugins/milimo-hermes/. War Room: /opt/hermes/warroom/. link-cli at /usr/local/bin/link-cli. API: 127.0.0.1:18642. Work within sandbox boundary."
+ENV HERMES_ENVIRONMENT_HINT="MilimoClaw Hermes profile sandbox on NemoClaw. Six-agent business mesh: Content, Ops, Analytics, Finance, Build, Assistant (Lucy). Registered tools: milimo_status, milimo_warroom, milimo_approve, milimo_veto, milimo_spend (Finance Claw Stripe Link spend flow with --test mode), delegate_task. Plugin: /sandbox/.hermes/plugins/milimo-hermes/. War Room: /opt/hermes/warroom/. link-cli at /usr/local/bin/link-cli. API: 127.0.0.1:18642. CRITICAL: When milimo_spend or _check_link_cli_auth returns an approval_url, always output the full URL verbatim to the operator. Do not paraphrase, omit, or replace it with a generic statement. The operator cannot approve without the exact URL. Wait for operator confirmation before proceeding. Work within sandbox boundary."
 
 # Set mutable-default permissions (Hermes standard)
 USER root
