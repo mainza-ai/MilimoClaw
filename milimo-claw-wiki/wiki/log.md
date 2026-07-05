@@ -8,6 +8,42 @@
 
 ---
 
+### 2026-07-05 — Proxy fallback fix: `_discover_proxy_env()` for Hermes `execute_code` env gap
+
+**Pages**: `wiki/modules/finance/spend-handler.md`, `wiki/modules/finance/link-cli-setup.md`, `wiki/architecture/hermes-profile.md`, `wiki/log.md`, `wiki/index.md`
+
+**Source**: Live Hermes agent report — 3 consecutive `UNKNOWN POST https://api.link.com/spend_requests` failures from `execute_code`; identical terminal command succeeded
+
+**Changes**:
+- `milimo-core/src/milimo_core/finance/spend_handler.py`:
+  - Enhanced `_build_link_cli_env()` to always set `NODE_USE_ENV_PROXY=1` and fall back to `_discover_proxy_env()` when proxy vars are absent from `os.environ`
+  - Added `_discover_proxy_env()` reading `/etc/environment`, `/etc/environment.d/*.conf`, `~/.config/environment.d/*.conf`, `/sandbox/.config/milimo/proxy.env`, and `/proc/<pid>/environ`
+- `milimo-hermes-sandbox/milimo-core/src/milimo_core/finance/spend_handler.py`: mirrored
+- `wiki/modules/finance/spend-handler.md`: updated F-18 to "Enhanced (2026-07-05, commit `91388df`)", added `_discover_proxy_env` implementation section and repro history
+- `wiki/modules/finance/link-cli-setup.md`: updated `UNKNOWN` error section to confirm fix is complete
+- `wiki/architecture/hermes-profile.md`: updated last-updated date
+- `wiki/index.md`: updated last-updated date and recent changes table
+- `wiki/log.md`: this entry
+
+**Root cause**:
+- Hermes `execute_code` runtime strips proxy vars (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `NODE_USE_ENV_PROXY`) from Python `os.environ`
+- Terminal shell inherits them from OpenShell gateway profile
+- Node.js `link-cli` reads proxy from env vars; without them, `api.link.com` unreachable → opaque `UNKNOWN` error
+
+**Fix**:
+- Fast path: `os.environ` already has proxy vars (terminal tool) — no change
+- Fallback: when absent, `_discover_proxy_env()` scans system config and `/proc` for running processes that DO have proxy vars
+- `NODE_USE_ENV_PROXY=1` always set so Node.js respects discovered proxies
+
+**Verified**:
+- `python3 -m pytest milimo-core/tests/` → 269 passed
+- `python3 -m pytest milimo-blueprint/tests/` → 1265 passed
+- `ast.parse()` on updated `spend_handler.py` → Syntax OK
+- Import `SpendApprovalHandler` → OK
+- Files byte-identical: `milimo-core/.../spend_handler.py` == `milimo-hermes-sandbox/.../spend_handler.py`
+
+---
+
 ### 2026-07-04 — Missing `milimo_spend` Tool Causes Agent sudo Prompt in Hermes Chat
 
 **Pages**: `milimo-hermes-plugin/milimo_hermes_plugin/tools.py`, `wiki/troubleshooting/common-issues.md`, `README.md`

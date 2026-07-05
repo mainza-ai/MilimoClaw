@@ -84,19 +84,30 @@ Line 430 calls `_validate_justification(request)` outside the `try` block. Bug A
 
 ## 4. Fixes (all in `milimo-core/src/milimo_core/finance/spend_handler.py`)
 
-### Fix 1 (P0) — `_build_link_cli_env` helper
+### Fix 1 (P0) — `_build_link_cli_env` proxy propagation + `_discover_proxy_env` fallback
 
-New method to replace the inline env-building in `handle_hold_release` (lines 509-524) and `_poll_spend_request` (lines 912-924):
+New/updated methods to replace the inline env-building in `handle_hold_release` (lines 509–524) and `_poll_spend_request` (lines 912–924):
 
 ```python
 def _build_link_cli_env(self, operator_id: str | None = None) -> dict[str, str]:
-    env: dict[str, str] = {**os.environ}
-    for var in ("HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
-                "http_proxy", "https_proxy", "no_proxy",
-                "NODE_USE_ENV_PROXY"):
-        value = os.environ.get(var)
+    env: dict[str, str] = {
+        **os.environ,
+        "NODE_USE_ENV_PROXY": os.environ.get("NODE_USE_ENV_PROXY", "1"),
+    }
+
+    proxy_vars = ("HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+                  "http_proxy", "https_proxy", "no_proxy")
+    for var in proxy_vars:
+        value = env.get(var) or os.environ.get(var)
         if value:
             env[var] = value
+
+    if not any(env.get(v) for v in proxy_vars):
+        fallback = self._discover_proxy_env()
+        env.update(fallback)
+        if fallback:
+            env["NODE_USE_ENV_PROXY"] = "1"
+
     if operator_id:
         safe_op_id = "".join(c for c in operator_id if c.isalnum() or c in ("-", "_")).strip()
         if safe_op_id and safe_op_id not in ("system", "operator", "sandbox"):
@@ -109,14 +120,72 @@ def _build_link_cli_env(self, operator_id: str | None = None) -> dict[str, str]:
         if os.path.exists("/sandbox/.config"):
             env["XDG_CONFIG_HOME"] = "/sandbox/.config"
     return env
+
+def _discover_proxy_env(self) -> dict[str, str]:
+    result: dict[str, str] = {}
+    PROXY_KEYS = frozenset({
+        "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+        "http_proxy", "https_proxy", "no_proxy",
+        "NODE_USE_ENV_PROXY",
+    })
+
+    # 1. /etc/environment
+    env_file = Path("/etc/environment")
+    if env_file.is_file():
+        for line in env_file.read_text().splitlines():
+            key, _, val = line.strip().partition("=")
+            if key.strip() in PROXY_KEYS:
+                result[key.strip()] = val.strip().strip("\"'")
+
+    # 2. /etc/environment.d/*.conf
+    for conf in Path("/etc/environment.d").glob("*.conf"):
+        for line in conf.read_text().splitlines():
+            key, _, val = line.strip().partition("=")
+            if key.strip() in PROXY_KEYS:
+                result[key.strip()] = val.strip().strip("\"'")
+
+    # 3. ~/.config/environment.d/*.conf
+    for conf in (Path.home() / ".config" / "environment.d").glob("*.conf"):
+        for line in conf.read_text().splitlines():
+            key, _, val = line.strip().partition("=")
+            if key.strip() in PROXY_KEYS:
+                result[key.strip()] = val.strip().strip("\"'")
+
+    # 4. /sandbox/.config/milimo/proxy.env
+    milimo_proxy = Path("/sandbox/.config/milimo/proxy.env")
+    if milimo_proxy.is_file():
+        for line in milimo_proxy.read_text().splitlines():
+            key, _, val = line.strip().partition("=")
+            if key.strip() in PROXY_KEYS:
+                result[key.strip()] = val.strip().strip("\"'")
+
+    # 5. /proc/<pid>/environ
+    for entry in Path("/proc").iterdir():
+        if not entry.is_dir() or not entry.name.isdigit():
+            continue
+        environ_file = entry / "environ"
+        if not environ_file.is_file():
+            continue
+        for token in environ_file.read_bytes().decode("utf-8", errors="replace").split("\x00"):
+            if "=" not in token:
+                continue
+            key, _, val = token.partition("=")
+            if key in result:
+                continue
+            if key in PROXY_KEYS and val:
+                result[key] = val
+        if all(k in result for k in ("HTTP_PROXY", "HTTPS_PROXY")) or \
+           ("http_proxy" in result and "https_proxy" in result):
+            break
+    return result
 ```
 
 Then:
 ```python
-# handle_hold_release line 509:
+# handle_hold_release line 522:
 env = self._build_link_cli_env(operator_id)
 
-# _poll_spend_request line 912:
+# _poll_spend_request line 1111:
 env = self._build_link_cli_env(operator_id)
 ```
 
@@ -196,8 +265,8 @@ print('status:', result.status, 'lsrq:', result.link_spend_request_id)
 "
 ```
 
-Before Fix 1: `status: blocked`, `lsrq: None`
-After Fix 1: `status: released`, `lsrq: lsrq_*` (if proxy vars present in parent env)
+Before Fix 1 (`3f9ea89`): `status: blocked`, `lsrq: None`
+After Fix 1 (`3f9ea89` + `91388df`): `status: released`, `lsrq: lsrq_*` even when `os.environ` lacks proxy vars, because `_discover_proxy_env()` recovers them from system config and `/proc`
 
 ---
 
