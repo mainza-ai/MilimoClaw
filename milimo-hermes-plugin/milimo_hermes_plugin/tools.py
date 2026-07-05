@@ -21,13 +21,23 @@ import subprocess
 
 logger = logging.getLogger("milimo.hermes.tools")
 
-from milimo_core.protocols.delegation import ClawTask, ClawResult
-from milimo_core.ops.approval_handler import OpsApprovalHandler, OpsApprovalAction
-from milimo_core.cost_guard import get_cost_guard
-from milimo_core.milimo_paths import CLAWS_DIR
-from milimo_core import WarRoomNotifier, get_warroom_notifier, init_warroom_notifier, NotificationPayload
-from milimo_core.finance.spend_handler import SpendApprovalHandler, SpendRequest
-from milimo_core.finance.finance_init import FinanceOperationalLog
+try:
+    from milimo_core.protocols.delegation import ClawTask, ClawResult
+    from milimo_core.ops.approval_handler import OpsApprovalHandler, OpsApprovalAction
+    from milimo_core.cost_guard import get_cost_guard
+    from milimo_core.milimo_paths import CLAWS_DIR
+    from milimo_core import (
+        WarRoomNotifier, get_warroom_notifier, init_warroom_notifier, NotificationPayload
+    )
+    from milimo_core.finance.spend_handler import SpendApprovalHandler, SpendRequest
+    from milimo_core.finance.finance_init import FinanceOperationalLog
+    _MILIMO_CORE_OK = True
+except ImportError:
+    _MILIMO_CORE_OK = False
+    ClawTask = ClawResult = OpsApprovalHandler = OpsApprovalAction = None
+    get_cost_guard = CLAWS_DIR = None
+    WarRoomNotifier = get_warroom_notifier = init_warroom_notifier = NotificationPayload = None
+    SpendApprovalHandler = SpendRequest = FinanceOperationalLog = None
 
 
 # Global references initialized by plugin
@@ -75,6 +85,11 @@ def _get_spend_handler() -> SpendApprovalHandler:
     """Lazy-init the spend handler from env/defaults."""
     global _spend_handler
     if _spend_handler is None:
+        if not _MILIMO_CORE_OK:
+            raise RuntimeError(
+                "milimo_core is not installed in this environment. "
+                "Ensure the Dockerfile runs: uv pip install -e /opt/milimo-core/"
+            )
         import os as _os
         operational_log = FinanceOperationalLog(
             CLAWS_DIR / "finance" / "logs" / "operational.log"
