@@ -212,7 +212,7 @@ class AnalyticsClaw:
             logger.warning("AnalyticsClaw not started, cannot handle message")
             return {"status": "error", "error": "claw_not_started", "role": "analytics"}
 
-        message_type = raw_message.get("message_type", "")
+        message_type = (raw_message.get("message_type", "") or "").strip().lower()
         sender = raw_message.get("sender_role", "unknown")
 
         logger.debug("Received %s from %s", message_type, sender)

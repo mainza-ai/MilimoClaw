@@ -128,6 +128,7 @@ Development conventions and guides.
 | [[hermes-skill-factory-remediation-2026-07-04]] | Skill factory + claw capability dispatch remediation plan | ✓ |
 | [[link-cli-install-production-readiness-2026-07-04]] | link-cli runtime install path + auth UX production gaps | ✓ |
 | [[spend-handler-debug-briefing-2026-07-05]] | Spend handler debug briefing: 3 code bugs + proxy env root cause for UNKNOWN error | ✓ |
+| [[blackbox-test-fix-plan-2026-07-05]] | Full 13-bug blackbox fix plan: Analytics/Content/Build/Finance/Ops/Lucy — status + resumption guide | ✓ |
 | [[debugging]] | Debugging guide and tools | ✓ |
 | [[sandbox-file-sharing]] | Accessing and extracting claw-generated files | ✓ |
 
