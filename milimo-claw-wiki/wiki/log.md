@@ -1702,6 +1702,12 @@ Each entry follows this format:
 - F-17: `_validate_justification` ValueError not caught in `handle_hold_release`
 - F-18: `_build_link_cli_env` helper not yet implemented — proxy vars not propagated to link-cli subprocess env; confirmed root cause of UNKNOWN error
 
-**Links**: [[spend-handler]] • [[link-cli-setup]] • [[sandbox-isolation]] • [[test-spend-flow]] • [[network-egress]]
+**Implementation**:
+- Commit `3f9ea89` — `fix: proxy env propagation + hold/queued state recovery + _log_decision guard`
+  - F-18: added `_build_link_cli_env()` helper; replaced inline env-building in `handle_hold_release` (line 522) and `_poll_spend_request` (line 955)
+  - F-15: restored `payment_method_id`, `justification`, `credential_type` in `hold/queued` reconstruction (lines 172-174)
+  - F-16: added `spend_id` guard at top of `_log_decision` (line 827)
+  - F-17: wrapped `_validate_justification` in `try/except ValueError` at line 430
+- Wiki updated: spend-handler.md findings table and fix plan section mark F-15–F-18 as Fixed
 
-**Resumes from**: F-18 fix — implement `_build_link_cli_env`, replace env-building blocks in `handle_hold_release` (line 509) and `_poll_spend_request` (line 912), plus F-15/F-16/F-17 fixes in `spend_handler.py`
+**Resumes from**: awaiting live retest in rebuilt sandbox to confirm `handle_hold_release` executes end-to-end through registered `milimo_spend` tool
