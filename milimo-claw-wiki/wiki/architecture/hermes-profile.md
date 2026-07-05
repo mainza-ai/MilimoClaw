@@ -189,16 +189,22 @@ nemohermes milimo-hermes exec -- sh -c 'API_KEY=$(head -c 32 /dev/urandom | xxd 
 nemohermes milimo-hermes exec -- hermes gateway run --replace
 ```
 
-#### Hermes Has No Context About MilimoClaw
-The default `SOUL.md` (system prompt) doesn't describe MilimoClaw.
+#### SOUL.md Context — Registered Tools and Spend Flow
+The `SOUL.md` baked into the Docker image now includes:
+- `## Registered Tools` — lists all 6 registered tools (`milimo_status`, `milimo_warroom`, `milimo_approve`, `milimo_veto`, `milimo_spend`, `delegate_task`) with one-line descriptions
+- `## Finance Claw Spend Flow` — step-by-step instructions for the agent: call `milimo_spend` with `action=queue_review`, surface `_check_link_cli_auth` approval URLs to the operator immediately, wait for device approval before proceeding, use `--test` flag, never fall back to raw shell unless tool is unavailable
+- `HERMES_ENVIRONMENT_HINT` — updated to include tool names, `link-cli` path, and `MILIMO_SPEND_TEST_MODE=true`
 
-**Fix** (`milimo-hermes-sandbox/Dockerfile`):
-The SOUL.md now includes a description of the six-claw mesh, environment paths, and the agent's role as the MilimoClaw gateway.
+Without these sections, the agent spends iterations on filesystem exploration instead of invoking `milimo_spend` directly.
+
+**Fix** (baked in `milimo-hermes-sandbox/Dockerfile`):
+The SOUL.md and HERMES_ENVIRONMENT_HINT are generated at build time from the `RUN` step that writes `/sandbox/.hermes/SOUL.md` and the `ENV HERMES_ENVIRONMENT_HINT=...` line.
 
 **Manual update** on a running sandbox:
 ```bash
-# Apply new SOUL.md:
-nemohermes milimo-hermes exec -- sh -c 'cat > /sandbox/.hermes/SOUL.md' < /tmp/milimo-soul.md
+# Rebuild and re-onboard to pick up updated SOUL.md:
+docker build -t milimo-hermes-sandbox:latest -f milimo-hermes-sandbox/Dockerfile milimo-hermes-sandbox/
+NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
 ```
 
 **Note:** After updating SOUL.md, start a new chat session (`hermes`) to see the context — existing sessions cache the old prompt.
