@@ -1711,3 +1711,25 @@ Each entry follows this format:
 - Wiki updated: spend-handler.md findings table and fix plan section mark F-15–F-18 as Fixed
 
 **Resumes from**: awaiting live retest in rebuilt sandbox to confirm `handle_hold_release` executes end-to-end through registered `milimo_spend` tool
+
+---
+
+### 2026-07-05 — SOUL.md / HERMES_ENVIRONMENT_HINT updated with registered tools and spend flow context
+
+**Commit**: `e067622` — `docs: update SOUL.md and HERMES_ENVIRONMENT_HINT with registered tools and spend flow context`
+
+**Pages**: `wiki/architecture/hermes-profile.md`, `milimo-hermes-sandbox/Dockerfile`
+
+**Source**: Live Hermes session — agent spent 60 iterations on filesystem exploration instead of invoking `milimo_spend`. Root cause: `SOUL.md` did not list available tools or describe the Finance Claw spend flow, so the agent had no context that `milimo_spend` was the correct tool for the demo prompt.
+
+**Changes**:
+- `SOUL.md` (baked into Docker image):
+  - Added `## Registered Tools` section listing all 6 tools with descriptions
+  - Added `## Finance Claw Spend Flow` section with exact call sequence, device approval URL surfacing behavior, test mode flag, payment-method discovery command
+  - Updated Finance Claw description to include "agent spend requests via Stripe Link"
+  - Added preference for `milimo_spend` tool over raw shell fallback
+- `HERMES_ENVIRONMENT_HINT`: added tool names, `link-cli` path at `/usr/local/bin/link-cli`, and `MILIMO_SPEND_TEST_MODE=true`
+- `wiki/architecture/hermes-profile.md`: documented SOUL.md context update and manual update procedure
+- `wiki/log.md`: this entry
+
+**Resumes from**: full retest with rebuilt image to confirm agent invokes `milimo_spend` directly and surfaces device approval URL when unauthenticated
