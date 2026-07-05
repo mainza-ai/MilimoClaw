@@ -789,21 +789,37 @@ class SpendApprovalHandler:
     def _build_link_cli_env(self, operator_id: str | None = None) -> dict[str, str]:
         """Build env dict for link-cli subprocess.
 
-        Propagates the sandbox proxy settings so the Node.js link-cli binary
-        can reach api.link.com regardless of whether the caller runs in the
-        terminal shell (which inherits proxy vars) or Hermes execute_code
-        (which does not).
+        Propagates proxy settings so the Node.js link-cli binary can reach
+        api.link.com.  Starts from ``os.environ`` for the common case (terminal
+        shell), and falls back to system configuration files and ``/proc``
+        process environments when the caller runs inside Hermes ``execute_code``,
+        which intentionally strips some environment variables from the
+        subprocess.
         """
-        env: dict[str, str] = {**os.environ}
+        env: dict[str, str] = {
+            **os.environ,
+            "NODE_USE_ENV_PROXY": os.environ.get("NODE_USE_ENV_PROXY", "1"),
+        }
 
         for var in (
             "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
             "http_proxy", "https_proxy", "no_proxy",
-            "NODE_USE_ENV_PROXY",
         ):
-            value = os.environ.get(var)
+            value = env.get(var) or os.environ.get(var)
             if value:
                 env[var] = value
+
+        proxy_vars = ("HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+                      "http_proxy", "https_proxy", "no_proxy")
+        if not any(env.get(v) for v in proxy_vars):
+            fallback = self._discover_proxy_env()
+            env.update(fallback)
+            if fallback:
+                env["NODE_USE_ENV_PROXY"] = "1"
+                logger.debug(
+                    "link-cli env fallback: injected proxy vars from %s",
+                    list(fallback.keys()),
+                )
 
         if operator_id:
             safe_op_id = "".join(c for c in operator_id if c.isalnum() or c in ("-", "_")).strip()
@@ -819,6 +835,146 @@ class SpendApprovalHandler:
                 env["XDG_CONFIG_HOME"] = "/sandbox/.config"
 
         return env
+
+    def _discover_proxy_env(self) -> dict[str, str]:
+        """Discover proxy env vars from system config and running processes.
+
+        Hermes ``execute_code`` can spawn Python with a stripped ``os.environ``
+        that lacks proxy variables.  This method reads common system proxy
+        configuration locations so link-cli can still route through the sandbox
+        HTTP proxy.
+        """
+        result: dict[str, str] = {}
+
+        # 1. /etc/environment (Docker / distro key=value pairs)
+        env_file = Path("/etc/environment")
+        if env_file.is_file():
+            try:
+                text = env_file.read_text(encoding="utf-8")
+            except OSError:
+                text = ""
+            for line in text.splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" not in line:
+                    continue
+                key, _, val = line.partition("=")
+                key = key.strip()
+                val = val.strip().strip("\"'")
+                if key in (
+                    "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+                    "http_proxy", "https_proxy", "no_proxy",
+                    "NODE_USE_ENV_PROXY",
+                ):
+                    result[key] = val
+
+        # 2. /etc/environment.d/*.conf (systemd-style KEY=VAL files)
+        env_d = Path("/etc/environment.d")
+        if env_d.is_dir():
+            for conf in env_d.glob("*.conf"):
+                try:
+                    text = conf.read_text(encoding="utf-8")
+                except OSError:
+                    continue
+                for line in text.splitlines():
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if "=" not in line:
+                        continue
+                    key, _, val = line.partition("=")
+                    key = key.strip()
+                    val = val.strip().strip("\"'")
+                    if key in (
+                        "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+                        "http_proxy", "https_proxy", "no_proxy",
+                        "NODE_USE_ENV_PROXY",
+                    ):
+                        result[key] = val
+
+        # 3. systemd user environment.d
+        user_env_d = Path.home() / ".config" / "environment.d"
+        if user_env_d.is_dir():
+            for conf in user_env_d.glob("*.conf"):
+                try:
+                    text = conf.read_text(encoding="utf-8")
+                except OSError:
+                    continue
+                for line in text.splitlines():
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if "=" not in line:
+                        continue
+                    key, _, val = line.partition("=")
+                    key = key.strip()
+                    val = val.strip().strip("\"'")
+                    if key in (
+                        "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+                        "http_proxy", "https_proxy", "no_proxy",
+                        "NODE_USE_ENV_PROXY",
+                    ):
+                        result[key] = val
+
+        # 4. /sandbox/.config/milimo/proxy.env (explicit milimo override)
+        milimo_proxy = Path("/sandbox/.config/milimo/proxy.env")
+        if milimo_proxy.is_file():
+            try:
+                text = milimo_proxy.read_text(encoding="utf-8")
+            except OSError:
+                text = ""
+            for line in text.splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" not in line:
+                    continue
+                key, _, val = line.partition("=")
+                key = key.strip()
+                val = val.strip().strip("\"'")
+                if key in (
+                    "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+                    "http_proxy", "https_proxy", "no_proxy",
+                    "NODE_USE_ENV_PROXY",
+                ):
+                    result[key] = val
+
+        # 5. Inspect running processes in /proc for proxy envs
+        proc_dir = Path("/proc")
+        if proc_dir.is_dir():
+            for entry in proc_dir.iterdir():
+                if not entry.is_dir() or not entry.name.isdigit():
+                    continue
+                environ_file = entry / "environ"
+                if not environ_file.is_file():
+                    continue
+                try:
+                    environ_text = environ_file.read_bytes().decode("utf-8", errors="replace")
+                except OSError:
+                    continue
+                # NUL-delimited key=value pairs
+                for token in environ_text.split("\x00"):
+                    if "=" not in token:
+                        continue
+                    key, _, val = token.partition("=")
+                    if key in result:
+                        continue
+                    if key in (
+                        "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+                        "http_proxy", "https_proxy", "no_proxy",
+                        "NODE_USE_ENV_PROXY",
+                    ) and val:
+                        result[key] = val
+                if all(
+                    k in result
+                    for k in ("HTTP_PROXY", "HTTPS_PROXY")
+                ) or (
+                    "http_proxy" in result and "https_proxy" in result
+                ):
+                    break
+
+        return result
 
     def _log_decision(self, decision: dict) -> None:
         import fcntl
