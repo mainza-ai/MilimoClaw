@@ -213,7 +213,7 @@ class TestOpportunityScorer:
             )
         ]
         opportunity_scorer.write_opportunity_scores(opps)
-        opp_path = fs.base / "reports" / "opportunity-scores.json"
+        opp_path = fs.BASE / "reports" / "opportunity-scores.json"
         assert opp_path.exists()
         data = json.loads(opp_path.read_text())
         assert "opportunities" in data

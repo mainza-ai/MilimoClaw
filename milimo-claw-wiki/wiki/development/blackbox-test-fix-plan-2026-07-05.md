@@ -203,3 +203,56 @@ sed -i '' 's/fs\._base\b/fs.BASE/g' tests/test_ops_unit.py
 - Commit `aa5bde8` — SOUL.md approval_url HARD RULE
 - Commit `91388df` — proxy fallback `_discover_proxy_env`
 - MilimoClaw Wiki operation log: [[log.md]]
+
+---
+
+## 8. Post-Merge CI Breakage — B-4 Test Fixture Sync (2026-07-05)
+
+After merge to `main`, Hermes CI / Integration Tests failed with:
+
+```
+AttributeError: 'FinanceFilesystemInit' object has no attribute 'base'
+```
+
+### Root Cause
+
+B-4 standardized init classes to `self.BASE` in production code, but `root/milimo-blueprint/tests/` still used `fs.base` in fixtures. The sandbox `milimo-hermes-sandbox/milimo-blueprint/tests/` was already updated during original fix, but **root copy missed**.
+
+### Files Fixed
+
+**Root `milimo-blueprint/tests/` — `fs.base` → `fs.BASE` (9 files):**
+- `test_analytics_init.py`
+- `test_finance_approval_handler.py`
+- `test_finance_mvr_integration.py`
+- `test_invoice_manager.py`
+- `test_opportunity_scorer.py`
+- `test_payment_monitor.py`
+- `test_pricing_engine.py`
+- `test_report_generator.py`
+- `test_revenue_tracker.py`
+
+**Root `milimo-blueprint/tests/test_forward_projector.py` — A-2 assertion update:**
+- `test_project_revenue_returns_projection`: `assert proj is not None` → `assert proj is None` (no data fixture)
+- `test_empty_projection_when_no_data`: `assert proj is not None` → `assert proj is None`
+
+### Verification
+
+```bash
+# Root milimo-blueprint
+cd milimo-blueprint && PYTHONPATH=... python -m pytest tests/ -k "not test_is_quarter_start"
+# Result: 1264 passed, 1 skipped
+
+# Sandbox milimo-blueprint
+cd milimo-hermes-sandbox/milimo-blueprint && PYTHONPATH=... python -m pytest tests/ --ignore=tests/test_drift_mechanism.py
+# Result: 1260 passed, 1 skipped
+```
+
+### Commit
+
+`2da5049` on `develop` — merged to `main` as `3f2ffb2`.
+
+### Lesson Learned
+
+When B-4 standardizes `self.BASE`, always update **both** copies of test fixtures:
+1. `milimo-hermes-sandbox/milimo-blueprint/tests/`
+2. Root `milimo-blueprint/tests/`
