@@ -193,6 +193,7 @@ nemohermes milimo-hermes exec -- hermes gateway run --replace
 The `SOUL.md` baked into the Docker image now includes:
 - `## Registered Tools` — lists all 6 registered tools (`milimo_status`, `milimo_warroom`, `milimo_approve`, `milimo_veto`, `milimo_spend`, `delegate_task`) with one-line descriptions
 - `## Finance Claw Spend Flow` — step-by-step instructions for the agent: call `milimo_spend` with `action=queue_review`, surface `_check_link_cli_auth` approval URLs to the operator immediately, wait for device approval before proceeding, use `--test` flag, never fall back to raw shell unless tool is unavailable
+- **HARD RULE on approval URLs**: If `_check_link_cli_auth` returns an `approval_url`, the agent MUST output the full URL verbatim in its response to the operator. The agent must NOT paraphrase, summarize, omit, or replace it with a generic phrase like "please approve in the Link app" or "I have started a background poll". The operator cannot approve without the exact URL. After surfacing it, the agent must STOP and WAIT for the operator to confirm approval before calling any further tools. Do not proceed to `queue_review` or any other spend step until the operator explicitly confirms they have approved the device code.
 - `HERMES_ENVIRONMENT_HINT` — updated to include tool names, `link-cli` path, and `MILIMO_SPEND_TEST_MODE=true`
 
 Without these sections, the agent spends iterations on filesystem exploration instead of invoking `milimo_spend` directly.
