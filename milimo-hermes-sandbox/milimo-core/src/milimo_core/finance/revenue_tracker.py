@@ -87,7 +87,7 @@ class RevenueTracker:
         today = datetime.now(timezone.utc)
         today_str = today.strftime("%Y-%m-%d")
 
-        weekly_path = self.fs.base / "revenue" / "weekly-summary.json"
+        weekly_path = self.fs.BASE / "revenue" / "weekly-summary.json"
         weekly_data = self._load_json(
             weekly_path,
             {
@@ -184,7 +184,7 @@ class RevenueTracker:
             last_updated=today.isoformat(),
         )
 
-        weekly_path = self.fs.base / "revenue" / "weekly-summary.json"
+        weekly_path = self.fs.BASE / "revenue" / "weekly-summary.json"
         self._atomic_write_summary(
             weekly_path,
             {
@@ -306,7 +306,7 @@ Provide a brief analysis and any recommendations."""
         """
         today = datetime.now(timezone.utc)
 
-        pricing_path = self.fs.base / "pricing" / "rules.json"
+        pricing_path = self.fs.BASE / "pricing" / "rules.json"
         pricing_data = self._load_json(pricing_path, {"default_hourly_rate": 100})
         current_rate = pricing_data.get("default_hourly_rate", 100)
 
@@ -370,7 +370,7 @@ Should the rate be adjusted? Provide:
 
     def get_current_week_summary(self) -> RevenueSummary:
         """Read revenue/weekly-summary.json and return RevenueSummary."""
-        weekly_path = self.fs.base / "revenue" / "weekly-summary.json"
+        weekly_path = self.fs.BASE / "revenue" / "weekly-summary.json"
         data = self._load_json(
             weekly_path,
             {
@@ -399,7 +399,7 @@ Should the rate be adjusted? Provide:
         from .invoice_manager import Invoice
 
         invoices: list[Invoice] = []
-        paid_dir = self.fs.base / "invoices" / "paid"
+        paid_dir = self.fs.BASE / "invoices" / "paid"
 
         if not paid_dir.exists():
             return invoices
@@ -423,7 +423,7 @@ Should the rate be adjusted? Provide:
         count = 0
 
         for status in ["pending", "approved", "sent"]:
-            status_dir = self.fs.base / "invoices" / status
+            status_dir = self.fs.BASE / "invoices" / status
             if status_dir.exists():
                 count += len(list(status_dir.glob("*.json")))
 
@@ -432,7 +432,7 @@ Should the rate be adjusted? Provide:
     def _calculate_pipeline_value(self) -> float:
         """Sum all sent/ invoices not yet paid."""
         total = 0.0
-        sent_dir = self.fs.base / "invoices" / "sent"
+        sent_dir = self.fs.BASE / "invoices" / "sent"
 
         if not sent_dir.exists():
             return total
@@ -451,7 +451,7 @@ Should the rate be adjusted? Provide:
         today = datetime.now(timezone.utc)
         last_monday = today - timedelta(days=today.weekday() + 7)
         snapshot_path = (
-            self.fs.base
+            self.fs.BASE
             / "revenue"
             / "history"
             / f"{last_monday.strftime('%Y-%m-%d')}.json"
@@ -465,14 +465,14 @@ Should the rate be adjusted? Provide:
 
     def _get_current_revenue(self) -> float:
         """Get current total revenue from annual summary."""
-        annual_path = self.fs.base / "revenue" / "annual-summary.json"
+        annual_path = self.fs.BASE / "revenue" / "annual-summary.json"
         data = self._load_json(annual_path, {"year_total": 0})
         return data.get("year_total", 0)
 
     def _get_current_expenses(self) -> float:
         """Get current total expenses from expense log."""
         total = 0.0
-        expense_path = self.fs.base / "expenses" / "log.jsonl"
+        expense_path = self.fs.BASE / "expenses" / "log.jsonl"
 
         if not expense_path.exists():
             return total
@@ -489,7 +489,7 @@ Should the rate be adjusted? Provide:
 
     def _update_monthly_summary(self, invoice: Invoice) -> None:
         """Update monthly summary with payment."""
-        monthly_path = self.fs.base / "revenue" / "monthly-summary.json"
+        monthly_path = self.fs.BASE / "revenue" / "monthly-summary.json"
         data = self._load_json(
             monthly_path,
             {
@@ -507,7 +507,7 @@ Should the rate be adjusted? Provide:
 
     def _update_annual_summary(self, invoice: Invoice) -> None:
         """Update annual summary with payment."""
-        annual_path = self.fs.base / "revenue" / "annual-summary.json"
+        annual_path = self.fs.BASE / "revenue" / "annual-summary.json"
         data = self._load_json(
             annual_path,
             {

@@ -162,17 +162,17 @@ def inference_client() -> MockInferenceClient:
 
 class TestOpsFilesystemInit:
     def test_initialize_creates_directories(self, fs: OpsFilesystemInit):
-        assert (fs._base / "active").is_dir()
-        assert (fs._base / "prospects").is_dir()
-        assert (fs._base / "completed").is_dir()
-        assert (fs._base / "contracts").is_dir()
-        assert (fs._base / "templates").is_dir()
-        assert (fs._base / "logs").is_dir()
+        assert (fs.BASE / "active").is_dir()
+        assert (fs.BASE / "prospects").is_dir()
+        assert (fs.BASE / "completed").is_dir()
+        assert (fs.BASE / "contracts").is_dir()
+        assert (fs.BASE / "templates").is_dir()
+        assert (fs.BASE / "logs").is_dir()
 
     def test_initialize_creates_templates(self, fs: OpsFilesystemInit):
-        assert (fs._base / "templates" / "welcome-message.md").is_file()
-        assert (fs._base / "templates" / "intake-questionnaire.md").is_file()
-        assert (fs._base / "templates" / "proposal-template.md").is_file()
+        assert (fs.BASE / "templates" / "welcome-message.md").is_file()
+        assert (fs.BASE / "templates" / "intake-questionnaire.md").is_file()
+        assert (fs.BASE / "templates" / "proposal-template.md").is_file()
 
     def test_initialize_is_idempotent(self, fs: OpsFilesystemInit):
         result = fs.initialize()
@@ -181,15 +181,15 @@ class TestOpsFilesystemInit:
 
     def test_create_client_dirs(self, fs: OpsFilesystemInit):
         fs.create_client_dirs("client-123")
-        assert (fs._base / "active" / "client-123").is_dir()
-        assert (fs._base / "active" / "client-123" / "projects").is_dir()
-        assert (fs._base / "active" / "client-123" / "comms").is_dir()
+        assert (fs.BASE / "active" / "client-123").is_dir()
+        assert (fs.BASE / "active" / "client-123" / "projects").is_dir()
+        assert (fs.BASE / "active" / "client-123" / "comms").is_dir()
 
     def test_create_project_dirs(self, fs: OpsFilesystemInit):
         fs.create_client_dirs("client-123")
         fs.create_project_dirs("client-123", "project-456")
         assert (
-            fs._base / "active" / "client-123" / "projects" / "project-456"
+            fs.BASE / "active" / "client-123" / "projects" / "project-456"
         ).is_dir()
 
     def test_get_template(self, fs: OpsFilesystemInit):
@@ -590,7 +590,7 @@ class TestClientHealthScorer:
         inference = MockInferenceClient(responses)
         gateway = MockMeshGateway()
         dispatcher = OpsSignalDispatcher(
-            gateway, operational_log, "test-squad", fs._base / "pricing_confirmed"
+            gateway, operational_log, "test-squad", fs.BASE / "pricing_confirmed"
         )
 
         scorer = ClientHealthScorer(
@@ -713,7 +713,7 @@ class TestProjectManager:
     ):
         gateway = MockMeshGateway()
         dispatcher = OpsSignalDispatcher(
-            gateway, operational_log, "test-squad", fs._base / "pricing_confirmed"
+            gateway, operational_log, "test-squad", fs.BASE / "pricing_confirmed"
         )
 
         manager = ProjectManager(
@@ -748,7 +748,7 @@ class TestProjectManager:
         ]
         assert len(complete_calls) == 1
 
-        completed_dir = fs._base / "completed" / "client-1" / "project-1"
+        completed_dir = fs.BASE / "completed" / "client-1" / "project-1"
         updated_status = fs.read_json(completed_dir / "status.json")
         assert updated_status is not None
         assert updated_status["client_confirmed"] is True

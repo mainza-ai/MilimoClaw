@@ -154,6 +154,7 @@ class LucyAssistant:
         self._pending_tracks: dict[str, ActiveProcessTrack] = {}
         self._running = False
         self._started = False
+        self._inbound_handlers: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {}
 
         self._inbox_dir.mkdir(parents=True, exist_ok=True)
         self._base_path.mkdir(parents=True, exist_ok=True)
@@ -169,6 +170,8 @@ class LucyAssistant:
         self._running = True
         self._started = True
 
+        self._register_inbound_handlers()
+
         # Start background supervision loop
         self._supervision_thread = threading.Thread(
             target=self._run_supervision_loop, daemon=True, name="lucy-supervision"
@@ -176,6 +179,45 @@ class LucyAssistant:
         self._supervision_thread.start()
 
         logger.info("LucyAssistant: started successfully")
+
+    def _register_inbound_handlers(self) -> None:
+        self._inbound_handlers["assistant_response"] = self._handle_assistant_response
+        self._inbound_handlers["assistant_query"] = self._handle_assistant_query
+        self._inbound_handlers["assistant_task"] = self._handle_assistant_task
+        self._inbound_handlers["mesh_broadcast"] = self._handle_mesh_broadcast
+
+    def _handle_assistant_query(
+        self, raw_message: dict[str, Any]
+    ) -> dict[str, Any]:
+        payload = raw_message.get("payload", {})
+        query = payload.get("query", "")
+        return {
+            "status": "accepted",
+            "role": "assistant",
+            "message_type": "assistant_query",
+            "query": query,
+        }
+
+    def _handle_assistant_task(
+        self, raw_message: dict[str, Any]
+    ) -> dict[str, Any]:
+        payload = raw_message.get("payload", {})
+        task = payload.get("task", "")
+        return {
+            "status": "accepted",
+            "role": "assistant",
+            "message_type": "assistant_task",
+            "task": task,
+        }
+
+    def _handle_mesh_broadcast(
+        self, raw_message: dict[str, Any]
+    ) -> dict[str, Any]:
+        return {
+            "status": "acknowledged",
+            "role": "assistant",
+            "message_type": "mesh_broadcast",
+        }
 
     def shutdown(self) -> None:
         """Stop Lucy."""
@@ -209,33 +251,46 @@ class LucyAssistant:
 
         try:
             if message_type == "assistant_response":
-                query_id = payload.get("original_message_id", "")
-                response_data = payload.get("response", {})
-
-                pending = self._pending.get(query_id)
-                if pending and not pending.responded:
-                    pending.add_response(sender_role, response_data)
-
-                    if pending.is_complete:
-                        pending.responded = True
-                        result["consolidated"] = self._consolidate(pending)
-                    elif pending.is_expired:
-                        pending.responded = True
-                        result["consolidated"] = self._consolidate(pending)
-
-                result["query_id"] = query_id
-                result["sender"] = sender_role
-                result["action"] = "response_collected"
-
+                result = self._handle_assistant_response(raw_message, result)
             else:
-                result["status"] = "unknown_type"
-                result["action"] = "ignored"
+                handler = self._inbound_handlers.get(message_type)
+                if handler:
+                    result = handler(raw_message)
+                else:
+                    result["status"] = "no_handler"
+                    result["action"] = "ignored"
 
         except Exception as e:
             result["status"] = "error"
             result["error"] = str(e)
             logger.error("LucyAssistant: handle_inbound error: %s", e)
 
+        return result
+
+    def _handle_assistant_response(
+        self, raw_message: dict[str, Any], result: dict[str, Any]
+    ) -> dict[str, Any]:
+        message_type = raw_message.get("message_type", "")
+        payload = raw_message.get("payload", {})
+        sender_role = raw_message.get("sender_role", "")
+
+        query_id = payload.get("original_message_id", "")
+        response_data = payload.get("response", {})
+
+        pending = self._pending.get(query_id)
+        if pending and not pending.responded:
+            pending.add_response(sender_role, response_data)
+
+            if pending.is_complete:
+                pending.responded = True
+                result["consolidated"] = self._consolidate(pending)
+            elif pending.is_expired:
+                pending.responded = True
+                result["consolidated"] = self._consolidate(pending)
+
+        result["query_id"] = query_id
+        result["sender"] = sender_role
+        result["action"] = "response_collected"
         return result
 
     def dispatch_query(

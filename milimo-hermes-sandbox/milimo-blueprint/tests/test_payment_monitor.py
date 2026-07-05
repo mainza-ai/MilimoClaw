@@ -113,11 +113,11 @@ class TestPaymentMonitor:
 
     @pytest.fixture
     def operational_log(self, fs: FinanceFilesystemInit):
-        return FinanceOperationalLog(fs.base / "logs" / "operational.log")
+        return FinanceOperationalLog(fs.BASE / "logs" / "operational.log")
 
     @pytest.fixture
     def payment_events_log(self, fs: FinanceFilesystemInit):
-        return PaymentEventsLog(fs.base / "logs" / "payment-events.log")
+        return PaymentEventsLog(fs.BASE / "logs" / "payment-events.log")
 
     @pytest.fixture
     def gateway(self):
@@ -202,7 +202,7 @@ class TestPaymentMonitor:
 
     def test_process_payment_received_moves_to_paid(self, payment_monitor, fs):
         """Payment received moves invoice to paid/."""
-        sent_dir = fs.base / "invoices" / "sent"
+        sent_dir = fs.BASE / "invoices" / "sent"
         sent_dir.mkdir(parents=True, exist_ok=True)
 
         invoice = Invoice(
@@ -248,7 +248,7 @@ class TestPaymentMonitor:
 
     def test_process_payment_overdue_moves_to_overdue(self, payment_monitor, fs):
         """Overdue payment moves invoice to overdue/."""
-        sent_dir = fs.base / "invoices" / "sent"
+        sent_dir = fs.BASE / "invoices" / "sent"
         sent_dir.mkdir(parents=True, exist_ok=True)
 
         invoice = Invoice(
@@ -334,7 +334,7 @@ class TestPaymentMonitor:
 
     def test_check_and_flag_overdue_returns_overdue_invoices(self, payment_monitor, fs):
         """check_and_flag_overdue returns list of overdue invoices."""
-        sent_dir = fs.base / "invoices" / "sent"
+        sent_dir = fs.BASE / "invoices" / "sent"
         sent_dir.mkdir(parents=True, exist_ok=True)
 
         invoice = Invoice(
@@ -384,7 +384,7 @@ class TestPaymentMonitor:
 
     def test_check_all_sent_invoices_returns_statuses(self, payment_monitor, fs):
         """check_all_sent_invoices returns list of statuses."""
-        sent_dir = fs.base / "invoices" / "sent"
+        sent_dir = fs.BASE / "invoices" / "sent"
         sent_dir.mkdir(parents=True, exist_ok=True)
 
         for i in range(3):

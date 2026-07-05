@@ -101,13 +101,13 @@ class FinanceFilesystemInit:
     """
 
     def __init__(self, base_path: Path | None = None):
-        self.base = base_path or BASE
+        self.BASE = base_path or BASE
 
     def initialize(self) -> InitResult:
         result = InitResult()
 
         for dir_path in REQUIRED_DIRS:
-            full_path = self.base / dir_path
+            full_path = self.BASE / dir_path
             try:
                 if full_path.exists():
                     result.already_existed.append(dir_path)
@@ -118,7 +118,7 @@ class FinanceFilesystemInit:
                 result.failed.append((dir_path, str(e)))
 
         for file_path, content in REQUIRED_FILES.items():
-            full_path = self.base / file_path
+            full_path = self.BASE / file_path
             try:
                 if full_path.exists():
                     result.already_existed.append(file_path)
@@ -138,12 +138,12 @@ class FinanceFilesystemInit:
         result = ValidationResult()
 
         for dir_path in REQUIRED_DIRS:
-            full_path = self.base / dir_path
+            full_path = self.BASE / dir_path
             if not full_path.is_dir():
                 result.missing_dirs.append(dir_path)
 
         for file_path in REQUIRED_FILES:
-            full_path = self.base / file_path
+            full_path = self.BASE / file_path
             if not full_path.is_file():
                 result.missing_files.append(file_path)
 
@@ -157,21 +157,21 @@ class FinanceFilesystemInit:
         valid_statuses = ["pending", "approved", "sent", "paid", "overdue"]
         if status not in valid_statuses:
             raise ValueError(f"Invalid invoice status: {status}")
-        return self.base / "invoices" / status / f"{invoice_id}.json"
+        return self.BASE / "invoices" / status / f"{invoice_id}.json"
 
     def get_pricing_estimate_path(self, project_id: str) -> Path:
-        return self.base / "pricing" / "estimates" / f"{project_id}.json"
+        return self.BASE / "pricing" / "estimates" / f"{project_id}.json"
 
     def get_pricing_history_path(self, project_id: str) -> Path:
-        return self.base / "pricing" / "history" / f"{project_id}.json"
+        return self.BASE / "pricing" / "history" / f"{project_id}.json"
 
     def get_tax_quarterly_path(self, year: int, quarter: int) -> Path:
         if quarter not in [1, 2, 3, 4]:
             raise ValueError(f"Invalid quarter: {quarter}")
-        return self.base / "tax" / "quarterly" / f"{year}-Q{quarter}.json"
+        return self.BASE / "tax" / "quarterly" / f"{year}-Q{quarter}.json"
 
     def get_revenue_daily_path(self, date: datetime) -> Path:
-        return self.base / "revenue" / "history" / f"{date.strftime('%Y-%m-%d')}.json"
+        return self.BASE / "revenue" / "history" / f"{date.strftime('%Y-%m-%d')}.json"
 
 
 @dataclass

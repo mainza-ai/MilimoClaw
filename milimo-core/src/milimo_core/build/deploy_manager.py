@@ -122,11 +122,14 @@ class DeployManager:
 
         deploy_path = self._fs.get_deploy_path("pending", deploy_id)
         if not deploy_path.exists():
+            history_path = self._fs.get_deploy_path("history", deploy_id)
+            if history_path.exists():
+                return DeployRecord(**self._fs.read_json(history_path))
             raise ValueError(f"Deploy {deploy_id} not found in pending/")
 
         deploy_data = self._fs.read_json(deploy_path)
         pr_id = deploy_data.get("pr_id", "")
-        lock_path = self._fs.base / f".deploy_lock.{pr_id}"
+        lock_path = self._fs.BASE / f".deploy_lock.{pr_id}"
 
         # Implement PID-validated lock check to prevent duplicate parallel deployments
         if lock_path.exists():

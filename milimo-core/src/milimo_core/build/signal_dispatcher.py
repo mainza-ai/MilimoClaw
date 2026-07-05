@@ -265,7 +265,7 @@ class BuildSignalDispatcher:
         payload = message.get("payload", {})
         self._retention_signals = payload
 
-        signals_path = self._fs.base / "context" / "sprint" / "retention-signals.json"
+        signals_path = self._fs.BASE / "context" / "sprint" / "retention-signals.json"
         signals_path.parent.mkdir(parents=True, exist_ok=True)
         self._fs.atomic_write_json(signals_path, payload)
 

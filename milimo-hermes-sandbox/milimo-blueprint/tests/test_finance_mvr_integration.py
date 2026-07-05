@@ -173,11 +173,11 @@ class TestMVRFinanceClaw:
 
     @pytest.fixture
     def operational_log(self, fs: FinanceFilesystemInit):
-        return FinanceOperationalLog(fs.base / "logs" / "operational.log")
+        return FinanceOperationalLog(fs.BASE / "logs" / "operational.log")
 
     @pytest.fixture
     def payment_events_log(self, fs: FinanceFilesystemInit):
-        return PaymentEventsLog(fs.base / "logs" / "payment-events.log")
+        return PaymentEventsLog(fs.BASE / "logs" / "payment-events.log")
 
     @pytest.fixture
     def gateway(self):
@@ -219,7 +219,7 @@ class TestMVRFinanceClaw:
         ]
 
         for dir_path in required_dirs:
-            full_path = fs.base / dir_path
+            full_path = fs.BASE / dir_path
             assert full_path.exists(), f"Directory {dir_path} not created"
 
     # -------------------------------------------------------------------------
@@ -335,7 +335,7 @@ class TestMVRFinanceClaw:
             payment_events_log=payment_events_log,
         )
 
-        decisions_path = fs.base / "logs" / "decisions.log"
+        decisions_path = fs.BASE / "logs" / "decisions.log"
         approval_handler = FinanceApprovalHandler(
             invoice_manager=invoice_manager,
             operational_log=operational_log,
@@ -436,7 +436,7 @@ class TestMVRFinanceClaw:
             payment_events_log=payment_events_log,
         )
 
-        sent_dir = fs.base / "invoices" / "sent"
+        sent_dir = fs.BASE / "invoices" / "sent"
         sent_dir.mkdir(parents=True, exist_ok=True)
 
         overdue_invoice = Invoice(
@@ -497,7 +497,7 @@ class TestMVRFinanceClaw:
             status="sent",
         )
 
-        sent_dir = fs.base / "invoices" / "sent"
+        sent_dir = fs.BASE / "invoices" / "sent"
         sent_dir.mkdir(parents=True, exist_ok=True)
         sent_path = fs.get_invoice_path("sent", invoice_first.invoice_id)
         sent_path.write_text(json.dumps(invoice_first.to_dict()))
@@ -506,7 +506,7 @@ class TestMVRFinanceClaw:
 
         assert len(approval_handler.queued_reviews) == 1
 
-        payment_events_log2 = PaymentEventsLog(fs.base / "logs" / "payment-events.log")
+        payment_events_log2 = PaymentEventsLog(fs.BASE / "logs" / "payment-events.log")
         approval_handler2 = MockApprovalHandler()
 
         payment_monitor2 = PaymentMonitor(
@@ -661,7 +661,7 @@ class TestMVRFinanceClaw:
     ):
         """MVR-12: Expense classification uses inference with data_type='tax_category_classification'."""
         expense_tracker = ExpenseTracker(
-            fs_path=fs.base,
+            fs_path=fs.BASE,
             inference_client=inference_client,
             operational_log=operational_log,
         )
@@ -700,7 +700,7 @@ class TestMVRFinanceClaw:
         )
         operational_log.append(entry)
 
-        log_path = fs.base / "logs" / "operational.log"
+        log_path = fs.BASE / "logs" / "operational.log"
         assert log_path.exists()
 
         with open(log_path) as f:
@@ -722,7 +722,7 @@ class TestMVRFinanceClaw:
             inference_client=inference_client,
             stripe_client=stripe_client,
             gateway=gateway,
-            base_path=fs.base,
+            base_path=fs.BASE,
         )
 
         finance_claw.startup()

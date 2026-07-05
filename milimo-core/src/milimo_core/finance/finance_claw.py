@@ -444,7 +444,16 @@ class FinanceClaw:
                                 outcome="rejected",
                                 details={"reason": payload.get("reason", "")},
                             )
-                        )
+                         )
+
+            elif message_type == "invoice_ready":
+                spend_handler = self._components.get("spend_handler")
+                if spend_handler:
+                    invoice_id = payload.get("invoice_id", "")
+                    amount = int(payload.get("amount_cents", payload.get("amount", 0)))
+                    r = spend_handler.handle_invoice_ready(invoice_id, amount)
+                    result["invoice_id"] = invoice_id
+                    result["action"] = "invoice_recorded"
 
             elif message_type == "spend_request":
                 spend_handler = self._components.get("spend_handler")

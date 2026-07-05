@@ -95,7 +95,7 @@ class CostMonitor:
 
         # Write cost alerts log if alert triggered
         if is_alert:
-            alerts_path = self._fs.base / "logs" / "cost-alerts.log"
+            alerts_path = self._fs.BASE / "logs" / "cost-alerts.log"
             alerts_path.parent.mkdir(parents=True, exist_ok=True)
             with alerts_path.open("a") as f:
                 f.write(

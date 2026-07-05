@@ -333,16 +333,6 @@ class ForwardProjector:
 
         return platforms
 
-    def _empty_projection(self, metric: str) -> ForwardProjection:
-        """Return an empty projection when no data is available."""
-        return ForwardProjection(
-            metric=metric,
-            projection_weeks=self.PROJECTION_WEEKS,
-            point_estimate=0.0,
-            confidence_interval_low=0.0,
-            confidence_interval_high=0.0,
-            confidence_level=0.1,
-            data_weeks_used=0,
-            risk_flags=["No historical data available"],
-            generated_at=datetime.now(timezone.utc).isoformat(),
-        )
+    def _empty_projection(self, metric: str) -> None:
+        """Return None when no data is available for the metric."""
+        return None

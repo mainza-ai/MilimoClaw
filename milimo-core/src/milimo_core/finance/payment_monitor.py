@@ -106,7 +106,7 @@ class PaymentMonitor:
         Return list of current statuses.
         """
         statuses: list[PaymentStatus] = []
-        sent_dir = self.fs.base / "invoices" / "sent"
+        sent_dir = self.fs.BASE / "invoices" / "sent"
 
         if not sent_dir.exists():
             return statuses
@@ -361,7 +361,7 @@ class PaymentMonitor:
         Process each overdue invoice.
         """
         overdue_invoices: list[Invoice] = []
-        sent_dir = self.fs.base / "invoices" / "sent"
+        sent_dir = self.fs.BASE / "invoices" / "sent"
 
         if not sent_dir.exists():
             return overdue_invoices

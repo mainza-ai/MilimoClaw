@@ -307,13 +307,13 @@ class OpsFilesystemInit:
     """
 
     def __init__(self, base_path: Path | None = None):
-        self._base = base_path or BASE
+        self.BASE = base_path or BASE
 
     def initialize(self) -> InitResult:
         result = InitResult()
 
         for dir_name in REQUIRED_DIRS:
-            dir_path = self._base / dir_name
+            dir_path = self.BASE / dir_name
             try:
                 if dir_path.exists():
                     result.already_existed.append(dir_name)
@@ -326,7 +326,7 @@ class OpsFilesystemInit:
                 logger.error("Failed to create directory %s: %s", dir_path, e)
 
         for file_path, content in REQUIRED_TEMPLATE_FILES.items():
-            full_path = self._base / file_path
+            full_path = self.BASE / file_path
             try:
                 if full_path.exists():
                     result.already_existed.append(file_path)
@@ -340,7 +340,7 @@ class OpsFilesystemInit:
                 logger.error("Failed to create template %s: %s", full_path, e)
 
         for log_file in REQUIRED_LOG_FILES:
-            log_path = self._base / log_file
+            log_path = self.BASE / log_file
             try:
                 if log_path.exists():
                     result.already_existed.append(log_file)
@@ -359,17 +359,17 @@ class OpsFilesystemInit:
         result = ValidationResult()
 
         for dir_name in REQUIRED_DIRS:
-            dir_path = self._base / dir_name
+            dir_path = self.BASE / dir_name
             if not dir_path.is_dir():
                 result.missing_dirs.append(dir_name)
 
         for file_path in REQUIRED_TEMPLATE_FILES:
-            full_path = self._base / file_path
+            full_path = self.BASE / file_path
             if not full_path.is_file():
                 result.missing_files.append(file_path)
 
         for log_file in REQUIRED_LOG_FILES:
-            log_path = self._base / log_file
+            log_path = self.BASE / log_file
             if not log_path.is_file():
                 result.missing_files.append(log_file)
 
@@ -378,16 +378,16 @@ class OpsFilesystemInit:
     def get_client_path(
         self, status: Literal["active", "completed"], client_id: str
     ) -> Path:
-        return self._base / status / client_id
+        return self.BASE / status / client_id
 
     def get_project_path(self, client_id: str, project_id: str) -> Path:
-        return self._base / "active" / client_id / "projects" / project_id
+        return self.BASE / "active" / client_id / "projects" / project_id
 
     def get_prospect_path(self, inquiry_id: str) -> Path:
-        return self._base / "prospects" / inquiry_id
+        return self.BASE / "prospects" / inquiry_id
 
     def get_template(self, template_name: str) -> str:
-        template_path = self._base / "templates" / template_name
+        template_path = self.BASE / "templates" / template_name
         if not template_path.exists():
             raise FileNotFoundError(f"Template not found: {template_name}")
         return template_path.read_text()
@@ -425,14 +425,14 @@ class OpsFilesystemInit:
             return None
 
     def get_active_clients(self) -> list[str]:
-        active_dir = self._base / "active"
+        active_dir = self.BASE / "active"
         if not active_dir.exists():
             return []
         return [d.name for d in active_dir.iterdir() if d.is_dir()]
 
     def get_active_projects(self) -> list[tuple[str, str]]:
         projects: list[tuple[str, str]] = []
-        active_dir = self._base / "active"
+        active_dir = self.BASE / "active"
         if not active_dir.exists():
             return projects
 

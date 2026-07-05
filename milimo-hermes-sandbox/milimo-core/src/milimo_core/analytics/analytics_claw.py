@@ -600,7 +600,8 @@ class AnalyticsClaw:
     def score_opportunities(self, message: dict) -> dict:
         if not self.opportunity_scorer:
             raise RuntimeError("AnalyticsClaw not started — call startup() first")
-        return self.opportunity_scorer.to_dict()
+        scored = self.opportunity_scorer.score_all()
+        return {"opportunities": [s.to_dict() for s in scored]}
 
     def generate_reports(self) -> dict:
         if not self.report_generator:
@@ -610,7 +611,9 @@ class AnalyticsClaw:
     def query_analytics(self, message: dict) -> dict:
         if not self.query_handler:
             raise RuntimeError("AnalyticsClaw not started — call startup() first")
-        response = self.query_handler.handle(message)
+        normalized = dict(message)
+        normalized.setdefault("message_type", normalized.get("query_type", "general"))
+        response = self.query_handler.handle(normalized)
         return response.data if response.data else {}
 
     def project_forecasts(self) -> dict:

@@ -377,7 +377,7 @@ class InvoiceManager:
 
         pending_path = self.fs.get_invoice_path("pending", invoice_id)
 
-        blocked_dir = self.fs.base / "invoices" / "blocked"
+        blocked_dir = self.fs.BASE / "invoices" / "blocked"
         blocked_dir.mkdir(parents=True, exist_ok=True)
         blocked_path = blocked_dir / f"{invoice_id}.json"
         blocked_path.write_text(json.dumps(invoice.to_dict(), indent=2))
@@ -578,7 +578,7 @@ Create line items that fairly represent the work done. Return JSON array:
     ) -> list[Invoice]:
         """Load all invoices with a given status."""
         invoices: list[Invoice] = []
-        status_dir = self.fs.base / "invoices" / status
+        status_dir = self.fs.BASE / "invoices" / status
         if not status_dir.exists():
             return invoices
 

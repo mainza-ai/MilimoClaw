@@ -161,14 +161,14 @@ class BuildFilesystemInit:
     """
 
     def __init__(self, base_path: Path | None = None) -> None:
-        self.base = base_path or BASE
+        self.BASE = base_path or BASE
 
     def initialize(self) -> InitResult:
         """Create all REQUIRED_DIRS and REQUIRED_FILES. Never overwrite existing files."""
         result = InitResult()
 
         for dir_rel in REQUIRED_DIRS:
-            dir_path = self.base / dir_rel
+            dir_path = self.BASE / dir_rel
             try:
                 if dir_path.exists():
                     result.already_existed.append(dir_rel)
@@ -179,7 +179,7 @@ class BuildFilesystemInit:
                 result.failed.append((dir_rel, str(exc)))
 
         for file_rel, default_content in REQUIRED_FILES.items():
-            file_path = self.base / file_rel
+            file_path = self.BASE / file_rel
             try:
                 if file_path.exists():
                     result.already_existed.append(file_rel)
@@ -202,11 +202,11 @@ class BuildFilesystemInit:
         result = ValidationResult()
 
         for dir_rel in REQUIRED_DIRS:
-            if not (self.base / dir_rel).is_dir():
+            if not (self.BASE / dir_rel).is_dir():
                 result.missing_dirs.append(dir_rel)
 
         for file_rel in REQUIRED_FILES:
-            if not (self.base / file_rel).exists():
+            if not (self.BASE / file_rel).exists():
                 result.missing_files.append(file_rel)
 
         return result
@@ -221,7 +221,7 @@ class BuildFilesystemInit:
             raise ValueError(
                 f"Invalid PR status: {status!r}. Must be one of {valid_statuses}"
             )
-        return self.base / "prs" / status / f"{pr_id}.json"
+        return self.BASE / "prs" / status / f"{pr_id}.json"
 
     def get_deploy_path(
         self,
@@ -233,20 +233,20 @@ class BuildFilesystemInit:
             raise ValueError(
                 f"Invalid deploy status: {status!r}. Must be one of {valid_statuses}"
             )
-        return self.base / "deployments" / status / f"{deploy_id}.json"
+        return self.BASE / "deployments" / status / f"{deploy_id}.json"
 
     def get_error_pattern_path(self, pattern_id: str) -> Path:
-        return self.base / "context" / "errors" / "patterns" / f"{pattern_id}.json"
+        return self.BASE / "context" / "errors" / "patterns" / f"{pattern_id}.json"
 
     def get_active_error_path(self, error_id: str) -> Path:
-        return self.base / "context" / "errors" / "active" / f"{error_id}.json"
+        return self.BASE / "context" / "errors" / "active" / f"{error_id}.json"
 
     def get_task_path(self, task_id: str) -> Path:
         """Enhancement: file-based task dependency storage (from OmO)."""
-        return self.base / "tasks" / f"{task_id}.json"
+        return self.BASE / "tasks" / f"{task_id}.json"
 
     def get_inference_history_path(self) -> Path:
-        return self.base / "context" / "costs" / "inference-history.jsonl"
+        return self.BASE / "context" / "costs" / "inference-history.jsonl"
 
     def atomic_write_json(self, path: Path, data: dict) -> None:
         """Write to temp file in same directory, rename on success."""

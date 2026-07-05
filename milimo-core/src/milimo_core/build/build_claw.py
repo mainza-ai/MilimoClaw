@@ -548,7 +548,7 @@ class BuildClaw:
             try:
                 if self._fs:
                     plan_path = (
-                        self._fs.base / "context" / "sprint" / "current-plan.json"
+                        self._fs.BASE / "context" / "sprint" / "current-plan.json"
                     )
                 else:
                     break
