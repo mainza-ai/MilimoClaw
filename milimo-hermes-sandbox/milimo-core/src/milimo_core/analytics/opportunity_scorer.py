@@ -464,7 +464,7 @@ class OpportunityScorer:
 
     def write_opportunity_scores(self, opportunities: list[ScoredOpportunity]) -> None:
         """Write all opportunities to opportunity-scores.json."""
-        opp_path = self.fs.base / "reports" / "opportunity-scores.json"
+        opp_path = self.fs.BASE / "reports" / "opportunity-scores.json"
         opp_path.parent.mkdir(parents=True, exist_ok=True)
 
         data = {

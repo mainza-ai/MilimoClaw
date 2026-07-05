@@ -480,7 +480,7 @@ class ProjectManager:
     def _archive_project(self, client_id: str, project_id: str) -> None:
         """Move a completed project to the completed directory and log the action."""
         project_dir = self._fs.get_project_path(client_id, project_id)
-        completed_dir = self._fs._base / "completed" / client_id / project_id
+        completed_dir = self._fs.BASE / "completed" / client_id / project_id
         completed_dir.parent.mkdir(parents=True, exist_ok=True)
 
         if project_dir.exists():

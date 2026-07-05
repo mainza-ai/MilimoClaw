@@ -149,7 +149,7 @@ class IntakeManager:
         self._approval_handler = approval_handler
         self._operational_log = operational_log
         self._squad_niche = squad_niche
-        self._inquiries_dir = fs._base / "prospects"
+        self._inquiries_dir = fs.BASE / "prospects"
         self._pending_pricing: dict[str, dict[str, Any]] = {}
 
     def receive_inquiry(self, raw_inquiry: dict[str, Any]) -> TriageScore:
@@ -656,7 +656,7 @@ Keep it concise (under 150 words)."""
     ) -> bool:
         from datetime import timedelta
 
-        prospect_dir = self._fs._base / "prospects"
+        prospect_dir = self._fs.BASE / "prospects"
         if not prospect_dir.exists():
             return False
 

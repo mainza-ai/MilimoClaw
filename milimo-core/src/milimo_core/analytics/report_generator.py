@@ -185,7 +185,7 @@ class ReportGenerator:
         5. Rename temp to final path
         """
         report_path = self.fs.get_report_path()
-        archive_dir = self.fs.base / "reports" / "weekly-intelligence-archive"
+        archive_dir = self.fs.BASE / "reports" / "weekly-intelligence-archive"
         archive_dir.mkdir(parents=True, exist_ok=True)
 
         report_json = json.dumps(report.to_dict(), indent=2)
@@ -632,7 +632,7 @@ Write in a professional but friendly tone. Be specific with numbers. End with on
 
     def _collect_recent_anomalies(self) -> list[dict[str, Any]]:
         """Collect recent anomalies for the report."""
-        anomalies_dir = self.fs.base / "signals" / "anomalies"
+        anomalies_dir = self.fs.BASE / "signals" / "anomalies"
         anomalies: list[dict[str, Any]] = []
 
         if anomalies_dir.exists():
@@ -647,7 +647,7 @@ Write in a professional but friendly tone. Be specific with numbers. End with on
 
     def _collect_opportunities(self) -> list[dict[str, Any]]:
         """Collect scored opportunities."""
-        opp_path = self.fs.base / "reports" / "opportunity-scores.json"
+        opp_path = self.fs.BASE / "reports" / "opportunity-scores.json"
 
         if opp_path.exists():
             try:

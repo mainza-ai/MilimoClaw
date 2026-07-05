@@ -198,7 +198,7 @@ Respond with format: TIER HOURS (e.g., M 8)"""
         start_wait = time.time()
         while time.time() - start_wait < wait_timeout:
             signals_file = (
-                self._fs.base / "context" / "sprint" / "retention-signals.json"
+                self._fs.BASE / "context" / "sprint" / "retention-signals.json"
             )
             if (
                 self._dispatcher
@@ -238,7 +238,7 @@ Respond with format: TIER HOURS (e.g., M 8)"""
         )
 
         # Write plan atomically
-        plan_path = self._fs.base / "context" / "sprint" / "current-plan.json"
+        plan_path = self._fs.BASE / "context" / "sprint" / "current-plan.json"
         plan_data = {
             "plan_id": plan.plan_id,
             "generated_at": plan.generated_at,
@@ -276,7 +276,7 @@ Respond with format: TIER HOURS (e.g., M 8)"""
     # ------------------------------------------------------------------
 
     def handle_sprint_plan_approved(self, plan_id: str) -> dict[str, Any] | None:
-        plan_path = self._fs.base / "context" / "sprint" / "current-plan.json"
+        plan_path = self._fs.BASE / "context" / "sprint" / "current-plan.json"
         plan_data = self._fs.read_json(plan_path)
 
         if plan_data.get("plan_id") != plan_id:
@@ -301,7 +301,7 @@ Respond with format: TIER HOURS (e.g., M 8)"""
         actual_hours: float,
         sprint_id: str,
     ) -> None:
-        velocity_path = self._fs.base / "context" / "sprint" / "velocity.json"
+        velocity_path = self._fs.BASE / "context" / "sprint" / "velocity.json"
         velocity_data = self._read_velocity_data()
 
         sprints = velocity_data.get("sprints", [])
@@ -342,7 +342,7 @@ Respond with format: TIER HOURS (e.g., M 8)"""
         )
 
     def _read_velocity_data(self) -> dict[str, Any]:
-        velocity_path = self._fs.base / "context" / "sprint" / "velocity.json"
+        velocity_path = self._fs.BASE / "context" / "sprint" / "velocity.json"
         if velocity_path.exists():
             try:
                 data = self._fs.read_json(velocity_path)

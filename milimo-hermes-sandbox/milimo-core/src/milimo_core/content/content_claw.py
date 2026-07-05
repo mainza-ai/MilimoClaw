@@ -25,6 +25,7 @@ Outbound messages dispatched:
 from __future__ import annotations
 
 import logging
+import uuid
 from pathlib import Path
 from typing import Any, Callable
 
@@ -36,7 +37,8 @@ from .content_init import (
     ContentOperationalLog,
     LogEntry,
 )
-from .content_generator import ContentGenerator
+from .content_generator import ContentGenerator, DraftContext
+from .platform_publisher import PlatformCredentials, PlatformPublisher
 from .brief_manager import BriefManager
 from .approval_handler import ContentApprovalHandler
 from .platform_publisher import PlatformPublisher
@@ -643,13 +645,34 @@ class ContentClaw:
     def _publish(self, platform: str, content: str) -> dict:
         if not self._publisher:
             raise RuntimeError("ContentClaw not started — call startup() first")
-        self._publisher.publish(content, platform)
+        draft = Draft(
+            draft_id=f"draft-{uuid.uuid4().hex[:8]}",
+            platform=platform,
+            client_id=None,
+            project_id=None,
+            content_type="post",
+            raw_content=content,
+            processed_content=content,
+            status="approved",
+        )
+        credentials = PlatformCredentials(platform=platform, access_token="")
+        self._publisher.publish(draft, credentials)
         return {"status": "published", "platform": platform}
 
     def generate_content(self, brief: dict) -> dict:
         if not self._generator:
             raise RuntimeError("ContentClaw not started — call startup() first")
-        return self._generator._build_prompt(brief)
+        context = DraftContext(
+            topic=brief.get("topic"),
+            brief_text=brief.get("brief_text"),
+            tone_hint=brief.get("tone_hint"),
+            client_id=brief.get("client_id"),
+            project_id=brief.get("project_id"),
+            style_guide=brief.get("style_guide"),
+        )
+        platform = brief.get("platform", "generic")
+        prompt = self._generator._build_prompt(platform=platform, context=context)
+        return {"status": "generated", "platform": platform, "prompt": prompt}
 
     def schedule_content(self, item: dict) -> dict:
         if not self._scheduler:

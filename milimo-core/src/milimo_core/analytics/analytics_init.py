@@ -191,7 +191,7 @@ class AnalyticsFilesystemInit:
     """
 
     def __init__(self, base_path: Path | None = None) -> None:
-        self.base = base_path or BASE
+        self.BASE = base_path or BASE
 
     def initialize(self) -> InitResult:
         """
@@ -202,7 +202,7 @@ class AnalyticsFilesystemInit:
         result = InitResult()
 
         for rel_dir in REQUIRED_DIRS:
-            dir_path = self.base / rel_dir
+            dir_path = self.BASE / rel_dir
             try:
                 if dir_path.exists():
                     result.already_existed.append(rel_dir)
@@ -215,7 +215,7 @@ class AnalyticsFilesystemInit:
                 logger.error("Failed to create directory %s: %s", rel_dir, e)
 
         for rel_file in REQUIRED_FILES:
-            file_path = self.base / rel_file
+            file_path = self.BASE / rel_file
             try:
                 if file_path.exists():
                     result.already_existed.append(rel_file)
@@ -250,12 +250,12 @@ class AnalyticsFilesystemInit:
         result = ValidationResult()
 
         for rel_dir in REQUIRED_DIRS:
-            dir_path = self.base / rel_dir
+            dir_path = self.BASE / rel_dir
             if not dir_path.is_dir():
                 result.missing_dirs.append(rel_dir)
 
         for rel_file in REQUIRED_FILES:
-            file_path = self.base / rel_file
+            file_path = self.BASE / rel_file
             if not file_path.is_file():
                 result.missing_files.append(rel_file)
 
@@ -267,7 +267,7 @@ class AnalyticsFilesystemInit:
         signal_id: str,
     ) -> Path:
         """Get the path for a signal file."""
-        return self.base / "signals" / signal_type / f"{signal_id}.json"
+        return self.BASE / "signals" / signal_type / f"{signal_id}.json"
 
     def get_data_path(
         self,
@@ -275,28 +275,28 @@ class AnalyticsFilesystemInit:
         sub_path: str = "",
     ) -> Path:
         """Get the path for data storage."""
-        path = self.base / "data" / data_type
+        path = self.BASE / "data" / data_type
         if sub_path:
             path = path / sub_path
         return path
 
     def get_report_path(self, report_name: str = "weekly-intelligence.json") -> Path:
         """Get the path for a report file."""
-        return self.base / "reports" / report_name
+        return self.BASE / "reports" / report_name
 
     def get_archive_path(self, date_str: str) -> Path:
         """Get the archive path for a specific date."""
         return (
-            self.base / "reports" / "weekly-intelligence-archive" / f"{date_str}.json"
+            self.BASE / "reports" / "weekly-intelligence-archive" / f"{date_str}.json"
         )
 
     def get_baseline_path(self, baseline_type: str) -> Path:
         """Get the path for a baseline file."""
-        return self.base / "baselines" / f"{baseline_type}-baseline.json"
+        return self.BASE / "baselines" / f"{baseline_type}-baseline.json"
 
     def get_log_path(self, log_name: str) -> Path:
         """Get the path for a log file."""
-        return self.base / "logs" / log_name
+        return self.BASE / "logs" / log_name
 
 
 __all__ = [

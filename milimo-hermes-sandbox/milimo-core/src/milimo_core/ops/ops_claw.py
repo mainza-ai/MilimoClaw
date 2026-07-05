@@ -363,6 +363,11 @@ class OpsClaw:
         self._inbound_handlers["feature_brief_acknowledged"] = (
             self._handle_feature_brief_acknowledged
         )
+        self._inbound_handlers["hold_release"] = self._handle_hold_release
+        self._inbound_handlers["review_approve"] = self._handle_review_approve
+        self._inbound_handlers["review_reject"] = self._handle_review_reject
+        self._inbound_handlers["client_health_signal"] = self._handle_client_health_signal
+        self._inbound_handlers["fake_alert"] = self._handle_fake_alert
 
     def _register_approval_handlers(self) -> None:
         """Register default approval thresholds for ops actions.
@@ -757,6 +762,78 @@ class OpsClaw:
                     },
                 }
             )
+
+    def _handle_hold_release(self, message: dict[str, Any]) -> dict[str, Any]:
+        payload = message.get("payload", message)
+        action_id = payload.get("action_id", "")
+        if self._approval_handler:
+            self._approval_handler.log_auto(
+                action_type="mesh_hold_release",
+                entity_id=action_id,
+                content_preview=f"Hold release for action {action_id}",
+            )
+        return {"status": "processed", "role": "ops", "message_type": "hold_release"}
+
+    def _handle_review_approve(self, message: dict[str, Any]) -> dict[str, Any]:
+        payload = message.get("payload", message)
+        action_id = payload.get("action_id", "")
+        if self._approval_handler:
+            self._approval_handler.log_auto(
+                action_type="mesh_review_approve",
+                entity_id=action_id,
+                content_preview=f"Review approve for action {action_id}",
+            )
+        return {"status": "processed", "role": "ops", "message_type": "review_approve"}
+
+    def _handle_review_reject(self, message: dict[str, Any]) -> dict[str, Any]:
+        payload = message.get("payload", message)
+        action_id = payload.get("action_id", "")
+        reason = payload.get("reason", "")
+        if self._approval_handler:
+            self._approval_handler.log_auto(
+                action_type="mesh_review_reject",
+                entity_id=action_id,
+                content_preview=f"Review reject for action {action_id}: {reason}",
+            )
+        return {
+            "status": "processed",
+            "role": "ops",
+            "message_type": "review_reject",
+            "action_id": action_id,
+        }
+
+    def _handle_client_health_signal(self, message: dict[str, Any]) -> dict[str, Any]:
+        payload = message.get("payload", message)
+        client_id = payload.get("client_id", "")
+        status = payload.get("status", "unknown")
+        if self._health_scorer:
+            self._health_scorer.record_signal(client_id, status)
+        return {
+            "status": "processed",
+            "role": "ops",
+            "message_type": "client_health_signal",
+            "client_id": client_id,
+        }
+
+    def _handle_fake_alert(self, message: dict[str, Any]) -> dict[str, Any]:
+        payload = message.get("payload", message)
+        severity = payload.get("severity", "unknown")
+        if self._operational_log:
+            self._operational_log.append(
+                OpsLogEntry(
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    action_type="adversarial_alert_rejected",
+                    entity_id="fake_alert",
+                    outcome="rejected",
+                    details={"severity": severity, "reason": "unverified_sender"},
+                )
+            )
+        return {
+            "status": "rejected",
+            "role": "ops",
+            "message_type": "fake_alert",
+            "reason": "adversarial_input",
+        }
 
     @property
     def is_running(self) -> bool:

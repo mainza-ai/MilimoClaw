@@ -49,7 +49,7 @@ class TestAnalyticsFilesystemInit:
         assert len(result.created_dirs) > 0 or len(result.already_existed) > 0
 
         for rel_dir in REQUIRED_DIRS:
-            dir_path = fs.base / rel_dir
+            dir_path = fs.BASE / rel_dir
             assert dir_path.is_dir(), f"Directory not created: {rel_dir}"
 
     def test_initialize_creates_all_files(self, fs: AnalyticsFilesystemInit):
@@ -59,7 +59,7 @@ class TestAnalyticsFilesystemInit:
         assert result.success
 
         for rel_file in REQUIRED_FILES:
-            file_path = fs.base / rel_file
+            file_path = fs.BASE / rel_file
             assert file_path.is_file(), f"File not created: {rel_file}"
 
     def test_initialize_is_idempotent(self, fs: AnalyticsFilesystemInit):
@@ -80,7 +80,7 @@ class TestAnalyticsFilesystemInit:
 
         for rel_file in REQUIRED_FILES:
             if rel_file.endswith(".json"):
-                file_path = fs.base / rel_file
+                file_path = fs.BASE / rel_file
                 content = file_path.read_text()
                 try:
                     data = json.loads(content)
@@ -114,7 +114,7 @@ class TestAnalyticsFilesystemInit:
         """Test that validate fails when files are missing."""
         fs.initialize()
 
-        some_file = fs.base / REQUIRED_FILES[0]
+        some_file = fs.BASE / REQUIRED_FILES[0]
         if some_file.exists():
             some_file.unlink()
 
@@ -130,20 +130,20 @@ class TestAnalyticsFilesystemInit:
         assert not result.valid
 
         for rel_dir in REQUIRED_DIRS:
-            dir_path = fs.base / rel_dir
+            dir_path = fs.BASE / rel_dir
             assert not dir_path.exists(), f"Validate should not create: {rel_dir}"
 
     def test_get_signal_path_returns_correct_path(self, fs: AnalyticsFilesystemInit):
         """Test that get_signal_path returns expected path."""
         path = fs.get_signal_path("anomalies", "test-signal-123")
 
-        assert path == fs.base / "signals" / "anomalies" / "test-signal-123.json"
+        assert path == fs.BASE / "signals" / "anomalies" / "test-signal-123.json"
 
     def test_get_data_path_returns_correct_path(self, fs: AnalyticsFilesystemInit):
         """Test that get_data_path returns expected path."""
         path = fs.get_data_path("content-performance")
 
-        assert path == fs.base / "data" / "content-performance"
+        assert path == fs.BASE / "data" / "content-performance"
 
     def test_get_data_path_with_sub_path(self, fs: AnalyticsFilesystemInit):
         """Test that get_data_path with sub_path returns correct path."""
@@ -153,7 +153,7 @@ class TestAnalyticsFilesystemInit:
 
         assert (
             path
-            == fs.base
+            == fs.BASE
             / "data"
             / "content-performance"
             / "linkedin"
@@ -165,19 +165,19 @@ class TestAnalyticsFilesystemInit:
         """Test that get_report_path returns expected path."""
         path = fs.get_report_path()
 
-        assert path == fs.base / "reports" / "weekly-intelligence.json"
+        assert path == fs.BASE / "reports" / "weekly-intelligence.json"
 
     def test_get_baseline_path_returns_correct_path(self, fs: AnalyticsFilesystemInit):
         """Test that get_baseline_path returns expected path."""
         path = fs.get_baseline_path("content")
 
-        assert path == fs.base / "baselines" / "content-baseline.json"
+        assert path == fs.BASE / "baselines" / "content-baseline.json"
 
     def test_get_log_path_returns_correct_path(self, fs: AnalyticsFilesystemInit):
         """Test that get_log_path returns expected path."""
         path = fs.get_log_path("operational.log")
 
-        assert path == fs.base / "logs" / "operational.log"
+        assert path == fs.BASE / "logs" / "operational.log"
 
 
 class TestAnalyticsLogEntry:

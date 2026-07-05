@@ -65,7 +65,7 @@ class DocMaintainer:
             pr_type = pr.get("type", "fix")
             pr_description = pr.get("description", "")
 
-        changelog_path = self._fs.base / "docs" / "changelog.md"
+        changelog_path = self._fs.BASE / "docs" / "changelog.md"
 
         # Use inference to generate changelog entry
         if self._inference is not None:
@@ -137,7 +137,7 @@ class DocMaintainer:
                 devlog += f"- {d.entity_id}: {d.outcome}\n"
             devlog += "\n"
 
-        devlog_path = self._fs.base / "docs" / "devlog" / f"week-{week_start}.md"
+        devlog_path = self._fs.BASE / "docs" / "devlog" / f"week-{week_start}.md"
         devlog_path.parent.mkdir(parents=True, exist_ok=True)
         devlog_path.write_text(devlog)
 
@@ -186,7 +186,7 @@ class DocMaintainer:
         for f in changed_files:
             if f.endswith((".py", ".ts", ".js")):
                 # Check if corresponding docs exist
-                doc_path = self._fs.base / "docs" / (f.replace("/", "_") + ".md")
+                doc_path = self._fs.BASE / "docs" / (f.replace("/", "_") + ".md")
                 if doc_path.exists():
                     # Simple heuristic: if code changed, docs might be stale
                     drifted_docs.append(f)

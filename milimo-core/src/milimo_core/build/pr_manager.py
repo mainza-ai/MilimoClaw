@@ -92,7 +92,7 @@ class PRManager:
         gh_number, gh_url = self._github.create_pull_request(
             title=f"Fix #{resolution.issue_number}",
             body=str(description),
-            branch=resolution.branch_name,
+            head_branch=resolution.branch_name,
         )
 
         pr = PRRecord(
@@ -169,6 +169,10 @@ class PRManager:
             pr_title=pr_data.get("title", ""),
             github_pr_url=pr_data.get("github_pr_url", ""),
         )
+
+        # Persist hold_action_id into the approved record
+        pr_data["hold_action_id"] = hold_action_id
+        self._fs.atomic_write_json(approved_path, pr_data)
 
         self._pr_log.append("review_approved", pr_id, {})
         self._log.append(

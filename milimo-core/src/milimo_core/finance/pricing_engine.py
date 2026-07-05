@@ -200,7 +200,7 @@ class PricingEngine:
         ceiling_multiplier, scope_weights.
         Return defaults if file is empty or missing keys.
         """
-        rules_path = self.fs.base / "pricing" / "rules.json"
+        rules_path = self.fs.BASE / "pricing" / "rules.json"
         defaults = {
             "default_hourly_rate": float(os.environ.get("MILIMO_HOURLY_RATE", "100")),
             "floor_multiplier": float(os.environ.get("MILIMO_FLOOR_MULTIPLIER", "0.8")),
@@ -230,7 +230,7 @@ class PricingEngine:
         Return list of {estimated_hours, actual_hours, accuracy_pct}.
         Used to calibrate current estimate.
         """
-        history_dir = self.fs.base / "pricing" / "history"
+        history_dir = self.fs.BASE / "pricing" / "history"
         if not history_dir.exists():
             return []
 

@@ -103,7 +103,7 @@ class ClientHealthScorer:
         self._operational_log = operational_log
         self._comms_log = comms_log
         self._decisions_log_path = (
-            decisions_log_path or fs._base / "logs" / "decisions.log"
+            decisions_log_path or fs.BASE / "logs" / "decisions.log"
         )
 
     def score_client(self, client_id: str) -> ClientHealthScore:
@@ -337,7 +337,7 @@ Respond in JSON format:
 
     def _count_deliverables(self, client_id: str) -> int:
         count = 0
-        active_dir = self._fs._base / "active" / client_id / "projects"
+        active_dir = self._fs.BASE / "active" / client_id / "projects"
         if not active_dir.exists():
             return count
 

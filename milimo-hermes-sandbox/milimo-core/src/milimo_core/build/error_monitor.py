@@ -166,7 +166,7 @@ class ErrorMonitor:
     # ------------------------------------------------------------------
 
     def _load_known_pattern(self, root_cause: str) -> ErrorPattern | None:
-        patterns_dir = self._fs.base / "context" / "errors" / "patterns"
+        patterns_dir = self._fs.BASE / "context" / "errors" / "patterns"
         if not patterns_dir.exists():
             return None
 
