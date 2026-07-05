@@ -9,7 +9,7 @@
 - `milimo-hermes-sandbox/`
 - `docs/adr/001-subagent-isolation.md` through `005-delegation-asymmetry.md`
 
-**Last updated**: 2026-07-04
+**Last updated**: 2026-07-05
 
 **Tags**: #architecture #hermes #profile #dual-track
 

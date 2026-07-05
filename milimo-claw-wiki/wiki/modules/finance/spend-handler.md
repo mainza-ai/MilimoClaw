@@ -226,7 +226,7 @@ This keeps the TUI and inter-claw gateway responsive for the entire approval win
 | **F-15** | High | **Fixed (2026-07-05)** | `_get_request` `hold/queued` reconstruction branch (lines 172-174) hardcoded `payment_method_id=None`, `justification=""`, and `credential_type="card"`. Fixed in commit `3f9ea89`: now reads all three from `decisions.log` `details`, mirroring the correct `review/queued` branch at lines 158-160. |
 | **F-16** | Medium | **Fixed (2026-07-05)** | `_log_decision()` had no guard against `decision.get("spend_id")` being `None` or missing. Fixed in commit `3f9ea89`: added early-return guard with warning log before any file write. |
 | **F-17** | Medium | **Fixed (2026-07-05)** | `handle_hold_release` called `_validate_justification(request)` at line 430 outside the `try` block. Fixed in commit `3f9ea89`: wrapped in `try/except ValueError`, logs `release_failed / invalid_justification` and returns `blocked` status. |
-| **F-18** | High | **Fixed (2026-07-05)** | `handle_hold_release` and `_poll_spend_request` built `env = {**os.environ}` without propagating proxy vars. Inside Hermes `execute_code`, `os.environ` lacks `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `NODE_USE_ENV_PROXY`, causing Node.js `link-cli` to fail with opaque `UNKNOWN` error when calling `api.link.com`. Fixed in commit `3f9ea89`: added `_build_link_cli_env()` helper that explicitly propagates proxy vars plus `XDG_CONFIG_HOME`; replaced inline env-building at lines 522 and 955 with single helper call. |
+| **F-18** | High | **Enhanced (2026-07-05, commit `91388df`)** | `handle_hold_release` and `_poll_spend_request` originally built `env = {**os.environ}` without propagating proxy vars. Commit `3f9ea89` added `_build_link_cli_env()` to propagate proxy vars from `os.environ`. Commit `91388df` further enhanced it with `_discover_proxy_env()` fallback: when proxy vars are absent from `os.environ` (Hermes `execute_code` case), the handler now reads `/etc/environment`, `/etc/environment.d/*.conf`, `~/.config/environment.d/*.conf`, `/sandbox/.config/milimo/proxy.env`, and `/proc/<pid>/environ` from running processes to recover proxy settings. `NODE_USE_ENV_PROXY=1` is always set so the Node.js `link-cli` respects discovered proxies. |
 
 ---
 
@@ -446,29 +446,32 @@ Without this, a blank justification (from F-15's effect) propagates a bare `Valu
 
 ---
 
-### Fix F-18 — Propagate proxy env vars into `link-cli` subprocess
+### Fix F-18 — Propagate proxy env vars into `link-cli` subprocess (enhanced fallback)
 
 **File**: `milimo-core/src/milimo_core/finance/spend_handler.py`
-**New helper method** (insert in `SpendApprovalHandler` class, before `_log_decision`):
+**New/updated methods**: `_build_link_cli_env`, `_discover_proxy_env`
+
+#### `_build_link_cli_env`
 
 ```python
 def _build_link_cli_env(self, operator_id: str | None = None) -> dict[str, str]:
-    """Build env dict for link-cli subprocess, ensuring proxy vars and
-    XDG_CONFIG_HOME are set regardless of whether the call originates
-    from a terminal shell or Hermes execute_code."""
-    env: dict[str, str] = {**os.environ}
+    env: dict[str, str] = {
+        **os.environ,
+        "NODE_USE_ENV_PROXY": os.environ.get("NODE_USE_ENV_PROXY", "1"),
+    }
 
-    # Propagate proxy settings so link-cli (Node.js) can reach api.link.com
-    # inside the sandbox network path. execute_code runtime may not include
-    # these in os.environ even when the terminal shell exports them.
-    for var in (
-        "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
-        "http_proxy", "https_proxy", "no_proxy",
-        "NODE_USE_ENV_PROXY",
-    ):
-        value = os.environ.get(var)
+    proxy_vars = ("HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+                  "http_proxy", "https_proxy", "no_proxy")
+    for var in proxy_vars:
+        value = env.get(var) or os.environ.get(var)
         if value:
             env[var] = value
+
+    if not any(env.get(v) for v in proxy_vars):
+        fallback = self._discover_proxy_env()
+        env.update(fallback)
+        if fallback:
+            env["NODE_USE_ENV_PROXY"] = "1"
 
     # Operator-scoped XDG_CONFIG_HOME for link-cli credentials isolation
     if operator_id:
@@ -487,40 +490,87 @@ def _build_link_cli_env(self, operator_id: str | None = None) -> dict[str, str]:
     return env
 ```
 
+#### `_discover_proxy_env`
+
+```python
+def _discover_proxy_env(self) -> dict[str, str]:
+    result: dict[str, str] = {}
+
+    # 1. /etc/environment
+    env_file = Path("/etc/environment")
+    if env_file.is_file():
+        for line in env_file.read_text().splitlines():
+            key, _, val = line.strip().partition("=")
+            if key.strip() in PROXY_KEYS:
+                result[key.strip()] = val.strip().strip("\"'")
+
+    # 2. /etc/environment.d/*.conf
+    for conf in Path("/etc/environment.d").glob("*.conf"):
+        for line in conf.read_text().splitlines():
+            key, _, val = line.strip().partition("=")
+            if key.strip() in PROXY_KEYS:
+                result[key.strip()] = val.strip().strip("\"'")
+
+    # 3. ~/.config/environment.d/*.conf
+    for conf in (Path.home() / ".config" / "environment.d").glob("*.conf"):
+        for line in conf.read_text().splitlines():
+            key, _, val = line.strip().partition("=")
+            if key.strip() in PROXY_KEYS:
+                result[key.strip()] = val.strip().strip("\"'")
+
+    # 4. /sandbox/.config/milimo/proxy.env (explicit override)
+    milimo_proxy = Path("/sandbox/.config/milimo/proxy.env")
+    if milimo_proxy.is_file():
+        for line in milimo_proxy.read_text().splitlines():
+            key, _, val = line.strip().partition("=")
+            if key.strip() in PROXY_KEYS:
+                result[key.strip()] = val.strip().strip("\"'")
+
+    # 5. /proc/<pid>/environ (running processes)
+    for entry in Path("/proc").iterdir():
+        if not entry.is_dir() or not entry.name.isdigit():
+            continue
+        environ_file = entry / "environ"
+        if not environ_file.is_file():
+            continue
+        for token in environ_file.read_bytes().decode("utf-8", errors="replace").split("\x00"):
+            if "=" not in token:
+                continue
+            key, _, val = token.partition("=")
+            if key in result:
+                continue
+            if key in PROXY_KEYS and val:
+                result[key] = val
+        if all(k in result for k in ("HTTP_PROXY", "HTTPS_PROXY")) or \
+           ("http_proxy" in result and "https_proxy" in result):
+            break
+
+    return result
+```
+
 **Call-site replacements**:
 
-In `handle_hold_release` — replace lines 509–524:
+In `handle_hold_release` — replace inline env-building:
 ```python
 # OLD:
 env = {**os.environ}
-if operator_id:
-    safe_op_id = ...
-    ...
-else:
-    if os.path.exists("/sandbox/.config"):
-        env["XDG_CONFIG_HOME"] = "/sandbox/.config"
+# ... manual XDG_CONFIG_HOME logic ...
 
 # NEW:
 env = self._build_link_cli_env(operator_id)
 ```
 
-In `_poll_spend_request` — replace lines 912–924:
-```python
-# OLD:
-env = {**os.environ}
-if operator_id:
-    safe_op_id = ...
-else:
-    ...
-
-# NEW:
-env = self._build_link_cli_env(operator_id)
-```
+In `_poll_spend_request` — same replacement.
 
 **Root cause confirmed by Hermes agent (2026-07-05 session)**:
-Terminal shell env includes `HTTP_PROXY=http://10.200.0.1:3128`, `HTTPS_PROXY=http://10.200.0.1:3128`, `NO_PROXY=localhost,127.0.0.1,::1,10.200.0.1`, `NODE_USE_ENV_PROXY=1`. `execute_code` runtime env does not. `link-cli` is a Node.js CLI; Node picks up proxy from these env vars. Without them, the request to `api.link.com` fails inside the sandbox network path, and `link-cli` returns the opaque UNKNOWN error instead of a clearer DNS/timeout message.
+Terminal shell env includes `HTTP_PROXY=http://10.200.0.1:3128`, `HTTPS_PROXY=http://10.200.0.1:3128`, `NO_PROXY=localhost,127.0.0.1,::1,...`, `NODE_USE_ENV_PROXY=1`. Hermes `execute_code` runtime env does **not**. `link-cli` is a Node.js binary; Node's HTTP client reads proxy settings from these env vars. Without them, the request to `api.link.com` fails inside the sandbox network path, and `link-cli` returns the opaque `UNKNOWN` error.
 
-**Repro**: Same `link-cli spend-request create` command in `execute_code` without proxy vars → rc=1, UNKNOWN. Same command with proxy vars injected → rc=0, valid `lsrq_*`.
+Commit `3f9ea89` added `_build_link_cli_env()` with direct `os.environ` propagation. Commit `91388df` added `_discover_proxy_env()` fallback so that even when `os.environ` is stripped by Hermes `execute_code`, proxy settings are recovered from system config files (`/etc/environment`, `/etc/environment.d`, `~/.config/environment.d`, `/sandbox/.config/milimo/proxy.env`) and running `/proc/<pid>/environ` entries. `NODE_USE_ENV_PROXY=1` is always set so Node.js `link-cli` respects discovered proxies.
+
+**Repro history**:
+- 3 consecutive `link-cli spend-request create --no-request-approval --test` from `execute_code` → rc=1, `UNKNOWN`
+- Same command from Hermes terminal tool → rc=0, `lsrq_1Tphn3K2MJSohSIrXcB1pCMq`
+- Agent manually bypassed via terminal, then completed formal flow through registered `milimo_spend` tool
 
 ---
 

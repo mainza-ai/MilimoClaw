@@ -400,7 +400,19 @@ env | grep -i proxy
 # → NODE_USE_ENV_PROXY=1
 ```
 
-**Fix**: This is a code fix in `SpendApprovalHandler`, not a user workaround. See [[spend-handler]] Fix F-18 (`_build_link_cli_env` helper). The handler must explicitly propagate proxy vars into the subprocess `env` dict before calling `subprocess.run`. Until the code fix lands, the only workaround is to run the spend flow from the terminal shell (which has the proxy vars) rather than relying on `execute_code`.
+**Fix**: This is resolved in commit `91388df` via `SpendApprovalHandler._discover_proxy_env()`. The handler now:
+1. Starts from `os.environ` (terminal shell case — fast path)
+2. Falls back to system config sources when proxy vars are absent:
+   - `/etc/environment`
+   - `/etc/environment.d/*.conf`
+   - `~/.config/environment.d/*.conf`
+   - `/sandbox/.config/milimo/proxy.env`
+   - `/proc/<pid>/environ` from running processes
+3. Sets `NODE_USE_ENV_PROXY=1` whenever fallback proxy vars are injected
+
+After rebuilding the sandbox image with this fix, `execute_code` calls succeed without manual proxy injection.
+
+See [[spend-handler]] Fix F-18 for the implementation detail.
 
 ---
 
