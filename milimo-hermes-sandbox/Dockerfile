@@ -32,7 +32,7 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/hermes/.venv
 # Copy milimo-core first (changes less often → better layer caching)
 COPY milimo-core/ /opt/milimo-core/
 RUN chmod -R a+rX,go-w /opt/milimo-core/ \
-    && uv pip install --no-cache-dir -e /opt/milimo-core/
+    && uv pip install --no-cache-dir /opt/milimo-core/
 
 # Also make milimo-core importable from the system Python interpreter
 # (Hermes agent subprocesses may resolve `python3` to /usr/bin/python3)

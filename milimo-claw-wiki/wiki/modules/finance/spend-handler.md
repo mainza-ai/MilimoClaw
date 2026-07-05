@@ -223,6 +223,10 @@ This keeps the TUI and inter-claw gateway responsive for the entire approval win
 | **F-11** | Medium | **Fixed (2026-07-04)** | `SpendApprovalHandler.close()` signals all polling threads to stop and joins them with 10s timeout. |
 | **F-12** | Low | **Fixed (2026-07-04)** | War Room server argparse default changed from `8080` to `9090`. |
 | **F-14** | Low | **Fixed (2026-07-04)** | `_lsrq_index: dict[str, str]` added for O(1) `lsrq_*` → `spend_id` lookups; populated on every successful `create`. |
+| **F-15** | High | **Open (2026-07-05)** | `_get_request` `hold/queued` reconstruction branch (lines 172-174) hardcodes `payment_method_id=None`, `justification=""`, and `credential_type="card"` instead of reading them from `decisions.log` `details`. This causes `handle_hold_release` to emit `cmd_create` without `--payment-method-id` and with empty `--context`, producing an incomplete spend-request body. The `review/queued` branch at line 158-160 does this correctly; `hold/queued` must mirror it. |
+| **F-16** | Medium | **Open (2026-07-05)** | `_log_decision()` (line 791) has no guard against `decision.get("spend_id")` being `None` or missing. Any caller that builds a decision dict without `spend_id` (e.g. initial test attempts) writes a corrupt JSON line to `decisions.log`. `_recover_and_resume_polling` guards on read (`if not spend_id: continue`), but the write side is unguarded. Log pollution from `spend-review-None` entries survives daemon restarts. |
+| **F-17** | Medium | **Open (2026-07-05)** | `handle_hold_release` calls `_validate_justification(request)` at line 430 outside the `try` block that wraps the subprocess. If F-15 causes `justification=""` to reach the validator, a bare `ValueError` propagates unhandled up the call stack. The request is not logged and the operator receives no structured error. |
+| **F-18** | High | **Open (2026-07-05)** | `handle_hold_release` and `_poll_spend_request` build `env = {**os.environ}` before calling `subprocess.run(cmd, ..., env=env)`. Inside Hermes `execute_code`, `os.environ` does not include `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, or `NODE_USE_ENV_PROXY`. `link-cli` is a Node.js binary; without these vars it cannot route HTTP requests to `api.link.com` through the sandbox outbound proxy (`http://10.200.0.1:3128`). The CLI returns `{"code":"UNKNOWN","message":"Request failed: POST https://api.link.com/spend_requests"}` — opaque because the underlying failure is DNS/network unreachability, not a Stripe API error. The identical command succeeds in the terminal shell because the shell inherits proxy vars. Verified root cause by Hermes agent repro: same command in `execute_code` without proxy vars → rc=1 UNKNOWN; with proxy vars injected → rc=0, valid `lsrq_*` returned. |
 
 ---
 
@@ -364,8 +368,163 @@ finance:
 - [[war-room]] — TUI for pending actions
 - [[message-contracts]] — Message types
 - [[test-spend-flow]] — Automated tests for JSON parsing, state recovery, background polling, and bridge fallback
+- [[link-cli-setup]] — link-cli auth, proxy configuration, and UNKNOWN error troubleshooting
+- [[sandbox-isolation]] — Landlock, network namespace, and why proxy vars may be absent in execute_code
 
 ---
+
+## Open Findings — Fix Plan (2026-07-05)
+
+### Fix F-15 — Restore lost fields in `hold/queued` reconstruction
+
+**File**: `milimo-core/src/milimo_core/finance/spend_handler.py`
+**Lines**: 172–174
+
+Replace the hardcoded values in the `hold/queued` branch of `_get_request`:
+
+```python
+# BEFORE (lines 172-174):
+justification="",
+payment_method_id=None,
+credential_type="card",
+
+# AFTER:
+justification=details.get("justification", ""),
+payment_method_id=details.get("payment_method_id"),
+credential_type=details.get("credential_type", "card"),
+```
+
+This mirrors the correct pattern already used in the `review/queued` branch at lines 158–160. After this fix, `handle_hold_release` reconstructs a complete `SpendRequest` with the original `payment_method_id`, `justification`, and `credential_type`, so `cmd_create` includes `--payment-method-id`, a non-empty `--context`, and the correct `--credential-type`.
+
+---
+
+### Fix F-16 — Guard `_log_decision` against `spend_id=None`
+
+**File**: `milimo-core/src/milimo_core/finance/spend_handler.py`
+**Insert before line 794** (`self.decisions_path.parent.mkdir(...)`):
+
+```python
+spend_id = decision.get("spend_id")
+if not spend_id:
+    logger.warning(
+        "_log_decision: refusing to write entry without spend_id; "
+        "action_id=%s stage=%s action_type=%s",
+        decision.get("action_id"),
+        decision.get("stage"),
+        decision.get("action_type"),
+    )
+    return
+```
+
+Prevents garbage entries like `{"action_id":"spend-review-None","spend_id":null,...}` from polluting `decisions.log`.
+
+---
+
+### Fix F-17 — Catch `ValueError` from `_validate_justification` in `handle_hold_release`
+
+**File**: `milimo-core/src/milimo_core/finance/spend_handler.py`
+**Replace line 430** (`_validate_justification(request)`):
+
+```python
+try:
+    _validate_justification(request)
+except ValueError as ve:
+    request.status = "blocked"
+    self._log_decision({
+        "action_id": action_id,
+        "spend_id": spend_id,
+        "stage": "hold",
+        "action_type": "release_failed",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "operator": operator_id or "operator",
+        "details": {"outcome": "invalid_justification", "error": str(ve)},
+    })
+    return request
+```
+
+Without this, a blank justification (from F-15's effect) propagates a bare `ValueError` unhandled up the call stack with no structured decision logged.
+
+---
+
+### Fix F-18 — Propagate proxy env vars into `link-cli` subprocess
+
+**File**: `milimo-core/src/milimo_core/finance/spend_handler.py`
+**New helper method** (insert in `SpendApprovalHandler` class, before `_log_decision`):
+
+```python
+def _build_link_cli_env(self, operator_id: str | None = None) -> dict[str, str]:
+    """Build env dict for link-cli subprocess, ensuring proxy vars and
+    XDG_CONFIG_HOME are set regardless of whether the call originates
+    from a terminal shell or Hermes execute_code."""
+    env: dict[str, str] = {**os.environ}
+
+    # Propagate proxy settings so link-cli (Node.js) can reach api.link.com
+    # inside the sandbox network path. execute_code runtime may not include
+    # these in os.environ even when the terminal shell exports them.
+    for var in (
+        "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+        "http_proxy", "https_proxy", "no_proxy",
+        "NODE_USE_ENV_PROXY",
+    ):
+        value = os.environ.get(var)
+        if value:
+            env[var] = value
+
+    # Operator-scoped XDG_CONFIG_HOME for link-cli credentials isolation
+    if operator_id:
+        safe_op_id = "".join(c for c in operator_id if c.isalnum() or c in ("-", "_")).strip()
+        if safe_op_id and safe_op_id not in ("system", "operator", "sandbox"):
+            base_config_dir = "/sandbox/.config" if os.path.exists("/sandbox") else os.path.expanduser("~/.config")
+            user_config_dir = f"{base_config_dir}/users/{safe_op_id}"
+            env["XDG_CONFIG_HOME"] = user_config_dir
+        else:
+            if os.path.exists("/sandbox/.config"):
+                env["XDG_CONFIG_HOME"] = "/sandbox/.config"
+    else:
+        if os.path.exists("/sandbox/.config"):
+            env["XDG_CONFIG_HOME"] = "/sandbox/.config"
+
+    return env
+```
+
+**Call-site replacements**:
+
+In `handle_hold_release` — replace lines 509–524:
+```python
+# OLD:
+env = {**os.environ}
+if operator_id:
+    safe_op_id = ...
+    ...
+else:
+    if os.path.exists("/sandbox/.config"):
+        env["XDG_CONFIG_HOME"] = "/sandbox/.config"
+
+# NEW:
+env = self._build_link_cli_env(operator_id)
+```
+
+In `_poll_spend_request` — replace lines 912–924:
+```python
+# OLD:
+env = {**os.environ}
+if operator_id:
+    safe_op_id = ...
+else:
+    ...
+
+# NEW:
+env = self._build_link_cli_env(operator_id)
+```
+
+**Root cause confirmed by Hermes agent (2026-07-05 session)**:
+Terminal shell env includes `HTTP_PROXY=http://10.200.0.1:3128`, `HTTPS_PROXY=http://10.200.0.1:3128`, `NO_PROXY=localhost,127.0.0.1,::1,10.200.0.1`, `NODE_USE_ENV_PROXY=1`. `execute_code` runtime env does not. `link-cli` is a Node.js CLI; Node picks up proxy from these env vars. Without them, the request to `api.link.com` fails inside the sandbox network path, and `link-cli` returns the opaque UNKNOWN error instead of a clearer DNS/timeout message.
+
+**Repro**: Same `link-cli spend-request create` command in `execute_code` without proxy vars → rc=1, UNKNOWN. Same command with proxy vars injected → rc=0, valid `lsrq_*`.
+
+---
+
+## See Also
 
 ## See Also
 

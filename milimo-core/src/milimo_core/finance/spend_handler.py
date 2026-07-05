@@ -169,9 +169,9 @@ class SpendApprovalHandler:
                                 merchant_url=details.get("merchant_url", ""),
                                 amount_cents=details.get("amount_cents", 0),
                                 currency=details.get("currency", "USD"),
-                                justification="",
-                                payment_method_id=None,
-                                credential_type="card",
+                                justification=details.get("justification", ""),
+                                payment_method_id=details.get("payment_method_id"),
+                                credential_type=details.get("credential_type", "card"),
                             )
                             self._requests[spend_id] = req
                             break
@@ -427,9 +427,22 @@ class SpendApprovalHandler:
         """
         spend_id = action_id.replace("spend-hold-", "")
         request = self._get_request(spend_id)
-        _validate_justification(request)
-
-        from datetime import datetime, timezone
+        try:
+            _validate_justification(request)
+        except ValueError as ve:
+            request.status = "blocked"
+            self._log_decision(
+                {
+                    "action_id": action_id,
+                    "spend_id": spend_id,
+                    "stage": "hold",
+                    "action_type": "release_failed",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "operator": operator_id or "operator",
+                    "details": {"outcome": "invalid_justification", "error": str(ve)},
+                }
+            )
+            return request
 
         # 1. Acquire atomic filesystem lock
         lock_path = self.spend_log_path.parent / f".spend_lock_{spend_id}"
@@ -506,22 +519,7 @@ class SpendApprovalHandler:
                 )
                 return request
 
-            env = {**os.environ}
-            if operator_id:
-                safe_op_id = "".join(c for c in operator_id if c.isalnum() or c in ("-", "_")).strip()
-                if safe_op_id and safe_op_id not in ("system", "operator", "sandbox"):
-                    base_config_dir = "/sandbox/.config" if os.path.exists("/sandbox") else os.path.expanduser("~/.config")
-                    user_config_dir = f"{base_config_dir}/users/{safe_op_id}"
-                    env["XDG_CONFIG_HOME"] = user_config_dir
-                    logger.info("Isolating link-cli XDG_CONFIG_HOME for operator %s to %s", safe_op_id, user_config_dir)
-                else:
-                    if os.path.exists("/sandbox/.config"):
-                        env["XDG_CONFIG_HOME"] = "/sandbox/.config"
-                        logger.info("Setting default sandbox XDG_CONFIG_HOME to /sandbox/.config")
-            else:
-                if os.path.exists("/sandbox/.config"):
-                    env["XDG_CONFIG_HOME"] = "/sandbox/.config"
-                    logger.info("Setting default sandbox XDG_CONFIG_HOME to /sandbox/.config")
+            env = self._build_link_cli_env(operator_id)
 
             cmd_create = [
                 self.link_cli_path,
@@ -788,9 +786,54 @@ class SpendApprovalHandler:
             finally:
                 fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
+    def _build_link_cli_env(self, operator_id: str | None = None) -> dict[str, str]:
+        """Build env dict for link-cli subprocess.
+
+        Propagates the sandbox proxy settings so the Node.js link-cli binary
+        can reach api.link.com regardless of whether the caller runs in the
+        terminal shell (which inherits proxy vars) or Hermes execute_code
+        (which does not).
+        """
+        env: dict[str, str] = {**os.environ}
+
+        for var in (
+            "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+            "http_proxy", "https_proxy", "no_proxy",
+            "NODE_USE_ENV_PROXY",
+        ):
+            value = os.environ.get(var)
+            if value:
+                env[var] = value
+
+        if operator_id:
+            safe_op_id = "".join(c for c in operator_id if c.isalnum() or c in ("-", "_")).strip()
+            if safe_op_id and safe_op_id not in ("system", "operator", "sandbox"):
+                base_config_dir = "/sandbox/.config" if os.path.exists("/sandbox") else os.path.expanduser("~/.config")
+                user_config_dir = f"{base_config_dir}/users/{safe_op_id}"
+                env["XDG_CONFIG_HOME"] = user_config_dir
+            else:
+                if os.path.exists("/sandbox/.config"):
+                    env["XDG_CONFIG_HOME"] = "/sandbox/.config"
+        else:
+            if os.path.exists("/sandbox/.config"):
+                env["XDG_CONFIG_HOME"] = "/sandbox/.config"
+
+        return env
+
     def _log_decision(self, decision: dict) -> None:
         import fcntl
         import os
+
+        spend_id = decision.get("spend_id")
+        if not spend_id:
+            logger.warning(
+                "_log_decision: refusing to write entry without spend_id; "
+                "action_id=%s stage=%s action_type=%s",
+                decision.get("action_id"),
+                decision.get("stage"),
+                decision.get("action_type"),
+            )
+            return
 
         self.decisions_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.decisions_path, "a") as f:
@@ -909,19 +952,7 @@ class SpendApprovalHandler:
         """Background thread logic to poll link-cli retrieve status."""
 
         # Set environment with correct isolation
-        env = {**os.environ}
-        if operator_id:
-            safe_op_id = "".join(c for c in operator_id if c.isalnum() or c in ("-", "_")).strip()
-            if safe_op_id and safe_op_id not in ("system", "operator", "sandbox"):
-                base_config_dir = "/sandbox/.config" if os.path.exists("/sandbox") else os.path.expanduser("~/.config")
-                user_config_dir = f"{base_config_dir}/users/{safe_op_id}"
-                env["XDG_CONFIG_HOME"] = user_config_dir
-            else:
-                if os.path.exists("/sandbox/.config"):
-                    env["XDG_CONFIG_HOME"] = "/sandbox/.config"
-        else:
-            if os.path.exists("/sandbox/.config"):
-                env["XDG_CONFIG_HOME"] = "/sandbox/.config"
+        env = self._build_link_cli_env(operator_id)
 
         cmd = [
             self.link_cli_path,

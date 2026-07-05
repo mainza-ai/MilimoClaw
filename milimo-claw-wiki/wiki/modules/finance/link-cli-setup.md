@@ -376,6 +376,32 @@ Use: `link-cli payment-methods list`
 - Ensure you are logged in to the **same** Stripe Link account that created the request — cross-account approval is not supported
 - Check that test mode matches: a `--test` request must be approved in the Stripe **test** Dashboard; a live request must be approved in the **live** Dashboard
 
+### `UNKNOWN` error on `POST https://api.link.com/spend_requests` inside Hermes `execute_code`
+
+**Symptom**: `link-cli spend-request create` returns rc=1 with `{"code":"UNKNOWN","message":"Request failed: POST https://api.link.com/spend_requests"}` and empty stderr when invoked from Hermes `execute_code`. The identical command in the terminal shell succeeds with rc=0.
+
+**Root cause**: The sandbox terminal shell exports `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, and `NODE_USE_ENV_PROXY` (set by the OpenShell gateway or shell profile). Hermes `execute_code` runtime does **not** inherit these env vars. `link-cli` is a Node.js binary; Node's HTTP client reads proxy settings from these env vars. Without them, the request to `api.link.com` fails inside the sandbox network namespace — the CLI returns the opaque `UNKNOWN` error instead of a clearer DNS/timeout message.
+
+**Confirm**: Run inside `execute_code`:
+```python
+import os, json
+print(json.dumps({k: v for k, v in os.environ.items()
+                  if k.lower() in ("http_proxy", "https_proxy", "no_proxy",
+                                   "node_use_env_proxy")}))
+# → {}  (empty — proxy vars absent)
+```
+
+Run in terminal shell:
+```bash
+env | grep -i proxy
+# → HTTP_PROXY=http://10.200.0.1:3128
+# → HTTPS_PROXY=http://10.200.0.1:3128
+# → NO_PROXY=localhost,127.0.0.1,::1,...
+# → NODE_USE_ENV_PROXY=1
+```
+
+**Fix**: This is a code fix in `SpendApprovalHandler`, not a user workaround. See [[spend-handler]] Fix F-18 (`_build_link_cli_env` helper). The handler must explicitly propagate proxy vars into the subprocess `env` dict before calling `subprocess.run`. Until the code fix lands, the only workaround is to run the spend flow from the terminal shell (which has the proxy vars) rather than relying on `execute_code`.
+
 ---
 
 ## Related Pages

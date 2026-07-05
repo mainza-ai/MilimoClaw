@@ -2,7 +2,7 @@
 
 **Summary**: Append-only record of all wiki operations.
 
-**Last updated**: 2026-07-04
+**Last updated**: 2026-07-05
 
 **Tags**: #log #meta
 
@@ -1674,3 +1674,34 @@ Each entry follows this format:
 - `MILIMO_SPEND_TEST_MODE` defaults: `"true"` in `tools.py:83`, `"false"` in `finance_claw.py:197`
 
 **Resumes from**: Phase 1 — fix all 6 skill factories in `milimo-hermes-plugin/__init__.py`
+
+---
+
+### 2026-07-05 — Live Spend Flow Test: proxy env blocks `link-cli` in `execute_code`; 3 handler bugs found
+
+**Commits**: `fd0a353` (non-editable milimo-core install + import guard), `41b965e` (milimo-core non-editable install fix).
+
+**Pages**: `wiki/modules/finance/spend-handler.md`, `wiki/modules/finance/link-cli-setup.md`, `wiki/development/spend-handler-debug-briefing-2026-07-05.md`
+
+**Source**: Live Hermes chat session (2026-07-05) — Finance Claw Stripe Link test-mode spend flow demo. `milimo_core` now imports correctly, but `SpendApprovalHandler.handle_hold_release` returned `UNKNOWN` error while raw shell with identical args succeeded.
+
+**Root cause found by Hermes agent**: `link-cli` is a Node.js CLI. When invoked from terminal shell, it inherits `HTTP_PROXY=http://10.200.0.1:3128`, `HTTPS_PROXY`, `NO_PROXY`, `NODE_USE_ENV_PROXY` from the shell environment. When invoked from Hermes `execute_code`, `os.environ` inside the Python subprocess does not include these vars. Without proxy vars, `link-cli` cannot route to `api.link.com` inside the sandbox network namespace and returns opaque `{"code":"UNKNOWN"}`. Reproduced by injecting proxy vars into `execute_code` env → rc=0, valid `lsrq_*` returned.
+
+**Changes**:
+- `wiki/modules/finance/spend-handler.md`:
+  - Added open findings F-15 (hold/queued reconstruction drops payment_method_id + justification), F-16 (`_log_decision` writes spend_id=None entries), F-17 (ValueError unhandled in handle_hold_release), F-18 (proxy env vars not propagated to link-cli subprocess)
+  - Added Open Findings fix plan with exact before/after code for all 4 bugs
+- `wiki/modules/finance/link-cli-setup.md`:
+  - Added `UNKNOWN` error on POST /spend_requests troubleshooting section with root cause, confirm commands, and cross-reference to spend-handler Fix F-18
+- `wiki/development/spend-handler-debug-briefing-2026-07-05.md`:
+  - Created full debug briefing with 3 confirmed code bugs + UNKNOWN investigation, repro steps, and exact fix snippets
+
+**Open findings**:
+- F-15: `_get_request` `hold/queued` reconstruction hardcodes `payment_method_id=None` instead of reading from `decisions.log` details
+- F-16: `_log_decision` no spend_id guard — writes corrupt entries to decisions.log
+- F-17: `_validate_justification` ValueError not caught in `handle_hold_release`
+- F-18: `_build_link_cli_env` helper not yet implemented — proxy vars not propagated to link-cli subprocess env; confirmed root cause of UNKNOWN error
+
+**Links**: [[spend-handler]] • [[link-cli-setup]] • [[sandbox-isolation]] • [[test-spend-flow]] • [[network-egress]]
+
+**Resumes from**: F-18 fix — implement `_build_link_cli_env`, replace env-building blocks in `handle_hold_release` (line 509) and `_poll_spend_request` (line 912), plus F-15/F-16/F-17 fixes in `spend_handler.py`
