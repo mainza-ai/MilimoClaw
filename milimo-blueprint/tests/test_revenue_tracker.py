@@ -79,7 +79,7 @@ class TestRevenueTracker:
 
     @pytest.fixture
     def operational_log(self, fs: FinanceFilesystemInit):
-        return FinanceOperationalLog(fs.base / "logs" / "operational.log")
+        return FinanceOperationalLog(fs.BASE / "logs" / "operational.log")
 
     @pytest.fixture
     def gateway(self):
@@ -124,7 +124,7 @@ class TestRevenueTracker:
 
         revenue_tracker.record_payment(invoice)
 
-        weekly_path = fs.base / "revenue" / "weekly-summary.json"
+        weekly_path = fs.BASE / "revenue" / "weekly-summary.json"
         assert weekly_path.exists()
 
         data = json.loads(weekly_path.read_text())
@@ -180,7 +180,7 @@ class TestRevenueTracker:
 
     def test_weekly_summary_counts_pending_invoices(self, revenue_tracker, fs):
         """Weekly summary counts pending invoices."""
-        pending_dir = fs.base / "invoices" / "pending"
+        pending_dir = fs.BASE / "invoices" / "pending"
         pending_dir.mkdir(parents=True, exist_ok=True)
 
         for i in range(3):
@@ -226,7 +226,7 @@ class TestRevenueTracker:
         self, revenue_tracker, approval_handler, fs
     ):
         """Margin gap > 10% queues War Room REVIEW."""
-        expense_path = fs.base / "expenses" / "log.jsonl"
+        expense_path = fs.BASE / "expenses" / "log.jsonl"
         expense_path.parent.mkdir(parents=True, exist_ok=True)
         expense_path.write_text(
             json.dumps(
@@ -242,7 +242,7 @@ class TestRevenueTracker:
             + "\n"
         )
 
-        annual_path = fs.base / "revenue" / "annual-summary.json"
+        annual_path = fs.BASE / "revenue" / "annual-summary.json"
         annual_path.write_text(json.dumps({"year_total": 1000}))
 
         result = revenue_tracker.margin_analysis()
@@ -264,7 +264,7 @@ class TestRevenueTracker:
 
         revenue_tracker.record_payment(invoice)
 
-        monthly_path = fs.base / "revenue" / "monthly-summary.json"
+        monthly_path = fs.BASE / "revenue" / "monthly-summary.json"
         assert monthly_path.exists()
 
         data = json.loads(monthly_path.read_text())
@@ -285,7 +285,7 @@ class TestRevenueTracker:
 
         revenue_tracker.record_payment(invoice)
 
-        annual_path = fs.base / "revenue" / "annual-summary.json"
+        annual_path = fs.BASE / "revenue" / "annual-summary.json"
         assert annual_path.exists()
 
         data = json.loads(annual_path.read_text())
@@ -299,7 +299,7 @@ class TestRevenueTracker:
 
     def test_pipeline_value_calculation(self, revenue_tracker, fs):
         """Pipeline value sums sent/ invoices."""
-        sent_dir = fs.base / "invoices" / "sent"
+        sent_dir = fs.BASE / "invoices" / "sent"
         sent_dir.mkdir(parents=True, exist_ok=True)
 
         for i in range(2):
@@ -379,7 +379,7 @@ class TestRevenueTracker:
             )
             revenue_tracker.record_payment(invoice)
 
-        weekly_path = fs.base / "revenue" / "weekly-summary.json"
+        weekly_path = fs.BASE / "revenue" / "weekly-summary.json"
         data = json.loads(weekly_path.read_text())
 
         assert data["invoices_paid"] == 3

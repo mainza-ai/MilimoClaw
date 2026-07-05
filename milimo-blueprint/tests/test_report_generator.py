@@ -130,7 +130,7 @@ class TestReportGenerator:
         first_report_path = fs.get_report_path()
         first_report_path.read_text()
         report_generator.generate()
-        archive_dir = fs.base / "reports" / "weekly-intelligence-archive"
+        archive_dir = fs.BASE / "reports" / "weekly-intelligence-archive"
         assert archive_dir.exists()
         archive_files = list(archive_dir.glob("*.json"))
         assert len(archive_files) >= 1

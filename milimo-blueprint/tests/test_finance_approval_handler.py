@@ -91,11 +91,11 @@ class TestFinanceApprovalHandler:
 
     @pytest.fixture
     def operational_log(self, fs: FinanceFilesystemInit):
-        return FinanceOperationalLog(fs.base / "logs" / "operational.log")
+        return FinanceOperationalLog(fs.BASE / "logs" / "operational.log")
 
     @pytest.fixture
     def payment_events_log(self, fs: FinanceFilesystemInit):
-        return PaymentEventsLog(fs.base / "logs" / "payment-events.log")
+        return PaymentEventsLog(fs.BASE / "logs" / "payment-events.log")
 
     @pytest.fixture
     def gateway(self):
@@ -134,7 +134,7 @@ class TestFinanceApprovalHandler:
 
     @pytest.fixture
     def decisions_path(self, fs):
-        return fs.base / "logs" / "decisions.log"
+        return fs.BASE / "logs" / "decisions.log"
 
     @pytest.fixture
     def approval_handler(self, invoice_manager, operational_log, decisions_path):
@@ -250,7 +250,7 @@ class TestFinanceApprovalHandler:
             f"review-{invoice.invoice_id}", "Client cancelled"
         )
 
-        blocked_path = fs.base / "invoices" / "blocked" / f"{invoice.invoice_id}.json"
+        blocked_path = fs.BASE / "invoices" / "blocked" / f"{invoice.invoice_id}.json"
         assert blocked_path.exists()
 
     def test_handle_review_edit_updates_invoice(

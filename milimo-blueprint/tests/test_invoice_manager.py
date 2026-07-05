@@ -107,11 +107,11 @@ class TestInvoiceManagerTwoStageApproval:
 
     @pytest.fixture
     def operational_log(self, fs: FinanceFilesystemInit):
-        return FinanceOperationalLog(fs.base / "logs" / "operational.log")
+        return FinanceOperationalLog(fs.BASE / "logs" / "operational.log")
 
     @pytest.fixture
     def payment_events_log(self, fs: FinanceFilesystemInit):
-        return PaymentEventsLog(fs.base / "logs" / "payment-events.log")
+        return PaymentEventsLog(fs.BASE / "logs" / "payment-events.log")
 
     @pytest.fixture
     def gateway(self):
@@ -284,7 +284,7 @@ class TestInvoiceManagerTwoStageApproval:
         pending_path = fs.get_invoice_path("pending", invoice.invoice_id)
         assert not pending_path.exists()
 
-        blocked_path = fs.base / "invoices" / "blocked" / f"{invoice.invoice_id}.json"
+        blocked_path = fs.BASE / "invoices" / "blocked" / f"{invoice.invoice_id}.json"
         assert blocked_path.exists()
 
         loaded = json.loads(blocked_path.read_text())

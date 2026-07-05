@@ -81,7 +81,7 @@ class TestPricingEngine:
 
     @pytest.fixture
     def operational_log(self, fs: FinanceFilesystemInit):
-        return FinanceOperationalLog(fs.base / "logs" / "operational.log")
+        return FinanceOperationalLog(fs.BASE / "logs" / "operational.log")
 
     @pytest.fixture
     def gateway(self):
@@ -196,7 +196,7 @@ class TestPricingEngine:
 
     def test_load_pricing_rules_reads_file(self, pricing_engine, fs):
         """load_pricing_rules reads from rules.json."""
-        rules_path = fs.base / "pricing" / "rules.json"
+        rules_path = fs.BASE / "pricing" / "rules.json"
         custom_rules = {
             "default_hourly_rate": 150,
             "floor_multiplier": 0.75,
@@ -219,7 +219,7 @@ class TestPricingEngine:
 
     def test_load_historical_calibration_reads_files(self, pricing_engine, fs):
         """load_historical_calibration reads matching history files."""
-        history_dir = fs.base / "pricing" / "history"
+        history_dir = fs.BASE / "pricing" / "history"
         history_dir.mkdir(parents=True, exist_ok=True)
 
         history_data = {
@@ -339,7 +339,7 @@ class TestPricingEngine:
 
     def test_data_quality_complete_with_history(self, pricing_engine, fs):
         """data_quality is 'complete' when history exists."""
-        history_dir = fs.base / "pricing" / "history"
+        history_dir = fs.BASE / "pricing" / "history"
         history_dir.mkdir(parents=True, exist_ok=True)
         (history_dir / "old-proj.json").write_text(
             json.dumps(

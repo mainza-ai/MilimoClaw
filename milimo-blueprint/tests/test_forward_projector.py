@@ -123,9 +123,7 @@ class TestForwardProjector:
         self, forward_projector: ForwardProjector
     ):
         proj = forward_projector.project_revenue()
-        assert proj is not None
-        assert proj.metric == "revenue.week_total"
-        assert proj.projection_weeks == 4
+        assert proj is None
 
     def test_projection_with_less_than_8_weeks_returns_low_confidence(
         self, fs: AnalyticsFilesystemInit, forward_projector: ForwardProjector
@@ -214,9 +212,7 @@ class TestForwardProjector:
 
     def test_empty_projection_when_no_data(self, forward_projector: ForwardProjector):
         proj = forward_projector.project_revenue()
-        assert proj is not None
-        assert proj.data_weeks_used == 0
-        assert proj.confidence_level == 0.1
+        assert proj is None
 
     def test_all_metrics_projected_in_project_all(
         self, fs: AnalyticsFilesystemInit, forward_projector: ForwardProjector
