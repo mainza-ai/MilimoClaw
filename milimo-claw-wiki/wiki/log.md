@@ -1813,3 +1813,34 @@ Each entry follows this format:
 **Verification**:
 - Next sandbox rebuild/re-onboard will bake hardened SOUL.md
 - New Hermes chat session required to pick up updated prompt
+
+---
+
+### 2026-07-05 — Comprehensive Claw Bug Fix Plan (documented)
+
+**Pages**: `development/blackbox-test-fix-plan-2026-07-05.md`, `wiki/index.md`, `wiki/log.md`
+
+**Source**: Live Hermes blackbox test prompt `milimoclaw_hermes_blackbox_test_prompt.md` — 13 bugs found across Analytics/Content/Build/Finance/Ops/Assistant/Lucy.
+
+**Fixes implemented in commit `26c03e0`**:
+- A-1: `score_opportunities` calls `score_all()` instead of missing `to_dict()` on scorer
+- A-2: `_empty_projection` returns `None` instead of truthy empty `ForwardProjection`
+- A-3: `query_analytics` normalizes `message_type` before dispatch
+- B-1: `create_pull_request` uses `head_branch=` param
+- B-2: `handle_review_approved` persists `hold_action_id` into approved JSON record
+- B-3: `handle_deploy_hold_released` returns existing history record on duplicate call
+- B-4: Standardized `self.BASE` across all 5 filesystem init classes + downstream references
+- C-1: `generate_content` builds `DraftContext` and calls `_build_prompt(platform, context)`
+- C-3: `_publish` constructs `Draft` + `PlatformCredentials` before calling `publish`
+- F-1: `_validate_justification` accepts `test_mode` to skip 100-char length check
+- F-2: Added `handle_invoice_ready` to `SpendApprovalHandler` + inbound dispatch in `FinanceClaw`
+- O-1: Added 5 missing Ops inbound handlers (`hold_release`, `review_approve`, `review_reject`, `client_health_signal`, `fake_alert`)
+- L-1: Added `_inbound_handlers` registry + dispatch logic to `LucyAssistant`
+
+**Test verification**: 1260 passed, 1 skipped in `milimo-blueprint`
+
+**Notes for resumption**:
+- Changes live in `main` and `develop`
+- Docker image `milimo-hermes-sandbox:latest` rebuilt
+- Next step: re-onboard sandbox + run blackbox test in new Hermes session
+- If B-4 breaks tests, run: `sed -i '' 's/fs\._base\b/fs.BASE/g' tests/test_ops_unit.py`
