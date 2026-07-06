@@ -68,6 +68,7 @@ from warroom_bridge import (
     remove_warroom_action,
     register_warroom_action_handler,
     _ACTION_HANDLERS,
+    _warroom_inbox,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
