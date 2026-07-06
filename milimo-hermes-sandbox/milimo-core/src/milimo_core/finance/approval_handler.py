@@ -362,6 +362,38 @@ class FinanceApprovalHandler:
 
         return action_id
 
+    def get_pending_reviews(self) -> list[dict[str, Any]]:
+        latest: dict[str, dict[str, Any]] = {}
+        if not self.decisions_path.exists():
+            return []
+        for line in self.decisions_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            action_id = entry.get("action_id", "")
+            if action_id:
+                latest[action_id] = entry
+        return [e for e in latest.values() if e.get("stage") == "review" and e.get("action_type") == "queued"]
+
+    def get_pending_holds(self) -> list[dict[str, Any]]:
+        latest: dict[str, dict[str, Any]] = {}
+        if not self.decisions_path.exists():
+            return []
+        for line in self.decisions_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            action_id = entry.get("action_id", "")
+            if action_id:
+                latest[action_id] = entry
+        return [e for e in latest.values() if e.get("stage") == "hold" and e.get("action_type") == "queued"]
+
     def _log_decision(self, decision: dict) -> None:
         """Log decision to decisions.log with file locking."""
         import fcntl

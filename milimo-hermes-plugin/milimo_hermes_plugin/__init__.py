@@ -42,7 +42,7 @@ from milimo_core.cost_guard import get_cost_guard
 from milimo_core.hermes_credential_adapter import HermesCredentialAdapter
 from milimo_core.milimo_paths import CLAWS_DIR
 from .delegation import HermesDelegateAdapter
-from .tools import register_core_tools, set_claw_launcher, set_approval_handler, set_cost_guard
+from .tools import register_core_tools, set_claw_launcher, set_approval_handler, set_cost_guard, set_spend_handler, set_build_approval_handler, set_content_approval_handler, set_finance_invoice_handler
 
 
 # Global registry for instantiated claws

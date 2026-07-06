@@ -133,6 +133,11 @@ class BuildClaw:
             pr_log=self._pr_log,
             deploy_log=self._deploy_log,
         )
+        try:
+            from milimo_hermes_plugin.tools import set_build_approval_handler
+            set_build_approval_handler(self._approval_handler)
+        except ImportError:
+            pass
 
         # 5. Issue manager
         self._issue_manager = IssueManager(

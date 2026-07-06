@@ -442,6 +442,31 @@ class ContentApprovalHandler:
 
         return None
 
+    def get_pending_drafts(self) -> list[dict]:
+        pending_dir = self._fs.BASE / "drafts" / "pending"
+        if not pending_dir.exists():
+            return []
+        drafts = []
+        for path in pending_dir.glob("*.json"):
+            try:
+                data = json.loads(path.read_text())
+                drafts.append(
+                    {
+                        "draft_id": data.get("draft_id", path.stem),
+                        "action_id": data.get("draft_id", path.stem),
+                        "action_type": "draft_review",
+                        "status": "pending_review",
+                        "summary": (
+                            f"Draft for {data.get('platform', 'unknown')}: "
+                            f"{data.get('brief_id', 'no brief')}"
+                        ),
+                        "payload": data,
+                    }
+                )
+            except Exception:
+                continue
+        return drafts
+
     def _send_rejection_alert(self, alert: RejectionAlert) -> None:
         """Send rejection alert to War Room."""
         logger.warning(
