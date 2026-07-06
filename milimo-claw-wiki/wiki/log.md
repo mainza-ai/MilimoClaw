@@ -1879,3 +1879,70 @@ Each entry follows this format:
 - Docker image `milimo-hermes-sandbox:latest` rebuilt
 - Next step: re-onboard sandbox + run blackbox test in new Hermes session
 - If B-4 breaks tests, run: `sed -i '' 's/fs\._base\b/fs.BASE/g' tests/test_ops_unit.py`
+
+---
+
+### 2026-07-06 — Production Spend Flow Fix Plan documented
+
+**Commit**: `pending`
+
+**Pages**: `wiki/development/production-spend-flow-fix-plan-2026-07-06.md`, `wiki/troubleshooting/common-issues.md`
+
+**Source**: Live Hermes session — 60+ tool calls of filesystem exploration before reaching `_check_link_cli_auth`; agent then paraphrased `approval_url` instead of surfacing verbatim. Operator had to explicitly request the raw URL.
+
+**Root causes documented**:
+- P-1: `SOUL.md` stripped of step-by-step spend-flow instructions when moved to tracked file
+- P-2: `CLAW_CONTEXTS["finance"]` unreachable from main agent (only injected during `delegate_task`)
+- P-3: `HERMES_ENVIRONMENT_HINT` typo (`surf ace`) + weak phrasing vs. working `CRITICAL:` version
+- P-4: `_validate_justification` silently bypasses QA in test mode (`if test_mode: return`)
+- P-5: No parameter-gap handling for `payment_method_id` discovery
+- P-6: No structured output contract for agent-facing spend responses
+
+**Fixes planned**:
+- Fix 1: Expand `CLAW_CONTEXTS["finance"]` to 180-line production playbook
+- Fix 2: Inject Finance Claw context into main agent tool path (structural)
+- Fix 3: Replace SOUL.md spend instructions with generic pointer
+- Fix 4: Restore `HERMES_ENVIRONMENT_HINT` to working wording + fix typo
+- Fix 5: Remove `test_mode` bypass in `_validate_justification`
+- Fix 6: Auto-discover `payment_method_id` in `handle_milimo_spend`
+- Fix 7: Enforce structured output schema in all `handle_milimo_spend` branches
+- Fix 8: Inject Finance Claw context at plugin registration
+
+**Files to modify**: `delegation.py`, `agent_config/SOUL.md`, `Dockerfile`, `spend_handler.py`, `tools.py`, `__init__.py` (all mirrored to root copy)
+
+**Verification**: 8 production scenarios (A–H) covering auth states, payment-method gaps, justification validation, timeouts, mid-flow expiry
+
+**Troubleshooting additions**: `common-issues.md` gains 4 new entries for the specific symptoms observed (filesystem exploration, approval_url paraphrase, justification bypass, missing payment_method_id)
+
+**Resumes from**: operator approval of plan before any code changes
+
+---
+
+### 2026-07-06 — Production spend flow fixes implemented
+
+**Commit**: pending
+
+**Files modified**:
+- `milimo-hermes-sandbox/milimo-hermes-plugin/milimo_hermes_plugin/delegation.py`
+- `milimo-hermes-sandbox/agent_config/SOUL.md`
+- `milimo-hermes-sandbox/Dockerfile`
+- `milimo-hermes-sandbox/milimo-core/src/milimo_core/finance/spend_handler.py`
+- `milimo-hermes-sandbox/milimo-hermes-plugin/milimo_hermes_plugin/tools.py`
+
+**Root copies mirrored**:
+- `milimo-hermes-plugin/milimo_hermes_plugin/delegation.py`
+- `milimo-hermes-plugin/milimo_hermes_plugin/tools.py`
+- `Dockerfile`
+- `milimo-core/src/milimo_core/finance/spend_handler.py`
+
+**Fixes implemented**:
+- Fix 1: Expanded `CLAW_CONTEXTS["finance"]` to ~180-line production playbook covering intent recognition, parameter rules, call sequence, output format, error recovery
+- Fix 2: Added `HermesDelegateAdapter.get_finance_context()` classmethod so `tools.py` can import and inject Finance Claw context into tool responses
+- Fix 3: Rewrote `agent_config/SOUL.md` to remove inline spend-flow instructions; replaced with generic pointer to Finance Claw skill context
+- Fix 4: Restored `HERMES_ENVIRONMENT_HINT` to working `CRITICAL:` phrasing; fixed `surf ace` typo; added explicit Finance context pointer
+- Fix 5: Removed `test_mode` bypass in `_validate_justification`; signature is now `def _validate_justification(request: SpendRequest) -> None:`
+- Fix 6: Added `_discover_payment_method_id()` in `tools.py`; `queue_review` auto-discovers payment method when missing; returns structured error if none available
+- Fix 7: Added `_format_spend_response()` to normalize all spend tool responses with consistent schema (`action`, `spend_id`, `status`, `stage`, `test_mode`, `full_payload`, `next_step`); injects `_finance_context` on first queue_review call
+- Fix 8: Satisfied by Fix 2 — `tools.py` imports `_FINANCE_CONTEXT = HermesDelegateAdapter.get_finance_context()` at module load, making context available regardless of invocation path
+
+**Verification status**: Awaiting operator rebuild + live retest
