@@ -8,6 +8,41 @@
 
 ---
 
+### 2026-07-06 — Fix `NameError` in `FinanceApprovalHandler.queue_overdue_review()` (F-19)
+
+**Pages**: `wiki/modules/finance/spend-handler.md`, `wiki/modules/finance/finance-claw.md`, `wiki/log.md`, `wiki/index.md`
+
+**Source**: CI failure — `NameError: name 'invoice_id' is not defined` at `milimo-hermes-sandbox/milimo-core/src/milimo_core/finance/approval_handler.py:273` inside `queue_overdue_review()`.
+
+**Changes**:
+- `milimo-core/src/milimo_core/finance/approval_handler.py` line 273: `"invoice_id": invoice_id,` → `"invoice_id": invoice.invoice_id,`
+- `milimo-hermes-sandbox/milimo-core/src/milimo_core/finance/approval_handler.py`: mirrored
+
+**Root cause**: Commit `803e90f` (War Room unification) accidentally rewrote `invoice.invoice_id` to undefined `invoice_id` in the `queue_overdue_review` decision dict.
+
+**Verification**: `python -m pytest milimo-blueprint/tests/test_finance_approval_handler.py` → `15 passed`
+
+---
+
+### 2026-07-06 — Correct `link-cli` path in `HERMES_ENVIRONMENT_HINT` (Dockerfile)
+
+**Pages**: `wiki/modules/finance/link-cli-setup.md`, `wiki/log.md`, `wiki/index.md`
+
+**Source**: Live Hermes session trace — agent wasted ~4 minutes on filesystem thrashing (`find / -name "*link*"`, `find / -name "*finance*"`, etc.) because `HERMES_ENVIRONMENT_HINT` pointed to `/sandbox/.npm-global/bin/link-cli`, which is only the fallback self-healing prefix. The actual binary installed by the Dockerfile is at `/usr/local/bin/link-cli`.
+
+**Changes**:
+- `milimo-hermes-sandbox/Dockerfile`: changed `link-cli at /sandbox/.npm-global/bin/link-cli` → `link-cli at /usr/local/bin/link-cli` in `ENV HERMES_ENVIRONMENT_HINT`
+
+**Root cause**:
+- Commit `803e90f` rewrote `HERMES_ENVIRONMENT_HINT` with the fallback path instead of the primary install path
+- The Hermes agent reads this hint at session start and uses it to locate binaries and config; the wrong path caused redundant filesystem searches and agent confusion
+
+**Verification**:
+- Next sandbox rebuild will bake the corrected path into the image
+- New Hermes session required to pick up updated `HERMES_ENVIRONMENT_HINT`
+
+---
+
 ### 2026-07-05 — Harden SOUL.md/HERMES_ENVIRONMENT_HINT to force verbatim approval_url surfacing
 
 **Pages**: `wiki/architecture/hermes-profile.md`, `wiki/log.md`, `wiki/index.md`

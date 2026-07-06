@@ -416,6 +416,19 @@ See [[spend-handler]] Fix F-18 for the implementation detail.
 
 ---
 
+## HERMES_ENVIRONMENT_HINT Path Fix
+
+The `HERMES_ENVIRONMENT_HINT` environment variable baked into the Docker image must reference the actual `link-cli` binary location installed by the Dockerfile:
+
+- **Correct**: `/usr/local/bin/link-cli` (from `npm install -g @stripe/link-cli@0.8.2` run as root during build)
+- **Wrong**: `/sandbox/.npm-global/bin/link-cli` (fallback self-healing prefix used only when `shutil.which("link-cli")` fails at runtime)
+
+A mismatched path causes the Hermes agent to search incorrect directories, leading to filesystem thrashing (`find / -name "*link*"`), wasted time, and "I don't see a Finance Claw skill" false negatives.
+
+**Fix**: `milimo-hermes-sandbox/Dockerfile` line 209 — corrected in commit `d7b47b4`.
+
+---
+
 ## Related Pages
 
 - [[spend-handler]] — SpendApprovalHandler implementation, two-stage gate, and per-operator isolation
