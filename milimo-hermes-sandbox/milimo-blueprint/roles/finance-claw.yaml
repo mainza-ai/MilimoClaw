@@ -135,3 +135,64 @@ evolution_signals:
     - name: pricing_floor_guardian
       target_week: 7
       description: "Automatically flags proposals below the squad's profitable rate threshold"
+
+# ── Skill Prompts ──────────────────────────────────────────────────────
+# Each entry is a self-contained prompt injected when this claw is invoked
+# via delegate_task or when a claw-specific handoff is required.
+# The global Hermes soul does _not_ contain Finance implementation details;
+# they live here so the Finance Claw's own context is authoritative.
+skill_prompts:
+  spend_flow:
+    description: >
+      Finance Claw agent-initiated spend flow via Stripe Link CLI.
+      Two-stage: Stage 1 REVIEW (operator approves via War Room),
+      Stage 2 HOLD then release. Test mode is the default.
+    steps:
+      - action: queue_review
+        required_params:
+          - claw: finance
+          - merchant_name: str
+          - merchant_url: str
+          - amount_cents: int
+          - justification: ">= 100 characters"
+          - payment_method_id: "from link-cli payment-methods list --format json"
+          - credential_type: card
+          - test: true
+        notes: "After queue_review succeeds, the spend appears in the War Room as spend-review-<spend_id>."
+      - action: approve_review
+        notes: "Moves spend to HOLD stage (wait for link-cli device approval)."
+      - action: block_review
+        notes: "Rejects the spend request before it reaches HOLD."
+      - action: release_hold
+        required_params:
+          - spend_id: str
+          - operator_id: str
+        notes: "Finalizes the spend after the operator has approved the link-cli device code and confirmed."
+      - action: cancel_hold
+        required_params:
+          - spend_id: str
+        notes: "Cancels a spend currently in HOLD stage."
+      - action: status
+        notes: "Returns current spend status."
+
+  hard_rules:
+    - rule: approval_url_surfacing
+      text: >
+        If _check_link_cli_auth or handle_milimo_spend returns an approval_url, you MUST
+        include the full URL verbatim in your response to the operator. Output the exact
+        approval_url text. Do NOT paraphrase, summarize, omit, or replace it with a generic
+        phrase like "please approve in the Link app" or "I have started a background poll".
+        The operator cannot approve without the URL. After surfacing it, STOP and WAIT for
+        the operator to confirm approval before calling any further tools. Do not proceed to
+        release_hold or any other spend step until the operator explicitly confirms they
+        have approved the device code. Do NOT attempt to navigate, open, or visit the
+        approval_url yourself -- the sandbox blocks browser navigation to private/internal
+        addresses, and the operator must approve on their own device.
+    - rule: test_mode_default
+      text: "The spend flow runs in test mode by default (MILIMO_SPEND_TEST_MODE=true). No real money is charged."
+
+  environment:
+    link_cli_path: /usr/local/bin/link-cli
+    link_cli_pinned_version: "0.8.2"
+    mesh_war_room: /sandbox/.hermes/mesh/inbox/war_room/
+    tui: http://localhost:9090/warroom.html
