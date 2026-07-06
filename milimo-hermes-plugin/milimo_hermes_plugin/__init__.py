@@ -152,6 +152,16 @@ def on_load(config: dict[str, Any] | None = None) -> None:
     approval_handler = OpsApprovalHandler(fs_base=fs_base)
     set_approval_handler(approval_handler)
 
+    try:
+        from warroom_bridge import register_warroom_action_handler as _reg_ops_wr
+        _reg_ops_wr(
+            "ops",
+            lambda aid, data: approval_handler.handle_approve(aid, lambda: None),
+            lambda aid, data: approval_handler.handle_block(aid, reason="vetoed from war room"),
+        )
+    except ImportError:
+        pass
+
     # Initialize cost guard
     cost_guard = get_cost_guard()
     set_cost_guard(cost_guard)

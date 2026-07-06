@@ -24,6 +24,14 @@ from .build_init import BuildFilesystemInit, BuildOperationalLog, BuildLogEntry
 logger = logging.getLogger(__name__)
 
 
+def _try_import_write_warroom_action():
+    try:
+        from warroom_bridge import write_warroom_action
+        return write_warroom_action
+    except ImportError:
+        return None
+
+
 @dataclass
 class BuildApprovalAction:
     action_id: str
@@ -135,6 +143,7 @@ class BuildApprovalHandler:
         self._pr_log = pr_log
         self._deploy_log = deploy_log
         self._pending_actions: dict[str, BuildApprovalAction] = {}
+        self._write_warroom = _try_import_write_warroom_action()
 
     # ------------------------------------------------------------------
     # PR REVIEW (Stage 1)
@@ -184,6 +193,20 @@ class BuildApprovalHandler:
                 details={"pr_id": pr_id, "mode": "REVIEW"},
             )
         )
+        if self._write_warroom:
+            try:
+                self._write_warroom(
+                    action_id,
+                    claw_role="build",
+                    mode="REVIEW",
+                    action_type="pr_review",
+                    summary=action.summary,
+                    timestamp=action.created_at,
+                    recipient_role="build",
+                    payload=action.metadata,
+                )
+            except Exception:
+                pass
         return action_id
 
     # ------------------------------------------------------------------
@@ -220,6 +243,20 @@ class BuildApprovalHandler:
                 details={"pr_id": pr_id, "mode": "HOLD"},
             )
         )
+        if self._write_warroom:
+            try:
+                self._write_warroom(
+                    action_id,
+                    claw_role="build",
+                    mode="HOLD",
+                    action_type="pr_merge_hold",
+                    summary=action.summary,
+                    timestamp=action.created_at,
+                    recipient_role="build",
+                    payload=action.metadata,
+                )
+            except Exception:
+                pass
         return action_id
 
     # ------------------------------------------------------------------
@@ -258,6 +295,20 @@ class BuildApprovalHandler:
                 details={"deploy_id": deploy_id, "mode": "HOLD"},
             )
         )
+        if self._write_warroom:
+            try:
+                self._write_warroom(
+                    action_id,
+                    claw_role="build",
+                    mode="HOLD",
+                    action_type="deploy_hold",
+                    summary=action.summary,
+                    timestamp=action.created_at,
+                    recipient_role="build",
+                    payload=action.metadata,
+                )
+            except Exception:
+                pass
         return action_id
 
     # ------------------------------------------------------------------
@@ -295,6 +346,20 @@ class BuildApprovalHandler:
                 details={"plan_id": plan_id, "total_hours": total_hours},
             )
         )
+        if self._write_warroom:
+            try:
+                self._write_warroom(
+                    action_id,
+                    claw_role="build",
+                    mode="REVIEW",
+                    action_type="sprint_plan",
+                    summary=action.summary,
+                    timestamp=action.created_at,
+                    recipient_role="build",
+                    payload=action.metadata,
+                )
+            except Exception:
+                pass
         return action_id
 
     # ------------------------------------------------------------------
@@ -326,6 +391,20 @@ class BuildApprovalHandler:
                 details={"pr_id": pr_id},
             )
         )
+        if self._write_warroom:
+            try:
+                self._write_warroom(
+                    action_id,
+                    claw_role="build",
+                    mode="REVIEW",
+                    action_type="security_pr",
+                    summary=action.summary,
+                    timestamp=action.created_at,
+                    recipient_role="build",
+                    payload=action.metadata,
+                )
+            except Exception:
+                pass
         return action_id
 
     # ------------------------------------------------------------------
@@ -357,6 +436,20 @@ class BuildApprovalHandler:
                 details={"review_id": review_id},
             )
         )
+        if self._write_warroom:
+            try:
+                self._write_warroom(
+                    action_id,
+                    claw_role="build",
+                    mode="REVIEW",
+                    action_type="dependency_review",
+                    summary=action.summary,
+                    timestamp=action.created_at,
+                    recipient_role="build",
+                    payload=action.metadata,
+                )
+            except Exception:
+                pass
         return action_id
 
     # ------------------------------------------------------------------

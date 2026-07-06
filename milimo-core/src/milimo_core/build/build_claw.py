@@ -139,6 +139,16 @@ class BuildClaw:
         except ImportError:
             pass
 
+        try:
+            from warroom_bridge import register_warroom_action_handler
+            register_warroom_action_handler(
+                "build",
+                self._approval_handler.handle_approve,
+                self._approval_handler.handle_block,
+            )
+        except ImportError:
+            pass
+
         # 5. Issue manager
         self._issue_manager = IssueManager(
             fs=self._fs,

@@ -43,17 +43,30 @@ You are NOT read-only. Through the Milimo bridge you can:
 - `/milimo finals` — Finals Mode status (all-or-nothing approval)
 
 ### Unified War Room
-The War Room is the operator's single view of everything pending approval across all claws. It is no longer Ops-only.
-- `/milimo warroom action=hold_queue` — list all REVIEW and HOLD items from Ops, Finance (spends + invoices), Build (PRs/deploys), and Content (drafts)
-- `/milimo warroom action=approve item_id=<id>` — approve any pending item by ID
-- `/milimo warroom action=veto item_id=<id>` — veto any pending item by ID
+The War Room is the operator's single view of everything pending approval across all claws.
+Two surfaces show the same canonical queue (mesh_dir/inbox/war_room/*.json):
+
+1. **Browser TUI**: Open **http://localhost:9090/warroom.html** — click Approve or Veto buttons.
+   POST routes `/v1/warroom/hold-queue/<id>/approve` and `/veto` dispatch to the correct claw handler
+   via the live action handler registry (wired at startup by each claw).
+
+2. **Agent tool**: `/milimo warroom action=hold_queue` — list all REVIEW and HOLD items.
+   `/milimo warroom action=approve item_id=<id>` — approve.
+   `/milimo warroom action=veto item_id=<id>` — veto.
 
 Action IDs by type:
 - Ops: UUIDs from the Ops approval handler
 - Finance spends: `spend-review-<spend_id>` (REVIEW), `spend-hold-<spend_id>` (HOLD)
-- Finance invoices: `review-<invoice_id>` (REVIEW), `hold-<invoice_id>` (HOLD)
+- Finance invoices: `review-<invoice_id>` (REVIEW), `hold-<invoice_id>` (HOLD, ready to send)
 - Build: `pr-review-<pr_id>`, `pr-merge-hold-<pr_id>`, `deploy-hold-<deploy_id>`
 - Content: draft IDs in `pending_review` status
+
+**HARD RULE — Finance Spend approval_url**: When milimo_spend or _check_link_cli_auth returns
+an `approval_url`, you MUST include the full URL verbatim in your response to the operator.
+Do NOT paraphrase, summarize, omit, or replace it with a generic phrase like
+"please approve in the Link app". The operator cannot approve without the exact URL.
+After surfacing it, STOP and WAIT for the operator to confirm they have approved the device code
+before calling any further tools.
 
 ### Trigger Actions
 - `send_to_claw` — send typed messages to specific claws via the mesh
@@ -125,13 +138,15 @@ Before claws start, the launcher validates:
 The War Room is the human oversight layer above the mesh. All approval-required
 messages from claws are routed here — not to the claw inbox.
 
-Use `/milimo status` to see pending action counts, or open the War Room TUI
-with `milimo warroom` for the full interactive interface with:
-- Prioritized action cards from all claws (REVIEW/HOLD/AUTO modes)
-- Approve/veto buttons with audit trail
-- Revenue display and rate limit tracking
-- Evolution log showing recently built tools
-- Digest scheduler (morning brief at 07:00, evening wrap at 20:00)
+Two surfaces show the same canonical queue:
+1. **Browser TUI**: http://localhost:9090/warroom.html — click Approve/Veto buttons to
+   dispatch to the correct claw handler in real time.
+2. **Agent tool**: `/milimo warroom action=hold_queue` for the full list.
+
+The TUI includes:
+- Prioritized action cards from all claws (REVIEW/HOLD modes)
+- Approve/veto buttons wired to live handler registry (Ops, Finance, Build, Content)
+- Audit trail — every approve/veto is logged and dispatched
 
 **Finals Mode**: When enabled, all actions require unanimous squad approval.
 Check status with `/milimo finals`.

@@ -190,6 +190,16 @@ class FinanceClaw:
         except ImportError:
             pass
 
+        try:
+            from warroom_bridge import register_warroom_action_handler as _reg_fin_wr
+            _reg_fin_wr(
+                "finance",
+                lambda action_id, data: approval_handler.handle_review_approve(action_id),
+                lambda action_id, data: approval_handler.handle_review_block(action_id, reason="vetoed from war room"),
+            )
+        except ImportError:
+            pass
+
         import os as _os
 
         spend_handler = SpendApprovalHandler(

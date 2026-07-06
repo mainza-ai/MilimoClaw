@@ -273,6 +273,23 @@ class SpendApprovalHandler:
             },
         }
         self._log_decision(review_entry)
+
+        try:
+            from warroom_bridge import write_warroom_action
+            write_warroom_action(
+                action_id,
+                claw_role="finance",
+                mode="REVIEW",
+                action_type="spend_review",
+                summary=f"{request.claw} wants to buy from {request.merchant_name}: "
+                        f"${request.amount_cents / 100:.2f} — "
+                        f"{request.justification[:80]}...",
+                timestamp=review_entry["timestamp"],
+                recipient_role="finance",
+                payload=review_entry["details"],
+            )
+        except ImportError:
+            pass
         return action_id
 
     def handle_review_approve(self, action_id: str, *args: Any, **kwargs: Any) -> str:
@@ -360,6 +377,14 @@ class SpendApprovalHandler:
         self._requests[request.spend_id] = request
         self._persist_queue_state(request, "hold", action_id)
 
+        decision_payload = {
+            "merchant_name": request.merchant_name,
+            "amount_cents": request.amount_cents,
+            "warning": (
+                "This will create a Stripe Link spend request and "
+                "ping the user's Link app for final approval."
+            ),
+        }
         self._log_decision(
             {
                 "action_id": action_id,
@@ -368,16 +393,24 @@ class SpendApprovalHandler:
                 "action_type": "queued",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "operator": "system",
-                "details": {
-                    "merchant_name": request.merchant_name,
-                    "amount_cents": request.amount_cents,
-                    "warning": (
-                        "This will create a Stripe Link spend request and "
-                        "ping the user's Link app for final approval."
-                    ),
-                },
+                "details": decision_payload,
             }
         )
+        try:
+            from warroom_bridge import write_warroom_action as _wra
+            _wra(
+                action_id,
+                claw_role="finance",
+                mode="HOLD",
+                action_type="spend_hold",
+                summary=f"Approved — ready to charge {request.merchant_name} "
+                        f"${request.amount_cents / 100:.2f}",
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                recipient_role="finance",
+                payload=decision_payload,
+            )
+        except ImportError:
+            pass
         return action_id
 
     def _find_prior_release(self, spend_id: str) -> dict | None:

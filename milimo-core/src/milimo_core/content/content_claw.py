@@ -177,6 +177,16 @@ class ContentClaw:
         except ImportError:
             pass
 
+        try:
+            from warroom_bridge import register_warroom_action_handler
+            register_warroom_action_handler(
+                "content",
+                self._approval_handler.handle_approve,
+                self._approval_handler.handle_block,
+            )
+        except ImportError:
+            pass
+
         # 7. Platform publisher
         self._publisher = PlatformPublisher(
             fs=self._fs,
