@@ -56,6 +56,21 @@ class FinanceApprovalHandler:
             decisions_path or claw_base("finance") / "logs/decisions.log"
         )
 
+    def _write_warroom_action(self, action_id: str, stage: str, action_type: str, details: dict) -> None:
+        try:
+            from warroom_bridge import write_warroom_action
+            write_warroom_action(
+                action_id,
+                claw_role="finance",
+                mode=stage.upper(),
+                action_type=action_type,
+                summary=f"Invoice {details.get('invoice_id', action_id)}: ${(details.get('total', details.get('amount', 0)) / 100):.2f}",
+                recipient_role="finance",
+                payload=details,
+            )
+        except ImportError:
+            pass
+
     def queue_invoice_review(self, invoice: Invoice) -> str:
         """
         Add invoice to War Room REVIEW queue.
@@ -83,7 +98,7 @@ class FinanceApprovalHandler:
             },
         }
         self._log_decision(review_entry)
-
+        self._write_warroom_action(action_id, "review", "invoice_review", review_entry["details"])
         return action_id
 
     def queue_invoice_hold(self, invoice: Invoice) -> str:
@@ -114,7 +129,7 @@ class FinanceApprovalHandler:
             },
         }
         self._log_decision(hold_entry)
-
+        self._write_warroom_action(action_id, "hold", "invoice_hold", hold_entry["details"])
         return action_id
 
     def handle_review_approve(self, action_id: str, *args: Any, **kwargs: Any) -> None:
@@ -255,7 +270,7 @@ class FinanceApprovalHandler:
 
         decision = {
             "action_id": action_id,
-            "invoice_id": invoice.invoice_id,
+            "invoice_id": invoice_id,
             "stage": "review",
             "action_type": "queued",
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -269,7 +284,7 @@ class FinanceApprovalHandler:
             },
         }
         self._log_decision(decision)
-
+        self._write_warroom_action(action_id, "review", "overdue_review", decision["details"])
         return action_id
 
     def queue_overdue_hold(
@@ -299,7 +314,7 @@ class FinanceApprovalHandler:
             },
         }
         self._log_decision(decision)
-
+        self._write_warroom_action(action_id, "hold", "overdue_hold", decision["details"])
         return action_id
 
     def queue_margin_alert(
@@ -331,7 +346,7 @@ class FinanceApprovalHandler:
             },
         }
         self._log_decision(decision)
-
+        self._write_warroom_action(action_id, "review", "margin_alert", decision["details"])
         return action_id
 
     def queue_rate_recommendation(
@@ -359,7 +374,7 @@ class FinanceApprovalHandler:
             },
         }
         self._log_decision(decision)
-
+        self._write_warroom_action(action_id, "review", "rate_recommendation", decision["details"])
         return action_id
 
     def get_pending_reviews(self) -> list[dict[str, Any]]:

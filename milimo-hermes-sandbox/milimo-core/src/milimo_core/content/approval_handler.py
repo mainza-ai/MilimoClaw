@@ -28,6 +28,14 @@ from .content_generator import Draft
 logger = logging.getLogger("milimo.approval_handler")
 
 
+def _try_import_warroom_bridge():
+    try:
+        from warroom_bridge import write_warroom_action, remove_warroom_action
+        return write_warroom_action, remove_warroom_action
+    except ImportError:
+        return None, None
+
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -99,6 +107,46 @@ class ContentApprovalHandler:
         self._log = operational_log
         self._war_room = war_room
         self._on_publish = on_publish
+        _w_write, _w_remove = _try_import_warroom_bridge()
+        self._write_warroom = _w_write
+        self._remove_warroom = _w_remove
+
+    def _make_warroom_payload(self, draft: Draft) -> dict[str, Any]:
+        return {
+            "draft_id": draft.draft_id,
+            "platform": draft.platform,
+            "client_id": draft.client_id,
+            "project_id": draft.project_id,
+            "brief_id": draft.brief_id,
+            "content_preview": (draft.processed_content or "")[:200],
+            "scheduled_time": draft.scheduled_time,
+        }
+
+    def sync_warroom(self, draft: Draft) -> None:
+        if self._write_warroom is None:
+            return
+        try:
+            import datetime as _dt
+            self._write_warroom(
+                draft.draft_id,
+                claw_role="content",
+                mode="REVIEW",
+                action_type="draft_review",
+                summary=f"Draft for {draft.platform}: {draft.brief_id or 'no brief'}",
+                timestamp=_dt.datetime.now(_dt.timezone.utc).isoformat(),
+                recipient_role="content",
+                payload=self._make_warroom_payload(draft),
+            )
+        except Exception:
+            logger.debug("War room sync skipped for draft %s", draft.draft_id, exc_info=True)
+
+    def unsync_warroom(self, draft_id: str) -> None:
+        if self._remove_warroom is None:
+            return
+        try:
+            self._remove_warroom(draft_id)
+        except Exception:
+            logger.debug("War room unsync skipped for draft %s", draft_id, exc_info=True)
 
     def handle_approve(
         self,
@@ -155,6 +203,8 @@ class ContentApprovalHandler:
 
         if publish_immediately and self._on_publish:
             self._on_publish(draft)
+
+        self.unsync_warroom(draft_id)
 
         logger.info("Draft %s approved (action %s)", draft_id, action_id)
 
@@ -314,6 +364,8 @@ class ContentApprovalHandler:
 
         reason_str = reason or "No reason provided"
         self._log_approval(draft_id, "BLOCKED", action_id, reason_str)
+
+        self.unsync_warroom(draft_id)
 
         self._log.append(
             LogEntry(

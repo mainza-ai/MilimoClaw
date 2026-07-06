@@ -35,6 +35,29 @@ from .content_init import (
 logger = logging.getLogger("milimo.content_generator")
 
 
+def _write_warroom_action(draft_id: str, platform: str, brief_id: str | None,
+                           processed_content: str, timestamp: str) -> None:
+    try:
+        from warroom_bridge import write_warroom_action
+        write_warroom_action(
+            draft_id,
+            claw_role="content",
+            mode="REVIEW",
+            action_type="draft_review",
+            summary=f"Draft for {platform}: {brief_id or 'no brief'}",
+            timestamp=timestamp,
+            recipient_role="content",
+            payload={
+                "draft_id": draft_id,
+                "platform": platform,
+                "brief_id": brief_id,
+                "content_preview": (processed_content or "")[:200],
+            },
+        )
+    except ImportError:
+        pass
+
+
 # ---------------------------------------------------------------------------
 # Data Classes
 # ---------------------------------------------------------------------------
@@ -194,6 +217,10 @@ class ContentGenerator:
         draft_path.parent.mkdir(parents=True, exist_ok=True)
         draft_path.write_text(json.dumps(draft.to_dict(), indent=2))
 
+        ts = datetime.now(timezone.utc).isoformat()
+        _write_warroom_action(draft_id, platform, getattr(context, "brief_id", None),
+                              draft.processed_content, ts)
+
         self._log.append(
             LogEntry(
                 action_type="draft_generated",
@@ -241,6 +268,10 @@ class ContentGenerator:
         draft.brief_id = brief_id
         draft_path = self._fs.get_draft_path("pending", draft.draft_id)
         draft_path.write_text(json.dumps(draft.to_dict(), indent=2))
+
+        ts = datetime.now(timezone.utc).isoformat()
+        _write_warroom_action(draft.draft_id, platform, brief_id,
+                              draft.processed_content, ts)
 
         self._log.append(
             LogEntry(

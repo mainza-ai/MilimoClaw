@@ -39,6 +39,21 @@ except ImportError:
     WarRoomNotifier = get_warroom_notifier = init_warroom_notifier = NotificationPayload = None
     SpendApprovalHandler = SpendRequest = FinanceOperationalLog = None
 
+try:
+    from warroom_bridge import (
+        resolve_mesh_dir,
+        write_warroom_action,
+        read_warroom_action,
+        remove_warroom_action,
+        approve_hold_message as _bridge_approve,
+        veto_hold_message as _bridge_veto,
+    )
+    _WARROOM_BRIDGE_OK = True
+except ImportError:
+    _WARROOM_BRIDGE_OK = False
+    resolve_mesh_dir = write_warroom_action = read_warroom_action = None
+    remove_warroom_action = _bridge_approve = _bridge_veto = None
+
 
 # Global references initialized by plugin
 _claw_launcher = None
@@ -263,6 +278,49 @@ DELEGATE_TASK_SCHEMA = {
 
 # Tool handlers
 
+def _read_mesh_warroom() -> dict[str, list[dict]]:
+    """Read all JSON files from mesh_dir/inbox/war_room/ as the canonical
+    unified source of truth. Returns {"hold_queue": [...], "review_queue": [...]}.
+    Falls back to empty lists if bridge is unavailable."""
+    if not _WARROOM_BRIDGE_OK or resolve_mesh_dir is None:
+        return {"hold_queue": [], "review_queue": []}
+    try:
+        from warroom_bridge import _warroom_inbox as _wi
+        inbox = _wi()
+    except Exception:
+        return {"hold_queue": [], "review_queue": []}
+
+    hold_items: list[dict] = []
+    review_items: list[dict] = []
+    if not inbox.exists():
+        return {"hold_queue": hold_items, "review_queue": review_items}
+
+    for f in sorted(inbox.glob("*.json"), key=lambda p: p.stat().st_mtime):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        mode = (data.get("mode") or "").upper()
+        action_type = data.get("action_type", "")
+        entry = {
+            "action_id": data.get("action_id") or f.stem,
+            "message_id": data.get("message_id", f.stem),
+            "claw_role": data.get("claw_role", "unknown"),
+            "mode": mode,
+            "action_type": action_type,
+            "summary": data.get("summary", ""),
+            "timestamp": data.get("timestamp", ""),
+            "recipient_role": data.get("recipient_role", "finance"),
+            "payload": data.get("payload", {}),
+        }
+        if mode == "HOLD" or action_type.endswith("_hold") or "hold" in action_type:
+            hold_items.append(entry)
+        else:
+            review_items.append(entry)
+
+    return {"hold_queue": hold_items, "review_queue": review_items}
+
+
 async def handle_milimo_status(ctx: Any, detailed: bool = False) -> dict:
     """Get status of all 6 claws from the claw launcher."""
     if _claw_launcher is None:
@@ -296,140 +354,51 @@ async def handle_milimo_warroom(ctx: Any, action: str, item_id: str = None,
         return await handle_milimo_status(ctx, detailed=True)
 
     elif action == "hold_queue":
-        ops_hold: list[dict] = []
-        ops_review: list[dict] = []
+        # Canonical source: mesh_dir/inbox/war_room/*.json written by all handlers
+        mesh_queues = _read_mesh_warroom()
+        hold_queue: list[dict] = list(mesh_queues.get("hold_queue", []))
+        review_queue: list[dict] = list(mesh_queues.get("review_queue", []))
+
+        # Backfill any legacy in-memory items not yet synced to war_room files
         if _approval_handler is not None:
-            ops_hold = [item.to_dict() for item in _approval_handler.get_hold_queue()]
-            ops_review = [item.to_dict() for item in _approval_handler.get_review_queue()]
+            for item in _approval_handler.get_hold_queue():
+                existing = {e.get("action_id") for e in hold_queue}
+                if item.action_id not in existing:
+                    hold_queue.append({
+                        "action_id": item.action_id,
+                        "action_type": item.action_type,
+                        "entity_id": item.entity_id,
+                        "mode": item.mode,
+                        "summary": item.content[:200] if item.content else "",
+                        "timestamp": item.timestamp,
+                        "payload": item.context,
+                        "claw": "ops",
+                    })
+            for item in _approval_handler.get_review_queue():
+                existing = {e.get("action_id") for e in review_queue}
+                if item.action_id not in existing:
+                    review_queue.append({
+                        "action_id": item.action_id,
+                        "action_type": item.action_type,
+                        "entity_id": item.entity_id,
+                        "mode": item.mode,
+                        "summary": item.content[:200] if item.content else "",
+                        "timestamp": item.timestamp,
+                        "payload": item.context,
+                        "claw": "ops",
+                    })
 
-        spend_review_queue: list[dict] = []
-        spend_hold_queue: list[dict] = []
-        if _spend_handler is not None:
-            for spend_id, req in _spend_handler._requests.items():
-                entry = {
-                    "action_id": f"spend-review-{spend_id}",
-                    "entity_id": spend_id,
-                    "action_type": "spend_review" if req.status == "pending_review" else "spend_hold",
-                    "status": req.status,
-                    "summary": (
-                        f"{req.claw} wants to buy from {req.merchant_name}: "
-                        f"${req.amount_cents / 100:.2f} — "
-                        f"{req.justification[:80]}..."
-                        if len(req.justification) > 80 else req.justification
-                    ),
-                    "payload": {
-                        "spend_id": spend_id,
-                        "claw": req.claw,
-                        "merchant_name": req.merchant_name,
-                        "merchant_url": req.merchant_url,
-                        "amount_cents": req.amount_cents,
-                        "currency": req.currency,
-                        "justification": req.justification,
-                        "credential_type": req.credential_type,
-                        "payment_method_id": req.payment_method_id,
-                    },
-                    "claw": "finance",
-                }
-                if req.status == "pending_review":
-                    spend_review_queue.append(entry)
-                elif req.status == "held":
-                    spend_hold_queue.append(entry)
-
-        build_review: list[dict] = []
-        build_hold: list[dict] = []
-        if _build_approval_handler is not None:
-            for action in _build_approval_handler.get_all_pending_actions():
-                entry = {
-                    "action_id": action.action_id,
-                    "entity_id": action.entity_id,
-                    "action_type": action.action_type,
-                    "status": action.mode.lower(),
-                    "summary": action.summary,
-                    "payload": action.metadata,
-                    "claw": "build",
-                }
-                if action.mode == "REVIEW":
-                    build_review.append(entry)
-                elif action.mode == "HOLD":
-                    build_hold.append(entry)
-
-        finance_invoice_review: list[dict] = []
-        finance_invoice_hold: list[dict] = []
-        if _finance_invoice_handler is not None:
-            for entry in _finance_invoice_handler.get_pending_reviews():
-                finance_invoice_review.append(
-                    {
-                        "action_id": entry.get("action_id", ""),
-                        "entity_id": entry.get("invoice_id", ""),
-                        "action_type": entry.get("action_type", "invoice_review"),
-                        "status": "pending_review",
-                        "summary": (
-                            f"Invoice {entry.get('invoice_id')}: "
-                            f"${entry.get('details', {}).get('total', 0) / 100:.2f} "
-                            f"(risk: {entry.get('details', {}).get('risk_level', 'unknown')})"
-                        ),
-                        "payload": entry.get("details", {}),
-                        "claw": "finance",
-                    }
-                )
-            for entry in _finance_invoice_handler.get_pending_holds():
-                finance_invoice_hold.append(
-                    {
-                        "action_id": entry.get("action_id", ""),
-                        "entity_id": entry.get("invoice_id", ""),
-                        "action_type": entry.get("action_type", "invoice_hold"),
-                        "status": "held",
-                        "summary": (
-                            f"Invoice {entry.get('invoice_id')} approved — "
-                            f"${entry.get('details', {}).get('total', 0) / 100:.2f} "
-                            f"(ready to send to {entry.get('details', {}).get('client_id', 'client')})"
-                        ),
-                        "payload": entry.get("details", {}),
-                        "claw": "finance",
-                    }
-                )
-
-        content_review: list[dict] = []
-        if _content_approval_handler is not None:
-            content_review = [
-                {
-                    "action_id": d.get("action_id", ""),
-                    "entity_id": d.get("draft_id", ""),
-                    "action_type": d.get("action_type", "draft_review"),
-                    "status": "pending_review",
-                    "summary": d.get("summary", ""),
-                    "payload": d.get("payload", {}),
-                    "claw": "content",
-                }
-                for d in _content_approval_handler.get_pending_drafts()
-            ]
-
-        # Check for urgency flags and notify
         if _warroom_notifier:
-            for item in ops_hold + build_hold + finance_invoice_hold:
+            for item in hold_queue:
                 if isinstance(item, dict) and item.get("urgency_flag"):
                     _warroom_notifier.notify_hold_alert(
                         action_id=item.get("action_id", ""),
                         action_type=item.get("action_type", ""),
                         entity_id=item.get("entity_id", ""),
-                        claw_role=item.get("claw", "ops"),
+                        claw_role=item.get("claw_role", item.get("claw", "ops")),
                         urgency=item.get("urgency_flag"),
                     )
-            for item in spend_hold_queue:
-                _warroom_notifier.notify_hold_alert(
-                    action_id=item["action_id"],
-                    action_type=item["action_type"],
-                    entity_id=item["entity_id"],
-                    claw_role="finance",
-                    urgency="spend_held",
-                )
 
-        hold_queue = (
-            ops_hold + build_hold + finance_invoice_hold + spend_hold_queue
-        )
-        review_queue = (
-            ops_review + build_review + finance_invoice_review + spend_review_queue + content_review
-        )
         return {
             "hold_queue": hold_queue,
             "review_queue": review_queue,
@@ -465,194 +434,210 @@ async def handle_milimo_warroom(ctx: Any, action: str, item_id: str = None,
         if not item_id:
             return {"error": f"item_id required for {action}"}
 
-        # Finance spend flow
-        if isinstance(item_id, str) and item_id.startswith("spend-review-") and _spend_handler is not None:
-            spend_id = item_id[len("spend-review-"):]
-            req = _spend_handler._requests.get(spend_id)
-            if not req:
-                return {"action": action, "item_id": item_id, "status": "not_found", "error": f"Spend {spend_id} not found"}
+        # Prefer the canonical war room bridge (used by TUI too)
+        if _WARROOM_BRIDGE_OK:
+            try:
+                if action == "approve":
+                    _bridge_approve(item_id)
+                else:
+                    _bridge_veto(item_id)
+                return {"action": action, "item_id": item_id, "status": "processed"}
+            except Exception as exc:
+                return {"action": action, "item_id": item_id, "status": "error", "error": str(exc)}
 
-            if action == "approve":
-                if req.status != "pending_review":
-                    return {"action": "approve", "item_id": item_id, "status": "invalid", "error": f"Cannot approve spend in status: {req.status}"}
-                try:
-                    hold_action_id = _spend_handler.handle_review_approve(item_id)
-                    req.status = "held"
-                    if _warroom_notifier:
-                        _warroom_notifier.notify_hold_alert(
-                            action_id=item_id,
-                            action_type="spend_hold",
-                            entity_id=spend_id,
-                            claw_role="finance",
-                            urgency="spend_review_approved",
-                        )
-                    return {"action": "approve", "item_id": item_id, "hold_action_id": hold_action_id, "spend_id": spend_id}
-                except ValueError as ve:
-                    return {"action": "approve", "item_id": item_id, "status": "failed", "error": str(ve)}
+        # Fallback: direct handler calls (no bridge available)
+        return _handle_legacy_decision(action, item_id, reason)
 
-            else:  # veto
-                if req.status != "pending_review":
-                    return {"action": "veto", "item_id": item_id, "status": "invalid", "error": f"Cannot veto spend in status: {req.status}"}
-                try:
-                    _spend_handler.handle_review_block(item_id, reason or "vetoed from war room")
-                    req.status = "blocked"
-                    if _warroom_notifier:
-                        _warroom_notifier.notify_hold_alert(
-                            action_id=item_id,
-                            action_type="spend_review_blocked",
-                            entity_id=spend_id,
-                            claw_role="finance",
-                            urgency="spend_review_blocked",
-                        )
-                    return {"action": "veto", "item_id": item_id, "spend_id": spend_id}
-                except ValueError as ve:
-                    return {"action": "veto", "item_id": item_id, "status": "failed", "error": str(ve)}
+    return {"error": f"Unknown action: {action}"}
+def _handle_legacy_decision(action: str, item_id: str, reason: str | None) -> dict:
+    """Fallback: direct handler dispatch when warroom_bridge is unavailable."""
 
-        # Build approval flow (PR review/merge-hold, deploy hold)
-        if _build_approval_handler is not None and isinstance(item_id, str) and (
-            item_id.startswith("pr-review-")
-            or item_id.startswith("pr-merge-hold-")
-            or item_id.startswith("deploy-hold-")
-        ):
-            if action == "approve":
-                result = _build_approval_handler.handle_approve(item_id)
-                status = "approved" if result.executed else "failed"
-                if _warroom_notifier and result.executed:
+    # Finance spend flow
+    if isinstance(item_id, str) and item_id.startswith("spend-review-") and _spend_handler is not None:
+        spend_id = item_id[len("spend-review-"):]
+        req = _spend_handler._requests.get(spend_id)
+        if not req:
+            return {"action": action, "item_id": item_id, "status": "not_found", "error": f"Spend {spend_id} not found"}
+
+        if action == "approve":
+            if req.status != "pending_review":
+                return {"action": "approve", "item_id": item_id, "status": "invalid", "error": f"Cannot approve spend in status: {req.status}"}
+            try:
+                hold_action_id = _spend_handler.handle_review_approve(item_id)
+                req.status = "held"
+                if _warroom_notifier:
                     _warroom_notifier.notify_hold_alert(
                         action_id=item_id,
-                        action_type=result.details.get("mode", "build"),
-                        entity_id=item_id,
-                        claw_role="build",
-                        urgency=None,
+                        action_type="spend_hold",
+                        entity_id=spend_id,
+                        claw_role="finance",
+                        urgency="spend_review_approved",
                     )
+                return {"action": "approve", "item_id": item_id, "hold_action_id": hold_action_id, "spend_id": spend_id}
+            except ValueError as ve:
+                return {"action": "approve", "item_id": item_id, "status": "failed", "error": str(ve)}
+
+        else:  # veto
+            if req.status != "pending_review":
+                return {"action": "veto", "item_id": item_id, "status": "invalid", "error": f"Cannot veto spend in status: {req.status}"}
+            try:
+                _spend_handler.handle_review_block(item_id, reason or "vetoed from war room")
+                req.status = "blocked"
+                if _warroom_notifier:
+                    _warroom_notifier.notify_hold_alert(
+                        action_id=item_id,
+                        action_type="spend_review_blocked",
+                        entity_id=spend_id,
+                        claw_role="finance",
+                        urgency="spend_review_blocked",
+                    )
+                return {"action": "veto", "item_id": item_id, "spend_id": spend_id}
+            except ValueError as ve:
+                return {"action": "veto", "item_id": item_id, "status": "failed", "error": str(ve)}
+
+    # Build approval flow (PR review/merge-hold, deploy hold)
+    if _build_approval_handler is not None and isinstance(item_id, str) and (
+        item_id.startswith("pr-review-")
+        or item_id.startswith("pr-merge-hold-")
+        or item_id.startswith("deploy-hold-")
+    ):
+        if action == "approve":
+            result = _build_approval_handler.handle_approve(item_id)
+            status = "approved" if result.executed else "failed"
+            if _warroom_notifier and result.executed:
+                _warroom_notifier.notify_hold_alert(
+                    action_id=item_id,
+                    action_type=result.details.get("mode", "build"),
+                    entity_id=item_id,
+                    claw_role="build",
+                    urgency=None,
+                )
+            return {
+                "action": "approve",
+                "item_id": item_id,
+                "status": status,
+                "details": result.details,
+            }
+        else:  # veto
+            result = _build_approval_handler.handle_block(item_id, reason or "vetoed from war room")
+            status = "rejected" if result.executed else "failed"
+            return {
+                "action": "veto",
+                "item_id": item_id,
+                "status": status,
+                "details": result.details,
+            }
+
+    # Finance invoice approval flow
+    if _finance_invoice_handler is not None and isinstance(item_id, str):
+        if item_id.startswith("review-"):
+            if action == "approve":
+                try:
+                    _finance_invoice_handler.handle_review_approve(item_id)
+                    if _warroom_notifier:
+                        _warroom_notifier.notify_hold_alert(
+                            action_id=item_id,
+                            action_type="invoice_hold",
+                            entity_id=item_id.replace("review-", ""),
+                            claw_role="finance",
+                            urgency="invoice_review_approved",
+                        )
+                    return {"action": "approve", "item_id": item_id, "status": "moved_to_hold"}
+                except Exception as exc:
+                    return {"action": "approve", "item_id": item_id, "status": "failed", "error": str(exc)}
+            else:  # veto
+                try:
+                    _finance_invoice_handler.handle_review_block(item_id, reason or "vetoed from war room")
+                    return {"action": "veto", "item_id": item_id, "status": "blocked"}
+                except Exception as exc:
+                    return {"action": "veto", "item_id": item_id, "status": "failed", "error": str(exc)}
+
+        if item_id.startswith("hold-"):
+            if action == "approve":
                 return {
                     "action": "approve",
                     "item_id": item_id,
-                    "status": status,
-                    "details": result.details,
+                    "status": "requires_stripe_client",
+                    "error": "Invoice HOLD release requires a Stripe client; use the MilimoClaw TUI to send.",
                 }
-            else:  # veto
-                result = _build_approval_handler.handle_block(item_id, reason or "vetoed from war room")
-                status = "rejected" if result.executed else "failed"
-                return {
-                    "action": "veto",
-                    "item_id": item_id,
-                    "status": status,
-                    "details": result.details,
-                }
+            else:  # veto/cancel hold
+                try:
+                    _finance_invoice_handler.handle_hold_cancel(item_id)
+                    return {"action": "veto", "item_id": item_id, "status": "hold_cancelled"}
+                except Exception as exc:
+                    return {"action": "veto", "item_id": item_id, "status": "failed", "error": str(exc)}
 
-        # Finance invoice approval flow
-        if _finance_invoice_handler is not None and isinstance(item_id, str):
-            if item_id.startswith("review-"):
-                if action == "approve":
-                    try:
-                        _finance_invoice_handler.handle_review_approve(item_id)
-                        if _warroom_notifier:
-                            _warroom_notifier.notify_hold_alert(
-                                action_id=item_id,
-                                action_type="invoice_hold",
-                                entity_id=item_id.replace("review-", ""),
-                                claw_role="finance",
-                                urgency="invoice_review_approved",
-                            )
-                        return {"action": "approve", "item_id": item_id, "status": "moved_to_hold"}
-                    except Exception as exc:
-                        return {"action": "approve", "item_id": item_id, "status": "failed", "error": str(exc)}
-                else:  # veto
-                    try:
-                        _finance_invoice_handler.handle_review_block(item_id, reason or "vetoed from war room")
-                        return {"action": "veto", "item_id": item_id, "status": "blocked"}
-                    except Exception as exc:
-                        return {"action": "veto", "item_id": item_id, "status": "failed", "error": str(exc)}
-
-            if item_id.startswith("hold-"):
-                if action == "approve":
-                    return {
-                        "action": "approve",
-                        "item_id": item_id,
-                        "status": "requires_stripe_client",
-                        "error": "Invoice HOLD release requires a Stripe client; use the MilimoClaw TUI to send.",
-                    }
-                else:  # veto/cancel hold
-                    try:
-                        _finance_invoice_handler.handle_hold_cancel(item_id)
-                        return {"action": "veto", "item_id": item_id, "status": "hold_cancelled"}
-                    except Exception as exc:
-                        return {"action": "veto", "item_id": item_id, "status": "failed", "error": str(exc)}
-
-        # Content draft approval flow
-        if _content_approval_handler is not None and not item_id.startswith(("spend-review-", "pr-review-", "pr-merge-hold-", "deploy-hold-", "review-", "hold-")):
-            pending = _content_approval_handler.get_pending_drafts()
-            match = next((d for d in pending if d.get("draft_id") == item_id or d.get("action_id") == item_id), None)
-            if match:
-                if action == "approve":
-                    try:
-                        result = _content_approval_handler.handle_approve(
-                            draft_id=item_id,
-                            action_id=item_id,
-                        )
-                        status = "approved" if result.success else "failed"
-                        if _warroom_notifier and result.success:
-                            _warroom_notifier.notify_hold_alert(
-                                action_id=item_id,
-                                action_type="draft_approved",
-                                entity_id=item_id,
-                                claw_role="content",
-                                urgency=None,
-                            )
-                        return {"action": "approve", "item_id": item_id, "status": status, "details": result.to_dict() if hasattr(result, "to_dict") else {}}
-                    except Exception as exc:
-                        return {"action": "approve", "item_id": item_id, "status": "failed", "error": str(exc)}
-                else:  # veto
-                    try:
-                        result = _content_approval_handler.handle_block(
-                            draft_id=item_id,
-                            action_id=item_id,
-                            reason=reason or "vetoed from war room",
-                        )
-                        status = "rejected" if result.success else "failed"
-                        return {"action": "veto", "item_id": item_id, "status": status, "details": result.to_dict() if hasattr(result, "to_dict") else {}}
-                    except Exception as exc:
-                        return {"action": "veto", "item_id": item_id, "status": "failed", "error": str(exc)}
-
-        # Fallback to Ops approval handler
-        if _approval_handler is None:
-            return {"error": "Approval handler not initialized"}
-
-        if action == "approve":
-            result = _approval_handler.handle_approve(item_id, lambda: None)
-            status = "approved" if result else "failed"
-
-            if _warroom_notifier and result:
-                action_data = _approval_handler.get_action(item_id)
-                if action_data:
-                    _warroom_notifier.notify_hold_alert(
+    # Content draft approval flow
+    if _content_approval_handler is not None and isinstance(item_id, str) and not item_id.startswith(("spend-review-", "pr-review-", "pr-merge-hold-", "deploy-hold-", "review-", "hold-")):
+        pending = _content_approval_handler.get_pending_drafts()
+        match = next((d for d in pending if d.get("draft_id") == item_id or d.get("action_id") == item_id), None)
+        if match:
+            if action == "approve":
+                try:
+                    result = _content_approval_handler.handle_approve(
+                        draft_id=item_id,
                         action_id=item_id,
-                        action_type=action_data.action_type,
-                        entity_id=action_data.entity_id,
-                        claw_role="ops",
-                        urgency=None,
                     )
+                    status = "approved" if result.success else "failed"
+                    if _warroom_notifier and result.success:
+                        _warroom_notifier.notify_hold_alert(
+                            action_id=item_id,
+                            action_type="draft_approved",
+                            entity_id=item_id,
+                            claw_role="content",
+                            urgency=None,
+                        )
+                    return {"action": "approve", "item_id": item_id, "status": status, "details": result.to_dict() if hasattr(result, "to_dict") else {}}
+                except Exception as exc:
+                    return {"action": "approve", "item_id": item_id, "status": "failed", "error": str(exc)}
+            else:  # veto
+                try:
+                    result = _content_approval_handler.handle_block(
+                        draft_id=item_id,
+                        action_id=item_id,
+                        reason=reason or "vetoed from war room",
+                    )
+                    status = "rejected" if result.success else "failed"
+                    return {"action": "veto", "item_id": item_id, "status": status, "details": result.to_dict() if hasattr(result, "to_dict") else {}}
+                except Exception as exc:
+                    return {"action": "veto", "item_id": item_id, "status": "failed", "error": str(exc)}
 
-            return {"action": "approve", "item_id": item_id, "status": status}
+    # Fallback to Ops approval handler
+    if _approval_handler is None:
+        return {"error": "Approval handler not initialized"}
 
-        else:  # veto
-            result = _approval_handler.handle_block(item_id, reason or "No reason provided")
-            status = "rejected" if result else "failed"
+    if action == "approve":
+        result = _approval_handler.handle_approve(item_id, lambda: None)
+        status = "approved" if result else "failed"
 
-            if _warroom_notifier and result:
-                action_data = _approval_handler.get_action(item_id)
-                if action_data:
-                    _warroom_notifier.slack.send(NotificationPayload(
-                        title="HOLD Item Vetoed",
-                        message=f"Action `{item_id}` ({action_data.action_type}) was vetoed.",
-                        level="warning",
-                        metadata={"Action ID": item_id, "Reason": reason or "No reason provided"},
-                    ))
+        if _warroom_notifier and result:
+            action_data = _approval_handler.get_action(item_id)
+            if action_data:
+                _warroom_notifier.notify_hold_alert(
+                    action_id=item_id,
+                    action_type=action_data.action_type,
+                    entity_id=action_data.entity_id,
+                    claw_role="ops",
+                    urgency=None,
+                )
 
-            return {"action": "veto", "item_id": item_id, "status": status}
+        return {"action": "approve", "item_id": item_id, "status": status}
 
-    return {"error": f"Unknown action: {action}"}
+    else:  # veto
+        result = _approval_handler.handle_block(item_id, reason or "No reason provided")
+        status = "rejected" if result else "failed"
+
+        if _warroom_notifier and result:
+            action_data = _approval_handler.get_action(item_id)
+            if action_data:
+                _warroom_notifier.slack.send(NotificationPayload(
+                    title="HOLD Item Vetoed",
+                    message=f"Action `{item_id}` ({action_data.action_type}) was vetoed.",
+                    level="warning",
+                    metadata={"Action ID": item_id, "Reason": reason or "No reason provided"},
+                ))
+
+        return {"action": "veto", "item_id": item_id, "status": status}
 
 
 async def handle_milimo_approve(ctx: Any, item_id: str, reason: str = None,

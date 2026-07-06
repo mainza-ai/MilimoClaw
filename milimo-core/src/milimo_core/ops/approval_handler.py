@@ -11,6 +11,10 @@ REVIEW: drafted, operator approves before sending.
 HOLD: fully paused, operator explicitly releases.
 AUTO: runs and logs, visible in morning digest.
 Every decision logged to decisions.log.
+
+All pending actions are also serialised to mesh_dir/inbox/war_room/ so the
+HTTP War Room TUI (http://localhost:9090/warroom.html) and the Hermes
+agent share the same canonical source of truth.
 """
 
 from __future__ import annotations
@@ -25,6 +29,14 @@ from pathlib import Path
 from typing import Any, Callable
 
 logger = logging.getLogger("milimo.ops")
+
+
+def _try_import_write_warroom_action() -> Callable | None:
+    try:
+        from warroom_bridge import write_warroom_action, remove_warroom_action
+        return write_warroom_action, remove_warroom_action
+    except ImportError:
+        return None, None  # type: ignore[return-value]
 
 
 @dataclass
@@ -105,6 +117,8 @@ class OpsApprovalHandler:
         if not self._decisions_log.exists():
             self._decisions_log.touch()
 
+        self._write_warroom, self._remove_warroom = _try_import_write_warroom_action()
+
     def _generate_action_id(self) -> str:
         return uuid.uuid4().hex[:12]
 
@@ -129,6 +143,37 @@ class OpsApprovalHandler:
             return True
         return False
 
+    def _sync_warroom(self, action: OpsApprovalAction) -> None:
+        """Write a canonical action file to mesh_dir/inbox/war_room/."""
+        if self._write_warroom is None:
+            return
+        try:
+            self._write_warroom(
+                action.action_id,
+                claw_role="ops",
+                mode=action.mode,
+                action_type=action.action_type,
+                summary=action.content[:200] if action.content else "",
+                timestamp=action.timestamp,
+                recipient_role="ops",
+                payload={
+                    "entity_id": action.entity_id,
+                    "content": action.content,
+                    "context": action.context,
+                },
+            )
+        except Exception:
+            logger.debug("War room sync skipped for %s", action.action_id, exc_info=True)
+
+    def _unsync_warroom(self, action_id: str) -> None:
+        """Remove the canonical action file from mesh_dir/inbox/war_room/."""
+        if self._remove_warroom is None:
+            return
+        try:
+            self._remove_warroom(action_id)
+        except Exception:
+            logger.debug("War room unsync skipped for %s", action_id, exc_info=True)
+
     def queue_review(
         self,
         action_type: str,
@@ -147,6 +192,7 @@ class OpsApprovalHandler:
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
         self._write_action(action, self._review_queue_dir)
+        self._sync_warroom(action)
         logger.info(
             "Queued REVIEW action %s: %s for %s", action_id, action_type, entity_id
         )
@@ -170,6 +216,7 @@ class OpsApprovalHandler:
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
         self._write_action(action, self._hold_queue_dir)
+        self._sync_warroom(action)
         logger.info(
             "Queued HOLD action %s: %s for %s", action_id, action_type, entity_id
         )
@@ -211,6 +258,7 @@ class OpsApprovalHandler:
             self.log_decision(action)
             self._remove_action(action_id, self._review_queue_dir)
             self._remove_action(action_id, self._hold_queue_dir)
+            self._unsync_warroom(action_id)
             logger.info("APPROVED action %s: %s", action_id, action.action_type)
             return True
         except Exception as e:
@@ -241,6 +289,7 @@ class OpsApprovalHandler:
             self.log_decision(action)
             self._remove_action(action_id, self._review_queue_dir)
             self._remove_action(action_id, self._hold_queue_dir)
+            self._unsync_warroom(action_id)
             logger.info("EDITED and sent action %s: %s", action_id, action.action_type)
             return True
         except Exception as e:
@@ -265,6 +314,7 @@ class OpsApprovalHandler:
         self.log_decision(action)
         self._remove_action(action_id, self._review_queue_dir)
         self._remove_action(action_id, self._hold_queue_dir)
+        self._unsync_warroom(action_id)
 
         if action.action_type == "welcome_message":
             self._log_inquiry_declined(action.entity_id, reason)
@@ -289,6 +339,7 @@ class OpsApprovalHandler:
             action.outcome = "hold_released"
             self.log_decision(action)
             self._remove_action(action_id, self._hold_queue_dir)
+            self._unsync_warroom(action_id)
             logger.info("HOLD_RELEASED action %s: %s", action_id, action.action_type)
             return True
         except Exception as e:

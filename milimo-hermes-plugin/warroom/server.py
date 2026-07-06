@@ -59,7 +59,16 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Bridge layer — delegates file operations out of the request handler.
 # ---------------------------------------------------------------------------
-from warroom_bridge import approve_hold_message, veto_hold_message, resolve_mesh_dir
+from warroom_bridge import (
+    approve_hold_message,
+    veto_hold_message,
+    resolve_mesh_dir,
+    write_warroom_action,
+    read_warroom_action,
+    remove_warroom_action,
+    register_warroom_action_handler,
+    _ACTION_HANDLERS,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("milimo.warroom_server")
@@ -142,6 +151,48 @@ def _safe_action_id(raw: str) -> str:
 
 def _escaped_error(exc: Exception) -> str:
     return html_mod.escape(str(exc), quote=True)
+
+
+# ---------------------------------------------------------------------------
+# Fallback handlers — registered when no external handler is connected.
+# These are used for testing and single-process deployments where the
+# Hermes tools are not wired up.
+# ---------------------------------------------------------------------------
+
+def _make_fallback_approve(role: str):
+    def _approve(action_id: str, msg_data: dict) -> dict[str, Any] | None:
+        logger.info("[fallback:%s] approve %s — no handler wired", role, action_id)
+        return {"status": "approved", "role": role, "action_id": action_id}
+
+    return _approve
+
+
+def _make_fallback_veto(role: str):
+    def _veto(action_id: str, msg_data: dict) -> dict[str, Any] | None:
+        logger.info("[fallback:%s] veto %s — no handler wired", role, action_id)
+        return {"status": "vetoed", "role": role, "action_id": action_id}
+
+    return _veto
+
+
+def register_fallback_handlers() -> None:
+    """Register fallback handlers so approve/veto never silently no-op.
+
+    Real handler callbacks override these when milimo_core connects.
+    """
+    for role in ["ops", "build", "content", "finance"]:
+        if role not in _ACTION_HANDLERS:
+            register_warroom_action_handler(
+                role,
+                _make_fallback_approve(role),
+                _make_fallback_veto(role),
+            )
+            logger.debug("Registered fallback war room handler for %s", role)
+
+
+# Register fallbacks as soon as this module loads
+# (tools.py or build_claw.py will override them when the real handler starts)
+register_fallback_handlers()
 
 
 # ---------------------------------------------------------------------------
@@ -305,8 +356,7 @@ class WarRoomHTMXHandler(BaseHTTPRequestHandler):
 
     def _handle_hold_queue(self):
         try:
-            mesh_dir = resolve_mesh_dir()
-            warroom_inbox = mesh_dir / "inbox" / "war_room"
+            warroom_inbox = _warroom_inbox()
 
             html_parts = []
             pending_files = []
@@ -317,51 +367,80 @@ class WarRoomHTMXHandler(BaseHTTPRequestHandler):
                 )
 
             if not pending_files:
-                html = '<div class="empty">No pending actions</div>'
+                html = '<div class="empty">No pending actions — all claws clear</div>'
             else:
                 for msg_file in pending_files:
                     try:
                         msg_data = json.loads(msg_file.read_text(encoding="utf-8"))
-                        msg_id = msg_data.get("message_id", msg_file.stem)
-                        sender = msg_data.get("sender_role", "unknown")
-                        msg_type = msg_data.get("message_type", "unknown")
-                        payload = msg_data.get("payload", {})
+                        # --- canonical fields ---
+                        msg_id      = msg_data.get("message_id", msg_file.stem)
+                        claw_role   = msg_data.get("claw_role", "unknown")
+                        mode        = msg_data.get("mode", "")
+                        action_type = msg_data.get("action_type", "")
+                        summary     = msg_data.get("summary", "")
+                        payload     = msg_data.get("payload", {})
+                        ts          = msg_data.get("timestamp", "")
 
-                        description = f"Action Type: {msg_type}"
-                        if msg_type == "spend_request":
-                            merchant = payload.get("merchant_name", "unknown")
-                            amount = payload.get("amount_cents", 0) / 100.0
-                            description = f"Spend: ${amount:.2f} at {merchant}"
-                        elif msg_type == "invoice_ready":
-                            invoice_id = payload.get("invoice_id", "unknown")
-                            amount = payload.get("amount", 0)
-                            description = f"Invoice: ${amount:.2f} (#{invoice_id})"
-                        elif msg_type == "draft_ready":
-                            platform = payload.get("platform", "unknown")
-                            description = f"Draft Ready for {platform}"
-                        elif msg_type == "tool_proposal":
-                            tool = payload.get("tool_name", "unknown")
-                            description = f"Tool Proposal: {tool}"
+                        # Build a human-readable description from summary or payload
+                        description = summary or f"{action_type} ({msg_file.stem})"
+                        if not summary:
+                            if action_type in ("spend_review",):
+                                merchant  = payload.get("merchant_name", "unknown")
+                                amount    = payload.get("amount_cents", 0) / 100.0
+                                description = f"Spend: ${amount:.2f} at {merchant}"
+                            elif action_type in ("spend_hold",):
+                                merchant  = payload.get("merchant_name", "unknown")
+                                amount    = payload.get("amount_cents", 0) / 100.0
+                                description = f"Approved spend: ${amount:.2f} at {merchant}"
+                            elif action_type in ("invoice_hold", "review-"):
+                                inv_id = payload.get("invoice_id", msg_id)
+                                total  = payload.get("total", payload.get("amount", 0))
+                                if action_type.startswith("review-"):
+                                    description = f"Invoice review: {inv_id} (${total:.2f})"
+                                else:
+                                    description = f"Invoice approved: {inv_id} (${total:.2f})"
+                            elif action_type in ("draft_review", "draft_ready"):
+                                platform = payload.get("platform", payload.get("draft_id", "unknown"))
+                                description = f"Draft ready: {platform}"
+                            elif action_type in ("pr_merge_hold",):
+                                pr_title = payload.get("pr_title", payload.get("pr_id", msg_id))
+                                description = f"Merge PR: {pr_title}"
+                            elif action_type in ("deploy_hold",):
+                                ver  = payload.get("version", "?")
+                                dest = payload.get("deploy_target", "?")
+                                description = f"Deploy {ver} → {dest}"
 
-                        is_hold = (
-                            msg_type in ("spend_hold_decision", "hold_release")
-                            or payload.get("mode") == "HOLD"
-                        )
+                        # Hold-release vs standard Approve button label
+                        is_hold = mode == "HOLD" or action_type.endswith("_hold") or "hold" in action_type
                         approve_label = "Release" if is_hold else "Approve"
                         btn_cls = "btn-approve"
 
+                        # Mode badge
+                        mode_badge = f'<span class="mode-badge mode-{mode.lower()}">{mode}</span>' if mode else ""
+
                         safe_description = html_mod.escape(description, quote=True)
-                        safe_sender = html_mod.escape(sender, quote=True).upper()
+                        safe_claw        = html_mod.escape(claw_role, quote=True).upper()
+                        safe_ts          = html_mod.escape(ts, quote=True)
 
                         html_parts.append(f"""
                         <div class="hold-item">
                             <div class="hold-info">
                                 <div class="hold-id">{safe_description}</div>
-                                <div class="hold-claw">{safe_sender} CLAW</div>
+                                <div class="hold-meta">
+                                    <span class="hold-claw">{safe_claw} CLAW</span>
+                                    {mode_badge}
+                                    <span class="hold-ts">{safe_ts}</span>
+                                </div>
                             </div>
                             <div class="hold-actions">
-                                <button class="btn {btn_cls}" hx-post="/v1/warroom/hold-queue/{msg_file.name}/approve" hx-target="#hold-queue">{approve_label}</button>
-                                <button class="btn btn-veto" hx-post="/v1/warroom/hold-queue/{msg_file.name}/veto" hx-target="#hold-queue">Veto</button>
+                                <button class="btn {btn_cls}"
+                                    hx-post="/v1/warroom/hold-queue/{msg_file.name}/approve"
+                                    hx-target="#hold-queue"
+                                    hx-swap="outerHTML">{approve_label}</button>
+                                <button class="btn btn-veto"
+                                    hx-post="/v1/warroom/hold-queue/{msg_file.name}/veto"
+                                    hx-target="#hold-queue"
+                                    hx-swap="outerHTML">Veto</button>
                             </div>
                         </div>
                         """)
