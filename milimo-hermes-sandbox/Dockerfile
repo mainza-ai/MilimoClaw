@@ -147,7 +147,7 @@ COPY agent_config/SOUL.md /sandbox/.hermes/SOUL.md
 USER sandbox
 
 # Describe execution environment via Hermes environment-hint mechanism
-ENV HERMES_ENVIRONMENT_HINT="MilimoClaw Hermes profile sandbox on NemoClaw. Six-agent business mesh: Content, Ops, Analytics, Finance, Build, Assistant (Lucy). Registered tools: milimo_status, milimo_warroom, milimo_approve, milimo_veto, milimo_spend, delegate_task. War Room TUI: http://localhost:9090/warroom.html. Plugin: /sandbox/.hermes/plugins/milimo-hermes/. link-cli: /usr/local/bin/link-cli. API: 127.0.0.1:18642. Global rule: surf ace approval requirements verbatim and wait for operator confirmation. Do not navigate to private/internal addresses. Work within sandbox boundary."
+ENV HERMES_ENVIRONMENT_HINT="MilimoClaw Hermes profile sandbox on NemoClaw. Six-agent business mesh: Content, Ops, Analytics, Finance, Build, Assistant (Lucy). Registered tools: milimo_status, milimo_warroom, milimo_approve, milimo_veto, milimo_spend, delegate_task. War Room TUI: http://localhost:9090/warroom.html. Plugin: /sandbox/.hermes/plugins/milimo-hermes/. link-cli: /usr/local/bin/link-cli. API: 127.0.0.1:18642. CRITICAL: When milimo_spend or _check_link_cli_auth returns an approval_url, always output the full URL verbatim to the operator. Do not paraphrase, omit, or replace it with a generic statement. The operator cannot approve without the exact URL. Wait for operator confirmation before proceeding. Finance spend flows are governed by the Finance Claw operational context (CLAW_CONTEXTS). Work within sandbox boundary."
 
 # Set mutable-default permissions (Hermes standard)
 USER root

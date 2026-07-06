@@ -129,6 +129,7 @@ Development conventions and guides.
 | [[link-cli-install-production-readiness-2026-07-04]] | link-cli runtime install path + auth UX production gaps | ✓ |
 | [[spend-handler-debug-briefing-2026-07-05]] | Spend handler debug briefing: 3 code bugs + proxy env root cause for UNKNOWN error | ✓ |
 | [[blackbox-test-fix-plan-2026-07-05]] | Full 13-bug blackbox fix plan: Analytics/Content/Build/Finance/Ops/Lucy — status + resumption guide | ✓ |
+| [[production-spend-flow-fix-plan-2026-07-06]] | Production spend flow root cause analysis + fix plan (prompt/context layer) | ✓ |
 | [[debugging]] | Debugging guide and tools | ✓ |
 | [[sandbox-file-sharing]] | Accessing and extracting claw-generated files | ✓ |
 
@@ -145,7 +146,6 @@ Common issues and fixes.
 | [[sandbox-sync]] | Sandbox synchronization issues | ✓ |
 | [[claw-silent-responses]] | Claws returning blank output | ✓ |
 | [[sandbox-security-audit-2026-04-25]] | Critical: install.sh violates NemoClaw sandbox security model | ✓ |
-
 ---
 
 ## Audit & Production-Readiness
@@ -306,8 +306,8 @@ Installation and service management scripts.
 | Module pages | 76+ |
 | Coordination pages | 5 |
 | Evolution pages | 8 |
-| Development pages | 3 |
-| Troubleshooting pages | 4 |
+| Development pages | 4 |
+| Troubleshooting pages | 5 |
 | Reference pages | 4 |
 | Configuration pages | 4 |
 | Solo pages | 6 |
@@ -332,6 +332,7 @@ See [[log]] for complete operation history.
 
 | Date | Change | Pages Affected |
 |------|--------|----------------|
+| 2026-07-06 | Production spend flow root cause analysis documented (6 root causes, 8 fixes, 8 verification scenarios); troubleshooting section added for filesystem-exploration, approval_url paraphrase, justification bypass, missing payment_method_id | production-spend-flow-fix-plan-2026-07-06.md, common-issues.md, log.md, index.md |
 | 2026-07-05 | Harden SOUL.md/HERMES_ENVIRONMENT_HINT: approval_url must be surfaced verbatim; agent previously paraphrased away the device approval URL, forcing operator to explicitly request it | hermes-profile.md, log.md |
 | 2026-07-05 | Proxy env fallback fix: `_discover_proxy_env()` added to `_build_link_cli_env()` so `link-cli` works from Hermes `execute_code` even when proxy vars are stripped; commit `91388df` | spend-handler.md, link-cli-setup.md, log.md |
 | 2026-07-05 | Live spend flow test: proxy env vars absent in execute_code confirmed as root cause of `UNKNOWN` error; F-15/F-16/F-17/F-18 documented in wiki and implemented in commit `3f9ea89` (_build_link_cli_env proxy propagation, hold/queued state recovery, _log_decision guard, ValueError handling) | spend-handler.md, link-cli-setup.md, log.md, index.md, spend-handler-debug-briefing-2026-07-05.md |

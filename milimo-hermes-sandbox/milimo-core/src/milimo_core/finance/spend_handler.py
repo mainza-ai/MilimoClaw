@@ -76,9 +76,7 @@ class SpendRequest:
 _LINK_CLI_MIN_CONTEXT_LENGTH = 100
 
 
-def _validate_justification(request: SpendRequest, test_mode: bool = False) -> None:
-    if test_mode:
-        return
+def _validate_justification(request: SpendRequest) -> None:
     if len(request.justification) < _LINK_CLI_MIN_CONTEXT_LENGTH:
         raise ValueError(
             f"justification must be at least {_LINK_CLI_MIN_CONTEXT_LENGTH} characters "
@@ -324,7 +322,7 @@ class SpendApprovalHandler:
         request = self._get_request(spend_id)
         request.amount_cents = amount_cents
         request.justification = justification
-        _validate_justification(request, test_mode=self.test_mode)
+        _validate_justification(request)
 
         self._log_decision(
             {
@@ -480,7 +478,7 @@ class SpendApprovalHandler:
         spend_id = action_id.replace("spend-hold-", "")
         request = self._get_request(spend_id)
         try:
-            _validate_justification(request, test_mode=self.test_mode)
+        _validate_justification(request)
         except ValueError as ve:
             request.status = "blocked"
             self._log_decision(

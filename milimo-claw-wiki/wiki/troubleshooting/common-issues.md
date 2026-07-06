@@ -486,3 +486,108 @@ nemohermes <name> recover
 - [[issues-and-fixes]] — Complete audit
 - [[sandbox-sync]] — Sandbox synchronization
 - [[sequencing-rules]] — Rule violations
+
+---
+
+### Agent Explores Filesystem Instead of Calling `milimo_spend`
+
+**Symptom**: When the operator requests a Finance Claw spend flow (e.g., "Pay Stripe invoice $49 for API credits"), the Hermes agent spends dozens of tool calls reading source files (`finance_claw.py`, `spend_handler.py`), grepping for `spend|finance|link-cli`, walking `~/.linkcli`, `~/.config/linkcli`, `/sandbox/.linkcli`, and searching for `*.token`/`*.key` files — instead of calling the registered `milimo_spend` tool directly.
+
+**Root Causes** (check in order):
+
+1. **`agent_config/SOUL.md` has no Finance Claw spend-flow instructions.**
+   The main Hermes agent reads `SOUL.md` as its system prompt. Without step-by-step instructions for `milimo_spend`, the agent has no operational context and falls back to filesystem exploration.
+
+   **Verify**:
+   ```bash
+   cat milimo-hermes-sandbox/agent_config/SOUL.md | grep -A5 "Finance Claw Spend Flow"
+   ```
+   If no output, this is the cause.
+
+   **Fix**: Finance Claw operational context must live in `CLAW_CONTEXTS["finance"]` in `milimo-hermes-plugin/delegation.py`. `SOUL.md` should contain only a generic pointer to the skill, not inline spend instructions. See [[production-spend-flow-fix-plan-2026-07-06]].
+
+2. **`CLAW_CONTEXTS["finance"]` is unreachable from the main agent.**
+   The main agent invokes `milimo_spend` directly (not via `delegate_task`). `CLAW_CONTEXTS` is only injected during delegation. The agent never sees the Finance Claw rules (tool-first, no self-navigation, parameter requirements).
+
+   **Verify**:
+   ```bash
+   grep -n "build_context" milimo-hermes-sandbox/milimo-hermes-plugin/milimo_hermes_plugin/delegation.py
+   ```
+   Confirm `build_context` is called only inside `delegate()`, not before `handle_milimo_spend`.
+
+3. **`HERMES_ENVIRONMENT_HINT` has a typo or weak phrasing.**
+   The hint is the highest-priority context at session start. A typo like `surf ace` or generic wording (`"Global rule: surface approval requirements verbatim"`) causes the agent to treat the approval_url rule as advisory.
+
+   **Verify**:
+   ```bash
+   grep "HERMES_ENVIRONMENT_HINT" milimo-hermes-sandbox/Dockerfile
+   ```
+   Confirm it includes the exact tool names (`milimo_spend`, `_check_link_cli_auth`) and `CRITICAL:` emphasis.
+
+**Prevention**: After any prompt/SOUL.md change, run the spend-flow blackbox scenario (see [[test-spend-flow]]). Confirm the agent calls `milimo_spend` within 2 tool calls and never reads source files.
+
+---
+
+### Agent Paraphrases `approval_url` Instead of Surfacing It Verbatim
+
+**Symptom**: `_check_link_cli_auth` returns `{"error": "link_cli_not_authenticated", "approval_url": "https://app.link.com/device/setup?code=..."}`. Agent emits `"Open this URL and approve the device code in your Link app: [URL]"` — the URL is present but wrapped in prose, or the agent says "I have started a background poll" without showing the URL.
+
+**Root Causes**:
+
+1. **Missing HARD RULE in Finance Claw context.**
+   The approval-url rule must be a numbered HARD RULE in `CLAW_CONTEXTS["finance"]` — not a suggestion, not in SOUL.md's tool description, not in HERMES_ENVIRONMENT_HINT alone.
+
+   **Verify**:
+   ```bash
+   grep -A2 "APPROVAL URL" milimo-hermes-sandbox/milimo-hermes-plugin/milimo_hermes_plugin/delegation.py
+   ```
+   Confirm wording: `emit the EXACT URL as a plain string ... Do NOT paraphrase, summarize, shorten, wrap in markdown`.
+
+2. **HERMES_ENVIRONMENT_HINT absent or malformed.**
+   The hint must repeat the rule with `CRITICAL:` emphasis to ensure it survives prompt compression at session start.
+
+**Prevention**: Add to CI or pre-commit check: grep `CLAW_CONTEXTS["finance"]` for `APPROVAL URL` rule + `VERBATIM` wording. If missing, block the commit.
+
+---
+
+### `_validate_justification` Silently Passes Short Justifications in Test Mode
+
+**Symptom**: Operator requests a purchase with a 20-character justification (not a demo). `SpendApprovalHandler` logs it to `decisions.log` without raising `ValueError`. The spend request reaches the War Room with a malformed justification.
+
+**Root Cause**:
+```python
+def _validate_justification(request: SpendRequest, test_mode: bool = False) -> None:
+    if test_mode:
+        return          # ← BUG: skips ≥100-char check
+```
+`test_mode` was conflated with "skip all validation." Test mode should only skip the real charge (the `--test` flag in `link-cli spend-request create`). The justification QA gate must always run.
+
+**Fix**: Remove `test_mode` parameter from `_validate_justification` entirely. Always validate.
+
+**Verify**:
+```bash
+grep "_validate_justification" milimo-hermes-sandbox/milimo-core/src/milimo_core/finance/spend_handler.py
+```
+Confirm signature is `def _validate_justification(request: SpendRequest) -> None:` with no `test_mode` branch.
+
+---
+
+### Agent Returns Error Instead of Auto-Discovering `payment_method_id`
+
+**Symptom**: Operator says "Pay Stripe $49 for API credits." Agent calls `milimo_spend action=queue_review` without `payment_method_id`. Tool returns `{"error": "Missing required fields for queue_review: payment_method_id"}`. Agent has no guidance on how to discover it.
+
+**Root Cause**: `handle_milimo_spend` has a hard error for missing fields. The Finance Claw context does not specify that `payment_method_id` must be discovered via `link-cli payment-methods list --format json` before calling `queue_review`.
+
+**Fix** (in `tools.py`): When action is `queue_review` and `payment_method_id` is missing, run `link-cli payment-methods list --format json` and select the default. Return structured error only if no methods exist.
+
+**Prevention**: Add `payment_method_id` discovery as an explicit Step A in `CLAW_CONTEXTS["finance"]`.
+
+---
+
+## Related Pages
+
+- [[production-spend-flow-fix-plan-2026-07-06]] — Full production fix plan
+- [[spend-handler]] — Handler architecture
+- [[test-spend-flow]] — Test scenarios
+- [[link-cli-setup]] — Link CLI installation and auth
+- [[hermes-profile]] — Hermes prompt layers
