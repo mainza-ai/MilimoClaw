@@ -14,6 +14,7 @@ Registers the following tools:
 """
 
 from typing import Any, Optional
+import json
 import logging
 import os
 import shutil
@@ -31,6 +32,8 @@ try:
     )
     from milimo_core.finance.spend_handler import SpendApprovalHandler, SpendRequest
     from milimo_core.finance.finance_init import FinanceOperationalLog
+    from .delegation import HermesDelegateAdapter
+    _FINANCE_CONTEXT = HermesDelegateAdapter.get_finance_context()
     _MILIMO_CORE_OK = True
 except ImportError:
     _MILIMO_CORE_OK = False
@@ -38,6 +41,7 @@ except ImportError:
     get_cost_guard = CLAWS_DIR = None
     WarRoomNotifier = get_warroom_notifier = init_warroom_notifier = NotificationPayload = None
     SpendApprovalHandler = SpendRequest = FinanceOperationalLog = None
+    _FINANCE_CONTEXT = ""
 
 try:
     from warroom_bridge import (
@@ -702,6 +706,77 @@ def _extract_device_url(text: str) -> str | None:
     return None
 
 
+def _discover_payment_method_id() -> dict:
+    """Auto-discover the default payment method ID from link-cli.
+
+    Returns the first payment method ID found, or a structured error
+    if none are available.
+    """
+    try:
+        proc = subprocess.run(
+            ["link-cli", "payment-methods", "list", "--format", "json"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except FileNotFoundError:
+        return {
+            "error": "link_cli_not_available",
+            "action_required": "link-cli binary is not installed or not on PATH.",
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "error": "link_cli_payment_methods_timeout",
+            "action_required": "link-cli payment-methods list timed out. Retry or add a payment method manually.",
+        }
+
+    if proc.returncode != 0:
+        return {
+            "error": "link_cli_payment_methods_failed",
+            "stdout": proc.stdout,
+            "stderr": proc.stderr,
+            "action_required": "link-cli payment-methods list failed. Check Link app configuration.",
+        }
+
+    try:
+        methods = json.loads(proc.stdout)
+    except Exception:
+        methods = []
+
+    if not methods:
+        return {
+            "error": "no_payment_methods",
+            "action_required": "No payment methods found in your Link app. Add a card before proceeding.",
+        }
+
+    default = methods[0]
+    payment_method_id = default.get("id") or default.get("payment_method_id")
+    if not payment_method_id:
+        return {
+            "error": "no_payment_method_id",
+            "action_required": "Payment methods found but none have an id. Check Link app configuration.",
+        }
+
+    return {"payment_method_id": payment_method_id}
+
+
+def _format_spend_response(base: dict, finance_context: bool = False) -> dict:
+    """Normalize spend tool responses to a consistent schema.
+
+    Ensures every response includes the Finance Claw context so the
+    main agent can apply the rules on subsequent turns.
+    """
+    out = dict(base)
+    out.setdefault("action", "unknown")
+    out.setdefault("spend_id", "")
+    out.setdefault("status", "unknown")
+    out.setdefault("stage", "unknown")
+    out.setdefault("test_mode", True)
+    if finance_context and _FINANCE_CONTEXT:
+        out.setdefault("_finance_context", _FINANCE_CONTEXT)
+    return out
+
+
 _LINK_CLI_PREFIX = "/sandbox/.npm-global"
 _HAVE_LINK_CLI: bool | None = None
 
@@ -876,12 +951,18 @@ async def handle_milimo_spend(ctx: Any, action: str, spend_id: Optional[str] = N
 
     if action == "queue_review":
         missing = [f for f in ("claw", "merchant_name", "merchant_url", "amount_cents",
-                               "justification", "payment_method_id") if not locals().get(f)]
+                               "justification") if not locals().get(f)]
         if missing:
-            return {"error": f"Missing required fields for queue_review: {', '.join(missing)}"}
+            return _format_spend_response({"error": f"Missing required fields for queue_review: {', '.join(missing)}"})
 
         if len(justification or "") < 100:
-            return {"error": "justification must be at least 100 characters"}
+            return _format_spend_response({"error": "justification must be at least 100 characters"})
+
+        if not payment_method_id:
+            discovered = _discover_payment_method_id()
+            if "error" in discovered:
+                return _format_spend_response(discovered)
+            payment_method_id = discovered["payment_method_id"]
 
         request = SpendRequest(
             spend_id=_auto_spend_id(),
@@ -897,78 +978,103 @@ async def handle_milimo_spend(ctx: Any, action: str, spend_id: Optional[str] = N
         try:
             action_id = handler.queue_spend_review(request)
         except ValueError as ve:
-            return {"error": str(ve)}
-        return {
+            return _format_spend_response({"error": str(ve)})
+        return _format_spend_response({
             "action": "queue_review",
             "spend_id": request.spend_id,
             "action_id": action_id,
             "status": "pending_review",
-        }
+            "stage": "review",
+            "test_mode": handler.test_mode,
+            "full_payload": {
+                "claw": request.claw,
+                "merchant_name": request.merchant_name,
+                "merchant_url": request.merchant_url,
+                "amount_cents": request.amount_cents,
+                "currency": request.currency,
+                "justification": request.justification,
+                "payment_method_id": request.payment_method_id,
+                "credential_type": request.credential_type,
+            },
+            "next_step": "Awaiting War Room REVIEW approval",
+        }, finance_context=True)
 
     if action == "approve_review":
         if not spend_id:
-            return {"error": "spend_id is required for approve_review"}
+            return _format_spend_response({"error": "spend_id is required for approve_review"})
         try:
             spend = handler._get_request(spend_id)
         except KeyError:
-            return {"error": f"Spend request {spend_id} not found"}
+            return _format_spend_response({"error": f"Spend request {spend_id} not found"})
         if spend.status not in ("pending_review",):
-            return {"error": f"Cannot approve spend in status: {spend.status}"}
+            return _format_spend_response({"error": f"Cannot approve spend in status: {spend.status}"})
         try:
             hold_action_id = handler.handle_review_approve(
                 f"spend-review-{spend_id}",
             )
         except ValueError as ve:
-            return {"error": str(ve)}
+            return _format_spend_response({"error": str(ve)})
         spend.status = "held"
-        return {
+        return _format_spend_response({
             "action": "approve_review",
             "spend_id": spend_id,
             "status": "held",
+            "stage": "hold",
             "hold_action_id": hold_action_id,
-            "outcome": "moved_to_hold",
-        }
+            "test_mode": handler.test_mode,
+            "full_payload": {
+                "claw": spend.claw,
+                "merchant_name": spend.merchant_name,
+                "merchant_url": spend.merchant_url,
+                "amount_cents": spend.amount_cents,
+            },
+            "next_step": "Awaiting operator confirmation before release_hold",
+        }, finance_context=True)
 
     if action == "block_review":
         if not spend_id:
-            return {"error": "spend_id is required for block_review"}
+            return _format_spend_response({"error": "spend_id is required for block_review"})
         if not reason:
-            return {"error": "reason is required for block_review"}
+            return _format_spend_response({"error": "reason is required for block_review"})
         try:
             spend = handler._get_request(spend_id)
         except KeyError:
-            return {"error": f"Spend request {spend_id} not found"}
+            return _format_spend_response({"error": f"Spend request {spend_id} not found"})
         spend.status = "blocked"
         handler.handle_review_block(
             f"spend-review-{spend_id}",
             reason,
         )
-        return {
+        return _format_spend_response({
             "action": "block_review",
             "spend_id": spend_id,
             "status": "blocked",
+            "stage": "review",
             "reason": reason,
-        }
+            "test_mode": handler.test_mode,
+        })
 
     if action == "release_hold":
         if not spend_id:
-            return {"error": "spend_id is required for release_hold"}
+            return _format_spend_response({"error": "spend_id is required for release_hold"})
         try:
             spend = handler._get_request(spend_id)
         except KeyError:
-            return {"error": f"Spend request {spend_id} not found"}
+            return _format_spend_response({"error": f"Spend request {spend_id} not found"})
         try:
             released = handler.handle_hold_release(
                 f"spend-hold-{spend_id}",
                 operator_id="system",
             )
         except ValueError as ve:
-            return {"error": str(ve)}
-        return {
+            return _format_spend_response({"error": str(ve)})
+        return _format_spend_response({
             "action": "release_hold",
             "spend_id": spend_id,
             "status": released.status,
+            "stage": "hold",
             "link_spend_request_id": released.link_spend_request_id,
+            "test_mode": handler.test_mode,
             "outcome": (
                 "release_initiated"
                 if released.status == "released"
@@ -978,47 +1084,56 @@ async def handle_milimo_spend(ctx: Any, action: str, spend_id: Optional[str] = N
                     else "blocked"
                 )
             ),
-        }
+            "next_step": (
+                "Awaiting Link app approval on operator's phone"
+                if released.status == "approval_pending"
+                else "Spend complete"
+            ),
+        }, finance_context=True)
 
     if action == "cancel_hold":
         if not spend_id:
-            return {"error": "spend_id is required for cancel_hold"}
+            return _format_spend_response({"error": "spend_id is required for cancel_hold"})
         if not reason:
             reason = "Cancelled by operator"
         try:
             spend = handler._get_request(spend_id)
         except KeyError:
-            return {"error": f"Spend request {spend_id} not found"}
+            return _format_spend_response({"error": f"Spend request {spend_id} not found"})
         spend.status = "cancelled"
         handler.handle_hold_cancel(
             f"spend-hold-{spend_id}",
             reason,
         )
-        return {
+        return _format_spend_response({
             "action": "cancel_hold",
             "spend_id": spend_id,
             "status": "cancelled",
+            "stage": "hold",
             "reason": reason,
-        }
+            "test_mode": handler.test_mode,
+        })
 
     if action == "status":
         if not spend_id:
-            return {"error": "spend_id is required for status"}
+            return _format_spend_response({"error": "spend_id is required for status"})
         try:
             spend = handler._get_request(spend_id)
         except KeyError:
-            return {"error": f"Spend request {spend_id} not found"}
-        return {
+            return _format_spend_response({"error": f"Spend request {spend_id} not found"})
+        return _format_spend_response({
             "action": "status",
             "spend_id": spend_id,
             "status": spend.status,
+            "stage": spend.status,
             "link_spend_request_id": spend.link_spend_request_id,
             "claw": spend.claw,
             "merchant_name": spend.merchant_name,
             "merchant_url": spend.merchant_url,
             "amount_cents": spend.amount_cents,
             "currency": spend.currency,
-        }
+            "test_mode": handler.test_mode,
+        })
 
     return {"error": f"Unknown spend action: {action}"}
 
