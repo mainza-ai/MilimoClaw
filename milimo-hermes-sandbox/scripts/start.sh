@@ -2215,8 +2215,8 @@ hermes_auxiliaries_need_recovery() {
   hermes_socat_bridge_healthy api-socat "${SOCAT_PID:-}" "$PUBLIC_PORT" || return 0
   hermes_dashboard_healthy "${DASHBOARD_PID:-}" || return 0
   hermes_socat_bridge_healthy dashboard-socat "${DASHBOARD_SOCAT_PID:-}" "$DASHBOARD_PUBLIC_PORT" || return 0
-  hermes_warroom_healthy "${WARROOM_PID:-}" || return 0
-  hermes_socat_bridge_healthy warroom-socat "${WARROOM_SOCAT_PID:-}" "$WARROOM_PUBLIC_PORT" || return 0
+  # War room is best-effort: do NOT gate gateway health on it here.
+  # It is recovered independently in ensure_hermes_supervised_auxiliaries().
   return 1
 }
 
@@ -2281,22 +2281,26 @@ ensure_hermes_supervised_auxiliaries() {
       "$DASHBOARD_PUBLIC_PORT" "$DASHBOARD_INTERNAL_PORT" "dashboard" DASHBOARD_SOCAT_PID \
       "$DASHBOARD_PID" "$dashboard_user" || return 1
   fi
+  # War room is auxiliary — never block gateway/dashboard startup on it
   if ! hermes_warroom_healthy "${WARROOM_PID:-}"; then
-    hermes_stop_tracked_role warroom-socat "${WARROOM_SOCAT_PID:-0}" current "$WARROOM_PUBLIC_PORT" || return 1
+    hermes_stop_tracked_role warroom-socat "${WARROOM_SOCAT_PID:-0}" current "$WARROOM_PUBLIC_PORT" 2>/dev/null || true
     WARROOM_SOCAT_PID=""
-    hermes_stop_tracked_role warroom "${WARROOM_PID:-0}" "$dashboard_user" "$WARROOM_INTERNAL_PORT" || return 1
+    hermes_stop_tracked_role warroom "${WARROOM_PID:-0}" "$warroom_user" "$WARROOM_INTERNAL_PORT" 2>/dev/null || true
     WARROOM_PID=""
     if [ "$(id -u)" -eq 0 ]; then
-      start_warroom_server_sandbox_user || return 1
+      start_warroom_server_sandbox_user 2>/dev/null \
+        || echo "[warroom] sandbox startup failed — will retry next cycle" >&2
     else
-      start_warroom_server_current_user || return 1
+      start_warroom_server_current_user 2>/dev/null \
+        || echo "[warroom] current-user startup failed — will retry next cycle" >&2
     fi
   elif ! hermes_socat_bridge_healthy warroom-socat "${WARROOM_SOCAT_PID:-}" "$WARROOM_PUBLIC_PORT"; then
-    hermes_stop_tracked_role warroom-socat "${WARROOM_SOCAT_PID:-0}" current "$WARROOM_PUBLIC_PORT" || return 1
+    hermes_stop_tracked_role warroom-socat "${WARROOM_SOCAT_PID:-0}" current "$WARROOM_PUBLIC_PORT" 2>/dev/null || true
     WARROOM_SOCAT_PID=""
     start_socat_forwarder \
       "$WARROOM_PUBLIC_PORT" "$WARROOM_INTERNAL_PORT" "warroom" WARROOM_SOCAT_PID \
-      "$WARROOM_PID" "$dashboard_user" || return 1
+      "$WARROOM_PID" "$warroom_user" 2>/dev/null \
+      || echo "[warroom] socat forwarder failed — will retry next cycle" >&2
   fi
   ensure_gateway_log_stream || return 1
 }
