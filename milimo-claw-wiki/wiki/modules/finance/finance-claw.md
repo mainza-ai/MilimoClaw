@@ -91,6 +91,22 @@ Source: `milimo-audit-report.md`, Finding SA-1.4. Verified at HEAD `0c86b7b`.
 
 ---
 
+## ⚠️ Regression Fix F-19 [Medium]: `queue_overdue_review` undefined `invoice_id` — FIXED 2026-07-06
+
+**Pages**: `wiki/modules/finance/finance-claw.md`, `wiki/modules/finance/spend-handler.md`, `wiki/log.md`
+
+**Source**: CI failure — `NameError: name 'invoice_id' is not defined` at `approval_handler.py:273` inside `FinanceApprovalHandler.queue_overdue_review()`.
+
+**Impact**: Any code path that called `queue_overdue_review()` (invoices, overdue alerts) would crash immediately with a `NameError`, preventing the action from being queued and breaking downstream War Room rendering.
+
+**Fix applied**: Restored the correct attribute access `invoice.invoice_id` at line 273 in both root and sandbox copies of `milimo-core/src/milimo_core/finance/approval_handler.py`. Also confirmed lines 152, 184, 209, 232, 253, 303 already use the correct local variable or attribute form for their respective scopes.
+
+**Verification**:
+- `python -m pytest milimo-blueprint/tests/test_finance_approval_handler.py` → `15 passed`
+- No other `invoice_id` references in the file remain unresolved
+
+---
+
 ## Inbound Message Handlers
 
 | Message Type | Handler | Action |
