@@ -146,6 +146,11 @@ network_policies:
         protocol: rest
         enforcement: enforce
         tls: terminate
+      - host: app.link.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
     binaries:
       - { path: /usr/bin/python3 }
       - { path: /usr/local/bin/node }

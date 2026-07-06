@@ -110,6 +110,18 @@ endpoints:
       claw: "finance"
       purpose: "Stripe Link CLI device login flow"
 
+  - host: "app.link.com"
+    port: 443
+    access: full
+    tls: skip
+    binaries:
+      - "/usr/local/bin/node"
+      - "/usr/local/bin/link-cli"
+      - "/opt/hermes/.venv/bin/python"
+    metadata:
+      claw: "finance"
+      purpose: "Stripe Link CLI - Link approval UI"
+
   # Build Claw - Vercel deployments
   - host: "api.vercel.com"
     port: 443
