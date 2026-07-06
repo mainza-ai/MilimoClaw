@@ -282,6 +282,39 @@ async def handle_milimo_warroom(ctx: Any, action: str, item_id: str = None,
         hold_items = _approval_handler.get_hold_queue()
         review_items = _approval_handler.get_review_queue()
 
+        # Bridge Finance spend requests into the unified War Room view
+        spend_review_queue: list[dict] = []
+        spend_hold_queue: list[dict] = []
+        if _spend_handler is not None:
+            for spend_id, req in _spend_handler._requests.items():
+                entry = {
+                    "action_id": f"spend-review-{spend_id}",
+                    "entity_id": spend_id,
+                    "action_type": "spend_review" if req.status == "pending_review" else "spend_hold",
+                    "status": req.status,
+                    "summary": (
+                        f"{req.claw} wants to buy from {req.merchant_name}: "
+                        f"${req.amount_cents / 100:.2f} — "
+                        f"{req.justification[:80]}..."
+                        if len(req.justification) > 80 else req.justification
+                    ),
+                    "payload": {
+                        "spend_id": spend_id,
+                        "claw": req.claw,
+                        "merchant_name": req.merchant_name,
+                        "merchant_url": req.merchant_url,
+                        "amount_cents": req.amount_cents,
+                        "currency": req.currency,
+                        "justification": req.justification,
+                        "credential_type": req.credential_type,
+                        "payment_method_id": req.payment_method_id,
+                    },
+                }
+                if req.status == "pending_review":
+                    spend_review_queue.append(entry)
+                elif req.status == "held":
+                    spend_hold_queue.append(entry)
+
         # Check for urgency flags and notify
         if _warroom_notifier:
             for item in hold_items:
@@ -293,12 +326,20 @@ async def handle_milimo_warroom(ctx: Any, action: str, item_id: str = None,
                         claw_role="ops",  # Ops handles approvals
                         urgency=item.urgency_flag,
                     )
+            for item in spend_hold_queue:
+                _warroom_notifier.notify_hold_alert(
+                    action_id=item["action_id"],
+                    action_type=item["action_type"],
+                    entity_id=item["entity_id"],
+                    claw_role="finance",
+                    urgency="spend_held",
+                )
 
         return {
-            "hold_queue": [item.to_dict() for item in hold_items],
-            "review_queue": [item.to_dict() for item in review_items],
-            "total_hold": len(hold_items),
-            "total_review": len(review_items),
+            "hold_queue": [item.to_dict() for item in hold_items] + spend_hold_queue,
+            "review_queue": [item.to_dict() for item in review_items] + spend_review_queue,
+            "total_hold": len(hold_items) + len(spend_hold_queue),
+            "total_review": len(review_items) + len(spend_review_queue),
         }
 
     elif action == "cost_guard":
@@ -328,6 +369,49 @@ async def handle_milimo_warroom(ctx: Any, action: str, item_id: str = None,
     elif action in ("approve", "veto"):
         if not item_id:
             return {"error": f"item_id required for {action}"}
+
+        # Finance spend flow takes precedence when the item_id matches the spend-review pattern
+        if isinstance(item_id, str) and item_id.startswith("spend-review-") and _spend_handler is not None:
+            spend_id = item_id[len("spend-review-"):]
+            req = _spend_handler._requests.get(spend_id)
+            if not req:
+                return {"action": action, "item_id": item_id, "status": "not_found", "error": f"Spend {spend_id} not found"}
+
+            if action == "approve":
+                if req.status != "pending_review":
+                    return {"action": "approve", "item_id": item_id, "status": "invalid", "error": f"Cannot approve spend in status: {req.status}"}
+                try:
+                    hold_action_id = _spend_handler.handle_review_approve(item_id)
+                    req.status = "held"
+                    if _warroom_notifier:
+                        _warroom_notifier.notify_hold_alert(
+                            action_id=item_id,
+                            action_type="spend_hold",
+                            entity_id=spend_id,
+                            claw_role="finance",
+                            urgency="spend_review_approved",
+                        )
+                    return {"action": "approve", "item_id": item_id, "hold_action_id": hold_action_id, "spend_id": spend_id}
+                except ValueError as ve:
+                    return {"action": "approve", "item_id": item_id, "status": "failed", "error": str(ve)}
+
+            else:  # veto
+                if req.status != "pending_review":
+                    return {"action": "veto", "item_id": item_id, "status": "invalid", "error": f"Cannot veto spend in status: {req.status}"}
+                try:
+                    _spend_handler.handle_review_block(item_id, reason or "vetoed from war room")
+                    req.status = "blocked"
+                    if _warroom_notifier:
+                        _warroom_notifier.notify_hold_alert(
+                            action_id=item_id,
+                            action_type="spend_review_blocked",
+                            entity_id=spend_id,
+                            claw_role="finance",
+                            urgency="spend_review_blocked",
+                        )
+                    return {"action": "veto", "item_id": item_id, "spend_id": spend_id}
+                except ValueError as ve:
+                    return {"action": "veto", "item_id": item_id, "status": "failed", "error": str(ve)}
 
         if _approval_handler is None:
             return {"error": "Approval handler not initialized"}
