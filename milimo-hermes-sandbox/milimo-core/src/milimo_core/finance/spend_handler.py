@@ -478,7 +478,7 @@ class SpendApprovalHandler:
         spend_id = action_id.replace("spend-hold-", "")
         request = self._get_request(spend_id)
         try:
-        _validate_justification(request)
+            _validate_justification(request)
         except ValueError as ve:
             request.status = "blocked"
             self._log_decision(
