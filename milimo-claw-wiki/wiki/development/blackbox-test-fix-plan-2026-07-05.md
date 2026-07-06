@@ -294,3 +294,64 @@ python -m pytest tests/integration/test_tools.py -v
 Future work: the HTTP War Room TUI (`bridge_server.py`) still reads only `mesh_dir / "inbox" / "war_room"`. To also surface Finance spends in the browser UI, either:
 - have `SpendApprovalHandler` write JSON files to `mesh_dir / "inbox" / "war_room"`, or
 - instantiate `SpendWarRoomBridge` (in `orchestrator/finance/spend_warroom_bridge.py`) against `SoloWarRoom` and have the TUI query it as a secondary source.
+
+---
+
+## 10. Hermes War Room Full Unification — W-2 (2026-07-06)
+
+**Status**: Fixed in commit `4a80681` (develop) / `9213d87` (main)
+
+### What Changed
+
+Before this fix, `handle_milimo_warroom(action="hold_queue")` only surfaced Ops actions. After W-1, Finance spends were added. This fix completes unification by wiring:
+
+| Claw | Queue Source | Action ID Patterns | Approve/Veto Routing |
+|------|--------------|-------------------|----------------------|
+| **Ops** | `OpsApprovalHandler` (existing) | UUIDs | Direct handler |
+| **Finance - spends** | `SpendApprovalHandler._requests` (W-1) | `spend-review-<id>` | W-1 routing |
+| **Finance - invoices** | `FinanceApprovalHandler.get_pending_reviews/holds()` | `review-<invoice_id>`, `hold-<invoice_id>` | `handle_review_approve` / `handle_hold_cancel` |
+| **Build** | `BuildApprovalHandler.get_all_pending_actions()` | `pr-review-<id>`, `pr-merge-hold-<id>`, `deploy-hold-<id>` | `handle_approve` / `handle_block` |
+| **Content** | `ContentApprovalHandler.get_pending_drafts()` | draft IDs | `handle_approve(draft_id, action_id)` / `handle_block` |
+
+### Core Changes
+
+- `FinanceApprovalHandler`: added `get_pending_reviews()` and `get_pending_holds()` that read `decisions.log`
+- `ContentApprovalHandler`: added `get_pending_drafts()` that scans `drafts/pending/`
+- Each Claw's `startup()` now registers its handler with the Hermes plugin via `set_*_handler()`
+- Hermes plugin `tools.py`: `handle_milimo_warroom` aggregates all sources; approve/veto routes by prefix
+
+### Rebuild Required
+
+**Yes.** To see changes in a running Hermes session:
+```bash
+NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 \
+  NVIDIA_API_KEY="$(grep NVIDIA_API_KEY .env | cut -d= -f2)" \
+  NEMOCLAW_NON_INTERACTIVE=1 \
+  ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
+```
+
+### Verification
+
+```bash
+# Root milimo-blueprint
+cd milimo-blueprint && PYTHONPATH=... python -m pytest tests/ -k "not test_is_quarter_start"
+# 1264 passed, 1 skipped
+
+# Sandbox milimo-blueprint
+cd milimo-hermes-sandbox/milimo-blueprint && PYTHONPATH=... python -m pytest tests/ --ignore=tests/test_drift_mechanism.py
+# 1260 passed, 1 skipped
+
+# Hermes plugin
+cd milimo-hermes-sandbox/milimo-hermes-plugin && python -m pytest tests/integration/test_tools.py -v
+# 58 passed
+```
+
+### War Room Now Functional For
+
+- Ops review/hold/auto actions
+- Finance spend REVIEW → HOLD → release pipeline
+- Finance invoice REVIEW → HOLD queue
+- Build PR review/merge-hold and deploy-hold
+- Content draft approval/rejection
+
+**Note**: Invoice HOLD release requires a Stripe client and cannot be completed from the Hermes plugin alone; use the MilimoClaw TUI for transmission.
