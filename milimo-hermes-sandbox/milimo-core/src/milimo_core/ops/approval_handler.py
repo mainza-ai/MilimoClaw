@@ -31,11 +31,12 @@ from typing import Any, Callable
 logger = logging.getLogger("milimo.ops")
 
 
-def _try_import_write_warroom_action() -> Callable | None:
+def _try_import_write_warroom_action() -> tuple[Callable | None, Callable | None]:
     try:
         from warroom_bridge import write_warroom_action, remove_warroom_action
         return write_warroom_action, remove_warroom_action
-    except ImportError:
+    except ImportError as exc:
+        logger.warning("warroom_bridge unavailable — war room sync skipped: %s", exc)
         return None, None  # type: ignore[return-value]
 
 

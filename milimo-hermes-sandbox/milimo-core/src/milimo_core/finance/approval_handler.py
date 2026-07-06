@@ -13,6 +13,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal, Any
 import json
+import logging
+
+logger = logging.getLogger("milimo.finance.approval_handler")
 
 from ..milimo_paths import claw_base
 
@@ -55,6 +58,19 @@ class FinanceApprovalHandler:
         self.decisions_path = (
             decisions_path or claw_base("finance") / "logs/decisions.log"
         )
+        try:
+            from warroom_bridge import remove_warroom_action
+            self._remove_warroom = remove_warroom_action
+        except ImportError:
+            self._remove_warroom = None
+
+    def _unsync_warroom(self, action_id: str) -> None:
+        if self._remove_warroom is None:
+            return
+        try:
+            self._remove_warroom(action_id)
+        except Exception:
+            logger.debug("War room unsync skipped for %s", action_id, exc_info=True)
 
     def _write_warroom_action(self, action_id: str, stage: str, action_type: str, details: dict) -> None:
         try:
@@ -68,8 +84,8 @@ class FinanceApprovalHandler:
                 recipient_role="finance",
                 payload=details,
             )
-        except ImportError:
-            pass
+        except ImportError as exc:
+            logger.warning("warroom_bridge unavailable — war room sync skipped: %s", exc)
 
     def queue_invoice_review(self, invoice: Invoice) -> str:
         """
@@ -147,6 +163,8 @@ class FinanceApprovalHandler:
 
         self.queue_invoice_hold(invoice)
 
+        self._unsync_warroom(action_id)
+
         decision = {
             "action_id": action_id,
             "invoice_id": invoice.invoice_id,
@@ -204,6 +222,8 @@ class FinanceApprovalHandler:
 
         self.invoice_manager.handle_stage1_block(invoice_id, reason)
 
+        self._unsync_warroom(action_id)
+
         decision = {
             "action_id": action_id,
             "invoice_id": invoice_id,
@@ -227,6 +247,8 @@ class FinanceApprovalHandler:
 
         self.invoice_manager.handle_stage2_hold_release(invoice_id, stripe_client)
 
+        self._unsync_warroom(action_id)
+
         decision = {
             "action_id": action_id,
             "invoice_id": invoice_id,
@@ -247,6 +269,8 @@ class FinanceApprovalHandler:
         Logs to decisions.log: HOLD_CANCELLED
         """
         invoice_id = action_id.replace("hold-", "")
+
+        self._unsync_warroom(action_id)
 
         decision = {
             "action_id": action_id,

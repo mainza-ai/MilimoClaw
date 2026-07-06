@@ -54,8 +54,8 @@ def _write_warroom_action(draft_id: str, platform: str, brief_id: str | None,
                 "content_preview": (processed_content or "")[:200],
             },
         )
-    except ImportError:
-        pass
+    except ImportError as exc:
+        logger.warning("warroom_bridge unavailable — draft war room sync skipped: %s", exc)
 
 
 # ---------------------------------------------------------------------------

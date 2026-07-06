@@ -53,10 +53,11 @@ try:
         veto_hold_message as _bridge_veto,
     )
     _WARROOM_BRIDGE_OK = True
-except ImportError:
+except ImportError as exc:
     _WARROOM_BRIDGE_OK = False
     resolve_mesh_dir = write_warroom_action = read_warroom_action = None
     remove_warroom_action = _bridge_approve = _bridge_veto = None
+    logger.warning("warroom_bridge unavailable — war room features disabled: %s", exc)
 
 
 # Global references initialized by plugin

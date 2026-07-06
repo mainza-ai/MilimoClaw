@@ -461,6 +461,9 @@ class WarRoomHTMXHandler(BaseHTTPRequestHandler):
                 self.request_id,
             )
 
+    def _handle_hold_queue(self):
+        _send_html(self, 200, self._build_hold_queue_html(), self.request_id)
+
     def _handle_cost_guard(self):
         try:
             from milimo_core.cost_guard import get_cost_guard
@@ -495,6 +498,108 @@ class WarRoomHTMXHandler(BaseHTTPRequestHandler):
     # POST handler
     # ------------------------------------------------------------------
 
+    def _build_hold_queue_html(self) -> str:
+        """Return inner HTML for the hold-queue panel (no HTTP response)."""
+        try:
+            warroom_inbox = _warroom_inbox()
+
+            html_parts = []
+            pending_files = []
+            if warroom_inbox.exists():
+                pending_files = sorted(
+                    list(warroom_inbox.glob("*.json")),
+                    key=lambda f: f.stat().st_mtime,
+                )
+
+            if not pending_files:
+                return '<div class="empty">No pending actions — all claws clear</div>'
+
+            for msg_file in pending_files:
+                try:
+                    msg_data = json.loads(msg_file.read_text(encoding="utf-8"))
+                    msg_id      = msg_data.get("message_id", msg_file.stem)
+                    claw_role   = msg_data.get("claw_role", "unknown")
+                    mode        = msg_data.get("mode", "")
+                    action_type = msg_data.get("action_type", "")
+                    summary     = msg_data.get("summary", "")
+                    payload     = msg_data.get("payload", {})
+                    ts          = msg_data.get("timestamp", "")
+
+                    description = summary or f"{action_type} ({msg_file.stem})"
+                    if not summary:
+                        if action_type in ("spend_review",):
+                            merchant  = payload.get("merchant_name", "unknown")
+                            amount    = payload.get("amount_cents", 0) / 100.0
+                            description = f"Spend: ${amount:.2f} at {merchant}"
+                        elif action_type in ("spend_hold",):
+                            merchant  = payload.get("merchant_name", "unknown")
+                            amount    = payload.get("amount_cents", 0) / 100.0
+                            description = f"Approved spend: ${amount:.2f} at {merchant}"
+                        elif action_type in ("invoice_hold", "review-"):
+                            inv_id = payload.get("invoice_id", msg_id)
+                            total  = payload.get("total", payload.get("amount", 0))
+                            if action_type.startswith("review-"):
+                                description = f"Invoice review: {inv_id} (${total:.2f})"
+                            else:
+                                description = f"Invoice approved: {inv_id} (${total:.2f})"
+                        elif action_type in ("draft_review", "draft_ready"):
+                            platform = payload.get("platform", payload.get("draft_id", "unknown"))
+                            description = f"Draft ready: {platform}"
+                        elif action_type in ("pr_merge_hold",):
+                            pr_title = payload.get("pr_title", payload.get("pr_id", msg_id))
+                            description = f"Merge PR: {pr_title}"
+                        elif action_type in ("deploy_hold",):
+                            ver  = payload.get("version", "?")
+                            dest = payload.get("deploy_target", "?")
+                            description = f"Deploy {ver} → {dest}"
+
+                    is_hold = mode == "HOLD" or action_type.endswith("_hold") or "hold" in action_type
+                    approve_label = "Release" if is_hold else "Approve"
+                    btn_cls = "btn-approve"
+
+                    mode_badge = f'<span class="mode-badge mode-{mode.lower()}">{mode}</span>' if mode else ""
+
+                    safe_description = html_mod.escape(description, quote=True)
+                    safe_claw        = html_mod.escape(claw_role, quote=True).upper()
+                    safe_ts          = html_mod.escape(ts, quote=True)
+
+                    html_parts.append(f"""
+                    <div class="hold-item">
+                        <div class="hold-info">
+                            <div class="hold-id">{safe_description}</div>
+                            <div class="hold-meta">
+                                <span class="hold-claw">{safe_claw} CLAW</span>
+                                {mode_badge}
+                                <span class="hold-ts">{safe_ts}</span>
+                            </div>
+                        </div>
+                        <div class="hold-actions">
+                            <button class="btn {btn_cls}"
+                                hx-post="/v1/warroom/hold-queue/{msg_file.name}/approve"
+                                hx-target="#hold-queue"
+                                hx-swap="outerHTML">{approve_label}</button>
+                            <button class="btn btn-veto"
+                                hx-post="/v1/warroom/hold-queue/{msg_file.name}/veto"
+                                hx-target="#hold-queue"
+                                hx-swap="outerHTML">Veto</button>
+                        </div>
+                    </div>
+                    """)
+                except Exception as fe:
+                    logger.warning(
+                        "[%s] Failed to parse message file %s: %s",
+                        self.request_id, msg_file, fe,
+                    )
+
+            return "".join(html_parts) if html_parts else '<div class="empty">No pending actions</div>'
+        except Exception as exc:
+            logger.exception("[%s] Error building hold queue HTML", self.request_id)
+            return f'<div class="error">Error: {html_mod.escape(str(exc), quote=True)}</div>'
+
+    def _handle_hold_queue(self):
+        html = self._build_hold_queue_html()
+        _send_html(self, 200, html, self.request_id)
+
     def _process_decision(self, filename: str, decision: str):
         try:
             if decision == "approve":
@@ -506,17 +611,29 @@ class WarRoomHTMXHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(b"Bad decision")
                 return
-            self._handle_hold_queue()
+
+            inner = self._build_hold_queue_html()
+
         except Exception as exc:
             logger.exception(
                 "[%s] Error processing decision %s on %s",
                 self.request_id, decision, filename,
             )
-            _send_html(
-                self, 500,
-                f'<div class="error">Error: {_escaped_error(exc)}</div>',
-                self.request_id,
+            inner = (
+                f'<div class="error">Error: {html_mod.escape(str(exc), quote=True)}</div>'
             )
+
+        # Always return the full #hold-queue wrapper so that
+        # hx-swap="outerHTML" preserves hx-trigger="every 5s"
+        # (without this the polling attribute is lost after the first
+        # approve/veto and the queue freezes until a full page refresh).
+        wrapped = (
+            '<div id="hold-queue" hx-get="/v1/warroom/hold-queue" '
+            'hx-trigger="every 5s" hx-on::after-request='
+            '"if(event.detail.xhr.status>=500){this.setAttribute(\'hx-trigger\',\'every 30s\')}else{this.setAttribute(\'hx-trigger\',\'every 5s\')}" '
+            f'hx-swap="innerHTML">{inner}</div>'
+        )
+        _send_html(self, 200, wrapped, self.request_id)
 
 
 # ---------------------------------------------------------------------------

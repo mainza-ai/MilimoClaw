@@ -32,7 +32,8 @@ def _try_import_warroom_bridge():
     try:
         from warroom_bridge import write_warroom_action, remove_warroom_action
         return write_warroom_action, remove_warroom_action
-    except ImportError:
+    except ImportError as exc:
+        logger.warning("warroom_bridge unavailable — war room sync skipped: %s", exc)
         return None, None
 
 

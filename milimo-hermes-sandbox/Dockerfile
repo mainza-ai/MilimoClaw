@@ -68,6 +68,11 @@ RUN chown -R sandbox:sandbox /opt/milimo-core \
 # Copy War Room static assets
 COPY milimo-hermes-plugin/warroom/ /opt/hermes/warroom/
 RUN chmod -R a+rX,go-w /opt/hermes/warroom/
+# Make warroom_bridge importable from every Python interpreter in the sandbox
+# (milimo_core approval handlers run under /usr/bin/python3 or the venv,
+# neither of which has /opt/hermes/warroom on sys.path by default)
+RUN /usr/bin/python3 -c "import os, site; [open(os.path.join(d, 'warroom_bridge.pth'), 'w').write('/opt/hermes/warroom\n') for d in site.getsitepackages()]" || true \
+    && /opt/hermes/.venv/bin/python3 -c "import os, site; [open(os.path.join(d, 'warroom_bridge.pth'), 'w').write('/opt/hermes/warroom\n') for d in site.getsitepackages()]" || true
 
 # Copy blueprint for delegation/workflows
 COPY milimo-blueprint/ /opt/nemoclaw-blueprint/

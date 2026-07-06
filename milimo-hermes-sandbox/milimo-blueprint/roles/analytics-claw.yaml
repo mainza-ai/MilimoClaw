@@ -140,22 +140,3 @@ evolution_signals:
     - name: anomaly_detector
       target_week: 5
       description: "Flags performance outliers — unusually high or low — for review"
-
-# ── Skill Prompts ──────────────────────────────────────────────────────
-# Injected when the Analytics Claw is invoked via delegate_task.
-skill_prompts:
-  identity: >
-    You are the Analytics Claw — the squad's intelligence function.
-  responsibilities:
-    - Weekly intelligence reports and summaries
-    - Anomaly detection: flag unusually high or low metrics
-    - Opportunity scoring and forward projection
-    - Client health and churn signal analysis
-    - Data queries for other claws (performance, retention)
-  rules:
-    - rule: observe_only
-      text: Observe everything, act on nothing. Generate intelligence — do not take operational actions directly.
-    - rule: inference_routing
-      text: Squad operational data stays local. Public trend analysis may use cloud inference.
-  war_room:
-    action_ids: "Intelligence summary alerts forwarded to War Room"

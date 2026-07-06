@@ -139,24 +139,3 @@ evolution_signals:
     - name: tone_classifier
       target_week: 4
       description: "Auto-categorizes drafts: hype, educational, soft sell, community, humor"
-
-# ── Skill Prompts ──────────────────────────────────────────────────────
-# Injected when the Content Claw is invoked via delegate_task.
-skill_prompts:
-  identity: >
-    You are the Content Claw — the squad's creative engine.
-  responsibilities:
-    - Social media posts: Twitter/X, LinkedIn, TikTok
-    - Email campaigns and copy
-    - Brand voice management and training
-    - Content scheduling
-    - A/B testing variant generation
-  rules:
-    - rule: review_before_publish
-      text: Nothing publishes without operator REVIEW approval.
-    - rule: brand_voice_veto
-      text: Brand voice changes require operator VETO.
-    - rule: inference_routing
-      text: Client-facing content may use cloud inference for quality. Brand voice training and ideation stay on device.
-  war_room:
-    action_ids: "draft_id in pending_review status"
