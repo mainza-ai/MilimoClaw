@@ -256,3 +256,41 @@ cd milimo-hermes-sandbox/milimo-blueprint && PYTHONPATH=... python -m pytest tes
 When B-4 standardizes `self.BASE`, always update **both** copies of test fixtures:
 1. `milimo-hermes-sandbox/milimo-blueprint/tests/`
 2. Root `milimo-blueprint/tests/`
+
+---
+
+## 9. Hermes War Room Bridge — Finance Invisible to Operator (W-1)
+
+**Date**: 2026-07-06
+**Status**: Fixed in commit `fd2d4ed` (develop) / `de56828` (main)
+
+### Symptom
+
+After `handle_milimo_spend("queue_review")` returned `status=pending_review`, the operator opened the MilimoClaw War Room queue and saw **nothing**. The spend was real and recoverable from `SpendApprovalHandler._requests`, but no War Room surface exposed it.
+
+### Root Cause
+
+The Hermes `milimo_warroom` tool read exclusively from `_approval_handler` (the Ops `OpsApprovalHandler`). `SpendApprovalHandler` (Finance) was a separate in-memory queue with no bridge into the Hermes War Room view.
+
+Additionally, the HTTP War Room TUI in `bridge_server.py` reads from `mesh_dir / "inbox" / "war_room"`, but `SpendApprovalHandler._persist_queue_state` writes JSONL to `claw_base("finance") / "logs/agent-queue.log"` — a completely different location. The Hermes plugin never wrote mesh messages either.
+
+### Fix
+
+**`milimo-hermes-sandbox/.../tools.py`** and **root mirror** `milimo-hermes-plugin/.../tools.py`:
+
+- `handle_milimo_warroom(action="hold_queue")` now iterates `_spend_handler._requests` and surfaces `pending_review` → `review_queue` and `held` → `hold_queue` with normalized dicts matching Ops `Action.to_dict()` shape.
+- `handle_milimo_warroom(action="approve")` and `action="veto"` now detect `item_id.startswith("spend-review-")` and route through `_spend_handler.handle_review_approve()` / `_spend_handler.handle_review_block()` with status updates and notifications.
+
+### Verification
+
+```bash
+cd milimo-hermes-sandbox/milimo-hermes-plugin
+python -m pytest tests/integration/test_tools.py -v
+# 58 passed
+```
+
+### Resumption Note
+
+Future work: the HTTP War Room TUI (`bridge_server.py`) still reads only `mesh_dir / "inbox" / "war_room"`. To also surface Finance spends in the browser UI, either:
+- have `SpendApprovalHandler` write JSON files to `mesh_dir / "inbox" / "war_room"`, or
+- instantiate `SpendWarRoomBridge` (in `orchestrator/finance/spend_warroom_bridge.py`) against `SoloWarRoom` and have the TUI query it as a secondary source.
