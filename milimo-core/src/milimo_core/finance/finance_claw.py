@@ -184,6 +184,11 @@ class FinanceClaw:
             operational_log=operational_log,
             decisions_path=self.base_path / "logs" / "decisions.log",
         )
+        try:
+            from milimo_hermes_plugin.tools import set_finance_invoice_handler as _set_finance_invoice_handler
+            _set_finance_invoice_handler(approval_handler)
+        except ImportError:
+            pass
 
         import os as _os
 

@@ -171,6 +171,11 @@ class ContentClaw:
             operational_log=self._operational_log,
             war_room=self._war_room,
         )
+        try:
+            from milimo_hermes_plugin.tools import set_content_approval_handler
+            set_content_approval_handler(self._approval_handler)
+        except ImportError:
+            pass
 
         # 7. Platform publisher
         self._publisher = PlatformPublisher(
