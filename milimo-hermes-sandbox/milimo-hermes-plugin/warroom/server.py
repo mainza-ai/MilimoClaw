@@ -5,6 +5,7 @@ import html as html_mod
 import logging
 import signal
 import threading
+import time
 import uuid
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -82,6 +83,45 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 # ---------------------------------------------------------------------------
 _httpd: HTTPServer | None = None
 _server_thread: threading.Thread | None = None  # type: ignore[name-defined]
+
+
+# ---------------------------------------------------------------------------
+# D-2 — Lightweight in-memory rate limiter for POST endpoints
+# The base HTTPServer is single-threaded, so a bare dict without locks is
+# safe: only one request is processed at a time.
+# ---------------------------------------------------------------------------
+_RATE_LIMIT_WINDOW_SECONDS = 60
+_RATE_LIMIT_MAX_POSTS = 30
+_rate_limit_buckets: dict[str, list[float]] = {}
+_rate_limit_bucket_lock = threading.Lock()
+
+
+def _check_rate_limit(client_ip: str) -> bool:
+    """Return True if client_ip is within the POST rate limit."""
+    now = time.monotonic()
+    with _rate_limit_bucket_lock:
+        window = _rate_limit_buckets.get(client_ip, [])
+        window = [t for t in window if now - t < _RATE_LIMIT_WINDOW_SECONDS]
+        if len(window) >= _RATE_LIMIT_MAX_POSTS:
+            return False
+        window.append(now)
+        _rate_limit_buckets[client_ip] = window
+        return True
+
+
+# ---------------------------------------------------------------------------
+# D-3 — Operator identity extraction from Bearer token
+# ---------------------------------------------------------------------------
+
+def _get_client_ip(handler: BaseHTTPRequestHandler) -> str:
+    return getattr(handler, "client_address", ("unknown",))[0] if hasattr(handler, "client_address") else "unknown"
+
+
+def _get_operator_identity(handler: BaseHTTPRequestHandler) -> str:
+    token = _extract_bearer(handler.headers)
+    if token:
+        return f"token:{token[:8]}…"
+    return f"ip:{_get_client_ip(handler)}"
 
 
 def _handle_sigterm(signum, _frame):
@@ -247,6 +287,19 @@ class WarRoomHTMXHandler(BaseHTTPRequestHandler):
 
         if not _require_auth(self):
             return
+
+        # D-2 — rate-limit POST requests per client IP
+        client_ip = _get_client_ip(self)
+        if not _check_rate_limit(client_ip):
+            logger.warning(
+                "[%s] Rate limit exceeded for %s on %s",
+                self.request_id, client_ip, path,
+            )
+            _send_json(self, 429, {"error": "Too many requests — slow down"})
+            return
+
+        # D-3 — capture operator identity before dispatching
+        self._operator_identity = _get_operator_identity(self)
 
         origin = self.headers.get("Origin", "")
         expected = f"http://{self.headers.get('Host', '')}"
@@ -601,6 +654,7 @@ class WarRoomHTMXHandler(BaseHTTPRequestHandler):
         _send_html(self, 200, html, self.request_id)
 
     def _process_decision(self, filename: str, decision: str):
+        operator = getattr(self, "_operator_identity", "unknown")
         try:
             if decision == "approve":
                 approve_hold_message(filename)
@@ -611,6 +665,12 @@ class WarRoomHTMXHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(b"Bad decision")
                 return
+
+            # D-3 — structured log of who approved/vetoed what
+            logger.info(
+                "[%s] DECISION %s on %s by %s",
+                self.request_id, decision.upper(), filename, operator,
+            )
 
             inner = self._build_hold_queue_html()
 

@@ -274,17 +274,17 @@ After the dashboard startup block, added: - `WARROOM_INTERNAL_PORT` (env: `NEMOC
 
 ### Phase D — Security hardening for production
 
-**D-1. Authenticate GET endpoints**
+**D-1. Authenticate GET endpoints** ✅ Already in place
 
-Add Bearer auth to `GET /v1/warroom/hold-queue`, `/v1/warroom/claw-status`, and `/v1/warroom/cost-guard`. Return 401 on unauthenticated GETs. Currently only POST is protected.
+`do_GET()` calls `_require_auth(self)` at line 265 before dispatching to /v1/warroom/* handlers. When `WARROOM_AUTH_TOKEN` is set, every GET returns 401 without a valid Bearer token. No additional change required.
 
-**D-2. Add rate limiting on POST**
+**D-2. Add rate limiting on POST** ✅ Implemented 2026-07-07
 
-Accept no more than N approve/veto requests per minute per client IP. Use a simple in-memory sliding window or token bucket (the `RateLimiter` module already exists in the TypeScript warroom layer).
+Added `_RATE_LIMIT_WINDOW_SECONDS=60`, `_RATE_LIMIT_MAX_POSTS=30`, `_check_rate_limit(client_ip)`. `do_POST()` rejects excess requests with HTTP 429 before any action dispatches. The base HTTPServer is single-threaded, so the plain-dict sliding window is safe without additional locking.
 
-**D-3. Add structured logging for all approve/veto decisions**
+**D-3. Add structured logging for all approve/veto decisions** ✅ Implemented 2026-07-07
 
-Log: timestamp, operator ID (from Bearer token or session), action_id, decision, claw_role, outcome. Currently only handler-side `_log_decision` records who approved; the server's POST response doesn't capture operator identity.
+`do_POST()` captures `self._operator_identity = _get_operator_identity(self)` (either `token:<prefix>…` or `ip:<addr>`) before dispatching. `_process_decision()` logs `[req_id] DECISION APPROVE/VETO on <action_id> by <identity>` directly alongside handler-side `_log_decision` records.
 
 ---
 
