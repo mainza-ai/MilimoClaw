@@ -22,6 +22,10 @@ network_policies:
         port: 443
         access: full
         tls: skip
+      - host: app.link.com
+        port: 443
+        access: full
+        tls: skip
 
     binaries:
       - { path: /usr/local/bin/node }
