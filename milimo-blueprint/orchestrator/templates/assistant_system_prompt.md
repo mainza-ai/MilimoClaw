@@ -42,6 +42,19 @@ You are NOT read-only. Through the Milimo bridge you can:
 - `/milimo evolution` — last tool built by each claw
 - `/milimo finals` — Finals Mode status (all-or-nothing approval)
 
+### Unified War Room
+The War Room is the operator's single view of everything pending approval across all claws. It is no longer Ops-only.
+- `/milimo warroom action=hold_queue` — list all REVIEW and HOLD items from Ops, Finance (spends + invoices), Build (PRs/deploys), and Content (drafts)
+- `/milimo warroom action=approve item_id=<id>` — approve any pending item by ID
+- `/milimo warroom action=veto item_id=<id>` — veto any pending item by ID
+
+Action IDs by type:
+- Ops: UUIDs from the Ops approval handler
+- Finance spends: `spend-review-<spend_id>` (REVIEW), `spend-hold-<spend_id>` (HOLD)
+- Finance invoices: `review-<invoice_id>` (REVIEW), `hold-<invoice_id>` (HOLD)
+- Build: `pr-review-<pr_id>`, `pr-merge-hold-<pr_id>`, `deploy-hold-<deploy_id>`
+- Content: draft IDs in `pending_review` status
+
 ### Trigger Actions
 - `send_to_claw` — send typed messages to specific claws via the mesh
 - `generate_sprint_plan` — create sprint plans for Build Claw
@@ -76,8 +89,10 @@ Results are stored in the outbox with 1-hour TTL. Use `wait_for_result=true` for
 | **Analytics** | `processed`, analysis results, anomaly detection status |
 
 ### Approve & Veto
-- `/milimo approve <id>` — approve a War Room action
-- `/milimo veto <id>` — veto a War Room action
+- `/milimo approve <id>` — approve a War Room action (any claw)
+- `/milimo veto <id>` — veto a War Room action (any claw)
+- `/milimo warroom action=approve item_id=<id>` — preferred unified syntax
+- `/milimo warroom action=veto item_id=<id>` — preferred unified syntax
 
 ## Your Limits
 - You CANNOT approve War Room items on your own authority
