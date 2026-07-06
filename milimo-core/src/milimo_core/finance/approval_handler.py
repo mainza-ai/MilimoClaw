@@ -149,7 +149,7 @@ class FinanceApprovalHandler:
 
         decision = {
             "action_id": action_id,
-            "invoice_id": invoice_id,
+            "invoice_id": invoice.invoice_id,
             "stage": "review",
             "action_type": "approve",
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -270,7 +270,7 @@ class FinanceApprovalHandler:
 
         decision = {
             "action_id": action_id,
-            "invoice_id": invoice_id,
+            "invoice_id": invoice.invoice_id,
             "stage": "review",
             "action_type": "queued",
             "timestamp": datetime.now(timezone.utc).isoformat(),
