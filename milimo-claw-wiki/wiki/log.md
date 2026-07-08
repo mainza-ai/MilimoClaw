@@ -2,9 +2,45 @@
 
 **Summary**: Append-only record of all wiki operations.
 
-**Last updated**: 2026-07-06
+**Last updated**: 2026-07-08
 
 **Tags**: #log #meta
+
+---
+
+### 2026-07-08 — Successful rebuild + onboard: dashboard port correction, war room verified live
+
+**Pages**: `wiki/log.md`, `wiki/index.md`, `wiki/development/war-room-production-readiness-2026-07-06.md`, `README.md`
+
+**Source**: Live rebuild of `milimo-hermes` sandbox after stale-container + stale-onboard-lock cleanup.
+
+**Changes**:
+- `wiki/log.md`: this entry
+- `wiki/index.md`: last-updated → 2026-07-08; recent-changes table row added
+- `wiki/development/war-room-production-readiness-2026-07-06.md`: status table marked C-1/C-2/D-2/D-3 as **verified post-rebuild 2026-07-08**; known-current-behavior corrected; dashboard port corrected to 19119
+- `README.md`: corrected dashboard host port from `18790` → `19119`; removed stale `18789` references; clarified that `CHAT_UI_URL=http://localhost:18790` is the **container-internal** dashboard URL only
+
+**Root cause — apparent "build stall"**:
+- Docker build always finished cleanly (`59/59 FINISHED`, `EXIT: 0`). The apparent hang was at `nemohermes onboard` step `[6/8] Creating sandbox`, caused by a **stale Docker container** (`openshell-milimo-hermes-...`) and/or a stale `onboard.lock` at `~/.local/share/nemoclaw/onboard.lock`.
+- Clearing both (`docker rm -f <container>` + `rm ~/.local/share/nemoclaw/onboard.lock`) resolved it. The installer then completed all 8 steps successfully.
+
+**Root cause — dashboard port mismatch**:
+- The installer text references `18789`/`18790`, but the actual Hermes dashboard inside the sandbox listens on **port 19119**.
+- Pre-existing `openshell forward start 18789 milimo-hermes` forwarded the wrong internal port, producing an empty reply from the dashboard.
+- Resolution: `openshell forward start --background 19119 milimo-hermes` → dashboard returns `HTTP 200` at host `http://127.0.0.1:19119/`
+
+**Verified live state**:
+- Dashboard: `http://127.0.0.1:19119/` → HTTP 200 ✅
+- OpenAI API: `http://127.0.0.1:8642/v1` (forward `running`, PID 8355)
+- War Room: port 9090 forward present in `openshell forward list` → `running` (PID 7814) ✅
+- War Room server process: `/opt/hermes/.venv/bin/python /usr/local/bin/hermes.real dashboard --host 127.0.0.1 --port 19119` confirmed inside sandbox
+- Plugin sync: `[OK] plugin`, `[OK] core` during build
+- All 8 onboarding steps completed: policy versions 2–7 applied, `stripe-link` preset loaded, nous-portal/sentry/telegram/npm/pypi/huggingface/brew/vercel presets active
+
+**Next steps**:
+- Connect to Hermes: `nemohermes milimo-hermes connect`
+- Run end-to-end spend flow to validate war room populates dynamically and approve/veto works without refresh (phases A/B/C-1/C-2)
+- Remaining phases: B-2 WebSocket push, B-3 filesystem watcher, D-1 GET auth, D-2/D-3 verified already implemented
 
 ---
 

@@ -259,7 +259,7 @@ $ openclaw tui
 
 #### Option B: Hermes Profile (Web Dashboard + OpenAI-compatible API)
 
-To run the Hermes profile with web dashboard (port 18790) and OpenAI-compatible API (port 8642):
+To run the Hermes profile with web dashboard (host port 19119) and OpenAI-compatible API (port 8642):
 
 ```console
 $ export NVIDIA_API_KEY=nvapi-your-key-here
@@ -289,14 +289,14 @@ nemohermes milimo-hermes exec -- link-cli auth login
 ```
 
 **Result:**
-- Web Dashboard: `http://localhost:18790/`
+- Web Dashboard: `http://localhost:19119/`
 - OpenAI-compatible API: `http://localhost:8642/v1`
-- War Room: `/opt/hermes/warroom/warroom.html` inside sandbox (served externally via `python3 milimo-hermes-plugin/warroom/server.py 9090`)
-- Headless: SSH tunnel `ssh -L 18790:127.0.0.1:18790 user@host` or set `CHAT_UI_URL=http://localhost:18790`
+- War Room: `http://localhost:9090/warroom.html` (HTMX server, auto-started in container)
+- Headless: SSH tunnel `ssh -L 19119:127.0.0.1:19119 user@host` or set `CHAT_UI_URL=http://localhost:18790`
 
-> **Note**: Port `9090` is the default for the external HTMX War Room server. Port `8080` is reserved for the OpenClaw/OpenShell gateway.
+> **Note**: The Hermes dashboard is served internally on port **19119** inside the sandbox. The installer may reference `18789`/`18790` in its text output, but the actual listening port is `19119`. Verify with `openshell forward list` and `curl http://127.0.0.1:19119/` — it must return `HTTP 200`. If the dashboard is unreachable, run `openshell forward start --background 19119 milimo-hermes` to create the correct forward.
 
-> **Port forwarding**: `nemohermes onboard` maps ports `18789` (internal gateway), `18790` (dashboard), and `8642` (API) automatically. No manual `-p` flags are needed.
+> **Port forwarding**: `nemohermes onboard` maps ports `19119` (dashboard) and `8642` (API) automatically. If port 19119 is not listed in `openshell forward list`, start it manually: `openshell forward start --background 19119 milimo-hermes`.
 
 > **Two-container conflict**: `nemohermes onboard` may create a plain Hermes sandbox (`openshell` container) before `install-hermes.sh` creates `milimo-hermes`. If you see port conflicts, destroy the plain Hermes sandbox first: `nemohermes openshell destroy`.
 
@@ -374,14 +374,14 @@ $ nemohermes milimo-hermes status
 
 #### View War Room
 
-The War Room is a static HTML dashboard at `milimo-hermes-plugin/warroom/warroom.html`. The server resolves templates from both the milimo-core venv and `/opt/nemoclaw-blueprint` for system Python subprocess compatibility:
+The War Room is served automatically by the container at `http://localhost:9090/warroom.html` on host port 9090. No manual server start is needed:
 
 ```console
-$ python3 milimo-hermes-plugin/warroom/server.py 9090
-# Then open http://localhost:9090/warroom.html
+$ curl http://localhost:9090/health
+# Expected: {"status": "ok"}
 ```
 
-> **Note**: Port `9090` is the default for the HTMX War Room server. Port `8080` is reserved for the OpenClaw/OpenShell gateway.
+> **Note**: Port `9090` is the default for the HTMX War Room server and is forwarded automatically when the container starts. Port `8080` is reserved for the OpenClaw/OpenShell gateway. If port 9090 is not responding, verify the forward with `openshell forward list` and check container logs: `nemohermes milimo-hermes logs`.
 
 #### Check Sandbox Logs
 ```console
