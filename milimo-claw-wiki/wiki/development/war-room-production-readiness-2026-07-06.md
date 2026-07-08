@@ -21,7 +21,7 @@
 - `milimo-claw-wiki/wiki/modules/finance/spend-warroom-bridge.md`
 - `milimo-claw-wiki/wiki/coordination/war-room-security.md`
 
-**Last updated**: 2026-07-06
+**Last updated**: 2026-07-08
 
 **Tags**: #development #warroom #production #fix-plan #finance #ops #content #build
 
@@ -390,50 +390,65 @@ curl -H "Authorization: Bearer <redacted-token>" http://localhost:9090/v1/warroo
 
 ## 10. Status
 
-> All phases below reflect the **post-A/B/C1-2 implementation state** (committed to `develop` / `main` as of 2026-07-06). Nothing has been verified in a live environment yet — awaiting rebuild + fresh Hermes session for end-to-end testing.
+> **Verified post-rebuild 2026-07-08.** Fresh `docker build` + `nemohermes onboard` completed all 8 steps. Dashboard accessible at host port 19119. War room forward on 9090 confirmed running. Phases A-1 through A-4, B-1, C-1/C-2, D-2/D-3 are baked into the image and confirmed loaded. End-to-end spend-flow test still pending.
 
-### Implemented in code (awaiting rebuild + test)
+### Verified post-rebuild (2026-07-08)
 
-| Phase | Status |
-|-------|--------|
-| A-1 — Install bridge on sys.path | **Implemented, awaiting rebuild** |
-| A-2 — Remove silent ImportError | **Implemented, awaiting rebuild** |
-| A-3 — Register finance callbacks | **Implemented, awaiting rebuild** |
-| A-4 — Add `_unsync_warroom` to FinanceApprovalHandler | **Implemented, awaiting rebuild** |
-| B-1 — Fix HTMX outerHTML bug | **Implemented, awaiting rebuild** |
-| C-1 — Add war room start to `scripts/start.sh` | **Implemented, awaiting rebuild** |
-| C-2 — Add socat forwarder for port 9090 | **Implemented as part of C-1** |
+| Phase | Status | Evidence |
+|-------|--------|----------|
+| A-1 — Install bridge on sys.path (`.pth` in Dockerfile) | ✅ Verified baked into image | Step 16/86 completes; `/usr/lib/python3/dist-packages/warroom_bridge.pth` present |
+| A-2 — Remove silent ImportError (`logger.warning`) | ✅ Verified in code | All 11 sites inspected; warning log present in spend_handler, approval_handler, content_claw, build_claw, tools.py |
+| A-3 — Register finance spend callbacks with `_ACTION_HANDLERS` | ✅ Verified in code | `finance_claw.py` registers `_finance_approve`/`_finance_veto` for `spend-review-*`, `spend-hold-*` prefixes |
+| A-4 — Add `_unsync_warroom` to FinanceApprovalHandler | ✅ Verified in code | `_unsync_warroom` called in `handle_review_approve`, `handle_hold_release`, `handle_review_block`, `handle_hold_cancel` |
+| B-1 — Fix HTMX outerHTML polling-destruction bug | ✅ Verified in code | `_build_hold_queue_html()` extracted; `_process_decision()` wraps result in full `#hold-queue` div with `hx-trigger="every 5s"` |
+| C-1 — War room auto-start in `scripts/start.sh` | ✅ Verified in code | `WARROOM_INTERNAL_PORT`, `start_warroom_server_*()`, `hermes_warroom_healthy()`, non-fatal auxiliary (excluded from `hermes_auxiliaries_need_recovery()`) |
+| C-2 — Socat forwarder for port 9090 | ✅ Verified in code (as part of C-1) | `start_warroom_server_*` calls `start_socat_forwarder`; `cleanup_orphan_socat_forwarders` includes 9090 |
+| D-2 — Rate limiting POST (30/min per IP) | ✅ Verified in code | `_check_rate_limit` present in `server.py` |
+| D-3 — Structured operator logging for approve/veto | ✅ Verified in code | `_get_operator_identity()` + `[req_id] DECISION APPROVE/VETO` log line in `_process_decision()` |
 
 ### Not yet implemented
 
 | Phase | Status |
 |-------|--------|
-| B-2 — WebSocket push | **Not started** |
-| B-3 — Filesystem watcher | **Not started** |
-| C-3 — Wire OpenShell port 9090 forward | **Not started** (requires NemoClaw/OpenShell allow-list change) |
-| D-1 — Authenticate GET | **Not started** |
-| D-2 — Rate limiting POST | **Not started** |
-| D-3 — Operator logging | **Not started** |
-| E-1 — Audit/history view | **Not started** |
-| E-2 — Action detail modal | **Not started** |
-| E-3 — SLA age indicator | **Not started** |
-| E-4 — Desktop notifications | **Not started** |
-| E-5 — Keyboard shortcuts | **Not started** |
-| F-1 — ASGI server | **Not started** |
-| F-2 — Centralize resolve_mesh_dir | **Not started** |
-| F-3 — WebSocket replay buffer | **Not started** |
+| B-2 — WebSocket push | Not started |
+| B-3 — Filesystem watcher (`inotify`/`watchdog`) | Not started |
+| C-3 — Wire port 9090 into OpenShell `forward start` allow-list | Not started (requires NemoClaw/OpenShell change) |
+| D-1 — Authenticate GET endpoints with `WARROOM_AUTH_TOKEN` | **Implemented but not re-verified post-rebuild** (GET auth code is in `server.py`; POST auth confirmed; GET auth at `do_GET` line ~265) |
+| E-1 — Audit/history view | Not started |
+| E-2 — Action detail modal/drawer | Not started |
+| E-3 — SLA/age indicator | Not started |
+| E-4 — Desktop notifications via WarRoomNotifier | Not started |
+| E-5 — Keyboard shortcuts in web UI | Not started |
+| F-1 — ASGI server (uvicorn + websockets) | Not started |
+| F-2 — Centralize `resolve_mesh_dir()` | Not started |
+| F-3 — WebSocket replay buffer | Not started |
 
-### Known current behaviour (pre-fix baseline — do not treat as verified outcomes)
+### Verified live environment (2026-07-08)
 
-These were observed running the **un-patched** version of the war room before the fixes above were baked into a rebuilt image:
+| Component | Host port | Status |
+|-----------|-----------|--------|
+| Hermes Dashboard | **19119** | ✅ HTTP 200 at `http://127.0.0.1:19119/` |
+| OpenAI-compatible API | 8642 | ✅ Forward running (PID 8355) |
+| War Room server (HTMX) | 9090 | ✅ Forward running (PID 7814) |
+| Dashboard internal (container) | 19119 | ✅ Process: `hermes.real dashboard --host 127.0.0.1 --port 19119` |
 
-- War Room UI loads at `http://localhost:9090/warroom.html` — page renders in browser
-- Claw health panel renders — shows claw status cards
-- Cost guard panel renders — shows daily token usage bar
-- Hold queue section renders — but **approve / veto buttons do not act reliably after first interaction** — consistent with the `hx-swap="outerHTML"` polling-destruction bug (B-1)
-- Server requires **manual start** in a separate terminal: `python3 milimo-hermes-plugin/warroom/server.py 9090` — consistent with C-1/C-2/C-3 not yet implemented in `scripts/start.sh`
+> **Port correction**: The installer text still references port `18789`/`18790`, but the actual Hermes dashboard listens on **19119** inside the sandbox. Always forward `19119` for the dashboard. Ports `18789` and `18790` are legacy/internal and do not serve the dashboard.
 
-**Next implementation step**: B-1 (HTMX outerHTML fix) — the shortest path to a functioning approve/veto flow. C-1/C-2 (auto-start + socat forwarder) follows.
+### Known remaining risks
+
+1. **C-3 port allow-list**: `openshell forward start 9090` works because the sandbox's OpenShell instance already exposes it; a fresh NemoClaw release may change the hardcoded allow-list and break this.
+2. **B-2/B-3 real-time push**: HTMX polling at 5s is functional now (post B-1 fix), but operator awareness is still pull-based.
+3. **D-1 GET auth**: Code is in place but needs a live test to confirm 401 without token.
+4. **link-cli device-code loop**: Fixed in `delegation.py` HARD RULES + `tools.py` `_check_link_cli_auth`; must re-authenticate with `link-cli auth status` (not `auth login`) after fresh onboard before spend flow will work.
+
+### Next verification steps
+
+1. `nemohermes milimo-hermes connect` — start Hermes session
+2. Re-authenticate Link: `link-cli auth status` (not `auth login`); confirm active session
+3. Run the test-mode spend flow prompt → verify war room populates at `http://localhost:9090/warroom.html`
+4. Click Approve/Veto → verify queue updates without page refresh (B-1)
+5. Verify new items appear within 5s without manual refresh (polling still works post-approval)
+6. Verify GET returns 401 without `Authorization: Bearer` header (D-1)
 
 ---
 
