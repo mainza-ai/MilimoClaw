@@ -14,7 +14,10 @@ Provides 6 claw skills for Hermes profile:
 """
 
 import os
+import logging
 from typing import Any
+
+logger = logging.getLogger("milimo.hermes.plugin")
 
 from milimo_core.build import BuildClaw, BuildFilesystemInit
 from milimo_core.content import ContentClaw, ContentGenerator
@@ -159,8 +162,8 @@ def on_load(config: dict[str, Any] | None = None) -> None:
             lambda aid, data: approval_handler.handle_approve(aid, lambda: None),
             lambda aid, data: approval_handler.handle_block(aid, reason="vetoed from war room"),
         )
-    except ImportError:
-        pass
+    except ImportError as exc:
+        logger.warning("warroom_bridge unavailable — ops war room handler not registered: %s", exc)
 
     # Initialize cost guard
     cost_guard = get_cost_guard()

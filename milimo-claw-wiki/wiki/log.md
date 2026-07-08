@@ -8,6 +8,53 @@
 
 ---
 
+### 2026-07-06 — War room investigation: empty queue + static UI root cause + phased fix plan
+
+**Pages**: `wiki/development/war-room-production-readiness-2026-07-06.md`, `wiki/log.md`, `wiki/index.md`
+
+**Source**: Live end-to-end Finance Claw spend flow test — three spend requests logged to `decisions.log` but war room UI showed "No pending actions — all claws clear."
+
+**Changes**:
+- Created `wiki/development/war-room-production-readiness-2026-07-06.md` documenting:
+  - **Root cause (primary):** `warroom_bridge.py` is not on `sys.path` for `milimo_core` processes. All 11 import sites across `finance/spend_handler.py`, `finance/approval_handler.py`, `ops/approval_handler.py`, `build/approval_handler.py`, `content/approval_handler.py`, `content/content_generator.py`, `finance/finance_claw.py`, `content/content_claw.py`, `build/build_claw.py`, `milimo_hermes_plugin/__init__.py`, and `milimo_hermes_plugin/tools.py` silently fail with `ModuleNotFoundError` because `except ImportError: pass` swallows the error. The server at `warroom/server.py` can import it only because Python adds the script directory to `sys.path[0]` by accident.
+  - **Root cause (secondary):** HTMX outerHTML swap after approve/veto destroys the `hx-trigger="every 5s"` polling attribute, freezing the queue until manual page refresh.
+  - **Root cause (tertiary):** War room server is never auto-started in `scripts/start.sh`; port 9090 has no socat forwarder and no OpenShell `forward start` rule.
+  - Complete gap inventory (CRITICAL/HIGH/MEDIUM/LOW)
+  - Consistency matrix showing Finance (spend) is the weakest handler
+  - Phased fix plan (A–F): bridge sys.path install, silent-error removal, finance callback registration, auto-start + port forward, HTMX fix, WebSocket push, security hardening, UX enhancements
+  - Verification checklist for each phase
+
+**Root cause summary**:
+- `warroom_bridge.py` lives at `/opt/hermes/warroom/` and `/sandbox/.hermes/plugins/milimo-hermes/warroom/bridge.py`, neither of which is on `sys.path` for `milimo_core`. Every approval handler's `try: from warroom_bridge import ... except ImportError: pass` silently no-ops, so no JSON files are ever written to `mesh_dir/inbox/war_room/`. The server polls that directory and finds nothing.
+- Server starts successfully because Python adds its own script directory to `sys.path[0]`, which happens to contain `warroom_bridge.py` — this is accidental, not by design.
+
+**Impact**:
+- All three spend requests (`spend-e46e59e3`, `spend-c078beaf`, `spend-b4efaadf`) were logged to `decisions.log` but never written to the war room inbox
+- Finance, ops, content, and build handlers all silently skip war room sync
+- `tools.py` `_read_mesh_warroom()` returns empty lists because `_WARROOM_BRIDGE_OK = False`
+- Operator has no visibility into pending actions from any claw
+
+**Next step**: Awaiting user review and approval of phased implementation plan before any code changes.
+
+---
+
+### 2026-07-06 — Correct `_validate_justification` IndentationError in `spend_handler.py` (CI break)
+
+**Pages**: `wiki/development/production-spend-flow-fix-plan-2026-07-06.md`, `wiki/log.md`, `wiki/index.md`
+
+**Source**: CI failure after production spend flow fix — `IndentationError: expected an indented block after 'try' statement` at `spend_handler.py:480-481` in both `milimo-core/` and `milimo-hermes-sandbox/milimo-core/` copies.
+
+**Changes**:
+- `milimo-core/src/milimo_core/finance/spend_handler.py`: `_validate_justification(request)` at line 481 was not indented inside the `try:` block at line 480. Added 4-space indentation so the call is inside the `try`.
+- `milimo-hermes-sandbox/milimo-core/src/milimo_core/finance/spend_handler.py`: mirrored
+- Force-pushed `develop` (`72bdbec`), merged to `main` (`9076a3a`)
+
+**Root cause**: Commit `cb187d7` (production spend flow fix) introduced the `try:` block with the `_validate_justification` call on the following line at the same indentation level as `try`, which Python rejects as an `IndentationError`.
+
+**Verification**: `python3 -c "import ast; ast.parse(open('.../spend_handler.py').read()); print('OK')"` → `OK`; re-merged to `main`
+
+---
+
 ### 2026-07-06 — Fix `NameError` in `FinanceApprovalHandler.queue_overdue_review()` (F-19)
 
 **Pages**: `wiki/modules/finance/spend-handler.md`, `wiki/modules/finance/finance-claw.md`, `wiki/log.md`, `wiki/index.md`
@@ -1944,5 +1991,32 @@ Each entry follows this format:
 - Fix 6: Added `_discover_payment_method_id()` in `tools.py`; `queue_review` auto-discovers payment method when missing; returns structured error if none available
 - Fix 7: Added `_format_spend_response()` to normalize all spend tool responses with consistent schema (`action`, `spend_id`, `status`, `stage`, `test_mode`, `full_payload`, `next_step`); injects `_finance_context` on first queue_review call
 - Fix 8: Satisfied by Fix 2 — `tools.py` imports `_FINANCE_CONTEXT = HermesDelegateAdapter.get_finance_context()` at module load, making context available regardless of invocation path
+
+### 2026-07-06 — War room fix implementation: B-1 (HTMX polling fix) + C-1 (auto-start in start.sh)
+
+**Pages**: `wiki/development/war-room-production-readiness-2026-07-06.md`, `wiki/log.md`
+
+**Files modified**:
+- `milimo-hermes-sandbox/milimo-hermes-plugin/warroom/server.py` — B-1 fix
+- `milimo-hermes-sandbox/scripts/start.sh` — C-1 auto-start
+
+**Changes**:
+
+**B-1 — HTMX outerHTML polling-destruction bug fix**
+- Root cause: approve/veto buttons used `hx-target="#hold-queue" hx-swap="outerHTML"`. The server's `_handle_hold_queue()` returned only the inner HTML of the queue (not the outer `<div id="hold-queue">`). After `outerHTML` swap, the replacement div had no `hx-trigger="every 5s"` attribute → polling stopped permanently after the first approval.
+- Fix: Added `_build_hold_queue_html()` method that returns the inner HTML without sending a response. `_handle_hold_queue()` delegates to it and sends. `_process_decision()` now calls `_build_hold_queue_html()` directly, then wraps the result in a full `<div id="hold-queue" hx-trigger="every 5s" hx-swap="innerHTML">...</div>` wrapper and sends that. This preserves the polling attribute through every approve/veto cycle.
+
+**C-1+C-2 — War room auto-start in `scripts/start.sh`**
+- Added `WARROOM_INTERNAL_PORT` (configurable via `NEMOCLAW_WARROOM_PORT`, defaults to 9090) and `WARROOM_PUBLIC_PORT` port configuration with collision detection against PUBLIC_PORT, INTERNAL_PORT, and dashboard ports
+- Added `WARROOM_PID`, `WARROOM_SOCAT_PID`, `WARROOM_LOG_TAIL_PID`, and their `_START_IDENTITY` counterparts
+- Added `start_warroom_server_current_user()` and `start_warroom_server_sandbox_user()` functions — launch `/opt/hermes/warroom/server.py` as background process via `nohup`, capture PID, assign tracked role, start socat forwarder on `WARROOM_PUBLIC_PORT`
+- Added `hermes_warroom_healthy()` — health check via `/health` endpoint HTTP 200 probe
+- Added `hermes_auxiliaries_need_recovery()` now includes war room health checks
+- Extended `ensure_hermes_supervised_auxiliaries()` to auto-restart war room server and its socat forwarder on failure
+- Extended `refresh_hermes_supervised_child_pids()` to track war room PIDs for clean shutdown
+- Extended `cleanup_orphan_socat_forwarders()` to kill orphaned war room socat forwarders at startup
+- Extended `hermes_role_identity_value()` and `hermes_set_role_identity()` with `warroom`, `warroom-socat`, `warroom-log` cases
+- Extended `hermes_process_start_identity()` cmdline validation for `warroom` role (server.py process) and `warroom-log` (sed log tail)
+- Added `validate_port_configuration()` WARROOM collision guards against PUBLIC_PORT, INTERNAL_PORT, DASHBOARD_PUBLIC_PORT, DASHBOARD_INTERNAL_PORT
 
 **Verification status**: Awaiting operator rebuild + live retest

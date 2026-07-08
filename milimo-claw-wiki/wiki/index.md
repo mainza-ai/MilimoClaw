@@ -130,6 +130,7 @@ Development conventions and guides.
 | [[spend-handler-debug-briefing-2026-07-05]] | Spend handler debug briefing: 3 code bugs + proxy env root cause for UNKNOWN error | ✓ |
 | [[blackbox-test-fix-plan-2026-07-05]] | Full 13-bug blackbox fix plan: Analytics/Content/Build/Finance/Ops/Lucy — status + resumption guide | ✓ |
 | [[production-spend-flow-fix-plan-2026-07-06]] | Production spend flow root cause analysis + fix plan (prompt/context layer) | ✓ |
+| [[war-room-production-readiness-2026-07-06]] | War room empty/static root cause (bridge sys.path, HTMX outerHTML bug, missing auto-start) + phased implementation plan | Pending approval |
 | [[debugging]] | Debugging guide and tools | ✓ |
 | [[sandbox-file-sharing]] | Accessing and extracting claw-generated files | ✓ |
 

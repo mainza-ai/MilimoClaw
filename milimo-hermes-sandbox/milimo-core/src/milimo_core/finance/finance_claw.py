@@ -192,13 +192,30 @@ class FinanceClaw:
 
         try:
             from warroom_bridge import register_warroom_action_handler as _reg_fin_wr
-            _reg_fin_wr(
-                "finance",
-                lambda action_id, data: approval_handler.handle_review_approve(action_id),
-                lambda action_id, data: approval_handler.handle_review_block(action_id, reason="vetoed from war room"),
-            )
-        except ImportError:
-            pass
+
+            def _finance_approve(action_id: str, data: dict) -> None:
+                if action_id.startswith("spend-review-"):
+                    approval_handler.handle_review_approve(action_id)
+                elif action_id.startswith("spend-hold-"):
+                    spend_handler.handle_hold_release(action_id, operator_id="system")
+                elif action_id.startswith("review-"):
+                    approval_handler.handle_review_approve(action_id)
+                elif action_id.startswith("hold-"):
+                    approval_handler.handle_hold_release(action_id, None)
+
+            def _finance_veto(action_id: str, data: dict) -> None:
+                if action_id.startswith("spend-review-"):
+                    spend_handler.handle_review_block(action_id, reason="vetoed from war room")
+                elif action_id.startswith("spend-hold-"):
+                    spend_handler.handle_hold_cancel(action_id, reason="vetoed from war room")
+                elif action_id.startswith("review-"):
+                    approval_handler.handle_review_block(action_id, reason="vetoed from war room")
+                elif action_id.startswith("hold-"):
+                    approval_handler.handle_hold_cancel(action_id)
+
+            _reg_fin_wr("finance", _finance_approve, _finance_veto)
+        except ImportError as exc:
+            logger.warning("warroom_bridge unavailable — finance war room handler not registered: %s", exc)
 
         import os as _os
 

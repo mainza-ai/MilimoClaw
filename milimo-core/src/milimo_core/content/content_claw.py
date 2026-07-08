@@ -184,8 +184,8 @@ class ContentClaw:
                 self._approval_handler.handle_approve,
                 self._approval_handler.handle_block,
             )
-        except ImportError:
-            pass
+        except ImportError as exc:
+            logger.warning("warroom_bridge unavailable — content war room handler not registered: %s", exc)
 
         # 7. Platform publisher
         self._publisher = PlatformPublisher(

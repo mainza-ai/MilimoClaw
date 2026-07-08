@@ -286,8 +286,8 @@ class SpendApprovalHandler:
                 recipient_role="finance",
                 payload=review_entry["details"],
             )
-        except ImportError:
-            pass
+        except ImportError as exc:
+            logger.warning("warroom_bridge unavailable — war room sync skipped: %s", exc)
         return action_id
 
     def handle_review_approve(self, action_id: str, *args: Any, **kwargs: Any) -> str:
@@ -407,8 +407,8 @@ class SpendApprovalHandler:
                 recipient_role="finance",
                 payload=decision_payload,
             )
-        except ImportError:
-            pass
+        except ImportError as exc:
+            logger.warning("warroom_bridge unavailable — war room sync skipped: %s", exc)
         return action_id
 
     def _find_prior_release(self, spend_id: str) -> dict | None:

@@ -193,6 +193,26 @@ DASHBOARD_INTERNAL_PORT="${NEMOCLAW_HERMES_DASHBOARD_INTERNAL_PORT:-19119}"
 if [ "$DASHBOARD_PUBLIC_PORT" -eq "$DASHBOARD_INTERNAL_PORT" ]; then
   DASHBOARD_INTERNAL_PORT=19120
 fi
+
+# War Room — serve on a fixed port without a separate socat forwarder.
+# The server binds to 0.0.0.0:WARROOM_INTERNAL_PORT directly.
+WARROOM_INTERNAL_PORT="$(printf '%s' "${NEMOCLAW_WARROOM_PORT:-9090}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+case "$WARROOM_INTERNAL_PORT" in
+  *[!0-9]* | '')
+    echo "[gateway] ERROR: WARROOM_INTERNAL_PORT must be a number (got ${NEMOCLAW_WARROOM_PORT:-})" >&2
+    WARROOM_INTERNAL_PORT=9090
+    ;;
+  *) ;;
+esac
+if [ "$WARROOM_INTERNAL_PORT" -eq "$PUBLIC_PORT" ] \
+  || [ "$WARROOM_INTERNAL_PORT" -eq "$INTERNAL_PORT" ] \
+  || [ "$WARROOM_INTERNAL_PORT" -eq "$DASHBOARD_PUBLIC_PORT" ] \
+  || [ "$WARROOM_INTERNAL_PORT" -eq "$DASHBOARD_INTERNAL_PORT" ]; then
+  echo "[gateway] ERROR: WARROOM_INTERNAL_PORT ($WARROOM_INTERNAL_PORT) collides with another service port" >&2
+  exit 1
+fi
+WARROOM_PUBLIC_PORT="$WARROOM_INTERNAL_PORT"
+
 HERMES_DASHBOARD_TUI="${NEMOCLAW_HERMES_DASHBOARD_TUI:-${HERMES_DASHBOARD_TUI:-0}}"
 HERMES_DASHBOARD_HOME="${HERMES_DASHBOARD_HOME:-/sandbox/.hermes/dashboard-home}"
 HERMES="$(command -v hermes)" # Resolve once, use absolute path everywhere
@@ -320,6 +340,22 @@ validate_port_configuration() {
   fi
   if [ "$DASHBOARD_INTERNAL_PORT" -eq "$PUBLIC_PORT" ]; then
     echo "[gateway] ERROR: DASHBOARD_INTERNAL_PORT must not equal PUBLIC_PORT (${PUBLIC_PORT})" >&2
+    exit 1
+  fi
+  if [ "$WARROOM_INTERNAL_PORT" -eq "$PUBLIC_PORT" ]; then
+    echo "[gateway] ERROR: WARROOM_INTERNAL_PORT must not equal PUBLIC_PORT (${PUBLIC_PORT})" >&2
+    exit 1
+  fi
+  if [ "$WARROOM_INTERNAL_PORT" -eq "$INTERNAL_PORT" ]; then
+    echo "[gateway] ERROR: WARROOM_INTERNAL_PORT must not equal INTERNAL_PORT (${INTERNAL_PORT})" >&2
+    exit 1
+  fi
+  if [ "$WARROOM_INTERNAL_PORT" -eq "$DASHBOARD_PUBLIC_PORT" ]; then
+    echo "[gateway] ERROR: WARROOM_INTERNAL_PORT must not equal DASHBOARD_PUBLIC_PORT (${DASHBOARD_PUBLIC_PORT})" >&2
+    exit 1
+  fi
+  if [ "$WARROOM_INTERNAL_PORT" -eq "$DASHBOARD_INTERNAL_PORT" ]; then
+    echo "[gateway] ERROR: WARROOM_INTERNAL_PORT must not equal DASHBOARD_INTERNAL_PORT (${DASHBOARD_INTERNAL_PORT})" >&2
     exit 1
   fi
 }
@@ -468,6 +504,8 @@ cleanup_orphan_socat_forwarders() {
   local proc_root="${NEMOCLAW_PROC_ROOT:-/proc}"
   local dashboard_public_port="${DASHBOARD_PUBLIC_PORT:-}"
   local dashboard_internal_port="${DASHBOARD_INTERNAL_PORT:-}"
+  local warroom_public_port="${WARROOM_PUBLIC_PORT:-}"
+  local warroom_internal_port="${WARROOM_INTERNAL_PORT:-}"
   local cmdline_file pid cmdline
 
   for cmdline_file in "${proc_root}"/[0-9]*/cmdline; do
@@ -484,6 +522,13 @@ cleanup_orphan_socat_forwarders() {
           continue
         fi
         echo "[gateway] Removing orphaned dashboard socat forwarder for ${dashboard_public_port}->${dashboard_internal_port} (pid ${pid})" >&2
+        kill "$pid" 2>/dev/null || true
+        ;;
+      *socat*"TCP-LISTEN:${warroom_public_port}"*"TCP:127.0.0.1:${warroom_internal_port}"*)
+        if [ -z "$warroom_public_port" ] || [ -z "$warroom_internal_port" ]; then
+          continue
+        fi
+        echo "[gateway] Removing orphaned war room socat forwarder for ${warroom_public_port}->${warroom_internal_port} (pid ${pid})" >&2
         kill "$pid" 2>/dev/null || true
         ;;
     esac
@@ -861,6 +906,7 @@ cleanup_stale_hermes_gateway_runtime() {
 # socat bridges 0.0.0.0:<public> to 127.0.0.1:<internal>.
 SOCAT_PID=""
 DASHBOARD_SOCAT_PID=""
+WARROOM_SOCAT_PID=""
 _HERMES_PROC_ROOT="/proc"
 # OpenShell owns container PID 1 and starts this script as the sandbox user in
 # its managed topology. Bind every child identity to this immutable supervisor
@@ -869,19 +915,25 @@ _HERMES_PROC_ROOT="/proc"
 readonly HERMES_STARTUP_SUPERVISOR_PID="$$"
 GATEWAY_PID_START_IDENTITY=""
 DASHBOARD_PID_START_IDENTITY=""
+WARROOM_PID_START_IDENTITY=""
 SOCAT_PID_START_IDENTITY=""
 DASHBOARD_SOCAT_PID_START_IDENTITY=""
+WARROOM_SOCAT_PID_START_IDENTITY=""
 GATEWAY_LOG_TAIL_PID_START_IDENTITY=""
 DASHBOARD_LOG_TAIL_PID_START_IDENTITY=""
+WARROOM_LOG_TAIL_PID_START_IDENTITY=""
 
 hermes_role_identity_value() {
   case "$1" in
     gateway) printf '%s' "${GATEWAY_PID_START_IDENTITY:-}" ;;
     dashboard) printf '%s' "${DASHBOARD_PID_START_IDENTITY:-}" ;;
+    warroom) printf '%s' "${WARROOM_PID_START_IDENTITY:-}" ;;
     api-socat) printf '%s' "${SOCAT_PID_START_IDENTITY:-}" ;;
     dashboard-socat) printf '%s' "${DASHBOARD_SOCAT_PID_START_IDENTITY:-}" ;;
+    warroom-socat) printf '%s' "${WARROOM_SOCAT_PID_START_IDENTITY:-}" ;;
     gateway-log) printf '%s' "${GATEWAY_LOG_TAIL_PID_START_IDENTITY:-}" ;;
     dashboard-log) printf '%s' "${DASHBOARD_LOG_TAIL_PID_START_IDENTITY:-}" ;;
+    warroom-log) printf '%s' "${WARROOM_LOG_TAIL_PID_START_IDENTITY:-}" ;;
     *) return 1 ;;
   esac
 }
@@ -892,10 +944,13 @@ hermes_set_role_identity() {
   case "$role" in
     gateway) GATEWAY_PID_START_IDENTITY="$value" ;;
     dashboard) DASHBOARD_PID_START_IDENTITY="$value" ;;
+    warroom) WARROOM_PID_START_IDENTITY="$value" ;;
     api-socat) SOCAT_PID_START_IDENTITY="$value" ;;
     dashboard-socat) DASHBOARD_SOCAT_PID_START_IDENTITY="$value" ;;
+    warroom-socat) WARROOM_SOCAT_PID_START_IDENTITY="$value" ;;
     gateway-log) GATEWAY_LOG_TAIL_PID_START_IDENTITY="$value" ;;
     dashboard-log) DASHBOARD_LOG_TAIL_PID_START_IDENTITY="$value" ;;
+    warroom-log) WARROOM_LOG_TAIL_PID_START_IDENTITY="$value" ;;
     *) return 1 ;;
   esac
 }
@@ -963,12 +1018,18 @@ hermes_process_role_identity() {
         *) return 1 ;;
       esac
       ;;
-    api-socat | dashboard-socat)
+    api-socat | dashboard-socat | warroom-socat)
       case "$port" in
         '' | *[!0-9]*) return 1 ;;
       esac
       case "$cmdline" in
         *socat*"TCP-LISTEN:${port},"*) ;;
+        *) return 1 ;;
+      esac
+      ;;
+    warroom)
+      case "$cmdline" in
+        *server.py*"$WARROOM_INTERNAL_PORT"*) ;;
         *) return 1 ;;
       esac
       ;;
@@ -978,9 +1039,9 @@ hermes_process_role_identity() {
         *) return 1 ;;
       esac
       ;;
-    dashboard-log)
+    dashboard-log | warroom-log)
       case "$cmdline" in
-        *sed*dashboard-log*) ;;
+        *sed*${role}*) ;;
         *) return 1 ;;
       esac
       ;;
@@ -1335,6 +1396,57 @@ start_hermes_dashboard_sandbox_user() {
   start_socat_forwarder \
     "$DASHBOARD_PUBLIC_PORT" "$DASHBOARD_INTERNAL_PORT" "dashboard" DASHBOARD_SOCAT_PID \
     "$DASHBOARD_PID" sandbox
+}
+
+start_warroom_server_current_user() {
+  local warroom_script="/opt/hermes/warroom/server.py"
+  if [ ! -f "$warroom_script" ]; then
+    echo "[warroom] WARNING: $warroom_script not found — skipping war room startup" >&2
+    return 0
+  fi
+  prepare_restricted_log /tmp/warroom.log "" 600 || return 1
+  nohup /usr/bin/python3 "$warroom_script" "$WARROOM_INTERNAL_PORT" >/tmp/warroom.log 2>&1 &
+  WARROOM_PID=$!
+  echo "[warroom] war room server launched (pid $WARROOM_PID) on 127.0.0.1:${WARROOM_INTERNAL_PORT}" >&2
+  if ! hermes_capture_tracked_role warroom "$WARROOM_PID" current "$WARROOM_INTERNAL_PORT"; then
+    hermes_fatal_unproven_child warroom "$WARROOM_PID"
+  fi
+  start_socat_forwarder \
+    "$WARROOM_PUBLIC_PORT" "$WARROOM_INTERNAL_PORT" "warroom" WARROOM_SOCAT_PID \
+    "$WARROOM_PID" current
+}
+
+start_warroom_server_sandbox_user() {
+  local warroom_script="/opt/hermes/warroom/server.py"
+  if [ ! -f "$warroom_script" ]; then
+    echo "[warroom] WARNING: $warroom_script not found — skipping war room startup" >&2
+    return 0
+  fi
+  prepare_restricted_log /tmp/warroom.log sandbox:sandbox 600 || return 1
+  nohup "${STEP_DOWN_PREFIX_SANDBOX[@]}" sh -c 'umask 0077; exec /usr/bin/python3 "$@" >/tmp/warroom.log 2>&1' sh "$warroom_script" "$WARROOM_INTERNAL_PORT" &
+  WARROOM_PID=$!
+  echo "[warroom] war room server launched as 'sandbox' user (pid $WARROOM_PID) on 127.0.0.1:${WARROOM_INTERNAL_PORT}" >&2
+  if ! hermes_capture_tracked_role warroom "$WARROOM_PID" sandbox "$WARROOM_INTERNAL_PORT"; then
+    hermes_fatal_unproven_child warroom "$WARROOM_PID"
+  fi
+  start_socat_forwarder \
+    "$WARROOM_PUBLIC_PORT" "$WARROOM_INTERNAL_PORT" "warroom" WARROOM_SOCAT_PID \
+    "$WARROOM_PID" sandbox
+}
+
+hermes_warroom_healthy() {
+  local pid="$1"
+  local code
+  local service_user=current
+  [ "$(id -u)" -eq 0 ] && service_user=sandbox
+  hermes_tracked_role_is_current warroom "$pid" "$service_user" "$WARROOM_INTERNAL_PORT" || return 1
+  hermes_tracked_service_owns_listener "$pid" "$WARROOM_INTERNAL_PORT" sandbox || return 1
+  code="$(curl -so /dev/null -w '%{http_code}' --max-time 3 \
+    "http://127.0.0.1:${WARROOM_INTERNAL_PORT}/health" 2>/dev/null || true)"
+  case "$code" in
+    200) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 wait_for_hermes_gateway_internal() {
@@ -2103,6 +2215,8 @@ hermes_auxiliaries_need_recovery() {
   hermes_socat_bridge_healthy api-socat "${SOCAT_PID:-}" "$PUBLIC_PORT" || return 0
   hermes_dashboard_healthy "${DASHBOARD_PID:-}" || return 0
   hermes_socat_bridge_healthy dashboard-socat "${DASHBOARD_SOCAT_PID:-}" "$DASHBOARD_PUBLIC_PORT" || return 0
+  # War room is best-effort: do NOT gate gateway health on it here.
+  # It is recovered independently in ensure_hermes_supervised_auxiliaries().
   return 1
 }
 
@@ -2167,16 +2281,39 @@ ensure_hermes_supervised_auxiliaries() {
       "$DASHBOARD_PUBLIC_PORT" "$DASHBOARD_INTERNAL_PORT" "dashboard" DASHBOARD_SOCAT_PID \
       "$DASHBOARD_PID" "$dashboard_user" || return 1
   fi
+  # War room is auxiliary — never block gateway/dashboard startup on it
+  if ! hermes_warroom_healthy "${WARROOM_PID:-}"; then
+    hermes_stop_tracked_role warroom-socat "${WARROOM_SOCAT_PID:-0}" current "$WARROOM_PUBLIC_PORT" 2>/dev/null || true
+    WARROOM_SOCAT_PID=""
+    hermes_stop_tracked_role warroom "${WARROOM_PID:-0}" "$warroom_user" "$WARROOM_INTERNAL_PORT" 2>/dev/null || true
+    WARROOM_PID=""
+    if [ "$(id -u)" -eq 0 ]; then
+      start_warroom_server_sandbox_user 2>/dev/null \
+        || echo "[warroom] sandbox startup failed — will retry next cycle" >&2
+    else
+      start_warroom_server_current_user 2>/dev/null \
+        || echo "[warroom] current-user startup failed — will retry next cycle" >&2
+    fi
+  elif ! hermes_socat_bridge_healthy warroom-socat "${WARROOM_SOCAT_PID:-}" "$WARROOM_PUBLIC_PORT"; then
+    hermes_stop_tracked_role warroom-socat "${WARROOM_SOCAT_PID:-0}" current "$WARROOM_PUBLIC_PORT" 2>/dev/null || true
+    WARROOM_SOCAT_PID=""
+    start_socat_forwarder \
+      "$WARROOM_PUBLIC_PORT" "$WARROOM_INTERNAL_PORT" "warroom" WARROOM_SOCAT_PID \
+      "$WARROOM_PID" "$warroom_user" 2>/dev/null \
+      || echo "[warroom] socat forwarder failed — will retry next cycle" >&2
+  fi
   ensure_gateway_log_stream || return 1
 }
 
 refresh_hermes_supervised_child_pids() {
   local gateway_user=current
   local dashboard_user=current
+  local warroom_user=current
   SANDBOX_CHILD_PIDS=()
   if [ "$(id -u)" -eq 0 ]; then
     gateway_user=gateway
     dashboard_user=sandbox
+    warroom_user=sandbox
   fi
   hermes_tracked_role_is_current gateway "${GATEWAY_PID:-}" "$gateway_user" "$INTERNAL_PORT" \
     && SANDBOX_CHILD_PIDS+=("$GATEWAY_PID")
@@ -2186,6 +2323,10 @@ refresh_hermes_supervised_child_pids() {
     && SANDBOX_CHILD_PIDS+=("$SOCAT_PID")
   hermes_tracked_role_is_current dashboard-socat "${DASHBOARD_SOCAT_PID:-}" current "$DASHBOARD_PUBLIC_PORT" \
     && SANDBOX_CHILD_PIDS+=("$DASHBOARD_SOCAT_PID")
+  hermes_tracked_role_is_current warroom "${WARROOM_PID:-}" "$warroom_user" "$WARROOM_INTERNAL_PORT" \
+    && SANDBOX_CHILD_PIDS+=("$WARROOM_PID")
+  hermes_tracked_role_is_current warroom-socat "${WARROOM_SOCAT_PID:-}" current "$WARROOM_PUBLIC_PORT" \
+    && SANDBOX_CHILD_PIDS+=("$WARROOM_SOCAT_PID")
   hermes_tracked_role_is_current gateway-log "${GATEWAY_LOG_TAIL_PID:-}" current \
     && SANDBOX_CHILD_PIDS+=("$GATEWAY_LOG_TAIL_PID")
   hermes_tracked_role_is_current dashboard-log "${DASHBOARD_LOG_TAIL_PID:-}" current \

@@ -53,10 +53,11 @@ try:
         veto_hold_message as _bridge_veto,
     )
     _WARROOM_BRIDGE_OK = True
-except ImportError:
+except ImportError as exc:
     _WARROOM_BRIDGE_OK = False
     resolve_mesh_dir = write_warroom_action = read_warroom_action = None
     remove_warroom_action = _bridge_approve = _bridge_veto = None
+    logger.warning("warroom_bridge unavailable — war room features disabled: %s", exc)
 
 
 # Global references initialized by plugin
@@ -897,16 +898,35 @@ def _check_link_cli_auth() -> dict | None:
 
     if proc.returncode != 0 or "authenticated" not in (proc.stdout or "").lower():
         device_url = _extract_device_url(proc.stdout) or _extract_device_url(proc.stderr)
+        if device_url:
+            action_required = (
+                "Device approval required.\n"
+                "1. Surface this URL verbatim to the operator:\n"
+                f"   {device_url}\n"
+                "2. STOP. Do not run any more tools.\n"
+                "3. WAIT for the operator to confirm they have approved in their Link app.\n"
+                "4. After confirmation, run ONLY `link-cli auth status` to verify.\n"
+                "   - If it shows 'authenticated', proceed.\n"
+                "   - If it returns a new approval_url, surface that and wait again.\n"
+                "   - If it fails without a URL, surface the error to the operator.\n"
+                "FORBIDDEN: do NOT run `link-cli auth login` — it generates a new\n"
+                "device code and invalidates the pending approval."
+            )
+        else:
+            action_required = (
+                "link-cli auth status returned an error and no approval URL was found.\n"
+                "Run ONLY `link-cli auth status` to re-check.\n"
+                "Do NOT run `link-cli auth login` — it creates a new device code and "
+                "breaks any pending approval flow.\n"
+                "If the problem persists, ask the operator to check their Link app "
+                "or run `link-cli auth status` manually in a shell."
+            )
         return {
             "error": "link_cli_not_authenticated",
             "approval_url": device_url,
             "stdout": proc.stdout,
             "stderr": proc.stderr,
-            "action_required": (
-                "Visit the URL above and approve in your Link app, then retry."
-                if device_url
-                else "Run 'link-cli auth login' in an interactive shell, then retry."
-            ),
+            "action_required": action_required,
         }
     return None
 

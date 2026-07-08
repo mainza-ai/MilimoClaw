@@ -146,8 +146,8 @@ class BuildClaw:
                 self._approval_handler.handle_approve,
                 self._approval_handler.handle_block,
             )
-        except ImportError:
-            pass
+        except ImportError as exc:
+            logger.warning("warroom_bridge unavailable — build war room handler not registered: %s", exc)
 
         # 5. Issue manager
         self._issue_manager = IssueManager(
