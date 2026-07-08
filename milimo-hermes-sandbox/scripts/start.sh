@@ -1409,11 +1409,13 @@ start_warroom_server_current_user() {
   WARROOM_PID=$!
   echo "[warroom] war room server launched (pid $WARROOM_PID) on 127.0.0.1:${WARROOM_INTERNAL_PORT}" >&2
   if ! hermes_capture_tracked_role warroom "$WARROOM_PID" current "$WARROOM_INTERNAL_PORT"; then
-    hermes_fatal_unproven_child warroom "$WARROOM_PID"
+    echo "[warroom] role identity capture failed for pid $WARROOM_PID — continuing without tracked role (war room is auxiliary)" >&2
+    WARROOM_PID=""
   fi
   start_socat_forwarder \
     "$WARROOM_PUBLIC_PORT" "$WARROOM_INTERNAL_PORT" "warroom" WARROOM_SOCAT_PID \
-    "$WARROOM_PID" current
+    "$WARROOM_PID" current 2>/dev/null \
+    || echo "[warroom] socat forwarder failed — will retry next cycle" >&2
 }
 
 start_warroom_server_sandbox_user() {
@@ -1427,11 +1429,13 @@ start_warroom_server_sandbox_user() {
   WARROOM_PID=$!
   echo "[warroom] war room server launched as 'sandbox' user (pid $WARROOM_PID) on 127.0.0.1:${WARROOM_INTERNAL_PORT}" >&2
   if ! hermes_capture_tracked_role warroom "$WARROOM_PID" sandbox "$WARROOM_INTERNAL_PORT"; then
-    hermes_fatal_unproven_child warroom "$WARROOM_PID"
+    echo "[warroom] role identity capture failed for pid $WARROOM_PID — continuing without tracked role (war room is auxiliary)" >&2
+    WARROOM_PID=""
   fi
   start_socat_forwarder \
     "$WARROOM_PUBLIC_PORT" "$WARROOM_INTERNAL_PORT" "warroom" WARROOM_SOCAT_PID \
-    "$WARROOM_PID" sandbox
+    "$WARROOM_PID" sandbox 2>/dev/null \
+    || echo "[warroom] socat forwarder failed — will retry next cycle" >&2
 }
 
 hermes_warroom_healthy() {
@@ -2299,7 +2303,7 @@ ensure_hermes_supervised_auxiliaries() {
     WARROOM_SOCAT_PID=""
     start_socat_forwarder \
       "$WARROOM_PUBLIC_PORT" "$WARROOM_INTERNAL_PORT" "warroom" WARROOM_SOCAT_PID \
-      "$WARROOM_PID" "$warroom_user" 2>/dev/null \
+      "${WARROOM_PID:-0}" "$warroom_user" 2>/dev/null \
       || echo "[warroom] socat forwarder failed — will retry next cycle" >&2
   fi
   ensure_gateway_log_stream || return 1
