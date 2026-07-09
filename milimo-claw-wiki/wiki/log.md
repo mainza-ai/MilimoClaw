@@ -2081,3 +2081,17 @@ Each entry follows this format:
 - `curl http://127.0.0.1:8642/health` → `{"status":"ok","platform":"hermes-agent","version":"0.17.0"}`
 - `nemohermes milimo-hermes connect --probe-only` → `Probe complete: Hermes Agent gateway is running in 'milimo-hermes'`
 - Secret-boundary validators (`env-file`, `runtime-env`) both exit 0
+
+---
+
+### 2026-07-09 — Documented sandbox policy presets + non-interactive build command
+
+**Pages**: `wiki/troubleshooting/common-issues.md`, `wiki/troubleshooting/issues-and-fixes.md`, `wiki/architecture/hermes-profile.md`, `README.md`
+
+**Source**: Operator reported that `install-hermes.sh --non-interactive` build succeeded only after certain external URLs were added to the OpenShell sandbox policy via preset YAML files. Critical production URLs: Nous Portal (`portal.nousresearch.com`), Stripe Link (`api.link.com`, `app.link.com`, `login.link.com`), Stripe (`api.stripe.com`), Sentry, Vercel, npm, PyPI, HuggingFace, GitHub.
+
+**Changes**:
+- `wiki/troubleshooting/common-issues.md`: Added "Sandbox Blocks External URLs / Policy Presets Not Applied" entry with symptom table, required presets, fix commands
+- `wiki/troubleshooting/issues-and-fixes.md`: Added Issue 17 documenting all 9 policy presets, their whitelisted hosts, and the validated non-interactive build command including `NEMOCLAW_RECREATE_WITHOUT_BACKUP=1`
+- `wiki/architecture/hermes-profile.md`: Added non-interactive build command block; noted `NEMOCLAW_RECREATE_WITHOUT_BACKUP=1` requirement
+- `README.md`: Added headless/CI build command, policy presets table with all 9 presets and their hosts, verification commands, and warning about critical presets

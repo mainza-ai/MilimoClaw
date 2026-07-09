@@ -522,6 +522,16 @@ The sync script `scripts/pull_claw_files.sh` expects container names matching `o
 - Docker build uses `$sandbox_dir` as context (was `.` — fixed to resolve COPY path mismatches inside the sandbox build directory)
 - `build_onboard_command()` now called by `main()` (was dead code — `main()` used inline command without `--fresh`/`--recreate-sandbox`)
 - Post-onboarding: applies network policy presets from `milimo-blueprint/policies/presets/` via `nemohermes policy-add --from-dir`, including `nous-portal`
+- **Non-interactive build** (CI/headless):
+  ```bash
+  NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 \
+  NVIDIA_API_KEY="$(grep NVIDIA_API_KEY .env | cut -d= -f2)" \
+  NEMOCLAW_NON_INTERACTIVE=1 \
+  NEMOCLAW_ACCEPT_THIRD_PARTY=1 \
+  NEMOCLAW_AUTH_MODE=api_key \
+  ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
+  ```
+  `NEMOCLAW_RECREATE_WITHOUT_BACKUP=1` skips the shields backup step that cannot read sealed files. Without it, rebuild hangs waiting for a backup that will never complete.
 - Model default: `stepfun-ai/step-3.7-flash` (set via `NEMOCLAW_MODEL` env var, passed as Docker build arg)
 - **Post-rebuild additions** (2026-07-04):
   - Passes `MILIMO_SPEND_TEST_MODE`, `MILIMO_DAILY_SPEND_CAP_CENTS`, `MILIMO_OPERATOR` as Docker build args
