@@ -279,6 +279,50 @@ $ # Or manually onboard using the Dockerfile
 $ nemohermes onboard --name milimo-hermes --from ./milimo-hermes-sandbox/Dockerfile
 ```
 
+**Headless / CI build** (no TTY, skip backup step that hangs on sealed files):
+
+```bash
+NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 \
+NVIDIA_API_KEY="$(grep NVIDIA_API_KEY .env | cut -d= -f2)" \
+NEMOCLAW_NON_INTERACTIVE=1 \
+NEMOCLAW_ACCEPT_THIRD_PARTY=1 \
+NEMOCLAW_AUTH_MODE=api_key \
+  ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
+```
+
+> **Note**: `NEMOCLAW_RECREATE_WITHOUT_BACKUP=1` is required when running non-interactively. Without it, the build hangs at the shields-backup step because sealed files cannot be read by the backup process. After rebuild, if port 18790 is not responding, restore the forward: `openshell forward start --background 18790 milimo-hermes`.
+
+**Policy presets** (applied automatically by `install-hermes.sh` post-onboarding):
+
+The install script applies network policy presets from `milimo-blueprint/policies/presets/` via `nemohermes policy-add --from-dir`. Each preset whitelists external hosts required for real-world functionality. If any preset fails to apply, the sandbox will block those URLs at the OpenShell proxy layer.
+
+| Preset | Hosts added | Purpose |
+|--------|-------------|---------|
+| `npm` | `registry.npmjs.org`, `registry.yarnpkg.com` | Package installs inside sandbox |
+| `pypi` | `pypi.org`, `files.pythonhosted.org` | Python package installs |
+| `huggingface` | `huggingface.co`, `cdn-lfs.huggingface.co`, `router.huggingface.co` | Model downloads |
+| `brew` | `formulae.brew.sh`, `github.com`, `ghcr.io`, `pkg-containers.githubusercontent.com`, `objects.githubusercontent.com`, `raw.githubusercontent.com` | Homebrew + GitHub CLI |
+| `nous-portal` | `portal.nousresearch.com:443`, `inference-api.nousresearch.com:443` | Nous Portal OAuth + managed tool gateways |
+| `stripe-link` | `api.link.com`, `login.link.com`, `app.link.com` | Stripe Link CLI device-code auth + spend requests |
+| `stripe` | `api.stripe.com` | Invoice creation, customer lookup, payment monitoring |
+| `sentry` | `sentry.io`, `*.ingest.sentry.io` | Error reporting |
+| `vercel` | `api.vercel.com` | Deploy status + project management |
+
+**Verify all presets applied**:
+```bash
+nemohermes milimo-hermes policy-list
+# Must show: npm, pypi, huggingface, brew, nous-portal, stripe-link, stripe, sentry, vercel
+```
+
+If any preset is missing (collision or apply failure), apply individually:
+```bash
+for f in milimo-hermes-sandbox/milimo-blueprint/policies/presets/*.yaml; do
+  nemohermes milimo-hermes policy-add --from-file "$f" --yes 2>&1 || true
+done
+```
+
+> **Critical**: If `nous-portal`, `stripe-link`, or `stripe` presets are not active, the sandbox proxy will block those hosts and the corresponding features (OAuth login, spend flow, invoicing) will fail with connection errors.
+
 **Post-onboarding manual steps** (run inside the sandbox):
 ```bash
 # Login to Stripe Link CLI (required before first spend request)

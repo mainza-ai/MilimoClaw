@@ -322,6 +322,70 @@ nemohermes milimo-hermes connect --probe-only
 
 ---
 
+## Issue 17: Sandbox Policy Presets Must Be Applied for External URLs (CRITICAL)
+
+### Problem
+
+After `install-hermes.sh --non-interactive` or `nemohermes onboard`, features that depend on external services fail because the sandbox network policy is deny-by-default and the required presets were not applied (collision, network error, or the batch wrapper swallowing individual failures).
+
+Blocked symptoms:
+- `hermes setup --portal` → HTTP 403 from `portal.nousresearch.com`
+- `link-cli auth login` → cannot reach `api.link.com` / `app.link.com`
+- Stripe API calls from `SpendApprovalHandler` → connection refused
+- `gh` CLI → GitHub API blocked
+- `pip install` / `npm install` → registry downloads fail
+
+### Root Cause
+
+OpenShell's proxy at `10.200.0.1:3128` blocks all egress by default. The install script applies presets from `milimo-blueprint/policies/presets/` post-onboarding, but if any preset fails (e.g., name collision on `npm` which matches a built-in preset), the entire batch can be silently skipped depending on script version.
+
+### Required Presets and Hosts
+
+| Preset file | Hosts whitelisted | Purpose |
+|-------------|-------------------|---------|
+| `npm.yaml` | `registry.npmjs.org`, `registry.yarnpkg.com` | Package installs |
+| `pypi.yaml` | `pypi.org`, `files.pythonhosted.org` | Python packages |
+| `huggingface.yaml` | `huggingface.co`, `cdn-lfs.huggingface.co`, `router.huggingface.co` | Model downloads |
+| `brew.yaml` | `formulae.brew.sh`, `github.com`, `ghcr.io`, `pkg-containers.githubusercontent.com`, `objects.githubusercontent.com`, `raw.githubusercontent.com` |brew + GitHub |
+| `nous-portal.yaml` | `portal.nousresearch.com:443`, `inference-api.nousresearch.com:443` | OAuth + managed tool gateways |
+| `stripe-link.yaml` | `api.link.com`, `login.link.com`, `app.link.com` | Stripe Link CLI |
+| `stripe.yaml` | `api.stripe.com` | Invoices + payments |
+| `sentry.yaml` | `sentry.io`, `*.ingest.sentry.io` | Error reporting |
+| `vercel.yaml` | `api.vercel.com` | Deploy status |
+
+### Fix
+
+Verify and apply individually if needed:
+```bash
+nemohermes milimo-hermes policy-list
+# Must include all 9 presets above
+
+for f in milimo-hermes-sandbox/milimo-blueprint/policies/presets/*.yaml; do
+  nemohermes milimo-hermes policy-add --from-file "$f" --yes 2>&1 || true
+done
+```
+
+### Non-Interactive Build Command (CI / Docker / headless)
+
+The validated build command for environments without a TTY:
+```bash
+NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 \
+NVIDIA_API_KEY="$(grep NVIDIA_API_KEY .env | cut -d= -f2)" \
+NEMOCLAW_NON_INTERACTIVE=1 \
+NEMOCLAW_ACCEPT_THIRD_PARTY=1 \
+NEMOCLAW_AUTH_MODE=api_key \
+  ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
+```
+
+`NEMOCLAW_RECREATE_WITHOUT_BACKUP=1` is required — without it the build hangs at the shields-backup step because sealed files cannot be read by the backup process.
+
+### Files Modified
+
+- `milimo-hermes-sandbox/milimo-blueprint/policies/presets/*.yaml` — 9 preset files defining allowed egress hosts
+- `milimo-hermes-sandbox/install-hermes.sh` — applies presets post-onboarding; handles each preset individually so one failure does not block the rest
+
+---
+
 ## Verification Checklist
 
 1. All claws have assistant handlers: `grep -c "assistant" /sandbox/.milimo/blueprints/0.1.0/orchestrator/*/claw.py`

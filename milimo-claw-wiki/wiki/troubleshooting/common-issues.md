@@ -640,6 +640,44 @@ Confirm signature is `def _validate_justification(request: SpendRequest) -> None
 
 ---
 
+### Sandbox Blocks External URLs / Policy Presets Not Applied
+
+**Symptom**: Features that depend on external services fail silently or with connection errors:
+- `hermes setup --portal` → HTTP 403 from `portal.nousresearch.com`
+- `link-cli auth login` → cannot reach `api.link.com` / `app.link.com`
+- `SpendApprovalHandler` → Stripe API calls fail with connection refused
+- `gh` CLI → GitHub API requests blocked
+- `pip install` / `npm install` → registry downloads fail
+
+**Cause**: The sandbox network policy is deny-by-default. External hosts must be explicitly whitelisted via policy presets. If `install-hermes.sh` fails to apply presets (collision, network issue, or the batch `if/then/else` swallowing individual failures), the corresponding URLs are blocked by the OpenShell proxy at `10.200.0.1:3128`.
+
+**Fix**: Verify all presets applied:
+```bash
+nemohermes milimo-hermes policy-list
+# Must include: npm, pypi, huggingface, brew, nous-portal, stripe-link, stripe, sentry, vercel
+```
+
+Apply individually if any are missing:
+```bash
+for f in milimo-hermes-sandbox/milimo-blueprint/policies/presets/*.yaml; do
+  nemohermes milimo-hermes policy-add --from-file "$f" --yes 2>&1 || true
+done
+```
+
+**Critical presets for production**:
+| Preset | Blocked if missing |
+|--------|-------------------|
+| `nous-portal` | `portal.nousresearch.com:443`, `inference-api.nousresearch.com:443` — OAuth login + managed tool gateways |
+| `stripe-link` | `api.link.com`, `login.link.com`, `app.link.com` — spend approval flow |
+| `stripe` | `api.stripe.com` — invoice + payment monitoring |
+| `npm` / `pypi` / `huggingface` | Package/model downloads blocked |
+
+**Prevention**: After every `install-hermes.sh` or `nemohermes onboard`, run `nemohermes milimo-hermes policy-list` and grep for the preset names above. If any are missing, re-apply from `milimo-blueprint/policies/presets/`.
+
+**See also**: [[hermes-profile]] — policy preset architecture; [[common-issues]] — preset collision bug (npm preset name)
+
+---
+
 ## Related Pages
 
 - [[production-spend-flow-fix-plan-2026-07-06]] — Full production fix plan
