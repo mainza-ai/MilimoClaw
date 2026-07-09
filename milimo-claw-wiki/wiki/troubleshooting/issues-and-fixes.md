@@ -267,6 +267,61 @@ Modified the `hermes()` shell function definition inside [start.sh](file:///User
 
 ---
 
+## Issue 16: Gateway Daemon Race → Multiple Gateway Processes / Port 18642 Conflict (CRITICAL)
+
+### Problem
+
+`ps aux` inside the sandbox showed tens of `hermes.real gateway run` processes, all competing for port 18642. Hermes logs showed:
+- `ERROR gateway.platforms.api_server: [Api_Server] Port 18642 already in use`
+- `telegram.error.Conflict: Conflict: terminated by other getUpdates request; make sure that only one bot instance is running`
+- `nemohermes milimo-hermes connect --probe-only` → `SUPERVISOR_UNAVAILABLE`
+- Thread count growing unbounded → cgroup `pids_limit` exhaustion → `RuntimeError: can't start new thread`
+
+### Root Cause
+
+Two independent supervisors launched `hermes gateway run` in parallel:
+
+1. **`gateway-daemon.sh`** (auto-started from `/etc/init.d/hermes-gateway` at boot AND from `~/.bashrc`/`~/.profile` on every shell login inside the sandbox)
+2. **`start.sh` (`nemoclaw-start`)** — responds to OpenShell supervision signals and owns the crash-quarantine / recovery loops
+
+Each new `hermes gateway run --replace` only interacts with Hermes's own PID record — it cannot stop processes launched by the other supervisor. The daemon's 30s monitor loop re-launched a gateway each time `start.sh` killed one, causing continuous respawn churn. Telegram's server enforced a single `getUpdates` session; simultaneous processes triggered `Conflict` on every poll.
+
+### Fix (2026-07-09)
+
+**`scripts/start.sh`**: `cleanup_stale_hermes_gateway_runtime` replaced the old "preserve runtime lock state" no-op with an aggressive kill-and-sleep loop that force-terminates every live `hermes gateway` PID before relaunch.
+
+**`scripts/gateway-daemon.sh`**: Daemon enters monitor-only mode when port 18642 is already bound; the monitor loop confirms the port is free before re-launching.
+
+**`Dockerfile`**: Removed `.bashrc`/`.profile` auto-start hooks and boot-time `update-rc.d` registration for `gateway-daemon.sh`. `start.sh` is now the **sole** gateway manager. The daemon script remains on disk as a manual emergency fallback only.
+
+### Files Modified
+
+- `milimo-hermes-sandbox/scripts/start.sh`
+- `milimo-hermes-sandbox/scripts/gateway-daemon.sh`
+- `milimo-hermes-sandbox/Dockerfile`
+
+### Verification
+
+```bash
+# Inside sandbox — exactly 1 gateway + dashboard
+openshell sandbox exec -n milimo-hermes -- ps aux | grep -E '[h]ermes.real'
+# Expected: 2 lines (gateway run + dashboard), no --replace instances
+
+# No daemon process
+openshell sandbox exec -n milimo-hermes -- pgrep -af gateway-daemon
+# Expected: (no output)
+
+# Health endpoint
+curl -s http://127.0.0.1:8642/health
+# Expected: {"status":"ok","platform":"hermes-agent","version":"0.17.0"}
+
+# Probe
+nemohermes milimo-hermes connect --probe-only
+# Expected: Probe complete: Hermes Agent gateway is running in 'milimo-hermes'
+```
+
+---
+
 ## Verification Checklist
 
 1. All claws have assistant handlers: `grep -c "assistant" /sandbox/.milimo/blueprints/0.1.0/orchestrator/*/claw.py`

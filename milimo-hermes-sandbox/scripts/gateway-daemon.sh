@@ -142,18 +142,37 @@ fi
 # Start socat forwarder so the nemohermes health probe (:8642/health) works.
 start_socat_forwarder
 
-# Only start if not already running (e.g., nemoclaw CLI already recovered it)
-if gateway_running; then
+# only start if a gateway is not already running on the Hermes API port.
+# nemoclaw-start (start.sh) is the canonical launcher; the daemon must not
+# race it, otherwise two gateways collide on port 18642 and Telegram polling.
+if ss -Htn 2>/dev/null | grep -qE "[:.]18642\b" \
+  || (command -v netstat >/dev/null 2>&1 && netstat -Htn 2>/dev/null | grep -qE "[:.]18642\b"); then
+  log "Port 18642 already bound — assuming start.sh manages the gateway; entering monitor-only mode"
+  # shellcheck disable=SC2034  # informational flag; currently unused but kept for future use
+  GATEWAY_STARTED_BY_DAEMON=0
+elif gateway_running; then
   log "Gateway already running (PID $(gateway_pid)); monitoring only"
+  # shellcheck disable=SC2034
+  GATEWAY_STARTED_BY_DAEMON=0
 else
   start_gateway
+  # shellcheck disable=SC2034
+  GATEWAY_STARTED_BY_DAEMON=1
 fi
 daemon_pidfile_write
 
-# Monitor loop — ensures both gateway and socat stay alive.
+# Monitor loop — ensures both gateway and socat stay alive, but never
+# races nemoclaw-start by launching a second gateway while port 18642 is
+# already bound.
 while true; do
   sleep "${POLL_INTERVAL}"
   if ! gateway_running; then
+    # nemoclaw-start may have replaced the gateway between our last check and
+    # this one; confirm the port is free before launching.
+    if ss -Htn 2>/dev/null | grep -qE "[:.]18642\b" \
+      || (command -v netstat >/dev/null 2>&1 && netstat -Htn 2>/dev/null | grep -qE "[:.]18642\b"); then
+      continue
+    fi
     log "Gateway not running; restarting..."
     ensure_env
     start_gateway

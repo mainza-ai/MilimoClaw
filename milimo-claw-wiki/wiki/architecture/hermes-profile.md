@@ -210,6 +210,33 @@ NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 ./milimo-hermes-sandbox/install-hermes.sh --n
 
 **Note:** After updating SOUL.md, start a new chat session (`hermes`) to see the context — existing sessions cache the old prompt.
 
+#### Gateway Daemon Race: Multiple `hermes gateway` Processes (FIXED 2026-07-09)
+
+**Symptom**: `ps aux` shows 10+ `hermes.real gateway run --replace` processes growing every ~25 s. Logs show `Port 18642 already in use` and `telegram.error.Conflict`. Thread accumulation → cgroup `pids_limit` exhaustion → `RuntimeError: can't start new thread`.
+
+**Root cause** (pre-2026-07-09): Two supervisors raced to launch `hermes gateway run`:
+1. `gateway-daemon.sh` was auto-started from both `~/.bashrc` AND `~/.profile` AND `/etc/init.d/hermes-gateway` at boot — three separate entry points.
+2. `start.sh` (`nemoclaw-start`) also launched its own gateway when responding to OpenShell supervision signals.
+
+`hermes gateway run --replace` only interacts with Hermes's own PID record — it cannot stop processes launched by a different supervisor. The daemon's 30-second monitor loop re-spawned a new gateway each time `start.sh` killed one, causing continuous respawn churn.
+
+**Fix** (2026-07-09):
+- `scripts/gateway-daemon.sh` — daemon enters monitor-only mode when port 18642 is already bound; monitor loop checks port state before re-launching.
+- `milimo-hermes-sandbox/Dockerfile` — `.bashrc`/`.profile` auto-start hooks and `update-rc.d` boot registration for `gateway-daemon.sh` have been **removed**. `start.sh` is now the **sole** gateway manager.
+- The daemon script remains on disk at `/opt/hermes/scripts/gateway-daemon.sh` as a **manual emergency fallback only**.
+
+**Verify**:
+```bash
+# Exactly 1 gateway + 1 dashboard — no daemon
+openshell sandbox exec -n milimo-hermes -- ps aux | grep -E '[h]ermes.real'
+openshell sandbox exec -n milimo-hermes -- pgrep -af gateway-daemon
+# Expected: (no output)
+```
+
+**See also**: [[common-issues]] — Port 18642 Conflict entry; [[issues-and-fixes]] — Issue 16
+
+---
+
 #### Socat Forwarder Fails in `start.sh` (start_socat_forwarder)
 The `start_socat_forwarder` function in the default `start.sh` (`/usr/local/bin/nemoclaw-start`) exits immediately without creating the port bridge. The health probe at `http://localhost:8642/health` times out, causing `nemohermes recover` to fail with a 90-second provisioning timeout.
 

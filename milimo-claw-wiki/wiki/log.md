@@ -2056,3 +2056,28 @@ Each entry follows this format:
 - Added `validate_port_configuration()` WARROOM collision guards against PUBLIC_PORT, INTERNAL_PORT, DASHBOARD_PUBLIC_PORT, DASHBOARD_INTERNAL_PORT
 
 **Verification status**: Awaiting operator rebuild + live retest
+
+---
+
+### 2026-07-09 — Fixed gateway daemon race condition: multiple `hermes gateway` processes, port 18642 conflict, Telegram polling Conflict
+
+**Pages**: `wiki/troubleshooting/common-issues.md`, `wiki/troubleshooting/issues-and-fixes.md`, `README.md`
+
+**Source**: Live sandbox inspection after rebuild — `ps aux` showed 10+ `hermes.real gateway run --replace` processes growing every ~25 s. `connect --probe-only` returned `SUPERVISOR_UNAVAILABLE`. `gateway.log` showed `Port 18642 already in use` + `telegram.error.Conflict`.
+
+**Changes**:
+- `wiki/troubleshooting/common-issues.md`: Added "Multiple Hermes Gateway Processes / Port 18642 Conflict" entry with symptom, root cause, fix, and verify steps; updated `Last updated` → 2026-07-09
+- `wiki/troubleshooting/issues-and-fixes.md`: Added Issue 16 documenting the daemon race, three-file fix, and verification checklist
+- `README.md`: Added gateway-daemon-race callout after two-container-conflict note; version badge `v0.2.0` → `v0.2.1`
+
+**Files modified**:
+- `milimo-hermes-sandbox/scripts/start.sh` — `cleanup_stale_hermes_gateway_runtime` now force-kills all live gateway PIDs; added `local warroom_user=current` to fix unbound variable
+- `milimo-hermes-sandbox/scripts/gateway-daemon.sh` — monitor-only mode when port 18642 is already bound; monitor loop checks port before re-launching
+- `milimo-hermes-sandbox/Dockerfile` — removed `.bashrc`/`.profile` auto-start hooks and `update-rc.d` boot registration for `gateway-daemon.sh`
+
+**Verified live state**:
+- `ps aux | grep hermes.real` → exactly 2 processes (1 gateway + 1 dashboard), no `--replace`
+- `pgrep -af gateway-daemon` → no output
+- `curl http://127.0.0.1:8642/health` → `{"status":"ok","platform":"hermes-agent","version":"0.17.0"}`
+- `nemohermes milimo-hermes connect --probe-only` → `Probe complete: Hermes Agent gateway is running in 'milimo-hermes'`
+- Secret-boundary validators (`env-file`, `runtime-env`) both exit 0

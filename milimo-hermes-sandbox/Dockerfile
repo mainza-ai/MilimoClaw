@@ -356,7 +356,7 @@ RUN test -x /usr/local/lib/nemoclaw/validate-hermes-env-secret-boundary.py \
 
 # Cryptographic integrity check for validator and wrapper
 ARG NEMOCLAW_HERMES_WRAPPER_SHA256=03e0afbe00e352d0dfcf14b99ea1821f9fd29f87dad49ce19add2ec96d1941cc
-ARG NEMOCLAW_HERMES_VALIDATOR_SHA256=236194dcd21d8beeb988f662979249dbf47f52a95b0786bfc0d80e1b56a169b6
+ARG NEMOCLAW_HERMES_VALIDATOR_SHA256=c15d93c9d721486accea83606972be3651422c11c05663c10de53efaf1af4047
 RUN printf '%s  %s\n' \
         "$NEMOCLAW_HERMES_VALIDATOR_SHA256" /usr/local/lib/nemoclaw/validate-hermes-env-secret-boundary.py \
     | sha256sum -c - \
@@ -397,13 +397,11 @@ COPY scripts/gateway-daemon.sh /opt/hermes/scripts/gateway-daemon.sh
 COPY scripts/hermes-gateway-init.sh /etc/init.d/hermes-gateway
 RUN chmod 755 /opt/hermes/scripts/gateway-daemon.sh \
     && chmod 755 /etc/init.d/hermes-gateway \
-    && mkdir -p /opt/hermes/scripts \
     && chown -R root:root /etc/init.d/hermes-gateway \
-    && if command -v update-rc.d >/dev/null 2>&1; then \
-          update-rc.d hermes-gateway defaults; \
-        else \
-          ln -s /etc/init.d/hermes-gateway /etc/rcS.d/S99hermes-gateway; \
-        fi
+    && echo "gateway-daemon init.d registration disabled — start.sh is the sole gateway manager"
+# Boot-time registration is intentionally removed.  gateway-daemon.sh is a
+# manual emergency fallback only; any automatic provoke races start.sh for
+# port 18642, breaks --replace, and multiplies Telegram polling sessions.
 
 # Install gh CLI for Build Claw (GitHub issue management)
 # hadolint ignore=DL3008
@@ -434,26 +432,12 @@ RUN sha256sum /sandbox/.hermes/config.yaml /sandbox/.hermes/.env \
         chmod a+rw /sandbox/.bashrc /sandbox/.profile; \
     fi
 
-# Start the gateway daemon on shell login (defense-in-depth — nemohermes
-# recovery script also starts the gateway at connect time, but this ensures
-# it stays running across reconnects and after crashes).
-RUN { echo; echo "# Auto-start Hermes gateway daemon if not already running"; \
-    echo "if [ -x /opt/hermes/scripts/gateway-daemon.sh ] && ! pgrep -f 'gateway-daemon.sh' >/dev/null 2>&1; then"; \
-    echo "  /opt/hermes/scripts/gateway-daemon.sh >/dev/null 2>&1 &"; \
-    echo "fi"; } >> /sandbox/.bashrc \
-    && { echo; echo "# Auto-start Hermes gateway daemon on login"; \
-       echo "[ -x /opt/hermes/scripts/gateway-daemon.sh ] && [ -z \"\$(pgrep -f gateway-daemon.sh 2>/dev/null)\" ] && /opt/hermes/scripts/gateway-daemon.sh >/dev/null 2>&1 &"; \
-     } >> /sandbox/.profile \
-    && { echo; echo "# Multi-user Stripe Link credentials isolation"; \
-         echo "if [ -n \"\${MILIMO_OPERATOR:-}\" ]; then"; \
-         echo "  export XDG_CONFIG_HOME=\"/sandbox/.config/users/\${MILIMO_OPERATOR}\""; \
-         echo "fi"; } >> /sandbox/.bashrc \
-    && { echo; echo "# Multi-user Stripe Link credentials isolation"; \
-         echo "if [ -n \"\${MILIMO_OPERATOR:-}\" ]; then"; \
-         echo "  export XDG_CONFIG_HOME=\"/sandbox/.config/users/\${MILIMO_OPERATOR}\""; \
-         echo "fi"; } >> /sandbox/.profile \
-    && chown sandbox:sandbox /sandbox/.bashrc /sandbox/.profile \
-    && chmod 644 /sandbox/.bashrc /sandbox/.profile
+# gateway-daemon.sh is disabled from .bashrc / .profile auto-start.
+# The sole gateway manager is nemoclaw-start (start.sh), which responds to
+# OpenShell supervision signals, runs the secret-boundary validator, and owns
+# the crash-quarantine / recovery loops.  Running gateway-daemon.sh in parallel
+# creates a second gateway process that races for port 18642, breaks the
+# --replace semantics, and causes the Telegram polling Conflict.
 
 # ── Claw Data Directories ──────────────────────────────────────────────────
 # Pre-create claw filesystem roots at build time so the directory layout is
