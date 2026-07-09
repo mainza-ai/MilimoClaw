@@ -5,7 +5,7 @@
 **Sources**:
 - `milimo-claw-docs/troubleshooting/ISSUES_AND_FIXES_AUDIT.md`
 
-**Last updated**: 2026-05-06
+**Last updated**: 2026-07-09
 
 **Tags**: #troubleshooting #issues #fixes
 
@@ -461,6 +461,62 @@ def create_finance_claw(config=None):
 **Symptom**: Test-mode behavior is unpredictable — `tools.py` defaults to `"true"`, `finance_claw.py` defaults to `"false"`.
 
 **Fix**: Unify to `"true"` in `finance_claw.py:197` to match `tools.py:83`. Add CI test asserting both call sites read the same value.
+
+---
+
+### Multiple Hermes Gateway Processes / Port 18642 Conflict (FIXED 2026-07-09)
+
+**Symptom** (inside sandbox):
+```bash
+# ps aux shows many hermes gateway processes
+sandbox  488  ... /opt/hermes/.venv/bin/python /usr/local/bin/hermes.real gateway run
+sandbox  5510 ... /opt/hermes/.venv/bin/python /usr/local/bin/hermes.real gateway run --replace
+sandbox  5592 ... /opt/hermes/.venv/bin/python /usr/local/bin/hermes.real gateway run --replace
+# ... tens of processes, growing every 25 s
+```
+
+Also appears as:
+- `ERROR gateway.platforms.api_server: [Api_Server] Port 18642 already in use`
+- `telegram.error.Conflict: Conflict: terminated by other getUpdates request; make sure that only one bot instance is running`
+- Dashboard forwarding unreachable; `nemohermes ... connect --probe-only` returns `SUPERVISOR_UNAVAILABLE`
+
+**Root cause**: Two independent supervisors raced to launch `hermes gateway run`:
+
+1. `gateway-daemon.sh` was auto-started from `/etc/init.d/hermes-gateway` at boot AND from `~/.bashrc`/`~/.profile` on every shell login.
+2. `start.sh` (`nemoclaw-start`) launched its own gateway when responding to OpenShell supervision signals.
+3. Hermes v0.17's `--replace` flag only interacts with Hermes's own PID record — it cannot stop processes launched by a different supervisor.
+
+Each pair of simultaneous gateways collided on port 18642. Telegram saw two `getUpdates` sessions. The daemon's monitor loop kept re-launching, and `start.sh`'s supervisor treated each new PID as a fresh crash, multiplying the count over time.
+
+**Fix** (committed 2026-07-09):
+- `scripts/start.sh` — `cleanup_stale_hermes_gateway_runtime` now force-kills every live `hermes gateway` PID before relaunching.
+- `scripts/gateway-daemon.sh` — daemon enters monitor-only mode when port 18642 is already bound; monitor loop checks port state before re-launching.
+- `Dockerfile` — removed `.bashrc`/`.profile` auto-start hooks and boot-time `update-rc.d` registration for `gateway-daemon.sh`. `start.sh` is the **sole** gateway manager.
+
+**Verify**:
+```bash
+# Inside sandbox — must show exactly 1 gateway + 1 dashboard
+openshell sandbox exec -n milimo-hermes -- ps aux | grep -E '[h]ermes.real'
+# Expected:
+# sandbox  <pid>  ... hermes.real gateway run
+# sandbox  <pid>  ... hermes.real dashboard ...
+
+# No daemon process
+openshell sandbox exec -n milimo-hermes -- pgrep -af gateway-daemon
+# Expected: (no output)
+
+# Health endpoint
+curl -s http://127.0.0.1:8642/health
+# Expected: {"status":"ok","platform":"hermes-agent","version":"0.17.0"}
+
+# Probe
+nemohermes milimo-hermes connect --probe-only
+# Expected: Probe complete: Hermes Agent gateway is running in 'milimo-hermes'
+```
+
+**See also**: [[sandbox-isolation]] — cgroup `pids_limit` and `PYTHONTHREADSTACKSIZE`; [[hermes-profile]] — Hermes dashboard and API ports
+
+---
 
 ### `nemohermes <name> recover` Fails: Stale Shields Transition Lock
 

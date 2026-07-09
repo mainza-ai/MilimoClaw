@@ -12,7 +12,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square" alt="License" /></a>
   <a href="https://github.com/NVIDIA/NemoClaw"><img src="https://img.shields.io/badge/built_on-NemoClaw-purple.svg?style=flat-square" alt="Built on NemoClaw" /></a>
   <a href="https://github.com/mainza-ai/MilimoClaw/actions"><img src="https://img.shields.io/badge/build-passing-success.svg?style=flat-square" alt="Build Status" /></a>
-  <a href="https://github.com/mainza-ai/MilimoClaw/releases"><img src="https://img.shields.io/badge/version-v0.2.0-teal.svg?style=flat-square" alt="Version" /></a>
+  <a href="https://github.com/mainza-ai/MilimoClaw/releases"><img src="https://img.shields.io/badge/version-v0.2.1-teal.svg?style=flat-square" alt="Version" /></a>
 </p>
 
 > *"Your friend group is a startup. Your laptops and cloud nodes are the infrastructure. Your claws do the work."*
@@ -299,6 +299,8 @@ nemohermes milimo-hermes exec -- link-cli auth login
 > **Port forwarding**: `nemohermes onboard` maps ports `19119` (dashboard) and `8642` (API) automatically. If port 19119 is not listed in `openshell forward list`, start it manually: `openshell forward start --background 19119 milimo-hermes`.
 
 > **Two-container conflict**: `nemohermes onboard` may create a plain Hermes sandbox (`openshell` container) before `install-hermes.sh` creates `milimo-hermes`. If you see port conflicts, destroy the plain Hermes sandbox first: `nemohermes openshell destroy`.
+
+> **Gateway daemon race (fixed 2026-07-09)**: Earlier builds started `gateway-daemon.sh` from both `~/.bashrc` and `~/.profile` in addition to `start.sh`. That spawned two independent supervisors for `hermes gateway run`, causing port 18642 conflicts, Telegram `getUpdates` `Conflict` errors, and unbounded thread accumulation. The daemon hooks have been removed from `.bashrc`/`.profile` and the boot `init.d` registration. `start.sh` is now the sole gateway manager. If `ps aux | grep hermes.real` shows more than 2 processes (gateway + dashboard) or you see `SUPERVISOR_UNAVAILABLE`, rebuild: `./milimo-hermes-sandbox/install-hermes.sh --non-interactive --recreate-sandbox`.
 
 ##### Troubleshooting: `connect` Hangs / `relay open timed out`
 

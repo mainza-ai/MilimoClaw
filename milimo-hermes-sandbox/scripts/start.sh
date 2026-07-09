@@ -885,10 +885,21 @@ repair_hermes_startup_layout() {
 cleanup_stale_hermes_gateway_runtime() {
   local runtime_dir="${HERMES_DIR}/runtime"
 
-  if has_live_hermes_gateway; then
-    echo "[gateway] Existing Hermes gateway process detected; preserving runtime lock state" >&2
-    return 0
-  fi
+  # Kill every live gateway process before relaunch. The Hermes --replace flag
+  # only handles the Hermes-level PID-record, not long-lived systemd/docker
+  # container supervisor re-entries. Force-kill here to prevent port conflicts,
+  # orphaned Telegram polling sessions, and thread accumulation.
+  for _gw_pid in $(find "${proc_root:-/proc}" -maxdepth 1 -type d -name '[0-9]*' -printf '%f\n' 2>/dev/null | sort -n); do
+    [ -r "${proc_root:-/proc}/${_gw_pid}/cmdline" ] || continue
+    _gw_cmdline="$(tr '\0' ' ' <"${proc_root:-/proc}/${_gw_pid}/cmdline" 2>/dev/null || true)"
+    if cmdline_is_hermes_gateway "$_gw_cmdline"; then
+      echo "[gateway] Terminating stale Hermes gateway (pid ${_gw_pid})" >&2
+      kill "$_gw_pid" 2>/dev/null || true
+      sleep 1
+      kill -9 "$_gw_pid" 2>/dev/null || true
+    fi
+  done
+  sleep 2
 
   repair_hermes_startup_layout || return 1
 
@@ -2254,9 +2265,11 @@ launch_hermes_gateway() {
 ensure_hermes_supervised_auxiliaries() {
   local gateway_user=current
   local dashboard_user=current
+  local warroom_user=current
   if [ "$(id -u)" -eq 0 ]; then
     gateway_user=gateway
     dashboard_user=sandbox
+    warroom_user=sandbox
   fi
 
   if ! hermes_socat_bridge_healthy api-socat "${SOCAT_PID:-}" "$PUBLIC_PORT"; then
