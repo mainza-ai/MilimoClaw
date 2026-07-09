@@ -678,6 +678,65 @@ done
 
 ---
 
+### War Room Page Returns 404 / Connection Refused (FIXED 2026-07-09)
+
+**Symptom**: Visiting `http://127.0.0.1:9090/warroom.html` returns connection refused, or the page loads but shows no approve/release/veto buttons.
+
+```bash
+# War room health check fails
+curl -s http://127.0.0.1:9090/health
+# curl: (7) Failed to connect
+
+# Inside sandbox — no warroom process
+ps aux | grep server.py
+# (no output)
+```
+
+**Root cause**: Two bugs in `start.sh`'s war room launch sequence:
+
+1. **Wrong Python binary** (`start.sh:1419`, `start.sh:1439`): Both the current-user and sandbox-user launch paths used `/usr/bin/python3` to run `warroom/server.py`. The system Python has no `milimo_core` in `sys.path`, causing:
+   ```
+   ModuleNotFoundError: No module named 'milimo_core'
+   ```
+   The venv interpreter `/opt/hermes/.venv/bin/python3` (resolved as `$_HERMES_PYTHON` at `start.sh:293`) has `milimo_core` installed and is the correct binary.
+
+2. **Missing `typing.Any` import** (`warroom/server.py:204`): Type annotations `dict[str, Any] | None` reference `Any` without importing it from `typing`. Under Python 3.13 (used in the container), annotations are evaluated eagerly, raising:
+   ```
+   NameError: name 'Any' is not defined. Did you mean: 'any'?
+   ```
+   Even with the correct Python binary, this crashed the server before it could bind to port 9090.
+
+**Fix** (committed 2026-07-09 as `be62e42`):
+- `scripts/start.sh` — replaced both `/usr/bin/python3` with `"$_HERMES_PYTHON"` at lines 1419 and 1439
+- `milimo-hermes-plugin/warroom/server.py` — added `from typing import Any`
+
+**Rebuild required**: The running sandbox's `/opt/hermes/warroom/server.py` is baked into the image and owned by `root:root`. The non-root `sandbox` user cannot patch it at runtime. Rebuild the image:
+```bash
+NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 \
+NEMOCLAW_NON_INTERACTIVE=1 \
+NEMOCLAW_ACCEPT_THIRD_PARTY=1 \
+  ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
+```
+
+After rebuild, the war room auto-starts on port 9090. If port 9090 is not forwarded, add it:
+```bash
+openshell forward start --background 9090 milimo-hermes
+```
+
+**Verify**:
+```bash
+curl -s http://127.0.0.1:9090/health
+# Expected: {"status":"ok"}
+open http://127.0.0.1:9090/warroom.html
+# Expected: War Room UI with Claw Status, HOLD Queue (Approve/Veto buttons), Cost Guard
+```
+
+**Important**: The war room is a **standalone HTMX server on port 9090** — it is not embedded in the Hermes dashboard at port 18790/19119. The dashboard URL (`http://127.0.0.1:18790/sessions?profile=default`) is the chat UI and has no war room buttons.
+
+**See also**: [[issues-and-fixes]] — Issue 18 (full audit); [[hermes-profile]] — war room architecture
+
+---
+
 ## Related Pages
 
 - [[production-spend-flow-fix-plan-2026-07-06]] — Full production fix plan

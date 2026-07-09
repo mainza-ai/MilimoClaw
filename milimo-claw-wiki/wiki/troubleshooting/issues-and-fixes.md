@@ -396,8 +396,71 @@ NEMOCLAW_AUTH_MODE=api_key \
 
 ---
 
-## Related Pages
+## Issue 18: War Room Server Never Starts — Wrong Python Binary + Missing Typing Import (CRITICAL)
 
-- [[common-issues]] — Quick troubleshooting
-- [[sandbox-sync]] — Sandbox synchronization
-- [[assistant-lucy]] — Lucy documentation
+### Problem
+
+Visiting `http://127.0.0.1:9090/warroom.html` returns connection refused. The war room HTMX server (which serves the approve/release/veto UI) does not start during container boot.
+
+```bash
+curl -s http://127.0.0.1:9090/health
+# curl: (7) Failed to connect
+
+ps aux | grep "warroom/server.py"
+# (no output)
+```
+
+### Root Cause
+
+Two bugs in `scripts/start.sh` and `milimo-hermes-plugin/warroom/server.py`:
+
+**Bug 1 — Wrong Python binary** (`scripts/start.sh:1419` and `scripts/start.sh:1439`):
+
+Both launch functions used `/usr/bin/python3`, which has no `milimo_core` in `sys.path`:
+```
+ModuleNotFoundError: No module named 'milimo_core'
+```
+
+`/opt/hermes/.venv/bin/python3` (already resolved as `$_HERMES_PYTHON` at `start.sh:293`) has `milimo_core` installed and is the correct interpreter used by every other Hermes component.
+
+**Bug 2 — `Any` not imported** (`milimo-hermes-plugin/warroom/server.py:204`):
+
+Return annotations `dict[str, Any] | None` reference `Any` without an import. Under Python 3.13 (used in the container), annotations are evaluated eagerly, raising:
+```
+NameError: name 'Any' is not defined. Did you mean: 'any'?
+```
+This crashes the module before the HTTP server can bind to port 9090.
+
+**Why it wasn't caught earlier**: The war room is marked auxiliary. Its startup failure is logged to `/tmp/warroom.log` but does not abort container boot, so the rest of Hermes appeared healthy.
+
+### Fix (2026-07-09, commit `be62e42`)
+
+**`scripts/start.sh`** — replaced `/usr/bin/python3` with `$_HERMES_PYTHON` at lines 1419 and 1439.
+**`milimo-hermes-plugin/warroom/server.py`** — added `from typing import Any`.
+
+### Rebuild Required
+
+The running sandbox's `/opt/hermes/warroom/server.py` is baked into the image as `root:root 644`. The non-root `sandbox` user cannot patch it at runtime. Rebuild:
+
+```bash
+NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 \
+NEMOCLAW_NON_INTERACTIVE=1 \
+NEMOCLAW_ACCEPT_THIRD_PARTY=1 \
+  ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
+```
+
+### Verification (after rebuild)
+
+```bash
+curl -s http://127.0.0.1:9090/health
+# Expected: {"status":"ok"}
+
+open http://127.0.0.1:9090/warroom.html
+# Expected: War Room UI with Claw Status, HOLD Queue (Approve/Release/Veto), Cost Guard
+```
+
+**Note**: Port 9090 is the standalone war room server, entirely separate from the Hermes dashboard (18790/19119). The dashboard URL has no war room buttons — navigate directly to `http://127.0.0.1:9090/warroom.html`. If port 9090 is not forwarded: `openshell forward start --background 9090 milimo-hermes`.
+
+**See also**: [[common-issues]] — War Room 404 quick-reference; [[hermes-profile]] — war room architecture
+
+---
