@@ -52,7 +52,9 @@ RUNTIME_ALLOWED_NONSECRET_KEYS = frozenset(
         "OPENSHELL_SANDBOX_TOKEN_FILE",
     }
 )
-RUNTIME_ALLOWED_RAW_SECRET_KEYS = frozenset({"OPENCLAW_GATEWAY_TOKEN"})
+RUNTIME_ALLOWED_RAW_SECRET_KEYS = frozenset(
+    {"OPENCLAW_GATEWAY_TOKEN", "API_SERVER_KEY"}
+)
 # OpenShell's Docker/Podman supervisor owns this variable and injects a mounted
 # file path, not private-key material. Keep the allowance exact and runtime-only
 # so a caller cannot use the secret-shaped name to smuggle an arbitrary value or

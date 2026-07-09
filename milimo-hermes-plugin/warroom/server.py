@@ -717,6 +717,7 @@ def run(port: int = 9090):
         "Milimo War Room Server running on http://localhost:%d/warroom.html", port
     )
 
+    threading.stack_size(524288)
     _server_thread = threading.Thread(
         target=server.serve_forever, name="warroom-http", daemon=False
     )
