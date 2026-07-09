@@ -2291,12 +2291,18 @@ ensure_hermes_supervised_auxiliaries() {
     WARROOM_SOCAT_PID=""
     hermes_stop_tracked_role warroom "${WARROOM_PID:-0}" "$warroom_user" "$WARROOM_INTERNAL_PORT" 2>/dev/null || true
     WARROOM_PID=""
-    if [ "$(id -u)" -eq 0 ]; then
-      start_warroom_server_sandbox_user 2>/dev/null \
-        || echo "[warroom] sandbox startup failed — will retry next cycle" >&2
+    if hermes_warroom_is_quarantined; then
+      echo "[warroom] CRITICAL: war room crash-loop quarantined (${#HERMES_WARROOM_EXIT_TIMES[@]} exits in 60s) — skipping relaunch; check /tmp/warroom.log" >&2
+    elif [ "$(id -u)" -eq 0 ]; then
+      if ! start_warroom_server_sandbox_user 2>/dev/null; then
+        record_hermes_warroom_exit 2>/dev/null || true
+        echo "[warroom] sandbox startup failed — will retry next cycle" >&2
+      fi
     else
-      start_warroom_server_current_user 2>/dev/null \
-        || echo "[warroom] current-user startup failed — will retry next cycle" >&2
+      if ! start_warroom_server_current_user 2>/dev/null; then
+        record_hermes_warroom_exit 2>/dev/null || true
+        echo "[warroom] current-user startup failed — will retry next cycle" >&2
+      fi
     fi
   elif ! hermes_socat_bridge_healthy warroom-socat "${WARROOM_SOCAT_PID:-}" "$WARROOM_PUBLIC_PORT"; then
     hermes_stop_tracked_role warroom-socat "${WARROOM_SOCAT_PID:-0}" current "$WARROOM_PUBLIC_PORT" 2>/dev/null || true
@@ -2594,6 +2600,7 @@ launch_hermes_gateway_current_user() {
 
 HERMES_MANAGED_GATEWAY_EXIT_TIMES=()
 HERMES_MANAGED_GATEWAY_EXIT_COUNT=0
+HERMES_WARROOM_EXIT_TIMES=()
 readonly HERMES_MANAGED_EXPECTED_EXIT_DIR="/run/nemoclaw"
 readonly HERMES_MANAGED_EXPECTED_EXIT_MARKER="managed-gateway-expected-exit"
 readonly HERMES_MANAGED_CONTROLLER_PATH="/usr/local/lib/nemoclaw/managed-gateway-control.py"
@@ -2602,6 +2609,32 @@ quarantine_hermes_managed_gateway_relaunch() {
   while :; do
     sleep 60 || true
   done
+}
+
+_warroom_exit_quarantine() {
+  while :; do
+    sleep 60 || true
+  done
+}
+
+record_hermes_warroom_exit() {
+  local now
+  now="$(date +%s)"
+  local -a retained=()
+  for t in "${HERMES_WARROOM_EXIT_TIMES[@]+"${HERMES_WARROOM_EXIT_TIMES[@]}"}"; do
+    [ "$((now - t))" -le 60 ] && retained+=("$t")
+  done
+  HERMES_WARROOM_EXIT_TIMES=("${retained[@]+"${retained[@]}"}")
+  if [ "${#HERMES_WARROOM_EXIT_TIMES[@]}" -ge 5 ]; then
+    echo "[warroom] CRITICAL: ${#HERMES_WARROOM_EXIT_TIMES[@]} exits in 60s — war room relaunch quarantined until sandbox recreation; check /tmp/warroom.log" >&2
+    _warroom_exit_quarantine
+    return 1
+  fi
+  return 0
+}
+
+hermes_warroom_is_quarantined() {
+  [ "${#HERMES_WARROOM_EXIT_TIMES[@]}" -ge 5 ]
 }
 
 hermes_managed_controller_argv_is_expected() {
