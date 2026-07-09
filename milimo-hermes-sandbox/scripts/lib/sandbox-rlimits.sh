@@ -7,6 +7,7 @@
 
 NEMOCLAW_SANDBOX_NPROC_LIMIT=512
 NEMOCLAW_SANDBOX_NOFILE_LIMIT=65536
+NEMOCLAW_SANDBOX_STACK_LIMIT_KB=4096
 
 _nemoclaw_ulimit() {
   # `command` bypasses shell functions named `ulimit` in bash and POSIX sh,
@@ -114,6 +115,7 @@ harden_resource_limits() {
   _nemoclaw_rlimit_quiet="${1:-}"
   _nemoclaw_set_resource_limit u "$NEMOCLAW_SANDBOX_NPROC_LIMIT" nproc "$_nemoclaw_rlimit_quiet"
   _nemoclaw_set_resource_limit n "$NEMOCLAW_SANDBOX_NOFILE_LIMIT" nofile "$_nemoclaw_rlimit_quiet"
+  _nemoclaw_set_resource_limit s "$NEMOCLAW_SANDBOX_STACK_LIMIT_KB" "stack (KB)" "$_nemoclaw_rlimit_quiet"
   unset _nemoclaw_rlimit_quiet
 }
 
@@ -124,6 +126,8 @@ verify_resource_limits() {
   _nemoclaw_verify_resource_limit u "$NEMOCLAW_SANDBOX_NPROC_LIMIT" nproc "$_nemoclaw_rlimit_quiet" \
     || _nemoclaw_rlimit_status=1
   _nemoclaw_verify_resource_limit n "$NEMOCLAW_SANDBOX_NOFILE_LIMIT" nofile "$_nemoclaw_rlimit_quiet" \
+    || _nemoclaw_rlimit_status=1
+  _nemoclaw_verify_resource_limit s "$NEMOCLAW_SANDBOX_STACK_LIMIT_KB" "stack (KB)" "$_nemoclaw_rlimit_quiet" \
     || _nemoclaw_rlimit_status=1
 
   _nemoclaw_rlimit_return="$_nemoclaw_rlimit_status"

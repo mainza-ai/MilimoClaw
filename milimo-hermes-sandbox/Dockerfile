@@ -477,7 +477,8 @@ RUN mkdir -p /sandbox/.hermes/claws/build \
 ENV MILIMO_PROFILE=hermes \
     MILIMO_PLUGIN_DIR=/sandbox/.hermes/plugins/milimo-hermes \
     DELEGATION_MAX_CONCURRENT_CHILDREN=6 \
-    NEMOCLAW_HERMES_DASHBOARD_TUI=1
+    NEMOCLAW_HERMES_DASHBOARD_TUI=1 \
+    PYTHONTHREADSTACKSIZE=524288
 
 # Drop privileges (Hermes standard).
 # Note: NemoClaw overrides container user to 'sandbox' at runtime per

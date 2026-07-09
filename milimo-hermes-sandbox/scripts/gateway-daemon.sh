@@ -14,6 +14,7 @@ export HOME="/sandbox"
 HERMES_HOME="${HERMES_HOME:-/sandbox/.hermes}"
 ENV_FILE="${HERMES_HOME}/.env"
 GATEWAY_LOG="${HERMES_HOME}/logs/gateway-daemon.log"
+DAEMON_PIDFILE="/var/run/gateway-daemon.pid"
 POLL_INTERVAL=30
 
 # socat forwarder: Hermes API server binds to 127.0.0.1:18642.
@@ -43,20 +44,27 @@ ensure_env() {
 }
 
 gateway_pid() {
-  pgrep -f 'hermes gateway run' 2>/dev/null || true
+  pgrep -n -f 'hermes gateway run' 2>/dev/null || true
 }
 
 gateway_running() {
   [ -n "$(gateway_pid)" ]
 }
 
-start_gateway() {
-  log "Starting Hermes gateway..."
-  # hermes gateway run is foreground; background it via nohup.
-  # --replace kills any previous instance to avoid duplicates.
-  nohup hermes gateway run --replace >>"${GATEWAY_LOG}" 2>&1 &
-  local pid=$!
-  log "Gateway started with PID ${pid}"
+daemon_pidfile_write() {
+  echo "$$" >"${DAEMON_PIDFILE}"
+}
+
+daemon_pidfile_check() {
+  if [ -f "${DAEMON_PIDFILE}" ]; then
+    local existing_pid
+    existing_pid="$(cat "${DAEMON_PIDFILE}" 2>/dev/null || true)"
+    if [ -n "${existing_pid}" ] && kill -0 "${existing_pid}" 2>/dev/null; then
+      return 0
+    fi
+    rm -f "${DAEMON_PIDFILE}"
+  fi
+  return 1
 }
 
 stop_gateway() {
@@ -66,6 +74,21 @@ stop_gateway() {
     log "Stopping running gateway (PID ${pid})..."
     kill "${pid}" 2>/dev/null || true
   fi
+  while IFS= read -r pid; do
+    [ -n "${pid}" ] || continue
+    [ "${pid}" = "$(gateway_pid)" ] && continue
+    log "Stopping additional gateway instance (PID ${pid})..."
+    kill "${pid}" 2>/dev/null || true
+  done < <(pgrep -f 'hermes gateway run' 2>/dev/null || true)
+}
+
+start_gateway() {
+  log "Starting Hermes gateway..."
+  # hermes gateway run is foreground; background it via nohup.
+  # --replace kills any previous instance to avoid duplicates.
+  nohup hermes gateway run --replace >>"${GATEWAY_LOG}" 2>&1 &
+  local pid=$!
+  log "Gateway started with PID ${pid}"
 }
 
 # socat forwarder: Hermes API server binds to 127.0.0.1:18642.
@@ -98,16 +121,23 @@ stop_socat_forwarder() {
 }
 
 cleanup() {
+  rm -f "${DAEMON_PIDFILE}"
   stop_gateway
   stop_socat_forwarder
   log "Daemon shutting down"
   exit 0
 }
 
-trap cleanup SIGTERM SIGINT SIGHUP
+trap cleanup SIGTERM SIGINT
 
 log "=== Gateway daemon starting ==="
 ensure_env
+
+# Prevent concurrent daemon instances (.bashrc + /etc/init.d/ both fire this script)
+if daemon_pidfile_check; then
+  log "Another daemon instance is already running; exiting"
+  exit 0
+fi
 
 # Start socat forwarder so the nemohermes health probe (:8642/health) works.
 start_socat_forwarder
@@ -118,6 +148,7 @@ if gateway_running; then
 else
   start_gateway
 fi
+daemon_pidfile_write
 
 # Monitor loop — ensures both gateway and socat stay alive.
 while true; do
