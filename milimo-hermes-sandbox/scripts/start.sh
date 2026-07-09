@@ -1416,7 +1416,7 @@ start_warroom_server_current_user() {
     return 0
   fi
   prepare_restricted_log /tmp/warroom.log "" 600 || return 1
-  nohup /usr/bin/python3 "$warroom_script" "$WARROOM_INTERNAL_PORT" >/tmp/warroom.log 2>&1 &
+  nohup "$_HERMES_PYTHON" "$warroom_script" "$WARROOM_INTERNAL_PORT" >/tmp/warroom.log 2>&1 &
   WARROOM_PID=$!
   echo "[warroom] war room server launched (pid $WARROOM_PID) on 127.0.0.1:${WARROOM_INTERNAL_PORT}" >&2
   if ! hermes_capture_tracked_role warroom "$WARROOM_PID" current "$WARROOM_INTERNAL_PORT"; then
@@ -1436,7 +1436,7 @@ start_warroom_server_sandbox_user() {
     return 0
   fi
   prepare_restricted_log /tmp/warroom.log sandbox:sandbox 600 || return 1
-  nohup "${STEP_DOWN_PREFIX_SANDBOX[@]}" sh -c 'umask 0077; exec /usr/bin/python3 "$@" >/tmp/warroom.log 2>&1' sh "$warroom_script" "$WARROOM_INTERNAL_PORT" &
+  nohup "${STEP_DOWN_PREFIX_SANDBOX[@]}" sh -c 'umask 0077; exec "$1" "$2" "$3" >/tmp/warroom.log 2>&1' sh "$_HERMES_PYTHON" "$warroom_script" "$WARROOM_INTERNAL_PORT" &
   WARROOM_PID=$!
   echo "[warroom] war room server launched as 'sandbox' user (pid $WARROOM_PID) on 127.0.0.1:${WARROOM_INTERNAL_PORT}" >&2
   if ! hermes_capture_tracked_role warroom "$WARROOM_PID" sandbox "$WARROOM_INTERNAL_PORT"; then
