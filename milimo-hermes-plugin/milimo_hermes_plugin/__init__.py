@@ -391,8 +391,9 @@ def register(ctx: Any) -> None:
     # Register all claw skills via skills package
     register_all_skills(skill_registry)
 
-    # Register core tools (milimo_status, milimo_warroom, milimo_approve, milimo_veto, delegate_task)
-    register_core_tools(skill_registry)
+    # Register core Milimo tools (milimo_status, milimo_warroom, milimo_approve,
+    # milimo_veto, milimo_spend, delegate_task)
+    register_core_tools(ctx)
 
     # Register shared infrastructure skills
     skill_registry.register_skill(

@@ -8,7 +8,40 @@
 
 ---
 
-### 2026-07-12 — Fix Auth Rule Contradiction + Add Mandatory-First-Action + Forbid Handler Imports
+### 2026-07-12 — Fix Hermes v0.17+ Tool Registration API; milimo_spend Now Accessible
+
+**Pages**: `wiki/troubleshooting/issues-and-fixes.md`, `wiki/troubleshooting/common-issues.md`, `wiki/architecture/hermes-profile.md`, `wiki/log.md`
+
+**Source**: Live demo session (2026-07-12, model `hy3:free`) — Hermes agent authenticated successfully via `link-cli auth status` and surfaced approval URL, but could not invoke `milimo_spend`. Agent fell back to: (a) Python `exec` importing `SpendApprovalHandler` from `milimo_core.finance.spend_handler` and calling `handle_hold_release` directly, completing the spend flow through a workaround.
+
+**Changes**:
+- `milimo_hermes_plugin/tools.py` — Replaced `register_core_tools(skill_registry)` with `register_core_tools(ctx)`. The function now calls `ctx.register_tool(name, toolset="milimo", schema=..., handler=..., description=...)` — the Hermes Agent v0.17+ plugin API. Previously used `skill_registry.register_tool(name, description, parameters, handler)` — legacy OpenClaw shim that is a no-op in Hermes.
+- `milimo_hermes_plugin/__init__.py` — Passes `ctx` (PluginContext) to `register_core_tools()` instead of `skill_registry`
+- Plugin sync: `rsync -a --delete milimo-hermes-plugin/ milimo-hermes-sandbox/milimo-hermes-plugin/` — root ↔ sandbox byte-identical
+
+**Commits** (pending push to develop)
+
+**Root cause**:
+- Hermes Agent v0.17+ exposes tools via `PluginContext.register_tool(name, toolset, schema, handler, description)`. The `toolset` parameter is required — tools without it are silently dropped from the LLM's discoverable set.
+- The plugin was using the OpenClaw-era `skill_registry.register_tool()` API, which has no effect in Hermes. All 6 core tools (`milimo_status`, `milimo_warroom`, `milimo_approve`, `milimo_veto`, `milimo_spend`, `delegate_task`) were silently dropped.
+- This was not caught earlier because unit tests mock `skill_registry` rather than `ctx` — the mock never reflected the actual Hermes plugin contract.
+
+**Verify**:
+```bash
+# Unit tests pass — handler logic unchanged
+cd milimo-hermes-plugin && python -m pytest tests/ -x -q
+# Expected: 58 passed
+
+# Plugin sync clean
+bash scripts/check-plugin-sync.sh
+# Expected: [OK] plugin, [OK] core
+
+# Schema is correct for Hermes ctx.register_tool
+python3 -c "from milimo_hermes_plugin.tools import MILIMO_SPEND_SCHEMA; print(MILIMO_SPEND_SCHEMA['name'])"
+# Expected: milimo_spend
+```
+
+**See also**: [[issues-and-fixes]] Issue 22; [[common-issues]] Milimo Tools Not Visible in Hermes Agent Toolset; [[hermes-profile]] — Hermes Plugin Tool Registration API
 
 **Pages**: `wiki/troubleshooting/issues-and-fixes.md`, `wiki/troubleshooting/common-issues.md`, `wiki/architecture/hermes-profile.md`, `wiki/log.md`, `wiki/index.md`
 
