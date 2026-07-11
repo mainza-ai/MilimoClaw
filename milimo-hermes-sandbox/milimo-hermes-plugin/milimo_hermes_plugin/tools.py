@@ -945,15 +945,14 @@ def _check_link_cli_auth() -> dict | None:
             )
         else:
             action_required = (
-                "link-cli auth status returned no approval URL and is not authenticated.\n"
-                "This can happen when the CLI is not in a device-code flow, or when a "
-                "mock, wrapper, or alternate PATH entry is intercepting link-cli calls.\n"
-                "Do NOT run `link-cli auth login`.\n"
-                "Instead, ask the operator to:\n"
-                "  1. Run `link-cli auth status` in a shell and share the output.\n"
-                "  2. If a device approval URL appears, visit it and approve.\n"
-                "  3. If no URL appears, check the Link app for a pending approval "
-                "or run `link-cli auth login` themselves in an interactive terminal."
+                "link-cli is not authenticated and no approval URL is pending.\n"
+                "NEXT ACTION: call _run_link_cli_auth_login() to initiate the device "
+                "flow. That helper runs `link-cli auth login --timeout 300 "
+                "--client-name 'Hermes Finance Claw'` ONCE and returns the "
+                "approval URL. Surface the exact URL verbatim to the operator, "
+                "then STOP and WAIT for their confirmation. "
+                "Do NOT call auth login a second time — each invocation generates "
+                "a new device code and invalidates any pending approval URL."
             )
         return {
             "error": "link_cli_not_authenticated",
@@ -961,8 +960,73 @@ def _check_link_cli_auth() -> dict | None:
             "stdout": proc.stdout,
             "stderr": proc.stderr,
             "action_required": action_required,
+            "next_action": (
+                "run _run_link_cli_auth_login()" if not device_url else "surface_url_and_stop"
+            ),
         }
     return None
+
+
+def _run_link_cli_auth_login() -> dict:
+    """Run ``link-cli auth login`` once and capture the device approval URL.
+
+    This is the ONLY sanctioned path for initiating the Link CLI device-code
+    flow. It must be called exactly once — each subsequent call to
+    ``link-cli auth login`` generates a NEW device code and invalidates any
+    pending approval URL.
+
+    Returns:
+        On success: ``{"approval_url": "https://...", "device_code": "..."}``
+        On failure: ``{"error": "...", "action_required": "..."}``
+    """
+    missing = _ensure_link_cli()
+    if missing:
+        return missing
+
+    try:
+        proc = subprocess.run(
+            [
+                "link-cli", "auth", "login",
+                "--timeout", "300",
+                "--client-name", "Hermes Finance Claw",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except FileNotFoundError:
+        return {
+            "error": "link_cli_not_available",
+            "action_required": "link-cli binary is not installed or not on PATH.",
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "error": "link_cli_auth_login_timeout",
+            "action_required": (
+                "link-cli auth login timed out after 10s. "
+                "The device-code flow may still be pending — check the Link app."
+            ),
+        }
+
+    device_url = _extract_device_url(proc.stdout) or _extract_device_url(proc.stderr)
+    if device_url:
+        return {
+            "approval_url": device_url,
+            "device_code": device_url.rstrip("/").split("/")[-1],
+            "stdout": proc.stdout,
+            "stderr": proc.stderr,
+        }
+
+    return {
+        "error": "link_cli_auth_login_failed",
+        "stdout": proc.stdout,
+        "stderr": proc.stderr,
+        "action_required": (
+            "link-cli auth login returned no approval URL. "
+            "Share this output with the operator and ask them to check their Link app "
+            "or run `link-cli auth login` themselves in an interactive terminal."
+        ),
+    }
 
 
 def _auto_spend_id(prefix: str = "spend") -> str:
@@ -1278,6 +1342,7 @@ __all__ = [
     "set_approval_handler",
     "set_cost_guard",
     "set_spend_handler",
+    "_run_link_cli_auth_login",
     "MILIMO_STATUS_SCHEMA",
     "MILIMO_WARROOM_SCHEMA",
     "MILIMO_APPROVE_SCHEMA",
