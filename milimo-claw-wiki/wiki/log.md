@@ -2,9 +2,36 @@
 
 **Summary**: Append-only record of all wiki operations.
 
-**Last updated**: 2026-07-08
+**Last updated**: 2026-07-11
 
 **Tags**: #log #meta
+
+---
+
+### 2026-07-11 — Inject all 6 claw rules into Hermes base system prompt; expand HERMES_ENVIRONMENT_HINT
+
+**Pages**: `wiki/troubleshooting/common-issues.md`, `wiki/troubleshooting/issues-and-fixes.md`, `wiki/architecture/hermes-profile.md`, `wiki/log.md`, `wiki/index.md`
+
+**Source**: Live demo spend-flow test — Hermes agent never surfaced device approval URL. Instead it created a 151-line runtime mock `link-cli`, ran its own mock via `link-cli auth login` (forbidden), and exhausted iteration budget (60/60) without ever invoking the `milimo_spend` tool.
+
+**Changes**:
+- `agent_config/SOUL.md` — rewritten from 58-line generic to 243 lines with all 6 claw rule sets inline, sourced verbatim from `CLAW_CONTEXTS`. This is the only prompt layer active at turn 1 for the Hermes agent. Previously the rules existed only in `delegation.py` which is only injected during `delegate_task` calls the agent never made.
+- `milimo-hermes-sandbox/Dockerfile` — `HERMES_ENVIRONMENT_HINT` expanded from single compressed paragraph (approval_url fragment only, `surf ace` typo) to full 6-claw rule summaries and complete Finance Claw HARD RULES protocol. Highest-priority session-start context now mirrors SOUL.md.
+- `milimo-hermes-sandbox/milimo-hermes-plugin/milimo_hermes_plugin/tools.py` — `_link_cli_resolved_path()` added to enforce `/usr/local/bin/link-cli` as canonical path and log warnings on PATH hijack; unauthenticated fallback message in `_check_link_cli_auth` improved.
+- `milimo-hermes-sandbox/milimo-hermes-plugin/milimo_hermes_plugin/delegation.py` — HARD RULE 0 added: forbidden to create mocks/wrappers for external binaries.
+
+**Commits**: `a481e32` (mock detection + prompt rule + error text), `02ff7d7` (SOUL.md rewrite + HERMES_ENVIRONMENT_HINT expansion)
+
+**Root cause**:
+- Agent's base system prompt had zero Finance Claw rules — they were scoped only to `CLAW_CONTEXTS["finance"]` which requires a `delegate_task` call that never happened.
+- `environment_probe: true` in config pushed agent to shell-first behavior (`which`, `ls`, `cat`, `find`) instead of calling registered tools.
+- Agent improvised a Python mock when `link-cli payment-methods list` returned exit 1, then ran `auth login` via the mock — forbidden by its own rules (which were never loaded).
+
+**Rebuild required**: `./milimo-hermes-sandbox/install-hermes.sh --non-interactive` with `NEMOCLAW_RECREATE_WITHOUT_BACKUP=1`
+
+**Verification**: Agent must call `milimo_spend` within 2 tool calls on the demo prompt; must surface any `approval_url` verbatim; must never read `finance_claw.py`, `tools.py`, or create mock files.
+
+**See also**: [[issues-and-fixes]] Issue 19; [[common-issues]] filesystem exploration + approval_url sections; [[hermes-profile]] SOUL.md context
 
 ---
 

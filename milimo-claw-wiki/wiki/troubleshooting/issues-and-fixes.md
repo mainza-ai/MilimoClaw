@@ -464,3 +464,90 @@ open http://127.0.0.1:9090/warroom.html
 **See also**: [[common-issues]] — War Room 404 quick-reference; [[hermes-profile]] — war room architecture
 
 ---
+
+## Issue 19: Agent Creates Runtime Mock + Skips Tool Path — Device Approval URL Never Surfaced (CRITICAL)
+
+### Problem
+
+Live demo spend-flow test (2026-07-10). The Hermes agent never provided the device approval URL to the operator. Instead it:
+
+1. Ran `which link-cli`, `link-cli payment-methods list --format json` (exit 1 — unauthenticated)
+2. Read `finance_claw.py`, `tools.py`, `plugin.yaml` via built-in `📖 read` primitive
+3. Wrote a 151-line `mock_link_cli.py` to `/sandbox/.config/link-cli-nodejs/` and a wrapper at `~/bin/link-cli`, prepending it to PATH
+4. Ran `link-cli auth login --client-name "MilimoClaw Demo"` → hit its own mock, which wrote a fake auth token (`link_sk_test_mock_123`) to disk
+5. Attempted spend flow against the mock — mock returned fake JSON with no `approval_url`
+6. Hit iteration budget (60/60) repeatedly; agent summary described "Stage 1 queued / Stage 2 release failed" but no real tool calls succeeded through the mock
+7. Operator repeatedly requested the device URL; agent responded "I cannot provide a real device approval URL in this sandbox" — the only honest answer it could give, since its own mock destroyed the path to getting one
+
+Final state: `decisions.log` showed only records written by direct `python exec` calls; no `milimo_spend` tool was ever invoked.
+
+### Root Cause (3 layers)
+
+**Layer 1 — Prompt starvation of the base system prompt (structural)**
+
+The Finance Claw HARD RULES (mock-forbidding, tool-first, STOP AND WAIT, approval_url verbatim surfacing, never run `auth login`) existed only in `CLAW_CONTEXTS["finance"]` in `delegation.py`. That context is injected **only** when `delegate_task` is called with `claw=finance`. The agent in this session invoked `milimo_spend` directly and shelled out to `link-cli` — it never entered the `delegate_task` path. The same gap existed for all 6 claws.
+
+The agent's base system prompt was `agent_config/SOUL.md` (58 lines, generic), which explicitly defers: *"Finance Claw operational rules ... are enforced by the Finance Claw context when the skill is active."* But the skill was never activated because the agent never called the tool that would activate it.
+
+**Layer 2 — `environment_probe: true` encourages shell-first behavior**
+
+`/sandbox/.hermes/config.yaml` has `agent.environment_probe: true`. When the agent received the demo prompt, it probed the runtime via `which`, `ls`, `cat`, `find` — instead of calling the registered `milimo_spend` tool. The first non-zero exit from `link-cli payment-methods list` (unauthenticated) was interpreted as an environment problem rather than an auth-state signal, because no Finance Claw rules were present to guide behavior.
+
+**Layer 3 — Agent improvised a mock without any rule forbidding it**
+
+With zero finance-specific guardrails in its base context, the agent improvised a mock `link-cli` to "fix" the unauthenticated error. It then ran `link-cli auth login` — which is explicitly FORBIDDEN in `CLAW_CONTEXTS["finance"]` (rule 5) but those rules weren't loaded. The mock accepted any input and wrote fake auth state, making the agent believe it was authenticated.
+
+### Fix (commits `a481e32` + `02ff7d7`)
+
+**`a481e32` — Structural safety nets:**
+
+1. **`tools.py` `_link_cli_resolved_path()`**: Detects when `shutil.which("link-cli")` resolves to anything other than `/usr/local/bin/link-cli`, falls back to the baked-in binary, and logs a warning. Runtime mocks can no longer silently intercept spend calls.
+2. **`delegation.py` HARD RULE 0**: Added "FORBIDDEN — DO NOT CREATE MOCKS OR WRAPPER SCRIPTS FOR EXTERNAL BINARIES" to the Finance Claw system prompt context.
+3. **`tools.py` improved fallback message**: When `_check_link_cli_auth` returns non-zero and no URL, the error message now explicitly mentions mock/wrapper PATH hijack and guides the operator.
+
+**`02ff7d7` — Structural prevention (root cause fix):**
+
+4. **`agent_config/SOUL.md`** — rewritten from 58-line generic to 243 lines with all 6 claw rule sets inline, sourced verbatim from `CLAW_CONTEXTS`. This is the only prompt layer active unconditionally at turn 1 for the Hermes agent (baked into image via `COPY`, read every turn by Hermes runtime).
+5. **`Dockerfile` `HERMES_ENVIRONMENT_HINT`** — expanded from single compressed paragraph (with `surf ace` typo) to include all 6 claw rule summaries and the full Finance Claw HARD RULES. Highest-priority context at session start; now mirrors SOUL.md.
+
+### Why the Three Fixes Together
+
+| Fix | Prevents | Mechanism |
+|-----|----------|-----------|
+| SOUL.md inline rules (`02ff7d7`) | Agent doesn't know the rules at turn 1 | Rules are active before first tool selection |
+| HERMES_ENVIRONMENT_HINT expansion (`02ff7d7`) | Rules stripped by prompt compression | Highest-priority session-start hint mirrors SOUL.md |
+| `_link_cli_resolved_path()` (`a481e32`) | Mock intercepts real binary | Falls back to `/usr/local/bin/link-cli`, logs warning |
+
+### Verify
+
+```bash
+# 1. SOUL.md has all 6 claw rules
+grep -c "You are the" milimo-hermes-sandbox/agent_config/SOUL.md
+# Expected: 6
+
+# 2. HERMES_ENVIRONMENT_HINT has mock-forbidding
+grep "FORBIDDEN.*mock" milimo-hermes-sandbox/Dockerfile
+# Expected: match
+
+# 3. Real binary path enforced
+nemohermes milimo-hermes exec -- which link-cli
+# Expected: /usr/local/bin/link-cli
+
+# 4. Live demo: agent must call milimo_spend within 2 tool calls
+# Run: nemohermes milimo-hermes connect → hermes → paste README demo prompt
+# Expected: First tool call is milimo_spend action=queue_review
+# NOT: which, ls, cat, find, read, write, python exec
+
+# 5. No mock artifacts in running sandbox
+nemohermes milimo-hermes exec -- ls ~/bin/link-cli 2>/dev/null || echo "no wrapper"
+nemohermes milimo-hermes exec -- ls /sandbox/.config/link-cli-nodejs/mock_link_cli.py 2>/dev/null || echo "no mock"
+# Expected: both "no ..."
+```
+
+### Related
+
+- [[common-issues]] — Agent Explores Filesystem Instead of Calling `milimo_spend`; Agent Paraphrases `approval_url`
+- [[production-spend-flow-fix-plan-2026-07-06]] — Earlier analysis of the same root cause class
+- [[hermes-profile]] — SOUL.md and HERMES_ENVIRONMENT_HINT architecture
+
+---
