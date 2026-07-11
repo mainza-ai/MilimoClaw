@@ -778,8 +778,35 @@ def _format_spend_response(base: dict, finance_context: bool = False) -> dict:
     return out
 
 
+_LINK_CLI_REAL_PATH = "/usr/local/bin/link-cli"
 _LINK_CLI_PREFIX = "/sandbox/.npm-global"
 _HAVE_LINK_CLI: bool | None = None
+_LINK_CLI_WARNED: bool = False
+
+
+def _link_cli_resolved_path() -> str | None:
+    """Return the canonical path to the real link-cli binary, or None if missing.
+
+    Detects PATH-hijack scenarios (runtime mocks, wrappers, or alternate
+    installations) by comparing ``shutil.which`` output against
+    ``_LINK_CLI_REAL_PATH``.  Falls back to the known baked-in path so that
+    subprocess calls inside spend_handler cannot be silently intercepted.
+    """
+    resolved = shutil.which("link-cli")
+    if resolved and resolved == _LINK_CLI_REAL_PATH:
+        return resolved
+    if _LINK_CLI_REAL_PATH and os.path.isfile(_LINK_CLI_REAL_PATH) and os.access(_LINK_CLI_REAL_PATH, os.X_OK):
+        global _LINK_CLI_WARNED
+        if not _LINK_CLI_WARNED:
+            logger.warning(
+                "link-cli resolved to %s instead of %s — a mock or wrapper may "
+                "be intercepting calls; falling back to the baked-in binary.",
+                resolved,
+                _LINK_CLI_REAL_PATH,
+            )
+            _LINK_CLI_WARNED = True
+        return _LINK_CLI_REAL_PATH
+    return resolved
 
 
 def _ensure_link_cli() -> dict | None:
@@ -791,6 +818,10 @@ def _ensure_link_cli() -> dict | None:
     that is unaffected by the root-owned npm global directory — prepends the
     resulting ``bin`` directory to PATH, and re-checks.  The result is cached
     in ``_HAVE_LINK_CLI`` so repeated spend calls do not retry the install.
+
+    If the resolved binary does not match the known baked-in path, a warning
+    is logged and the real binary at ``_LINK_CLI_REAL_PATH`` is used instead
+    to prevent runtime mocks from intercepting spend calls.
     """
     global _HAVE_LINK_CLI
     if _HAVE_LINK_CLI is not None:
@@ -799,7 +830,7 @@ def _ensure_link_cli() -> dict | None:
             "action_required": "link-cli binary is not installed and runtime install failed.",
         }
 
-    resolved = shutil.which("link-cli")
+    resolved = _link_cli_resolved_path()
     if resolved:
         _HAVE_LINK_CLI = True
         return None
@@ -817,7 +848,7 @@ def _ensure_link_cli() -> dict | None:
             bin_dir = os.path.join(prefix, "bin")
             if bin_dir not in os.environ.get("PATH", ""):
                 os.environ["PATH"] = bin_dir + os.pathsep + os.environ.get("PATH", "")
-            resolved = shutil.which("link-cli")
+            resolved = _link_cli_resolved_path()
             if resolved:
                 _HAVE_LINK_CLI = True
                 return None
@@ -914,12 +945,15 @@ def _check_link_cli_auth() -> dict | None:
             )
         else:
             action_required = (
-                "link-cli auth status returned an error and no approval URL was found.\n"
-                "Run ONLY `link-cli auth status` to re-check.\n"
-                "Do NOT run `link-cli auth login` — it creates a new device code and "
-                "breaks any pending approval flow.\n"
-                "If the problem persists, ask the operator to check their Link app "
-                "or run `link-cli auth status` manually in a shell."
+                "link-cli auth status returned no approval URL and is not authenticated.\n"
+                "This can happen when the CLI is not in a device-code flow, or when a "
+                "mock, wrapper, or alternate PATH entry is intercepting link-cli calls.\n"
+                "Do NOT run `link-cli auth login`.\n"
+                "Instead, ask the operator to:\n"
+                "  1. Run `link-cli auth status` in a shell and share the output.\n"
+                "  2. If a device approval URL appears, visit it and approve.\n"
+                "  3. If no URL appears, check the Link app for a pending approval "
+                "or run `link-cli auth login` themselves in an interactive terminal."
             )
         return {
             "error": "link_cli_not_authenticated",
