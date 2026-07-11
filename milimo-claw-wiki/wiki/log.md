@@ -2,9 +2,38 @@
 
 **Summary**: Append-only record of all wiki operations.
 
-**Last updated**: 2026-07-11
+**Last updated**: 2026-07-12
 
 **Tags**: #log #meta
+
+---
+
+### 2026-07-12 — Fix Auth Rule Contradiction + Add Mandatory-First-Action + Forbid Handler Imports
+
+**Pages**: `wiki/troubleshooting/issues-and-fixes.md`, `wiki/troubleshooting/common-issues.md`, `wiki/architecture/hermes-profile.md`, `wiki/log.md`, `wiki/index.md`
+
+**Source**: Session continuation of 2026-07-11 work — three-layer fix for production-grade device approval URL surfacing.
+
+**Changes**:
+- `agent_config/SOUL.md` — Rule 3 rewritten to use `_run_link_cli_auth_login()` helper (not direct `link-cli auth login`); Rule 2 expanded to forbid direct imports of `SpendApprovalHandler`, `SpendWarRoomBridge`, and any `milimo_core.finance.*` class; `## Registered Tools` section now lists `_run_link_cli_auth_login`
+- `milimo-hermes-plugin/milimo_hermes_plugin/delegation.py` — finance `CLAW_CONTEXTS["finance"]` now has Rule 0 (mandatory-first-action, previously missing from delegation layer), Rule 2 (forbid direct handler imports), and renamed Rule 7 (auth initiation via `_run_link_cli_auth_login()` helper); root and sandbox copies kept byte-identical
+- `milimo-hermes-plugin/milimo_hermes_plugin/tools.py` — `_run_link_cli_auth_login()` helper (`a481e32`) and `next_action` hint in `_check_link_cli_auth` response already present; root and sandbox copies byte-identical
+- `milimo-hermes-sandbox/generate-config.ts` — `agent.environment_probe: false` already present (prevents `environment_probe: true` from overriding SOUL.md tool-first rule)
+- `milimo-hermes-sandbox/Dockerfile` — `HERMES_ENVIRONMENT_HINT` updated to match SOUL.md rules (already in working tree)
+- Wiki `issues-and-fixes.md` — Issue 20 added documenting the contradiction + mandatory-first-action + handler import forbidding + verification
+- Wiki `common-issues.md` — new entry "Agent Never Calls `milimo_spend` + Device Approval URL Surfacing Failure" with 4-layer root cause, verification commands, rebuild instructions
+- `scripts/check-plugin-sync.sh` passes: root plugin ↔ sandbox plugin byte-identical; root core ↔ sandbox core byte-identical
+
+**Commits**: `4e62fef` (develop), merged to `main` (`50d33d5`)
+
+**Root cause**:
+- `SOUL.md` and `delegation.py` were edited at different times by different passes and never reconciled. `SOUL.md` Rule 3 said "run `link-cli auth login` directly"; `delegation.py` Rule 5 said "FORBIDDEN — NEVER RUN `link-cli auth login`". The agent could not satisfy both simultaneously.
+- `delegation.py` had no `MANDATORY FIRST ACTION — SPEND FLOWS` rule, allowing filesystem probing before `milimo_spend`.
+- Neither file explicitly forbid direct Python imports of `milimo_core.finance.*` classes.
+
+**Rebuild required**: Same command as Issue 19 fix (NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 + NEMOCLAW_NON_INTERACTIVE=1).
+
+**See also**: [[issues-and-fixes]] Issue 20; [[common-issues]] device approval URL surfacing failure entry; [[hermes-profile]] — SOUL.md architecture
 
 ---
 

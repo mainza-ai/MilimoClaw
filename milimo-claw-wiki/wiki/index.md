@@ -2,7 +2,7 @@
 
 **Summary**: Master table of contents for the MilimoClaw knowledge base.
 
-**Last updated**: 2026-07-09
+**Last updated**: 2026-07-12
 
 > Note: After onboarding, the sandbox is already running. Use `nemohermes milimo-hermes connect` to start a chat session, not `nemoclaw start`.
 
@@ -334,6 +334,7 @@ See [[log]] for complete operation history.
 | Date | Change | Pages Affected |
 |------|--------|----------------|
 | 2026-07-11 | Inject all 6 claw rules into Hermes base system prompt (SOUL.md + HERMES_ENVIRONMENT_HINT); add runtime mock-detection safety net; issue 19 documented in troubleshooting | common-issues.md, issues-and-fixes.md, hermes-profile.md, log.md |
+| 2026-07-12 | Fix auth rule contradiction (SOUL.md vs delegation.py); add mandatory-first-action to delegation.py; add forbid-direct-handler-imports rule; add _run_link_cli_auth_login() helper references; generate-config.ts environment_probe: false | issues-and-fixes.md, common-issues.md, hermes-profile.md, log.md, index.md |
 | 2026-07-08 | Successful rebuild + onboard: apparent build stall was stale container/lock; dashboard host port corrected to 19119; war room verified live on 9090; phases A/B/C-1/C-2/D-2/D-3 marked verified | log.md, war-room-production-readiness-2026-07-06.md, README.md |
 | 2026-07-06 | Production spend flow root cause analysis documented (6 root causes, 8 fixes, 8 verification scenarios); troubleshooting section added for filesystem-exploration, approval_url paraphrase, justification bypass, missing payment_method_id | production-spend-flow-fix-plan-2026-07-06.md, common-issues.md, log.md, index.md |
 | 2026-07-05 | Harden SOUL.md/HERMES_ENVIRONMENT_HINT: approval_url must be surfaced verbatim; agent previously paraphrased away the device approval URL, forcing operator to explicitly request it | hermes-profile.md, log.md |
