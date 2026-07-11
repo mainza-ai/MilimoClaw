@@ -333,6 +333,7 @@ See [[log]] for complete operation history.
 
 | Date | Change | Pages Affected |
 |------|--------|----------------|
+| 2026-07-12 | Fix Hermes v0.17+ tool registration API mismatch: `register_core_tools()` now uses `ctx.register_tool(name, toolset="milimo", schema, handler, description)` instead of legacy `skill_registry.register_tool()` no-op | issues-and-fixes.md, common-issues.md, hermes-profile.md, log.md, index.md |
 | 2026-07-12 | SOUL.md blocked by OpenClaw forced_action scanner — rewritten with advisory language (same operational content, no imperative trigger patterns) | issues-and-fixes.md, common-issues.md, hermes-profile.md, log.md, index.md |
 | 2026-07-11 | Inject all 6 claw rules into Hermes base system prompt (SOUL.md + HERMES_ENVIRONMENT_HINT); add runtime mock-detection safety net; issue 19 documented in troubleshooting | common-issues.md, issues-and-fixes.md, hermes-profile.md, log.md |
 | 2026-07-12 | Fix auth rule contradiction (SOUL.md vs delegation.py); add mandatory-first-action to delegation.py; add forbid-direct-handler-imports rule; add _run_link_cli_auth_login() helper references; generate-config.ts environment_probe: false | issues-and-fixes.md, common-issues.md, hermes-profile.md, log.md, index.md |

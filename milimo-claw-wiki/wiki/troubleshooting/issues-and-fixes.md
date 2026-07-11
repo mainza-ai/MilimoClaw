@@ -728,8 +728,34 @@ After rebuild, start a **new** Hermes chat session (`hermes`) — existing sessi
 
 ### Related
 
-- [[issues-and-fixes]] — Issue 19 (live demo mock-creation + tool-path bypass); Issue 20 (auth rule contradiction + mandatory-first-action + handler import forbidding)
-- [[common-issues]] — Agent Never Calls `milimo_spend` + Device Approval URL Surfacing Failure; SOUL.md Blocked entry
+- [[issues-and-fixes]] — Issue 19 (live demo mock-creation + tool-path bypass); Issue 20 (auth rule contradiction + mandatory-first-action + handler import forbidding); Issue 22 (Hermes v0.17+ tool registration API mismatch)
+- [[common-issues]] — Agent Never Calls `milimo_spend` + Device Approval URL Surfacing Failure; SOUL.md Blocked entry; Milimo Tools Not Visible in Hermes Agent Toolset
 - [[hermes-profile]] — SOUL.md and HERMES_ENVIRONMENT_HINT architecture
 
 ---
+
+## Issue 22 — Hermes v0.17+ Tool Registration API Mismatch (2026-07-12)
+
+**Discovered**: Live demo session (2026-07-12, model `hy3:free`). Agent authenticated, discovered payment methods, but could not invoke `milimo_spend`. Agent fell back to: (a) shelling out to `link-cli` directly, then (b) Python `exec` importing `SpendApprovalHandler` from `milimo_core.finance.spend_handler` and calling `handle_hold_release` directly.
+
+**Root Cause**: Hermes Agent v0.17+ exposes tools via `ctx.register_tool(name, toolset, schema, handler, description)`. The plugin was calling `skill_registry.register_tool(name, description, parameters, handler)` — the legacy OpenClaw shim, which is a no-op in Hermes. Reference: https://github.com/nousresearch/hermes-agent/blob/main/website/docs/developer-guide/plugins/index.md
+
+**Fix**:
+- `milimo_hermes_plugin/tools.py` — Replaced 6 calls to `skill_registry.register_tool()` with a single loop over `_CORE_TOOLS`, calling `ctx.register_tool(name="milimo_spend", toolset="milimo", schema=MILIMO_SPEND_SCHEMA, handler=handle_milimo_spend, description=...)`
+- `milimo_hermes_plugin/__init__.py` — Changed `register_core_tools(skill_registry)` → `register_core_tools(ctx)`
+- Plugin sync: `rsync -a --delete milimo-hermes-plugin/ milimo-hermes-sandbox/milimo-hermes-plugin/`
+
+**Why this was missed**: The plugin was originally written for OpenClaw's plugin API. When migrated to Hermes, the `register_core_tools()` function was never updated to match Hermes's `ctx.register_tool()` contract. Tools appeared to work in tests because unit tests mock `skill_registry` — but the mock never reflected what Hermes actually required.
+
+**Verification**:
+```bash
+# Tests pass (handler logic unchanged)
+cd milimo-hermes-plugin && python -m pytest tests/ -x -q
+# Expected: 58 passed
+
+# Plugin sync is clean
+bash scripts/check-plugin-sync.sh
+# Expected: [OK] plugin, [OK] core
+```
+
+**See also**: [[common-issues]] — Milimo Tools Not Visible in Hermes Agent Toolset; [[hermes-profile]] — Hermes Tool Registration section

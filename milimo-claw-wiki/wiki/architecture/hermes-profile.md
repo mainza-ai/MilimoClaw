@@ -132,7 +132,41 @@
 | `milimo_warroom` | HOLD queue, cost guard, approve/veto |
 | `milimo_approve` | Approve HOLD item, optionally delegate |
 | `milimo_veto` | Veto/reject HOLD item |
+| `milimo_spend` | Finance Claw spend flow (Stage 1 REVIEW + Stage 2 HOLD) |
 | `delegate_task` | Native Hermes delegation wrapper |
+
+### 7a. Hermes Plugin Tool Registration API
+
+Hermes Agent v0.17+ exposes tools to the LLM through the PluginContext API, **not** through a legacy skill-registry shim.
+
+**Correct pattern** (in `register(ctx)`):
+```python
+def register(ctx):
+    ctx.register_tool(
+        name="milimo_spend",
+        toolset="milimo",            # Required: groups related tools
+        schema=MILIMO_SPEND_SCHEMA,  # JSON schema dict
+        handler=handle_milimo_spend, # async callable
+        description="Finance Claw agent-initiated spend flow...",
+    )
+```
+
+**Legacy (broken in Hermes v0.17+)** — this was the bug:
+```python
+def register_core_tools(skill_registry):
+    skill_registry.register_tool(   # OpenClaw shim — no-op in Hermes
+        name="milimo_spend",
+        description="...",
+        parameters={...},
+        handler=handle_milimo_spend,
+    )
+```
+
+**Why `toolset` matters**: The agent's bootstrap banner groups tools by toolset (`toolsets: browser, clarify, ... skills, terminal, ...`). Plugins MUST declare a `toolset` string; tools without one are silently dropped from the LLM's tool-discoverable set.
+
+**References**:
+- https://github.com/nousresearch/hermes-agent/blob/main/website/docs/developer-guide/plugins/index.md
+- https://github.com/nousresearch/hermes-agent/blob/main/website/docs/user-guide/features/plugins.md
 
 ### 8. War Room (`milimo-hermes-plugin/warroom/warroom.html`)
 - Standalone HTML served at `/warroom`

@@ -806,6 +806,28 @@ NEMOCLAW_AUTH_MODE=api_key \
 
 ---
 
+### Milimo Tools Not Visible in Hermes Agent Toolset (FIXED 2026-07-12)
+
+**Symptom**: The Hermes agent bootstrap shows `31 tools · toolsets: browser, clarify, code_execution, computer_use, cronjob, delegation, file, image_gen, kanban, memory, session_search, skills, terminal, todo, tts, vision, web`. None of the Milimo core tools (`milimo_status`, `milimo_warroom`, `milimo_approve`, `milimo_veto`, `milimo_spend`, `delegate_task`) are visible. The agent cannot call `milimo_spend` and falls back to shelling out to `link-cli` directly or importing `SpendApprovalHandler` through Python `exec`.
+
+**Root Cause**: Hermes Agent v0.17+ uses a different plugin tool-registration API than the legacy OpenClaw shim. The plugin was calling `skill_registry.register_tool(name, description, parameters, handler)` — which is a vestigial no-op in Hermes. The correct Hermes API is `ctx.register_tool(name, toolset, schema, handler, description)` with a required `toolset` parameter.
+
+**Fix** (commit `be62e42` + new):
+- `milimo_hermes_plugin/tools.py` — `register_core_tools(ctx)` now uses `ctx.register_tool()` with `toolset="milimo"` instead of `skill_registry.register_tool()`
+- `milimo_hermes_plugin/__init__.py` — passes `ctx` to `register_core_tools()`
+
+**Verify**:
+```bash
+python3 -c "
+import milimo_hermes_plugin.tools as tools
+print('MILIMO_SPEND_SCHEMA:', tools.MILIMO_SPEND_SCHEMA['name'])
+print('Tool registration signature:', tools.register_core_tools.__doc__)
+print('Expected: ctx.register_tool with toolset param')
+"
+```
+
+---
+
 ## Related Pages
 
 - [[production-spend-flow-fix-plan-2026-07-06]] — Full production fix plan

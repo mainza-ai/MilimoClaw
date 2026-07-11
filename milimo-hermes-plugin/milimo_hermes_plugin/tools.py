@@ -1284,50 +1284,32 @@ async def handle_delegate_task(ctx: Any, tasks: list[dict]) -> list[dict]:
 
 # Tool registration function
 
-def register_core_tools(skill_registry: Any) -> None:
-    """Register all core Milimo tools with the skill registry."""
+_CORE_TOOLS = [
+    ("milimo_status",  MILIMO_STATUS_SCHEMA,  handle_milimo_status),
+    ("milimo_warroom", MILIMO_WARROOM_SCHEMA, handle_milimo_warroom),
+    ("milimo_approve", MILIMO_APPROVE_SCHEMA, handle_milimo_approve),
+    ("milimo_veto",    MILIMO_VETO_SCHEMA,    handle_milimo_veto),
+    ("milimo_spend",   MILIMO_SPEND_SCHEMA,   handle_milimo_spend),
+    ("delegate_task",  DELEGATE_TASK_SCHEMA,  handle_delegate_task),
+]
 
-    skill_registry.register_tool(
-        name="milimo_status",
-        description=MILIMO_STATUS_SCHEMA["description"],
-        parameters=MILIMO_STATUS_SCHEMA["parameters"],
-        handler=handle_milimo_status
-    )
 
-    skill_registry.register_tool(
-        name="milimo_warroom",
-        description=MILIMO_WARROOM_SCHEMA["description"],
-        parameters=MILIMO_WARROOM_SCHEMA["parameters"],
-        handler=handle_milimo_warroom
-    )
+def register_core_tools(ctx: Any) -> None:
+    """Register all core Milimo tools with the Hermes plugin context.
 
-    skill_registry.register_tool(
-        name="milimo_approve",
-        description=MILIMO_APPROVE_SCHEMA["description"],
-        parameters=MILIMO_APPROVE_SCHEMA["parameters"],
-        handler=handle_milimo_approve
-    )
+    Hermes Agent v0.17+ exposes tools via ``ctx.register_tool`` rather than a
+    legacy skill-registry ``register_tool`` shim. Each tool is belayed to the
+    ``milimo`` toolset so the LLM sees them as first-class callables.
+    """
 
-    skill_registry.register_tool(
-        name="milimo_veto",
-        description=MILIMO_VETO_SCHEMA["description"],
-        parameters=MILIMO_VETO_SCHEMA["parameters"],
-        handler=handle_milimo_veto
-    )
-
-    skill_registry.register_tool(
-        name="milimo_spend",
-        description=MILIMO_SPEND_SCHEMA["description"],
-        parameters=MILIMO_SPEND_SCHEMA["parameters"],
-        handler=handle_milimo_spend
-    )
-
-    skill_registry.register_tool(
-        name="delegate_task",
-        description=DELEGATE_TASK_SCHEMA["description"],
-        parameters=DELEGATE_TASK_SCHEMA["parameters"],
-        handler=handle_delegate_task
-    )
+    for name, schema, handler in _CORE_TOOLS:
+        ctx.register_tool(
+            name=name,
+            toolset="milimo",
+            schema=schema,
+            handler=handler,
+            description=schema["description"],
+        )
 
 
 __all__ = [
