@@ -152,6 +152,8 @@ function buildHermesConfig(settings: HermesBuildSettings): Record<string, unknow
     agent: {
       max_turns: 60,
       reasoning_effort: "medium",
+      environment_probe: false,
+      tool_use_enforcement: "strict",
     },
     memory: {
       memory_enabled: true,
