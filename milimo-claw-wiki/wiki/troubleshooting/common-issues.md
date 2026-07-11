@@ -549,38 +549,36 @@ nemohermes <name> recover
 
 **Symptom**: When the operator requests a Finance Claw spend flow (e.g., "Pay Stripe invoice $49 for API credits"), the Hermes agent spends dozens of tool calls reading source files (`finance_claw.py`, `spend_handler.py`), grepping for `spend|finance|link-cli`, walking `~/.linkcli`, `~/.config/linkcli`, `/sandbox/.linkcli`, and searching for `*.token`/`*.key` files — instead of calling the registered `milimo_spend` tool directly.
 
-**Root Causes** (check in order):
+**Root Cause** (fixed 2026-07-11, commit `02ff7d7`):
 
-1. **`agent_config/SOUL.md` has no Finance Claw spend-flow instructions.**
-   The main Hermes agent reads `SOUL.md` as its system prompt. Without step-by-step instructions for `milimo_spend`, the agent has no operational context and falls back to filesystem exploration.
+The Finance Claw HARD RULES (tool-first, mock-forbidding, approval_url verbatim surfacing, STOP AND WAIT, auth-check protocol, test-mode default) existed in exactly two places:
 
-   **Verify**:
-   ```bash
-   cat milimo-hermes-sandbox/agent_config/SOUL.md | grep -A5 "Finance Claw Spend Flow"
-   ```
-   If no output, this is the cause.
+1. `CLAW_CONTEXTS["finance"]` in `milimo-hermes-plugin/delegation.py` — injected **only** when `delegate_task` is called with `claw=finance`. The agent in the failed demo invoked `milimo_spend` directly and shelled out to `link-cli`, never entering the `delegate_task` path, so these rules were never loaded.
+2. `milimo_spend` tool responses — the `_finance_context` field is attached to tool responses. Same problem: the agent never called the tool.
 
-   **Fix**: Finance Claw operational context must live in `CLAW_CONTEXTS["finance"]` in `milimo-hermes-plugin/delegation.py`. `SOUL.md` should contain only a generic pointer to the skill, not inline spend instructions. See [[production-spend-flow-fix-plan-2026-07-06]].
+The same gap existed for all 6 claws — their operational rules were scoped only to `CLAW_CONTEXTS` and unreachable from the agent's base system prompt at turn 1.
 
-2. **`CLAW_CONTEXTS["finance"]` is unreachable from the main agent.**
-   The main agent invokes `milimo_spend` directly (not via `delegate_task`). `CLAW_CONTEXTS` is only injected during delegation. The agent never sees the Finance Claw rules (tool-first, no self-navigation, parameter requirements).
+**Fix** (committed `02ff7d7`):
 
-   **Verify**:
-   ```bash
-   grep -n "build_context" milimo-hermes-sandbox/milimo-hermes-plugin/milimo_hermes_plugin/delegation.py
-   ```
-   Confirm `build_context` is called only inside `delegate()`, not before `handle_milimo_spend`.
+1. **`agent_config/SOUL.md`** — rewritten from 58-line generic to full 6-claw rules inline (243 lines). All HARD RULES for Build, Content, Ops, Analytics, Finance, and Lucy (Assistant) are now active from turn 1 regardless of which tool the agent calls. SOUL.md is baked into the Docker image via `COPY agent_config/SOUL.md /sandbox/.hermes/SOUL.md` and is read every turn by the Hermes runtime.
+2. **`Dockerfile` `HERMES_ENVIRONMENT_HINT`** — expanded from a single compressed paragraph with only the approval_url fragment (and a `surf ace` typo) to include all 6 claw rule summaries and the full Finance Claw protocol. This is the highest-priority context at session start and now mirrors SOUL.md content.
+3. **`milimo-hermes-plugin/tools.py`** — added `_link_cli_resolved_path()` (Fix 2) to detect PATH-hijack by runtime mocks/wrappers and fall back to the baked-in `/usr/local/bin/link-cli`; added forbidden-mock-creation rule to `delegation.py` system prompt (Fix 3); improved unauthenticated fallback message in `_check_link_cli_auth()` (Fix 4).
 
-3. **`HERMES_ENVIRONMENT_HINT` has a typo or weak phrasing.**
-   The hint is the highest-priority context at session start. A typo like `surf ace` or generic wording (`"Global rule: surface approval requirements verbatim"`) causes the agent to treat the approval_url rule as advisory.
+**Verify**:
+```bash
+# SOUL.md must contain all 6 claw rule sections
+grep -c "You are the" milimo-hermes-sandbox/agent_config/SOUL.md
+# Expected: 6 (Build, Content, Ops, Analytics, Finance, Lucy/Assistant)
 
-   **Verify**:
-   ```bash
-   grep "HERMES_ENVIRONMENT_HINT" milimo-hermes-sandbox/Dockerfile
-   ```
-   Confirm it includes the exact tool names (`milimo_spend`, `_check_link_cli_auth`) and `CRITICAL:` emphasis.
+# HERMES_ENVIRONMENT_HINT must contain mock-forbidding rule
+grep "FORBIDDEN.*mock" milimo-hermes-sandbox/Dockerfile
+# Expected: match
 
-**Prevention**: After any prompt/SOUL.md change, run the spend-flow blackbox scenario (see [[test-spend-flow]]). Confirm the agent calls `milimo_spend` within 2 tool calls and never reads source files.
+# After rebuild, agent must call milimo_spend within 2 tool calls
+# Run the spend-flow demo (see README "Demo / Test Mode Spend Flow")
+```
+
+**Prevention**: After any SOUL.md or HERMES_ENVIRONMENT_HINT change, run the spend-flow blackbox scenario (see [[test-spend-flow]]). Confirm the agent calls `milimo_spend` within 2 tool calls and never reads source files.
 
 ---
 
@@ -588,21 +586,26 @@ nemohermes <name> recover
 
 **Symptom**: `_check_link_cli_auth` returns `{"error": "link_cli_not_authenticated", "approval_url": "https://app.link.com/device/setup?code=..."}`. Agent emits `"Open this URL and approve the device code in your Link app: [URL]"` — the URL is present but wrapped in prose, or the agent says "I have started a background poll" without showing the URL.
 
-**Root Causes**:
+**Root Cause** (fixed 2026-07-11):
 
-1. **Missing HARD RULE in Finance Claw context.**
-   The approval-url rule must be a numbered HARD RULE in `CLAW_CONTEXTS["finance"]` — not a suggestion, not in SOUL.md's tool description, not in HERMES_ENVIRONMENT_HINT alone.
+The approval-url rule was present as a HARD RULE in `CLAW_CONTEXTS["finance"]` but was never loaded into the agent's base system prompt. The agent only saw it if `delegate_task` was called with `claw=finance` — which it never was for direct spend requests. Without the rule in context, the agent treated the URL as advisory rather than a hard verbatim-surfacing requirement.
 
-   **Verify**:
-   ```bash
-   grep -A2 "APPROVAL URL" milimo-hermes-sandbox/milimo-hermes-plugin/milimo_hermes_plugin/delegation.py
-   ```
-   Confirm wording: `emit the EXACT URL as a plain string ... Do NOT paraphrase, summarize, shorten, wrap in markdown`.
+**Fix** (committed `02ff7d7`):
+- `agent_config/SOUL.md` — approval_url rule is now a numbered HARD RULE in the Finance Claw section of the base system prompt (active from turn 1).
+- `Dockerfile` `HERMES_ENVIRONMENT_HINT` — includes the full approval_url surfacing protocol with `CRITICAL:` emphasis.
 
-2. **HERMES_ENVIRONMENT_HINT absent or malformed.**
-   The hint must repeat the rule with `CRITICAL:` emphasis to ensure it survives prompt compression at session start.
+**Verify**:
+```bash
+# SOUL.md must have the approval_url HARD RULE
+grep -A3 "APPROVAL URL" milimo-hermes-sandbox/agent_config/SOUL.md
+# Expected: "emit the EXACT URL as a plain string ... Do NOT paraphrase"
 
-**Prevention**: Add to CI or pre-commit check: grep `CLAW_CONTEXTS["finance"]` for `APPROVAL URL` rule + `VERBATIM` wording. If missing, block the commit.
+# HERMES_ENVIRONMENT_HINT must repeat it
+grep "approval_url" milimo-hermes-sandbox/Dockerfile
+# Expected: CRITICAL block with verbatim surfacing instructions
+```
+
+**Prevention**: The approval_url rule is now in both SOUL.md and HERMES_ENVIRONMENT_HINT — it cannot be accidentally stripped from one without also being visible in the other. CI check: grep both files for `APPROVAL URL` + `VERBATIM` wording after any prompt change.
 
 ---
 

@@ -9,7 +9,7 @@
 - `milimo-hermes-sandbox/`
 - `docs/adr/001-subagent-isolation.md` through `005-delegation-asymmetry.md`
 
-**Last updated**: 2026-07-05
+**Last updated**: 2026-07-11
 
 **Tags**: #architecture #hermes #profile #dual-track
 
@@ -189,26 +189,31 @@ nemohermes milimo-hermes exec -- sh -c 'API_KEY=$(head -c 32 /dev/urandom | xxd 
 nemohermes milimo-hermes exec -- hermes gateway run --replace
 ```
 
-#### SOUL.md Context — Registered Tools and Spend Flow
-The `SOUL.md` baked into the Docker image now includes:
-- `## Registered Tools` — lists all 6 registered tools (`milimo_status`, `milimo_warroom`, `milimo_approve`, `milimo_veto`, `milimo_spend`, `delegate_task`) with one-line descriptions
-- `## Finance Claw Spend Flow` — step-by-step instructions for the agent: call `milimo_spend` with `action=queue_review`, surface `_check_link_cli_auth` approval URLs to the operator immediately, wait for device approval before proceeding, use `--test` flag, never fall back to raw shell unless tool is unavailable
-- **HARD RULE on approval URLs**: If `_check_link_cli_auth` returns an `approval_url`, the agent MUST output the full URL verbatim in its response to the operator. The agent must NOT paraphrase, summarize, omit, or replace it with a generic phrase like "please approve in the Link app" or "I have started a background poll". The operator cannot approve without the exact URL. After surfacing it, the agent must STOP and WAIT for the operator to confirm approval before calling any further tools. Do not proceed to `queue_review` or any other spend step until the operator explicitly confirms they have approved the device code.
-- `HERMES_ENVIRONMENT_HINT` — updated to include tool names, `link-cli` path, and `MILIMO_SPEND_TEST_MODE=true`
+#### SOUL.md Context — All 6 Claw Rules Active From Turn 1
 
-Without these sections, the agent spends iterations on filesystem exploration instead of invoking `milimo_spend` directly.
+The `SOUL.md` baked into the Docker image (`COPY agent_config/SOUL.md /sandbox/.hermes/SOUL.md`) is the agent's system prompt, read every turn by the Hermes runtime. As of commit `02ff7d7` it contains all 6 claw rule sets inline — not as a generic pointer, but as the full HARD RULES for each claw:
 
-**Fix** (baked in `milimo-hermes-sandbox/Dockerfile`):
-The SOUL.md and HERMES_ENVIRONMENT_HINT are generated at build time from the `RUN` step that writes `/sandbox/.hermes/SOUL.md` and the `ENV HERMES_ENVIRONMENT_HINT=...` line.
+- `## Claw Rules` — all 6 sections (Build, Content, Ops, Analytics, Finance, Lucy/Assistant), each with responsibilities, numbered HARD RULES, and War Room action ID prefixes. Sourced verbatim from `CLAW_CONTEXTS` in `milimo-hermes-plugin/delegation.py`.
+- `## Registered Tools` — lists all 6 registered tools with one-line descriptions
+- `## Finance Claw Spend Flows` — operational pointer (rules now inline in `## Claw Rules` rather than deferred to tool-path context)
+- `## War Room` — unified interface description
+- `## Environment` — paths, ports, API endpoint
 
-**Manual update** on a running sandbox:
+**Why inline and not delegated**: The agent's base system prompt is the only context layer active unconditionally at turn 1. `CLAW_CONTEXTS["finance"]` in `delegation.py` is injected only when `delegate_task` is called with `claw=finance`. The primary spend-flow invocation path is a direct `milimo_spend` tool call or raw `link-cli` shell invocation — neither enters `delegate_task`. Without inline rules, the agent had zero finance-specific guardrails and improvised when it hit the unauthenticated state (see Issue 19).
+
+**`HERMES_ENVIRONMENT_HINT`** (Dockerfile `ENV`, highest-priority session-start context) mirrors the Finance Claw HARD RULES and all 6 claw summaries. Expanded in `02ff7d7` from a single compressed paragraph with only the approval_url fragment (and a `surf ace` typo) to the full rule set.
+
+**Rebuild to update**:
 ```bash
-# Rebuild and re-onboard to pick up updated SOUL.md:
-docker build -t milimo-hermes-sandbox:latest -f milimo-hermes-sandbox/Dockerfile milimo-hermes-sandbox/
-NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
+NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 \
+NVIDIA_API_KEY="$(grep NVIDIA_API_KEY .env | cut -d= -f2)" \
+NEMOCLAW_NON_INTERACTIVE=1 \
+NEMOCLAW_ACCEPT_THIRD_PARTY=1 \
+NEMOCLAW_AUTH_MODE=api_key \
+  ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
 ```
 
-**Note:** After updating SOUL.md, start a new chat session (`hermes`) to see the context — existing sessions cache the old prompt.
+**Note**: After updating SOUL.md, start a new chat session (`hermes`) to see the context — existing sessions cache the old prompt.
 
 #### Gateway Daemon Race: Multiple `hermes gateway` Processes (FIXED 2026-07-09)
 
