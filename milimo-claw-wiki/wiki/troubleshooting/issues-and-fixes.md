@@ -5,7 +5,7 @@
 **Sources**:
 - `milimo-claw-docs/troubleshooting/ISSUES_AND_FIXES_AUDIT.md`
 
-**Last updated**: 2026-05-24
+**Last updated**: 2026-07-12
 
 **Tags**: #troubleshooting #audit #fixes
 
@@ -548,6 +548,96 @@ nemohermes milimo-hermes exec -- ls /sandbox/.config/link-cli-nodejs/mock_link_c
 
 - [[common-issues]] — Agent Explores Filesystem Instead of Calling `milimo_spend`; Agent Paraphrases `approval_url`
 - [[production-spend-flow-fix-plan-2026-07-06]] — Earlier analysis of the same root cause class
+- [[hermes-profile]] — SOUL.md and HERMES_ENVIRONMENT_HINT architecture
+
+---
+
+## Issue 20: Auth Rule Contradiction + Missing Mandatory-First-Action + Direct Handler Import Bypass (CRITICAL)
+
+### Problem
+
+The Finance Claw auth rules were structurally self-defeating across the three prompt layers:
+- `SOUL.md` Rule 3 instructed the agent to run `link-cli auth login --timeout 300 --client-name "Hermes Finance Claw"` directly when `_check_link_cli_auth` returned `link_cli_not_authenticated` with no approval URL.
+- `delegation.py` `CLAW_CONTEXTS["finance"]` Rule 5 forbade `link-cli auth login` under any circumstances.
+- `delegation.py` had no `MANDATORY FIRST ACTION — SPEND FLOWS` rule, so a spend-flow request could trigger arbitrary filesystem probing before `milimo_spend`.
+- Neither `SOUL.md` nor `delegation.py` explicitly forbid writing Python scripts that import `SpendApprovalHandler`, `SpendWarRoomBridge`, or any `milimo_core.finance.*` class — the exact bypass path used in the live demo (writing `/tmp/run_spend_demo.py` that imported `SpendApprovalHandler` directly).
+
+An agent receiving conflicting rules in different prompt layers will follow whichever one it encounters first, regardless of correctness.
+
+### Root Cause (3 layers)
+
+**Layer 1 — Structural contradiction**
+
+`SOUL.md` and `CLAW_CONTEXTS["finance"]` in `delegation.py` were edited at different times by different passes and never reconciled. `SOUL.md` Rule 3 said "run `link-cli auth login` directly"; `delegation.py` Rule 5 said "FORBIDDEN — NEVER RUN `link-cli auth login`". The agent could not satisfy both simultaneously.
+
+**Layer 2 — Missing mandatory-first-action rule**
+
+`delegation.py` `CLAW_CONTEXTS["finance"]` had no rule making `milimo_spend` the mandatory first action. A spend-flow request could trigger arbitrary filesystem probing (`which`, `ls`, `find`, `cat`, `grep`, `read`) before the agent called `milimo_spend`. SOUL.md had Rule 0 (mandatory first action) but `delegation.py` — loaded during `delegate_task` — did not.
+
+**Layer 3 — No forbid-direct-handler-imports rule**
+
+Neither `SOUL.md` nor `delegation.py` explicitly named `SpendApprovalHandler`, `SpendWarRoomBridge`, or `milimo_core.finance.*` as forbidden import targets. The live-demo agent improvised a 151-line `mock_link_cli.py` that imported `SpendApprovalHandler` directly, bypassing the tool layer's parameter validation, auth prechecks, and `_finance_context` injection.
+
+### Fix (commit `4e62fef`)
+
+**`agent_config/SOUL.md`** (sandbox, baked via Dockerfile `COPY`):
+- Rule 2 expanded: explicitly forbid Python scripts importing `SpendApprovalHandler`, `SpendWarRoomBridge`, or any `milimo_core.finance.*` class.
+- Rule 3 rewritten: instead of instructing the agent to run `link-cli auth login` directly, tells it to call the registered helper `_run_link_cli_auth_login()` ONCE. The helper encapsulates the actual subprocess call and enforces the "call exactly once" constraint.
+- `## Registered Tools` section updated to include `_run_link_cli_auth_login`.
+- `## Finance Claw Spend Flows` Step B updated to reference `_run_link_cli_auth_login()` helper.
+
+**`milimo-hermes-plugin/milimo_hermes_plugin/delegation.py`** (root + sandbox copies, kept byte-identical):
+- Added Rule 0: `MANDATORY FIRST ACTION — SPEND FLOWS` (same text as SOUL.md rule).
+- Renumbered all existing rules (0→1, 1→2, 2→3, 3→4, 4→5, 5→7, 6→8, 7→9, 8→10, 9→11, 10→12, 11→13).
+- Added Rule 2: `FORBIDDEN — DO NOT IMPORT milimo_core FINANCE CLASSES DIRECTLY`.
+- Auth initiation rule (new Rule 7): requires calling `_run_link_cli_auth_login()` helper. Explicitly forbids running `link-cli auth login` directly.
+- CORRECT CALL SEQUENCE Step B updated to reference `_run_link_cli_auth_login()`.
+- LOOP PREVENTION updated to reference `_run_link_cli_auth_login()` helper.
+
+**`milimo-hermes-plugin/milimo_hermes_plugin/tools.py`** (root + sandbox copies, byte-identical):
+- `_run_link_cli_auth_login()` helper committed in `a481e32`. It runs `link-cli auth login --timeout 300 --client-name "Hermes Finance Claw"` once, returns a dict with `approval_url` on success or structured error on failure. Each invocation generates a new device code; the helper does not cache or retry.
+- `_check_link_cli_auth()` return dict now includes `next_action: "run _run_link_cli_auth_login()"` when no approval URL is pending, so the tool-layer response itself tells the agent the correct next step.
+
+**`milimo-hermes-sandbox/generate-config.ts`** (already present in working tree):
+- `agent.environment_probe: false` — prevents `environment_probe: true` from overriding SOUL.md tool-first rule.
+
+**`milimo-hermes-sandbox/Dockerfile`** (already present in working tree):
+- `HERMES_ENVIRONMENT_HINT` updated to match the new SOUL.md rules.
+
+### Why `_run_link_cli_auth_login()` Instead of Direct `link-cli auth login`
+
+Direct invocation of `link-cli auth login` from the agent's reasoning process has two failure modes:
+1. **Infinite loop**: Each invocation generates a new device code and invalidates any pending approval URL. If the agent calls it while waiting for the operator to approve a previous URL, it silently destroys the operator's in-progress approval.
+2. **Structural contradiction**: The agent cannot satisfy both "run `auth login` to get a URL" and "never run `auth login`" rules simultaneously. Routing all auth-initiation through a single named tool eliminates the contradiction: the tool layer owns the actual subprocess, the agent only calls the tool.
+
+### Verify
+
+```bash
+# 1. SOUL.md Rule 3 references _run_link_cli_auth_login (not direct link-cli auth login)
+grep "_run_link_cli_auth_login" milimo-hermes-sandbox/agent_config/SOUL.md
+# Expected: at least 3 matches (Rule 3, Registered Tools, Step B)
+
+# 2. delegation.py finance context has Rule 0 (mandatory first action)
+grep -A2 "MANDATORY FIRST ACTION" milimo-hermes-sandbox/milimo-hermes-plugin/milimo_hermes_plugin/delegation.py
+# Expected: match in finance CLAW_CONTEXTS
+
+# 3. delegation.py has forbid-direct-handler-imports rule
+grep "SpendApprovalHandler" milimo-hermes-sandbox/milimo-hermes-plugin/milimo_hermes_plugin/delegation.py
+# Expected: match in finance CLAW_CONTEXTS
+
+# 4. _run_link_cli_auth_login is exported from tools.py
+python3 -c "from milimo_hermes_plugin.tools import _run_link_cli_auth_login; print('OK')"
+# Expected: OK
+
+# 5. Plugin sync: root ↔ sandbox copies identical
+bash scripts/check-plugin-sync.sh
+# Expected: [OK] plugin, [OK] core
+```
+
+### Related
+
+- [[common-issues]] — Device Approval URL Surfacing Failure; Agent Explores Filesystem Instead of Calling `milimo_spend`
+- [[issues-and-fixes]] — Issue 19 (live demo mock-creation + tool-path bypass)
 - [[hermes-profile]] — SOUL.md and HERMES_ENVIRONMENT_HINT architecture
 
 ---

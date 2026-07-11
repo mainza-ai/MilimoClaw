@@ -9,7 +9,7 @@
 - `milimo-hermes-sandbox/`
 - `docs/adr/001-subagent-isolation.md` through `005-delegation-asymmetry.md`
 
-**Last updated**: 2026-07-11
+**Last updated**: 2026-07-12
 
 **Tags**: #architecture #hermes #profile #dual-track
 
@@ -201,7 +201,7 @@ The `SOUL.md` baked into the Docker image (`COPY agent_config/SOUL.md /sandbox/.
 
 **Why inline and not delegated**: The agent's base system prompt is the only context layer active unconditionally at turn 1. `CLAW_CONTEXTS["finance"]` in `delegation.py` is injected only when `delegate_task` is called with `claw=finance`. The primary spend-flow invocation path is a direct `milimo_spend` tool call or raw `link-cli` shell invocation — neither enters `delegate_task`. Without inline rules, the agent had zero finance-specific guardrails and improvised when it hit the unauthenticated state (see Issue 19).
 
-**`HERMES_ENVIRONMENT_HINT`** (Dockerfile `ENV`, highest-priority session-start context) mirrors the Finance Claw HARD RULES and all 6 claw summaries. Expanded in `02ff7d7` from a single compressed paragraph with only the approval_url fragment (and a `surf ace` typo) to the full rule set.
+**`HERMES_ENVIRONMENT_HINT`** (Dockerfile `ENV`, highest-priority session-start context) mirrors the Finance Claw HARD RULES and all 6 claw summaries. Expanded in `02ff7d7` from a single compressed paragraph with only the approval_url fragment (and a `surf ace` typo) to the full rule set. Updated again in `4e62fef` to reference `_run_link_cli_auth_login()` helper and mandatory-first-action.
 
 **Rebuild to update**:
 ```bash
@@ -215,7 +215,40 @@ NEMOCLAW_AUTH_MODE=api_key \
 
 **Note**: After updating SOUL.md, start a new chat session (`hermes`) to see the context — existing sessions cache the old prompt.
 
-#### Gateway Daemon Race: Multiple `hermes gateway` Processes (FIXED 2026-07-09)
+#### Auth Initiation: `_run_link_cli_auth_login()` Helper (`a481e32` + `4e62fef`)
+
+The tool layer exposes `_run_link_cli_auth_login()` as the **only sanctioned path** for initiating the Link CLI device-code flow. It wraps `link-cli auth login --timeout 300 --client-name "Hermes Finance Claw"` and returns a dict with `approval_url` on success or structured error on failure.
+
+Why a tool wrapper instead of direct invocation:
+- Each call to `link-cli auth login` generates a NEW device code and invalidates any pending approval URL. The wrapper enforces "call exactly once" at the tool layer.
+- Eliminates the structural contradiction between `SOUL.md` (which used to say "run `auth login` directly") and `delegation.py` (which said "FORBIDDEN — NEVER RUN `auth login`"). The agent calls the tool instead; the tool owns the subprocess.
+
+`_check_link_cli_auth()` now returns `next_action: "run _run_link_cli_auth_login()"` in its error dict when no approval URL is pending, so the tool-layer response itself tells the agent the correct next step.
+
+**`delegation.py` finance context** (Rule 7):
+```
+AUTH INITIATION (via helper only): If _check_link_cli_auth returns
+link_cli_not_authenticated with NO approval_url, call the registered
+helper `_run_link_cli_auth_login()` ONCE. That helper runs
+`link-cli auth login --timeout 300 --client-name 'Hermes Finance Claw'`
+and returns the device approval URL. Surface the exact URL verbatim
+to the operator, then STOP and WAIT for their confirmation.
+Do NOT run `link-cli auth login` directly — each invocation generates
+a NEW device code and invalidates any pending approval URL.
+```
+
+**`SOUL.md` Rule 3** (same content, base system prompt — active unconditionally at turn 1).
+
+**Forbid-direct-handler-imports rule** (SOUL.md Rule 2, `delegation.py` Rule 2):
+```
+FORBIDDEN — DO NOT IMPORT milimo_core FINANCE CLASSES DIRECTLY:
+You must NOT write or execute Python scripts that import
+SpendApprovalHandler, SpendWarRoomBridge, or any
+milimo_core.finance.* class. Such imports bypass the tool layer's
+parameter validation, auth prechecks, and _finance_context injection.
+```
+
+---
 
 **Symptom**: `ps aux` shows 10+ `hermes.real gateway run --replace` processes growing every ~25 s. Logs show `Port 18642 already in use` and `telegram.error.Conflict`. Thread accumulation → cgroup `pids_limit` exhaustion → `RuntimeError: can't start new thread`.
 

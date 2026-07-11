@@ -5,7 +5,7 @@
 **Sources**:
 - `milimo-claw-docs/troubleshooting/ISSUES_AND_FIXES_AUDIT.md`
 
-**Last updated**: 2026-07-09
+**Last updated**: 2026-07-12
 
 **Tags**: #troubleshooting #issues #fixes
 
@@ -737,6 +737,72 @@ open http://127.0.0.1:9090/warroom.html
 **Important**: The war room is a **standalone HTMX server on port 9090** — it is not embedded in the Hermes dashboard at port 18790/19119. The dashboard URL (`http://127.0.0.1:18790/sessions?profile=default`) is the chat UI and has no war room buttons.
 
 **See also**: [[issues-and-fixes]] — Issue 18 (full audit); [[hermes-profile]] — war room architecture
+
+---
+
+### Agent Never Calls `milimo_spend` + Device Approval URL Surfacing Failure (FIXED 2026-07-12)
+
+**Symptom**: When the operator requests a spend flow (e.g., "Pay Stripe $49 for API credits"), the Hermes agent:
+1. Never calls `milimo_spend` — instead runs `which`, `ls`, `find`, `cat`, `grep`, and reads source files (`finance_claw.py`, `spend_handler.py`, `tools.py`)
+2. Writes a Python script importing `SpendApprovalHandler` directly (bypassing tool-layer parameter validation, auth prechecks, and `_finance_context` injection)
+3. Fails to surface the device approval URL — even when it appears in tool output
+
+**Root Cause** (3 layers, fixed in commits `a481e32`, `02ff7d7`, `4e62fef`):
+
+1. **Structural contradiction**: `SOUL.md` Rule 3 told the agent to run `link-cli auth login` directly; `delegation.py` `CLAW_CONTEXTS["finance"]` Rule 5 forbade it. The agent could not satisfy both simultaneously.
+
+2. **`environment_probe: true`** in `agent.environment_probe` pushed the agent to shell-first behavior (`which`, `ls`, `cat`) instead of calling registered tools. Fixed: `generate-config.ts` now sets `environment_probe: false`.
+
+3. **Auth rules scoped only to `CLAW_CONTEXTS["finance"]`**: Rules were injected only during `delegate_task` calls. The agent invoked `milimo_spend` directly — never entering the `delegate_task` path — so finance rules were never loaded into its base context.
+
+4. **No forbid-direct-handler-imports rule**: Neither `SOUL.md` nor `delegation.py` named `SpendApprovalHandler` / `SpendWarRoomBridge` / `milimo_core.finance.*` as forbidden import targets.
+
+**Fix**:
+- `agent_config/SOUL.md` — rewritten to 243 lines with all 6 claw rules inline (Rule 0 mandatory-first-action, Rule 2 forbid direct handler imports, Rule 3 auth via `_run_link_cli_auth_login()` helper, not direct `link-cli auth login`). Baked into Docker image via `COPY`, read every turn by Hermes runtime.
+- `Dockerfile` `HERMES_ENVIRONMENT_HINT` — expanded to full 6-claw rule summaries + Finance Claw HARD RULES. Highest-priority session-start context.
+- `delegation.py` — finance `CLAW_CONTEXTS["finance"]` now includes Rule 0 (mandatory-first-action), Rule 2 (forbid direct handler imports), and Rule 7 (auth initiation via `_run_link_cli_auth_login()` helper). Renumbered all rules; root and sandbox copies kept byte-identical.
+- `tools.py` — `_run_link_cli_auth_login()` helper (already present from `a481e32`) runs `link-cli auth login --timeout 300 --client-name "Hermes Finance Claw"` once and returns the device approval URL. `_check_link_cli_auth()` returns `next_action: "run _run_link_cli_auth_login()"` when no URL is pending.
+- `generate-config.ts` — `agent.environment_probe: false`.
+- Root/sandbox plugin copies kept byte-identical; `check-plugin-sync.sh` passes.
+
+**Why `_run_link_cli_auth_login()` instead of direct `link-cli auth login`**:
+- Each direct invocation generates a NEW device code and invalidates any pending approval URL. The wrapper enforces "call exactly once" at the tool layer — the agent cannot accidentally call it twice.
+- Eliminates the structural contradiction: the agent never needs to decide whether to run the forbidden command; it calls the allowed helper tool instead.
+
+**Verify**:
+```bash
+# SOUL.md must reference _run_link_cli_auth_login in Rule 3, Registered Tools, and Step B
+grep -c "_run_link_cli_auth_login" milimo-hermes-sandbox/agent_config/SOUL.md
+# Expected: >= 3
+
+# delegation.py finance context has Rule 0 (mandatory first action)
+grep "MANDATORY FIRST ACTION" milimo-hermes-sandbox/milimo-hermes-plugin/milimo_hermes_plugin/delegation.py
+# Expected: match
+
+# delegation.py forbids SpendApprovalHandler direct import
+grep "SpendApprovalHandler" milimo-hermes-sandbox/milimo-hermes-plugin/milimo_hermes_plugin/delegation.py
+# Expected: match (forbid rule)
+
+# environment_probe is false
+grep "environment_probe" milimo-hermes-sandbox/generate-config.ts
+# Expected: environment_probe: false
+
+# Plugin sync passes
+bash scripts/check-plugin-sync.sh
+# Expected: [OK] plugin, [OK] core
+```
+
+**Rebuild required**:
+```bash
+NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 \
+NVIDIA_API_KEY="$(grep NVIDIA_API_KEY .env | cut -d= -f2)" \
+NEMOCLAW_NON_INTERACTIVE=1 \
+NEMOCLAW_ACCEPT_THIRD_PARTY=1 \
+NEMOCLAW_AUTH_MODE=api_key \
+  ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
+```
+
+**See also**: [[issues-and-fixes]] — Issue 19 (demo mock creation + tool-path bypass); Issue 20 (auth rule contradiction + mandatory-first-action + handler import forbidding); [[hermes-profile]] — SOUL.md architecture; [[link-cli-setup]] — device approval flow
 
 ---
 
