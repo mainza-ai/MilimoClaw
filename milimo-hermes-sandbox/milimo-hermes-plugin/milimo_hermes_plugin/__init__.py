@@ -19,31 +19,36 @@ from typing import Any
 
 logger = logging.getLogger("milimo.hermes.plugin")
 
-from milimo_core.build import BuildClaw, BuildFilesystemInit
-from milimo_core.content import ContentClaw, ContentGenerator
-from milimo_core.ops import OpsClaw, IntakeManager, OpsApprovalHandler
-from milimo_core.ops.ops_claw import MockMeshGateway
-from milimo_core.analytics import AnalyticsClaw, SignalProcessor
-from milimo_core.finance import FinanceClaw, PricingEngine
-from milimo_core.assistant import LucyAssistant, PendingQuery
-from milimo_core.contracts import ClawMessage, ContractValidator
-from milimo_core.privacy_router import PrivacyRouter, InferenceBackend, RoutingDecision, PrivacyPolicy
-from milimo_core.inference_client import NvidiaInferenceClient
-from milimo_core.service_factory import (
-    create_github_client,
-    create_vercel_client,
-    create_sentry_client,
-    create_stripe_client,
-)
-from milimo_core.provenance_signer import ProvenanceSigner
-from milimo_core.tool_generator import ToolGenerator
-from milimo_core.tool_validator import ToolValidator
-from milimo_core.tool_sandbox import ToolSandbox
-from milimo_core.protocols.delegation import DelegationAdapter, ClawTask, ClawResult
-from milimo_core import WarRoomNotifier, init_warroom_notifier
-from milimo_core.cost_guard import get_cost_guard
-from milimo_core.hermes_credential_adapter import HermesCredentialAdapter
-from milimo_core.milimo_paths import CLAWS_DIR
+try:
+    from milimo_core.build import BuildClaw, BuildFilesystemInit
+    from milimo_core.content import ContentClaw, ContentGenerator
+    from milimo_core.ops import OpsClaw, IntakeManager, OpsApprovalHandler
+    from milimo_core.ops.ops_claw import MockMeshGateway
+    from milimo_core.analytics import AnalyticsClaw, SignalProcessor
+    from milimo_core.finance import FinanceClaw, PricingEngine
+    from milimo_core.assistant import LucyAssistant, PendingQuery
+    from milimo_core.contracts import ClawMessage, ContractValidator
+    from milimo_core.privacy_router import PrivacyRouter, InferenceBackend, RoutingDecision, PrivacyPolicy
+    from milimo_core.inference_client import NvidiaInferenceClient
+    from milimo_core.service_factory import (
+        create_github_client,
+        create_vercel_client,
+        create_sentry_client,
+        create_stripe_client,
+    )
+    from milimo_core.provenance_signer import ProvenanceSigner
+    from milimo_core.tool_generator import ToolGenerator
+    from milimo_core.tool_validator import ToolValidator
+    from milimo_core.tool_sandbox import ToolSandbox
+    from milimo_core.protocols.delegation import DelegationAdapter, ClawTask, ClawResult
+    from milimo_core import WarRoomNotifier, init_warroom_notifier
+    from milimo_core.cost_guard import get_cost_guard
+    from milimo_core.hermes_credential_adapter import HermesCredentialAdapter
+    from milimo_core.milimo_paths import CLAWS_DIR
+except ImportError as _exc:
+    logger.critical("Failed to import milimo_core submodules: %s — plugin will be degraded", _exc)
+    raise
+
 from .delegation import HermesDelegateAdapter
 from .tools import register_core_tools, set_claw_launcher, set_approval_handler, set_cost_guard, set_spend_handler, set_build_approval_handler, set_content_approval_handler, set_finance_invoice_handler
 
@@ -204,7 +209,8 @@ def get_privacy_router() -> PrivacyRouter:
                 role_overrides={},
             )
             _privacy_router = PrivacyRouter(default_policy)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Failed to create PrivacyRouter: %s — using fallback", exc)
             _privacy_router = PrivacyRouter(
                 PrivacyPolicy(
                     policy_version="1.0",
