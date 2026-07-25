@@ -104,7 +104,7 @@ jobs:
 
       - name: Run Python lint
         run: |
-          pip install ruff
+          pip install ruff==0.15.21
           ruff check milimo-blueprint/orchestrator/ --output-format=github
 
       - name: Run mirror drift check
