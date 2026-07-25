@@ -1452,7 +1452,7 @@ hermes_warroom_healthy() {
   local service_user=current
   [ "$(id -u)" -eq 0 ] && service_user=sandbox
   hermes_tracked_role_is_current warroom "$pid" "$service_user" "$WARROOM_INTERNAL_PORT" || return 1
-  hermes_tracked_service_owns_listener "$pid" "$WARROOM_INTERNAL_PORT" sandbox || return 1
+  hermes_tracked_service_owns_listener "$pid" "$WARROOM_INTERNAL_PORT" "$service_user" || return 1
   code="$(curl -so /dev/null -w '%{http_code}' --max-time 3 \
     "http://127.0.0.1:${WARROOM_INTERNAL_PORT}/health" 2>/dev/null || true)"
   case "$code" in
