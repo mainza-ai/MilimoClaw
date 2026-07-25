@@ -213,6 +213,9 @@ check_prerequisites() {
     fi
   fi
 
+  # Export for nemohermes onboard (expects NVIDIA_INFERENCE_API_KEY)
+  export NVIDIA_INFERENCE_API_KEY="${NVIDIA_API_KEY}"
+
   # Check for qualifying Python if Model Router enabled
   if [[ "$ENABLE_MODEL_ROUTER" == "true" ]]; then
     check_model_router_python
@@ -596,6 +599,7 @@ main() {
   export NEMOCLAW_INFERENCE_PROVIDER_ID="${NEMOCLAW_INFERENCE_PROVIDER_ID:-custom}"
   export NEMOCLAW_PROVIDER_KEY="${NEMOCLAW_PROVIDER_KEY:-inference}"
   export NEMOCLAW_INFERENCE_BASE_URL="${NEMOCLAW_INFERENCE_BASE_URL:-https://inference.local/v1}"
+  export NVIDIA_INFERENCE_API_KEY="${NVIDIA_API_KEY:-}"
   export CHAT_UI_URL="${CHAT_UI_URL:-http://127.0.0.1:8642}"
   export NEMOCLAW_MESSAGING_CHANNELS_B64="${NEMOCLAW_MESSAGING_CHANNELS_B64:-W10=}"
   export NEMOCLAW_MESSAGING_ALLOWED_IDS_B64="${NEMOCLAW_MESSAGING_ALLOWED_IDS_B64:-e30=}"
