@@ -70,6 +70,7 @@ agent_profiles:
       forward_ports:
         - 18789   # Hermes dashboard
         - 8642    # OpenAI-compatible API endpoint
+        - 9090    # War Room HTTP server
       build:
         dockerfile: "milimo-hermes-sandbox/Dockerfile"
         args:
