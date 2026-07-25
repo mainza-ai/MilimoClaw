@@ -1,5 +1,5 @@
 name: milimo-hermes-plugin
-version: "0.1.0"
+version: "0.2.0"
 description: MilimoClaw Hermes plugin - provides 6 claw skills for Hermes profile
 author: Mainza Kangombe
 license: Apache-2.0
@@ -18,9 +18,9 @@ hooks:
 config_schema:
   type: object
   properties:
-    claude_model:
+    default_model:
       type: string
-      default: "claude-3-5-sonnet"
+      default: "stepfun-ai/step-3.7-flash"
     privacy_level:
       type: string
       enum: ["local_only", "hybrid", "cloud_allowed"]
