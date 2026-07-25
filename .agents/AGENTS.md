@@ -1066,3 +1066,62 @@ milimo-claw/
 
 *Milimo Claw · built on NVIDIA NemoClaw*
 *"The milimo never stops. Work. Without working."*
+
+---
+
+## Production-Grade Coding Standards
+
+**This is not a demo. Every line of code must be production-grade.**
+The following standards are mandatory for all AI-generated or AI-modified code.
+
+### Error Handling
+
+1. **No silent failures.** Every `except` block must log or propagate. Never `except: pass` without a comment explaining why the exception is safe to ignore.
+2. **No bare `except:`.** Always catch specific exception types (`OSError`, `KeyError`, `json.JSONDecodeError`, etc.).
+3. **No exception swallowing.** When handling an exception, always log the error (with `logger.exception` or `logger.warning`). Silent `return None` / `return False` paths must be logged.
+4. **Fail closed.** Security checks default to denying access. If a file can't be read, a token can't be verified, or a permission check fails — deny, don't allow.
+5. **TOCTOU prevention.** Never `if exists(): open()` — use direct `open()` / `read_bytes()` with error handling. Never `if exists(): unlink()` — attempt the operation and handle the failure.
+
+### Security
+
+6. **Constant-time comparisons.** All auth token/signature comparisons must use `hmac.compare_digest()`. Never use `==` or `!=` for secrets.
+7. **CSRF protection.** Every state-changing HTTP endpoint must verify a server-generated CSRF token. Origin/Referer header checks alone are insufficient.
+8. **Path traversal prevention.** When accepting user-controlled filenames, validate against `/`, `\\`, `..`, and null bytes before using in filesystem operations.
+9. **Secrets in memory.** Zero out secret values after use where possible. Never log secrets, tokens, or API keys.
+
+### Concurrency & State
+
+10. **Signal handlers must never block.** Signal handlers should only set a `threading.Event` flag. Never call `shutdown()`, `join()`, `acquire()`, or blocking I/O from signal context.
+11. **Thread safety.** Document whether a variable is thread-safe. Use locks only when shared across threads. Single-threaded servers don't need locks on module-level state.
+12. **No global side effects.** Avoid `os.chdir()`, `sys.path` mutations at module level, and `threading.stack_size()` changes that affect other components.
+
+### I/O & Filesystem
+
+13. **Error handling on every I/O operation.** `rename()`, `unlink()`, `mkdir()`, `write_text()`, `read_bytes()` — every one must be in a try/except block or guaranteed to succeed.
+14. **No `__import__()` hacks.** Use standard `import` statements at the top of the file. Never `__import__("module")` inline.
+15. **Explicit file permissions.** When creating files with sensitive data, set explicit permissions (`os.chmod(path, 0o600)` or `0o640`). Never rely on umask defaults.
+
+### Code Quality
+
+16. **No dead code.** If a function is defined twice, the second definition shadows the first — remove the dead copy. If code paths are unreachable, delete them.
+17. **No unnecessary complexity.** If a data structure doesn't need locking (e.g., single-threaded access), don't add a lock. Delete dead variables, imports, and comments.
+18. **Public APIs for cross-module access.** Never access `obj._private_attribute` from another module. Add a public accessor method instead.
+19. **Idempotent operations.** Approve, veto, release, and similar operations should be safe to call multiple times — either silently no-op or return success.
+20. **Retry with changed arguments.** If a try block fails and you retry in the except block, change the inputs. Retrying the identical failing operation is guaranteed to fail again.
+
+### Logging & Observability
+
+21. **Every error path must produce a log message.** Include the affected file path, action_id, or identifier in the log for debugging.
+22. **Log levels are meaningful.** Use `error()` for actual failures, `warning()` for degraded behavior, `info()` for lifecycle events, `debug()` for diagnostic detail.
+23. **Log before raising.** When raising an exception after an error, log the context first so the log file contains the diagnostic even if the exception is caught higher up.
+
+### Validation
+
+24. **Validate configuration at startup.** If an env var is required, validate it exists and is well-formed before using it. Exit with a clear message on invalid config.
+25. **Crash-quarantine must not block critical services.** If an auxiliary daemon (war room, etc.) crashes repeatedly, log the quarantine and stop retrying — don't hang the main supervisor loop.
+26. **Port validation.** Accept only valid numeric port values. Exit on invalid input — never silently fall back to a default.
+
+### Architecture
+
+27. **One data source.** When multiple code paths implement the same operation (approve, veto, etc.), route them through a shared bridge/module. Don't maintain parallel in-memory and filesystem code paths.
+28. **Direct binding is preferred over socat.** If a service already binds `0.0.0.0`, don't add a socat forwarder that will fail with `EADDRINUSE`. Remove unnecessary indirection layers.
