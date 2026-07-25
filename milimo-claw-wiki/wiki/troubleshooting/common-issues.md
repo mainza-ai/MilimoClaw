@@ -5,7 +5,7 @@
 **Sources**:
 - `milimo-claw-docs/troubleshooting/ISSUES_AND_FIXES_AUDIT.md`
 
-**Last updated**: 2026-07-12
+**Last updated**: 2026-07-25
 
 **Tags**: #troubleshooting #issues #fixes
 
@@ -824,6 +824,26 @@ print('MILIMO_SPEND_SCHEMA:', tools.MILIMO_SPEND_SCHEMA['name'])
 print('Tool registration signature:', tools.register_core_tools.__doc__)
 print('Expected: ctx.register_tool with toolset param')
 "
+```
+
+---
+
+### Sandbox Creation Hangs at [6/8] — NVIDIA_INFERENCE_API_KEY Missing (FIXED 2026-07-25)
+
+**Symptom**: `nemohermes onboard --non-interactive` hangs at step [3/8] or [6/8] with:
+```
+NVIDIA_INFERENCE_API_KEY (or NEMOCLAW_PROVIDER_KEY) is required for NVIDIA Endpoints in non-interactive mode.
+```
+
+**Root Cause**: The `nemohermes onboard --non-interactive` CLI expects `NVIDIA_INFERENCE_API_KEY` (or `NEMOCLAW_PROVIDER_KEY`) to configure the inference provider. The `.env` file and `install-hermes.sh` use `NVIDIA_API_KEY` — a different env var. Without the correct var exported, non-interactive onboarding cannot proceed past provider configuration.
+
+**Fix** (commit `51f9cc8`):
+- `install-hermes.sh` now exports `export NVIDIA_INFERENCE_API_KEY="${NVIDIA_API_KEY}"` at both the prerequisite check and the env-var dump section
+- Users continue to use `NVIDIA_API_KEY` in `.env` (backward compatible)
+
+**Workaround**: Export manually before running install:
+```bash
+export NVIDIA_INFERENCE_API_KEY="$NVIDIA_API_KEY"
 ```
 
 ---

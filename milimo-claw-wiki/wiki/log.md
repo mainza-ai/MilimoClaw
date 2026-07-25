@@ -2229,11 +2229,44 @@ Each entry follows this format:
 
 ---
 
-### 2026-07-09 — Documented sandbox policy presets + non-interactive build command
+### 2026-07-25 — Production-grade war room hardening + NemoClaw upstream base image upgrade (4 phases)
 
-**Pages**: `wiki/troubleshooting/common-issues.md`, `wiki/troubleshooting/issues-and-fixes.md`, `wiki/architecture/hermes-profile.md`, `README.md`
+**Pages**: `wiki/architecture/nemoclaw-upgrade-plan.md`, `wiki/architecture/hermes-profile.md`, `wiki/troubleshooting/common-issues.md`, `wiki/troubleshooting/issues-and-fixes.md`, `wiki/index.md`, `.agents/AGENTS.md`
 
-**Source**: Operator reported that `install-hermes.sh --non-interactive` build succeeded only after certain external URLs were added to the OpenShell sandbox policy via preset YAML files. Critical production URLs: Nous Portal (`portal.nousresearch.com`), Stripe Link (`api.link.com`, `app.link.com`, `login.link.com`), Stripe (`api.stripe.com`), Sentry, Vercel, npm, PyPI, HuggingFace, GitHub.
+**Source**: Deep code audit of war room system and NemoClaw v0.0.85–v0.0.95 upstream upgrade.
+
+**Phase 1 — Base Image + Deps**:
+- Pinned `sandbox-base` and `hermes-sandbox-base` to latest upstream SHAs (`sha256:5052a448...`, `sha256:e9458647...`)
+- Bumped OpenClaw from `2026.3.11` to `2026.7.1`
+- Added `NEMOCLAW_INFERENCE_PROVIDER_ID` for v0.0.90+ inference route selector migration
+- Updated `generate-config.ts`, `.env`, CI workflow, `install-hermes.sh`
+- Docker build verified: Hermes Agent v0.18.0 (2026.7.1)
+
+**Phase 2 — Min Versions**:
+- Bumped `blueprint.yaml`: openshell `0.0.24→0.0.85`, openclaw `2026.3.0→2026.7.0`, hermes `2026.6.0→2026.7.0`
+
+**Phase 3 — Consistency**:
+- Fixed `plugin.yaml` version `0.1.0→0.2.0` (both copies)
+- Replaced stale `claude_model` default with `default_model`
+- Fixed README badge `v0.2.1→v0.2.0`
+- Excluded `.DS_Store` from sync check
+
+**Phase 4 — Hardening (25 bugs fixed across 7 files)**:
+- **Security**: CSRF token (replaced Origin-vs-Host), `hmac.compare_digest` auth, signal-safe shutdown via `threading.Event`
+- **Error handling**: All I/O operations (rename, mkdir, write_text, read, unlink) now have try/except with logging; silent failures eliminated
+- **Plugin resilience**: `milimo_core` imports guarded; `OpsApprovalHandler` creation guarded; `get_privacy_router` double-fail retry fixed
+- **Tools parity**: approve/veto now use bridge as primary path; corrupted JSON files logged; private `_requests` replaced with public `get_request()` API
+- **Startup reliability**: `_HERMES_PYTHON` validated before use; invalid `WARROOM_PORT` exits; socat forwarder removed (always failed EADDRINUSE); quarantine returns 1 instead of infinite loop
+- **Code quality**: `__import__("datetime")` hack replaced; duplicate path variables consolidated; unnecessary lock removed; TOCTOU fixed
+- **CSRF injection**: `warroom.html` now injects CSRF token into HTMX requests via `htmx:configRequest` handler
+- **CI fix**: Pinned `ruff==0.15.21` to avoid surprise lint breakage
+
+**AGENTS.md** — Added 28 production-grade coding standards covering error handling, security, concurrency, I/O, validation, and architecture.
+
+**install-hermes.sh fix** — Added `export NVIDIA_INFERENCE_API_KEY="${NVIDIA_API_KEY}"` so `nemohermes onboard --non-interactive` can find the API key (expected var name mismatch).
+
+**Changes**:
+- All Phase 1-4 changes committed to `develop` and merged to `main`
 
 **Changes**:
 - `wiki/troubleshooting/common-issues.md`: Added "Sandbox Blocks External URLs / Policy Presets Not Applied" entry with symptom table, required presets, fix commands
