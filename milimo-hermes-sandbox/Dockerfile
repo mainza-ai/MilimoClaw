@@ -77,6 +77,9 @@ RUN /usr/bin/python3 -c "import os, site; [open(os.path.join(d, 'warroom_bridge.
 # Copy blueprint for delegation/workflows
 COPY milimo-blueprint/ /opt/nemoclaw-blueprint/
 RUN chmod -R a+rX,go-w /opt/nemoclaw-blueprint/
+# Make orchestrator importable from every Python interpreter
+RUN /usr/bin/python3 -c "import os, site; [open(os.path.join(d, 'nemoclaw_blueprint.pth'), 'w').write('/opt/nemoclaw-blueprint\n') for d in site.getsitepackages()]" || true \
+    && /opt/hermes/.venv/bin/python3 -c "import os, site; [open(os.path.join(d, 'nemoclaw_blueprint.pth'), 'w').write('/opt/nemoclaw-blueprint\n') for d in site.getsitepackages()]" || true
 RUN mkdir -p /sandbox/.nemoclaw/blueprints/0.1.0 \
     && cp -r /opt/nemoclaw-blueprint/* /sandbox/.nemoclaw/blueprints/0.1.0/ \
     && chown -R sandbox:sandbox /sandbox/.nemoclaw/blueprints/0.1.0
@@ -465,6 +468,18 @@ RUN mkdir -p /sandbox/.hermes/claws/build \
          chmod 770 "$d"; \
          chown sandbox:sandbox "$d"; \
        done
+
+# ── Mesh / War Room Directories ───────────────────────────────────────────
+# Pre-create mesh inbox and war room directories with sandbox ownership so
+# the sandbox user can write war room actions and rename files on approve/veto
+# (rename(2) requires write permission on the source directory).
+RUN mkdir -p /sandbox/.hermes/mesh/inbox/war_room \
+               /sandbox/.hermes/mesh/rejected \
+    && chown -R sandbox:sandbox /sandbox/.hermes/mesh \
+    && chmod 770 /sandbox/.hermes/mesh \
+    && chmod 770 /sandbox/.hermes/mesh/inbox \
+    && chmod 770 /sandbox/.hermes/mesh/inbox/war_room \
+    && chmod 770 /sandbox/.hermes/mesh/rejected
 
 # Runtime environment
 ENV MILIMO_PROFILE=hermes \
