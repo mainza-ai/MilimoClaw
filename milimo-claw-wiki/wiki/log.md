@@ -2242,6 +2242,27 @@ Each entry follows this format:
 - Updated `generate-config.ts`, `.env`, CI workflow, `install-hermes.sh`
 - Docker build verified: Hermes Agent v0.18.0 (2026.7.1)
 
+### 2026-07-25 — Added dashboard port 18790 to blueprint forward_ports
+
+**Pages**: `milimo-blueprint/blueprint.yaml`, `milimo-hermes-sandbox/milimo-blueprint/blueprint.yaml`, `wiki/index.md`
+
+**Source**: Sandbox rebuild verification showed dashboard port forward not working on 18789. The Hermes dashboard socat lands on port 18790 (not 18789) when `--tui` mode is active in `start.sh`. Only 18789 was listed in `forward_ports`.
+
+**Changes**:
+- Added `- 18790` to `forward_ports` in both blueprint copies
+- Committed as `7ea91dc`
+
+**Post-rebuild access**:
+```bash
+# gRPC direct (most reliable — connects directly to dashboard service):
+openshell forward service --target-port 19119 --local 18789 milimo-hermes
+
+# SSH via socat (legacy — connects through the socat on 18790):
+openshell forward start --background 18790 milimo-hermes
+
+# War Room:
+openshell forward service --target-port 9090 --local 9090 milimo-hermes
+```
 **Phase 2 — Min Versions**:
 - Bumped `blueprint.yaml`: openshell `0.0.24→0.0.85`, openclaw `2026.3.0→2026.7.0`, hermes `2026.6.0→2026.7.0`
 
