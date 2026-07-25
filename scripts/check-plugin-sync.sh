@@ -52,6 +52,7 @@ check_copy() {
   exclude_args+=(--exclude='*.pyc')
   exclude_args+=(--exclude='*.pth')
   exclude_args+=(--exclude='*.egg-info')
+  exclude_args+=(--exclude='.DS_Store')
 
   local rc=0
   diff -ruN "${exclude_args[@]}" "$root_src" "$sandbox_copy" >"$TMP_A/diff.txt" 2>&1 || rc=$?

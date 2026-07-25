@@ -475,6 +475,7 @@ build_docker_image() {
   docker_args+=(-f "$sandbox_dir/Dockerfile")
   docker_args+=(-t milimo-hermes-sandbox:latest)
   docker_args+=(--build-arg "NEMOCLAW_MODEL=${NEMOCLAW_MODEL}")
+  docker_args+=(--build-arg "NEMOCLAW_INFERENCE_PROVIDER_ID=${NEMOCLAW_INFERENCE_PROVIDER_ID:-custom}")
   docker_args+=(--build-arg "NEMOCLAW_PROVIDER_KEY=${NEMOCLAW_PROVIDER_KEY}")
   docker_args+=(--build-arg "NEMOCLAW_INFERENCE_BASE_URL=${NEMOCLAW_INFERENCE_BASE_URL}")
   docker_args+=(--build-arg "CHAT_UI_URL=${CHAT_UI_URL}")
@@ -592,6 +593,7 @@ main() {
 
   # Set build arg environment variables (Docker will use these for ARGs in Dockerfile)
   export NEMOCLAW_MODEL="${NEMOCLAW_MODEL:-stepfun-ai/step-3.7-flash}"
+  export NEMOCLAW_INFERENCE_PROVIDER_ID="${NEMOCLAW_INFERENCE_PROVIDER_ID:-custom}"
   export NEMOCLAW_PROVIDER_KEY="${NEMOCLAW_PROVIDER_KEY:-inference}"
   export NEMOCLAW_INFERENCE_BASE_URL="${NEMOCLAW_INFERENCE_BASE_URL:-https://inference.local/v1}"
   export CHAT_UI_URL="${CHAT_UI_URL:-http://127.0.0.1:8642}"

@@ -66,7 +66,7 @@ HERMES_BOUNDARY_PATH = (
     "/usr/local/lib/nemoclaw/validate-hermes-env-secret-boundary.py"
 )
 OPENCLAW_GUARD_PATH = "/usr/local/lib/nemoclaw/openclaw-config-guard.py"
-OPENSHELL_ARGV0 = b"/opt/openshell/bin/openshell-sandbox"
+OPENSHELL_ARGV0 = os.environ.get("OPENSHELL_BINARY_PATH", "/opt/openshell/bin/openshell-sandbox").encode()
 NEMOCLAW_START_PATH = b"/usr/local/bin/nemoclaw-start"
 MAX_PROC_ENTRIES = 32768
 MAX_PROC_FILE_BYTES = 1024 * 1024

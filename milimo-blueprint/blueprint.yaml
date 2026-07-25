@@ -13,9 +13,9 @@
 # - hermes-milimo: New Hermes profile (web dashboard + OpenAI-compatible API)
 
 version: "0.2.0"
-min_openshell_version: "0.0.24"
-min_openclaw_version: "2026.3.0"
-min_hermes_version: "2026.6.0"
+min_openshell_version: "0.0.85"
+min_openclaw_version: "2026.7.0"
+min_hermes_version: "2026.7.0"
 
 # Pre-defined inference profiles that the squad can toggle at runtime
 profiles:

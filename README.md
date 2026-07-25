@@ -12,7 +12,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square" alt="License" /></a>
   <a href="https://github.com/NVIDIA/NemoClaw"><img src="https://img.shields.io/badge/built_on-NemoClaw-purple.svg?style=flat-square" alt="Built on NemoClaw" /></a>
   <a href="https://github.com/mainza-ai/MilimoClaw/actions"><img src="https://img.shields.io/badge/build-passing-success.svg?style=flat-square" alt="Build Status" /></a>
-  <a href="https://github.com/mainza-ai/MilimoClaw/releases"><img src="https://img.shields.io/badge/version-v0.2.1-teal.svg?style=flat-square" alt="Version" /></a>
+  <a href="https://github.com/mainza-ai/MilimoClaw/releases"><img src="https://img.shields.io/badge/version-v0.2.0-teal.svg?style=flat-square" alt="Version" /></a>
 </p>
 
 > *"Your friend group is a startup. Your laptops and cloud nodes are the infrastructure. Your claws do the work."*

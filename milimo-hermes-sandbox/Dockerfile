@@ -15,7 +15,7 @@
 # Pin by SHA for reproducible builds. To bump: pull the new image, run
 # `docker inspect ghcr.io/nvidia/nemoclaw/hermes-sandbox-base:latest --format '{{index .RepoDigests 0}}'`
 # and update the digest in .hermes-base-digest.
-ARG BASE_IMAGE=ghcr.io/nvidia/nemoclaw/hermes-sandbox-base@sha256:8dad3b989a9ed1e601743310b97be21be5f59f89f7913a47d04f3ec3c40b8ce6
+ARG BASE_IMAGE=ghcr.io/nvidia/nemoclaw/hermes-sandbox-base@sha256:e94586474de3b5782d60435fd6422e28d864ce9a34513a7de5a54f7358b3dffc
 
 FROM ${BASE_IMAGE}
 
@@ -94,6 +94,7 @@ RUN chmod -R a+rX /opt/nemoclaw-hermes-config/generate-config.ts \
 
 # Build args for config that varies per deployment
 ARG NEMOCLAW_MODEL=stepfun-ai/step-3.7-flash
+ARG NEMOCLAW_INFERENCE_PROVIDER_ID=custom
 ARG NEMOCLAW_PROVIDER_KEY=inference
 ARG NEMOCLAW_INFERENCE_BASE_URL=https://inference.local/v1
 ARG CHAT_UI_URL=http://127.0.0.1:8642
@@ -113,6 +114,7 @@ ARG MILIMO_DAILY_SPEND_CAP_CENTS=10000
 ARG MILIMO_OPERATOR=
 
 ENV NEMOCLAW_MODEL=${NEMOCLAW_MODEL} \
+    NEMOCLAW_INFERENCE_PROVIDER_ID=${NEMOCLAW_INFERENCE_PROVIDER_ID} \
     NEMOCLAW_PROVIDER_KEY=${NEMOCLAW_PROVIDER_KEY} \
     NEMOCLAW_INFERENCE_BASE_URL=${NEMOCLAW_INFERENCE_BASE_URL} \
     CHAT_UI_URL=${CHAT_UI_URL} \
@@ -308,6 +310,8 @@ RUN set -eu; \
 # These must match the original NemoClaw Hermes sandbox structure and hashes,
 # allowing the host-side nemohermes / openshell supervisor to recover, status,
 # and validate the sandbox safely.
+# Note: openclaw-config-guard.py is provided by the hermes-sandbox-base image
+# and referenced by managed-gateway-control.py — not copied locally.
 RUN mkdir -p /usr/local/lib/nemoclaw
 
 COPY scripts/lib/sandbox-init.sh /usr/local/lib/nemoclaw/sandbox-init.sh
@@ -357,6 +361,9 @@ RUN test -x /usr/local/lib/nemoclaw/validate-hermes-env-secret-boundary.py \
     || { echo "ERROR: validate-hermes-env-secret-boundary.py missing or not executable" >&2; exit 1; }
 
 # Cryptographic integrity check for validator and wrapper
+# IMPORTANT: These SHA hashes verify LOCAL copies (scripts/hermes-wrapper.py and
+# scripts/validate-env-secret-boundary.py), NOT upstream downloads. To detect
+# upstream drift, periodically run: scripts/check-upstream-drift.sh
 ARG NEMOCLAW_HERMES_WRAPPER_SHA256=03e0afbe00e352d0dfcf14b99ea1821f9fd29f87dad49ce19add2ec96d1941cc
 ARG NEMOCLAW_HERMES_VALIDATOR_SHA256=c15d93c9d721486accea83606972be3651422c11c05663c10de53efaf1af4047
 RUN printf '%s  %s\n' \
