@@ -303,7 +303,8 @@ def _read_mesh_warroom() -> dict[str, list[dict]]:
     for f in sorted(inbox.glob("*.json"), key=lambda p: p.stat().st_mtime):
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as _exc:
+            logger.warning("Failed to parse war room file %s: %s", f, _exc)
             continue
         mode = (data.get("mode") or "").upper()
         action_type = data.get("action_type", "")
@@ -460,8 +461,9 @@ def _handle_legacy_decision(action: str, item_id: str, reason: str | None) -> di
     # Finance spend flow
     if isinstance(item_id, str) and item_id.startswith("spend-review-") and _spend_handler is not None:
         spend_id = item_id[len("spend-review-"):]
-        req = _spend_handler._requests.get(spend_id)
-        if not req:
+        try:
+            req = _spend_handler.get_request(spend_id)
+        except (AttributeError, KeyError):
             return {"action": action, "item_id": item_id, "status": "not_found", "error": f"Spend {spend_id} not found"}
 
         if action == "approve":
@@ -648,17 +650,24 @@ def _handle_legacy_decision(action: str, item_id: str, reason: str | None) -> di
 async def handle_milimo_approve(ctx: Any, item_id: str, reason: str = None,
                                 delegate_to_claw: str = None, delegation_goal: str = None) -> dict:
     """Approve a pending item, optionally delegating to a claw."""
+    # Prefer the canonical war room bridge (used by TUI too)
+    if _WARROOM_BRIDGE_OK:
+        try:
+            _bridge_approve(item_id)
+            return {"action": "approve", "item_id": item_id, "status": "approved", "via": "bridge"}
+        except Exception as exc:
+            return {"action": "approve", "item_id": item_id, "status": "error", "error": str(exc)}
+
+    # Fallback: direct handler
     if _approval_handler is None:
         return {"error": "Approval handler not initialized"}
 
-    # Approve the item
     result = _approval_handler.handle_approve(item_id, lambda: None)
     if not result:
         return {"action": "approve", "item_id": item_id, "status": "failed", "error": "Item not found or approval failed"}
 
-    response = {"action": "approve", "item_id": item_id, "status": "approved"}
+    response = {"action": "approve", "item_id": item_id, "status": "approved", "via": "legacy"}
 
-    # Optionally delegate to a claw
     if delegate_to_claw and delegation_goal:
         from .delegation import HermesDelegateAdapter
         adapter = HermesDelegateAdapter(ctx)
@@ -687,6 +696,15 @@ async def handle_milimo_approve(ctx: Any, item_id: str, reason: str = None,
 
 async def handle_milimo_veto(ctx: Any, item_id: str, reason: str) -> dict:
     """Veto/reject a pending item."""
+    # Prefer the canonical war room bridge (used by TUI too)
+    if _WARROOM_BRIDGE_OK:
+        try:
+            _bridge_veto(item_id)
+            return {"action": "veto", "item_id": item_id, "reason": reason, "status": "rejected", "via": "bridge"}
+        except Exception as exc:
+            return {"action": "veto", "item_id": item_id, "reason": reason, "status": "error", "error": str(exc)}
+
+    # Fallback: direct handler
     if _approval_handler is None:
         return {"error": "Approval handler not initialized"}
 
@@ -695,7 +713,8 @@ async def handle_milimo_veto(ctx: Any, item_id: str, reason: str) -> dict:
         "action": "veto",
         "item_id": item_id,
         "reason": reason,
-        "status": "rejected" if result else "failed"
+        "status": "rejected" if result else "failed",
+        "via": "legacy"
     }
 
 
