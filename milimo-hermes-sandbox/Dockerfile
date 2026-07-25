@@ -310,6 +310,8 @@ RUN set -eu; \
 # These must match the original NemoClaw Hermes sandbox structure and hashes,
 # allowing the host-side nemohermes / openshell supervisor to recover, status,
 # and validate the sandbox safely.
+# Note: openclaw-config-guard.py is provided by the hermes-sandbox-base image
+# and referenced by managed-gateway-control.py — not copied locally.
 RUN mkdir -p /usr/local/lib/nemoclaw
 
 COPY scripts/lib/sandbox-init.sh /usr/local/lib/nemoclaw/sandbox-init.sh
@@ -359,6 +361,9 @@ RUN test -x /usr/local/lib/nemoclaw/validate-hermes-env-secret-boundary.py \
     || { echo "ERROR: validate-hermes-env-secret-boundary.py missing or not executable" >&2; exit 1; }
 
 # Cryptographic integrity check for validator and wrapper
+# IMPORTANT: These SHA hashes verify LOCAL copies (scripts/hermes-wrapper.py and
+# scripts/validate-env-secret-boundary.py), NOT upstream downloads. To detect
+# upstream drift, periodically run: scripts/check-upstream-drift.sh
 ARG NEMOCLAW_HERMES_WRAPPER_SHA256=03e0afbe00e352d0dfcf14b99ea1821f9fd29f87dad49ce19add2ec96d1941cc
 ARG NEMOCLAW_HERMES_VALIDATOR_SHA256=c15d93c9d721486accea83606972be3651422c11c05663c10de53efaf1af4047
 RUN printf '%s  %s\n' \

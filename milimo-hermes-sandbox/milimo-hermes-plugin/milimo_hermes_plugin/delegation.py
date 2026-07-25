@@ -8,9 +8,12 @@ Uses native `delegate_task` tool for parallel claw execution.
 DELEGATION_MAX_CONCURRENT_CHILDREN=6 should be set in Hermes config.
 """
 
+import logging
 from typing import Any
 
 from milimo_core.protocols.delegation import DelegationAdapter, ClawTask, ClawResult
+
+logger = logging.getLogger(__name__)
 
 
 class HermesDelegateAdapter(DelegationAdapter):
@@ -365,29 +368,39 @@ class HermesDelegateAdapter(DelegationAdapter):
                 "HermesDelegateAdapter._invoke_delegate_task requires context (ctx) to execute."
             )
 
-        try:
-            from tools.registry import registry
-            original_delegate_task = registry._tools.get("delegate_task") if registry else None
-            original_handler = original_delegate_task.handler if original_delegate_task else None
-        except ImportError:
-            original_handler = None
+        result_str = None
+        if hasattr(self._ctx, "dispatch_tool"):
+            try:
+                result_str = await self._ctx.dispatch_tool("delegate_task", {"tasks": tasks})
+            except Exception:
+                logger.warning("HermesDelegateAdapter: ctx.dispatch_tool failed, trying fallback", exc_info=True)
+                result_str = None
 
-        if original_handler:
-            import inspect
-            sig = inspect.signature(original_handler)
-            kwargs = {}
-            if "context" in sig.parameters:
-                kwargs["context"] = self._ctx
-            elif "ctx" in sig.parameters:
-                kwargs["ctx"] = self._ctx
+        if result_str is None:
+            try:
+                from tools.registry import registry
+                original_delegate_task = registry._tools.get("delegate_task") if registry else None
+                original_handler = original_delegate_task.handler if original_delegate_task else None
+            except (ImportError, AttributeError, KeyError):
+                logger.warning("HermesDelegateAdapter: private tools.registry API unavailable", exc_info=True)
+                original_handler = None
 
-            args = {"tasks": tasks}
-            if inspect.iscoroutinefunction(original_handler):
-                result_str = await original_handler(args, **kwargs)
+            if original_handler:
+                import inspect
+                sig = inspect.signature(original_handler)
+                kwargs = {}
+                if "context" in sig.parameters:
+                    kwargs["context"] = self._ctx
+                elif "ctx" in sig.parameters:
+                    kwargs["ctx"] = self._ctx
+                args = {"tasks": tasks}
+                if inspect.iscoroutinefunction(original_handler):
+                    result_str = await original_handler(args, **kwargs)
+                else:
+                    result_str = original_handler(args, **kwargs)
             else:
-                result_str = original_handler(args, **kwargs)
-        else:
-            result_str = await self._ctx.dispatch_tool("delegate_task", {"tasks": tasks})
+                logger.error("HermesDelegateAdapter: no delegation path available — delegate_task tool unreachable")
+                raise NotImplementedError("delegate_task tool unavailable in Hermes runtime")
 
         import json
         if isinstance(result_str, str):

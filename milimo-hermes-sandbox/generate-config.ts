@@ -141,7 +141,7 @@ function applyManagedToolConfig(
 function buildHermesConfig(settings: HermesBuildSettings): Record<string, unknown> {
   const apiServerToolsets = [...API_SERVER_TOOLSETS];
   const config: Record<string, unknown> = {
-    _config_version: 12,
+    _config_version: parseInt(process.env.NEMOCLAW_HERMES_CONFIG_VERSION || "12", 10),
     model: {
       default: settings.model,
       provider: "custom",
