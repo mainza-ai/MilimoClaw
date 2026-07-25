@@ -15,7 +15,7 @@
 # Pin by SHA for reproducible builds. To bump: pull the new image, run
 # `docker inspect ghcr.io/nvidia/nemoclaw/hermes-sandbox-base:latest --format '{{index .RepoDigests 0}}'`
 # and update the digest in .hermes-base-digest.
-ARG BASE_IMAGE=ghcr.io/nvidia/nemoclaw/hermes-sandbox-base@sha256:8dad3b989a9ed1e601743310b97be21be5f59f89f7913a47d04f3ec3c40b8ce6
+ARG BASE_IMAGE=ghcr.io/nvidia/nemoclaw/hermes-sandbox-base@sha256:e94586474de3b5782d60435fd6422e28d864ce9a34513a7de5a54f7358b3dffc
 
 FROM ${BASE_IMAGE}
 
@@ -94,6 +94,7 @@ RUN chmod -R a+rX /opt/nemoclaw-hermes-config/generate-config.ts \
 
 # Build args for config that varies per deployment
 ARG NEMOCLAW_MODEL=stepfun-ai/step-3.7-flash
+ARG NEMOCLAW_INFERENCE_PROVIDER_ID=custom
 ARG NEMOCLAW_PROVIDER_KEY=inference
 ARG NEMOCLAW_INFERENCE_BASE_URL=https://inference.local/v1
 ARG CHAT_UI_URL=http://127.0.0.1:8642
@@ -113,6 +114,7 @@ ARG MILIMO_DAILY_SPEND_CAP_CENTS=10000
 ARG MILIMO_OPERATOR=
 
 ENV NEMOCLAW_MODEL=${NEMOCLAW_MODEL} \
+    NEMOCLAW_INFERENCE_PROVIDER_ID=${NEMOCLAW_INFERENCE_PROVIDER_ID} \
     NEMOCLAW_PROVIDER_KEY=${NEMOCLAW_PROVIDER_KEY} \
     NEMOCLAW_INFERENCE_BASE_URL=${NEMOCLAW_INFERENCE_BASE_URL} \
     CHAT_UI_URL=${CHAT_UI_URL} \

@@ -9,7 +9,7 @@
     "prepare": "if [ -d .git ]; then prek install --hook-type pre-commit --hook-type commit-msg --hook-type pre-push; fi"
   },
   "dependencies": {
-    "openclaw": "2026.3.11"
+    "openclaw": "2026.7.1"
   },
   "files": [
     "milimo/dist/",

@@ -38,6 +38,7 @@ type SlackConfig = { allowedChannels?: string[] };
 
 type HermesBuildSettings = {
   model: string;
+  inferenceProviderId: string;
   baseUrl: string;
   providerKey: string;
   inferenceApi: string;
@@ -74,6 +75,7 @@ function readHermesBuildSettings(env: NodeJS.ProcessEnv): HermesBuildSettings {
 
   return {
     model,
+    inferenceProviderId: env.NEMOCLAW_INFERENCE_PROVIDER_ID || "custom",
     baseUrl,
     providerKey: env.NEMOCLAW_PROVIDER_KEY || "custom",
     inferenceApi: env.NEMOCLAW_INFERENCE_API || "",

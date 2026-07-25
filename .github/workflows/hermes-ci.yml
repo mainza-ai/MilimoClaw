@@ -99,11 +99,10 @@ jobs:
       - name: Resolve Hermes base image
         id: resolve-base
         run: |
-          BASE_IMAGE="ghcr.io/nvidia/nemoclaw/hermes-sandbox-base:latest"
+          BASE_IMAGE="ghcr.io/nvidia/nemoclaw/hermes-sandbox-base@sha256:e94586474de3b5782d60435fd6422e28d864ce9a34513a7de5a54f7358b3dffc"
           if docker pull "${BASE_IMAGE}" 2>/dev/null; then
-            DIGEST=$(docker inspect "${BASE_IMAGE}" --format '{{index .RepoDigests 0}}')
-            echo "image=${DIGEST}" >> "$GITHUB_OUTPUT"
-            echo "source=pulled" >> "$GITHUB_OUTPUT"
+            echo "image=${BASE_IMAGE}" >> "$GITHUB_OUTPUT"
+            echo "source=pinned-sha" >> "$GITHUB_OUTPUT"
           else
             echo "ERROR: Could not pull NVIDIA Hermes sandbox base image."
             echo "This is a public image - check network connectivity."

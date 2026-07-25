@@ -30,7 +30,7 @@ RUN npm install && npm run build
 # ---------------------------------------------------------------------------
 # Stage 2: Runtime — NemoClaw sandbox base + Milimo
 # ---------------------------------------------------------------------------
-ARG SANDBOX_BASE=ghcr.io/nvidia/nemoclaw/sandbox-base:latest
+ARG SANDBOX_BASE=ghcr.io/nvidia/nemoclaw/sandbox-base@sha256:5052a4489004534a33aab79c5612112e62deb1ee1c38224809e43be7de17083a
 FROM ${SANDBOX_BASE}
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
