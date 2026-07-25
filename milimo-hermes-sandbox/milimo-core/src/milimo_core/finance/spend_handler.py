@@ -128,6 +128,13 @@ class SpendApprovalHandler:
         self._shutdown_event = threading.Event()
         self._recover_and_resume_polling()
 
+    def get_request(self, spend_id: str) -> SpendRequest | None:
+        """Public accessor for spend request lookup. Returns None if not found."""
+        try:
+            return self._get_request(spend_id)
+        except (KeyError, ValueError):
+            return None
+
     def _get_request(self, spend_id: str) -> SpendRequest:
         """Retrieve request from memory or recover it from the decisions log."""
         if spend_id in self._requests:

@@ -200,7 +200,7 @@ WARROOM_INTERNAL_PORT="$(printf '%s' "${NEMOCLAW_WARROOM_PORT:-9090}" | sed 's/^
 case "$WARROOM_INTERNAL_PORT" in
   *[!0-9]* | '')
     echo "[gateway] ERROR: WARROOM_INTERNAL_PORT must be a number (got ${NEMOCLAW_WARROOM_PORT:-})" >&2
-    WARROOM_INTERNAL_PORT=9090
+    exit 1
     ;;
   *) ;;
 esac
@@ -298,6 +298,11 @@ for _candidate in /opt/hermes/.venv/bin/python3 /usr/local/bin/python3 /usr/bin/
   fi
 done
 unset _candidate
+
+if [ -z "$_HERMES_PYTHON" ] || [ ! -x "$_HERMES_PYTHON" ]; then
+  echo "[gateway] CRITICAL: No Python interpreter found — checked /opt/hermes/.venv/bin/python3, /usr/local/bin/python3, /usr/bin/python3" >&2
+  exit 1
+fi
 
 truthy_env() {
   case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in
