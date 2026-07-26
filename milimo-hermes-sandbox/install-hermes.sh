@@ -771,9 +771,41 @@ main() {
 
   setup_link_cli_auth
 
+  # ── Post-onboarding: reliable port forwarding ─────────────────────────
+  # The dashboard socat inside the sandbox lands on 18790 (not 18789) when
+  # --tui mode is active, so the SSH-based forward to 18789 always connects
+  # to nothing.  We use gRPC-based forwarding (openshell forward service)
+  # which tunnels directly to the service port, bypassing the socat layer.
+  log_info "Setting up reliable port forwarding..."
+
+  # Stop stale SSH-based forwards (they point to old sandbox instances)
+  for _port in 18789 9090; do
+    openshell forward stop "$_port" "$SANDBOX_NAME" 2>/dev/null || true
+  done
+  sleep 1
+
+  # Dashboard: gRPC tunnel directly to the Hermes dashboard service
+  # (bypasses the broken socat on 18790)
+  if ! openshell forward service \
+    --target-port 19119 --local 18789 "$SANDBOX_NAME" >/dev/null 2>&1; then
+    log_warn "  Dashboard gRPC forward failed — dashboard may not be accessible."
+  else
+    log_success "  Dashboard: http://127.0.0.1:18789/"
+  fi
+
+  # War Room: gRPC tunnel directly to the war room server
+  if ! openshell forward service \
+    --target-port 9090 --local 9090 "$SANDBOX_NAME" >/dev/null 2>&1; then
+    log_warn "  War Room gRPC forward failed — war room may not be accessible."
+  else
+    log_success "  War Room: http://127.0.0.1:9090/warroom.html"
+  fi
+
+  log_info "Port forwarding setup complete."
+
   log_info "Next steps:"
   log_info "  1. Connect: nemohermes $SANDBOX_NAME connect"
-  log_info "  2. Access dashboard: http://127.0.0.1:18790/"
+  log_info "  2. Access dashboard: http://127.0.0.1:18789/"
   log_info "  3. Change model: nemohermes inference set --model <model> --provider <provider> --sandbox $SANDBOX_NAME"
   log_info "  4. OpenAI-compatible API: http://127.0.0.1:8642/v1"
 
