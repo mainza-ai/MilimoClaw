@@ -333,8 +333,8 @@ See [[log]] for complete operation history.
 
 | Date | Change | Pages Affected |
 |------|--------|----------------|
+| 2026-07-25 | Deep AGENTS.md revision: fixed 16 legacy paths, added Hermes claw paths, dual-manifest plugin docs, complete file tree with 20+ missing entries; updated 4 skills (deploy-remote, manage-policy, configure-inference, monitor-sandbox) from legacy Brev/openshell to modern CLI; removed 18789 from all 3 blueprint forward_ports locations (root cause: CLI merges base + profile ports) | AGENTS.md, blueprint.yaml, skills/, index.md, log.md |
 | 2026-07-25 | Removed `NEMOCLAW_PROVIDER_KEY` from Dockerfile ARG/ENV (SecretsUsedInArgOrEnv warning — dead code, key injected at runtime by gateway) | Dockerfile, generate-config.ts, install-hermes.sh, index.md, log.md |
-| 2026-07-25 | Fixed toolset name mismatch (`milimo`→`milimo-hermes`), .pth path for Landlock, claw-status 500 error; added 9 registration tests to prevent recurrence | tools.py, Dockerfile, server.py, test_registration.py, hermes-profile.md, common-issues.md, issues-and-fixes.md, log.md, index.md |
 | 2026-07-25 | Fixed onboarding hang at [6/8]: preemptive sandbox destroy + 900s timeout + alias→function fix; added 18790 to forward_ports for dashboard reliability | install-hermes.sh, blueprint.yaml, common-issues.md, issues-and-fixes.md, log.md, index.md |
 | 2026-07-24 | Comparative audit of NemoClaw upstream vs MilimoClaw integration — 11 releases analyzed, 8 fragile integration points identified, 4-phase upgrade plan created | nemoclaw-upgrade-plan.md, index.md |
 | 2026-07-12 | Fix Hermes v0.17+ tool registration API mismatch: `register_core_tools()` now uses `ctx.register_tool(name, toolset="milimo", schema, handler, description)` instead of legacy `skill_registry.register_tool()` no-op | issues-and-fixes.md, common-issues.md, hermes-profile.md, log.md, index.md |
