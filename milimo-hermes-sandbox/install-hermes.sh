@@ -701,6 +701,8 @@ main() {
   for _port in 18789 18790 9090; do
     timeout 5 openshell forward stop "$_port" "$SANDBOX_NAME" 2>/dev/null || true
   done
+  # Brief wait for OS to release TCP ports after killing SSH forward processes
+  sleep 1
 
   # Layer 4: Verify sandbox is actually gone
   local _cleanup_attempts=0
