@@ -773,32 +773,31 @@ main() {
 
   # ── Post-onboarding: reliable port forwarding ─────────────────────────
   # The dashboard socat inside the sandbox lands on 18790 (not 18789) when
-  # --tui mode is active, so the SSH-based forward to 18789 always connects
-  # to nothing.  We use gRPC-based forwarding (openshell forward service)
-  # which tunnels directly to the service port, bypassing the socat layer.
-  log_info "Setting up reliable port forwarding..."
+  # --tui mode is active.  SSH-based forward to 18789 connects to nothing.
+  # We forward 18790 (dashboard socat) and 9090 (war room server) using
+  # openshell forward start --background, which creates an SSH tunnel via
+  # the OpenShell gateway proxy.  Each forward has a 15s timeout so a
+  # single stuck tunnel cannot block the install script.
+  log_info "Setting up port forwarding..."
 
-  # Stop stale SSH-based forwards (they point to old sandbox instances)
-  for _port in 18789 9090; do
-    openshell forward stop "$_port" "$SANDBOX_NAME" 2>/dev/null || true
+  # Stop stale forwards from previous sandbox instances
+  for _port in 18789 18790 9090; do
+    timeout 5 openshell forward stop "$_port" "$SANDBOX_NAME" 2>/dev/null || true
   done
   sleep 1
 
-  # Dashboard: gRPC tunnel directly to the Hermes dashboard service
-  # (bypasses the broken socat on 18790)
-  if ! openshell forward service \
-    --target-port 19119 --local 18789 "$SANDBOX_NAME" >/dev/null 2>&1; then
-    log_warn "  Dashboard gRPC forward failed — dashboard may not be accessible."
+  # Dashboard: SSH tunnel to socat on 18790 (forwards to dashboard on 19119)
+  if timeout 15 openshell forward start --background 18790 "$SANDBOX_NAME" >/dev/null 2>&1; then
+    log_success "  Dashboard: http://127.0.0.1:18790/"
   else
-    log_success "  Dashboard: http://127.0.0.1:18789/"
+    log_warn "  Dashboard forward failed — run: openshell forward start --background 18790 $SANDBOX_NAME"
   fi
 
-  # War Room: gRPC tunnel directly to the war room server
-  if ! openshell forward service \
-    --target-port 9090 --local 9090 "$SANDBOX_NAME" >/dev/null 2>&1; then
-    log_warn "  War Room gRPC forward failed — war room may not be accessible."
-  else
+  # War Room: SSH tunnel to war room server on 9090
+  if timeout 15 openshell forward start --background 9090 "$SANDBOX_NAME" >/dev/null 2>&1; then
     log_success "  War Room: http://127.0.0.1:9090/warroom.html"
+  else
+    log_warn "  War Room forward failed — run: openshell forward start --background 9090 $SANDBOX_NAME"
   fi
 
   log_info "Port forwarding setup complete."
