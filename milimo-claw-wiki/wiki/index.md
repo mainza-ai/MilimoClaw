@@ -2,7 +2,7 @@
 
 **Summary**: Master table of contents for the MilimoClaw knowledge base.
 
-**Last updated**: 2026-07-12
+**Last updated**: 2026-07-25
 
 > Note: After onboarding, the sandbox is already running. Use `nemohermes milimo-hermes connect` to start a chat session, not `nemoclaw start`.
 
@@ -333,6 +333,8 @@ See [[log]] for complete operation history.
 
 | Date | Change | Pages Affected |
 |------|--------|----------------|
+| 2026-07-25 | Fixed onboarding hang at [6/8]: preemptive sandbox destroy + 900s timeout + alias→function fix; added 18790 to forward_ports for dashboard reliability | install-hermes.sh, blueprint.yaml, common-issues.md, issues-and-fixes.md, log.md, index.md |
+| 2026-07-25 | Added dashboard port 18790 to blueprint forward_ports (socat lands on 18790, not 18789, when --tui is active); documented port forwarding setup after rebuild | blueprint.yaml, index.md, log.md |
 | 2026-07-24 | Comparative audit of NemoClaw upstream vs MilimoClaw integration — 11 releases analyzed, 8 fragile integration points identified, 4-phase upgrade plan created | nemoclaw-upgrade-plan.md, index.md |
 | 2026-07-12 | Fix Hermes v0.17+ tool registration API mismatch: `register_core_tools()` now uses `ctx.register_tool(name, toolset="milimo", schema, handler, description)` instead of legacy `skill_registry.register_tool()` no-op | issues-and-fixes.md, common-issues.md, hermes-profile.md, log.md, index.md |
 | 2026-07-12 | SOUL.md blocked by OpenClaw forced_action scanner — rewritten with advisory language (same operational content, no imperative trigger patterns) | issues-and-fixes.md, common-issues.md, hermes-profile.md, log.md, index.md |

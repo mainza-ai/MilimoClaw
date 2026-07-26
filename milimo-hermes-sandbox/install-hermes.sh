@@ -191,10 +191,11 @@ check_prerequisites() {
     exit 1
   fi
 
-  # Check for nemohermes alias
+  # Check for nemohermes CLI (create function fallback if not installed)
   if ! command -v nemohermes &>/dev/null; then
-    log_warn "nemohermes alias not found. Creating alias..."
-    alias nemohermes="NEMOCLAW_AGENT=hermes nemoclaw"
+    log_warn "nemohermes CLI not found. Creating fallback function..."
+    nemohermes() { NEMOCLAW_AGENT=hermes nemoclaw "$@"; }
+    export -f nemohermes
   fi
 
   # Check Docker
@@ -212,6 +213,9 @@ check_prerequisites() {
       log_warn "NVIDIA_API_KEY not set. You will be prompted during onboarding."
     fi
   fi
+
+  # Export for nemohermes onboard (expects NVIDIA_INFERENCE_API_KEY)
+  export NVIDIA_INFERENCE_API_KEY="${NVIDIA_API_KEY}"
 
   # Check for qualifying Python if Model Router enabled
   if [[ "$ENABLE_MODEL_ROUTER" == "true" ]]; then
@@ -532,7 +536,6 @@ build_onboard_command() {
   if [[ "$NON_INTERACTIVE" == "true" ]]; then
     cmd+=" --non-interactive --yes"
     cmd+=" --yes-i-accept-third-party-software"
-    cmd+=" --fresh"
     cmd+=" --recreate-sandbox"
     export NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1
     export NEMOCLAW_NON_INTERACTIVE=1
@@ -596,6 +599,7 @@ main() {
   export NEMOCLAW_INFERENCE_PROVIDER_ID="${NEMOCLAW_INFERENCE_PROVIDER_ID:-custom}"
   export NEMOCLAW_PROVIDER_KEY="${NEMOCLAW_PROVIDER_KEY:-inference}"
   export NEMOCLAW_INFERENCE_BASE_URL="${NEMOCLAW_INFERENCE_BASE_URL:-https://inference.local/v1}"
+  export NVIDIA_INFERENCE_API_KEY="${NVIDIA_API_KEY:-}"
   export CHAT_UI_URL="${CHAT_UI_URL:-http://127.0.0.1:8642}"
   export NEMOCLAW_MESSAGING_CHANNELS_B64="${NEMOCLAW_MESSAGING_CHANNELS_B64:-W10=}"
   export NEMOCLAW_MESSAGING_ALLOWED_IDS_B64="${NEMOCLAW_MESSAGING_ALLOWED_IDS_B64:-e30=}"
@@ -650,61 +654,138 @@ main() {
     return 0
   fi
 
-  # Run onboarding
-  log_info "Starting Hermes onboarding..."
-  log_info "Command: $onboard_cmd"
-  echo ""
+  # ── Pre-flight: clean stale state + verify gateway ──────────────────
+  # Stale --fresh resumable state from a previously killed onboard can
+  # interfere with the next attempt.  Clear it unconditionally.
+  rm -rf /tmp/.nemoclaw-onboarding-* 2>/dev/null || true
 
-  if eval "$onboard_cmd"; then
-    log_success "Hermes onboarding completed!"
+  # Verify the OpenShell gateway is responsive.  If not, recovery will
+  # add ~2 minutes to the onboard; better to fail fast here.
+  if ! timeout 10 curl -s --max-time 5 "http://127.0.0.1:8080/health" >/dev/null 2>&1; then
+    log_warn "OpenShell gateway health check failed — will attempt recovery during onboard."
+  fi
+
+  # ── Preemptive sandbox cleanup ──────────────────────────────────────
+  # nemohermes onboard --recreate-sandbox can hang indefinitely at
+  # [6/8] Creating sandbox if the graceful teardown of the existing
+  # sandbox stalls.  We handle this in three layers:
+  #
+  #   Layer 1 — nemohermes destroy (with timeout)
+  #   Layer 2 — docker rm -f any leftover openshell container
+  #   Layer 3 — wait until the sandbox status returns not-found
+  #
+  # Each layer has its own timeout so a single stuck call cannot block
+  # the install script.
+  log_info "Cleaning up any existing sandbox '$SANDBOX_NAME' before rebuild..."
+
+  # Layer 1: nemohermes destroy (handles gateway state cleanup)
+  if timeout 30 nemohermes "$SANDBOX_NAME" status --json 2>/dev/null | grep -q '"found":true'; then
+    log_info "  Existing sandbox found — destroying via nemohermes..."
+    NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 timeout 60 \
+      nemohermes "$SANDBOX_NAME" destroy --yes 2>/dev/null || true
+  else
+    log_info "  No existing sandbox found via nemohermes status."
+  fi
+
+  # Layer 2: Docker-level cleanup (handles stray containers)
+  local _old_container
+  _old_container="$(docker ps -a --filter name=openshell-"$SANDBOX_NAME" --format '{{.ID}}' 2>/dev/null | head -1)"
+  if [[ -n "$_old_container" ]]; then
+    log_info "  Removing stale Docker container $_old_container..."
+    docker rm -f "$_old_container" 2>/dev/null || true
+  fi
+
+  # Layer 3: Verify sandbox is actually gone
+  local _cleanup_attempts=0
+  while timeout 10 nemohermes "$SANDBOX_NAME" status --json 2>/dev/null | grep -q '"found":true'; do
+    _cleanup_attempts=$((_cleanup_attempts + 1))
+    if [ "$_cleanup_attempts" -ge 6 ]; then
+      log_warn "  Could not fully clean sandbox state after 6 attempts — proceeding anyway."
+      break
+    fi
+    log_info "  Waiting for sandbox cleanup (attempt $_cleanup_attempts)..."
+    sleep 5
+  done
+  log_success "Sandbox cleanup complete."
+
+  # ── Run onboarding with retry ────────────────────────────────────────
+  # Timeout for onboarding command (15 min). nemohermes onboard can hang
+  # indefinitely at [6/8] Creating sandbox if the destroy step stalls.
+  local _onboard_timeout="900"
+  local _onboard_retries=0
+  local _onboard_max_retries=1
+  local _onboard_ok=false
+
+  while [ "$_onboard_retries" -le "$_onboard_max_retries" ]; do
+    if [ "$_onboard_retries" -gt 0 ]; then
+      log_info "Retrying onboarding (attempt $((_onboard_retries + 1))/${_onboard_max_retries})..."
+      # After a failed --recreate-sandbox, the sandbox may already be
+      # destroyed.  Retry without --recreate-sandbox since there's nothing
+      # to recreate.
+      onboard_cmd="${onboard_cmd/--recreate-sandbox/}"
+    fi
+
+    log_info "Starting Hermes onboarding (timeout: ${_onboard_timeout}s, attempt $((_onboard_retries + 1)))..."
+    log_info "Command: $onboard_cmd"
     echo ""
 
-    # Apply network policy presets from the blueprint's presets/ directory.
-    # The nemohermes CLI supports --from-file and --from-dir to load custom
-    # preset YAML files (OpenShell policy preset format: preset.name + network_policies.*).
-    # Apply each preset individually so one failure doesn't abort the whole batch.
-    local preset_dir="$sandbox_dir/milimo-blueprint/policies/presets"
-    if [[ -d "$preset_dir" ]]; then
-      log_info "Applying network policy presets from $preset_dir..."
-      local preset_failed=0
-      for preset_file in "$preset_dir"/*.yaml; do
-        [[ -f "$preset_file" ]] || continue
-        local preset_name
-        preset_name=$(basename "$preset_file" .yaml)
-        log_info "Applying preset: $preset_name"
-        if ! nemohermes "$SANDBOX_NAME" policy-add --from-file "$preset_file" --yes 2>&1; then
-          log_warn "Preset $preset_name did not apply (collision or invalid). Check 'nemohermes $SANDBOX_NAME policy-list'."
-          preset_failed=1
-        fi
-      done
-      if [[ "$preset_failed" -eq 0 ]]; then
-        log_success "All network policy presets applied!"
-      else
-        log_warn "Some presets may not have applied. Check 'nemohermes $SANDBOX_NAME policy-list'."
-      fi
+    if timeout "$_onboard_timeout" bash -c "$onboard_cmd"; then
+      _onboard_ok=true
+      break
     fi
 
-    setup_link_cli_auth
+    log_warn "Onboarding attempt $((_onboard_retries + 1)) failed or timed out."
+    _onboard_retries=$((_onboard_retries + 1))
+  done
 
-    log_info "Next steps:"
-    log_info "  1. Connect: nemohermes $SANDBOX_NAME connect"
-    log_info "  2. Access dashboard: http://127.0.0.1:18790/"
-    log_info "  3. Change model: nemohermes inference set --model <model> --provider <provider> --sandbox $SANDBOX_NAME"
-    log_info "  4. OpenAI-compatible API: http://127.0.0.1:8642/v1"
-
-    if [[ -n "$CHAT_UI_URL" ]]; then
-      log_info "  5. Remote dashboard: $CHAT_UI_URL"
-    fi
-
-    if [[ "$HEADLESS" == "true" && -z "$CHAT_UI_URL" ]]; then
-      log_info "  5. SSH tunnel: ssh -L 18790:127.0.0.1:18790 $(whoami)@$(hostname -f)"
-    fi
-
-    log_info "  6. Nous Portal login (interactive): nemohermes $SANDBOX_NAME exec --tty -- hermes setup --portal"
-  else
-    log_error "Onboarding failed"
+  if ! "$_onboard_ok"; then
+    log_error "Onboarding failed after $_onboard_max_retries retries."
+    log_error "Try destroying manually first: nemohermes $SANDBOX_NAME destroy --yes"
     exit 1
   fi
+
+  log_success "Hermes onboarding completed!"
+  echo ""
+
+  # Apply network policy presets from the blueprint's presets/ directory.
+  local preset_dir="$sandbox_dir/milimo-blueprint/policies/presets"
+  if [[ -d "$preset_dir" ]]; then
+    log_info "Applying network policy presets from $preset_dir..."
+    local preset_failed=0
+    for preset_file in "$preset_dir"/*.yaml; do
+      [[ -f "$preset_file" ]] || continue
+      local preset_name
+      preset_name=$(basename "$preset_file" .yaml)
+      log_info "Applying preset: $preset_name"
+      if ! nemohermes "$SANDBOX_NAME" policy-add --from-file "$preset_file" --yes 2>&1; then
+        log_warn "Preset $preset_name did not apply (collision or invalid). Check 'nemohermes $SANDBOX_NAME policy-list'."
+        preset_failed=1
+      fi
+    done
+    if [[ "$preset_failed" -eq 0 ]]; then
+      log_success "All network policy presets applied!"
+    else
+      log_warn "Some presets may not have applied. Check 'nemohermes $SANDBOX_NAME policy-list'."
+    fi
+  fi
+
+  setup_link_cli_auth
+
+  log_info "Next steps:"
+  log_info "  1. Connect: nemohermes $SANDBOX_NAME connect"
+  log_info "  2. Access dashboard: http://127.0.0.1:18790/"
+  log_info "  3. Change model: nemohermes inference set --model <model> --provider <provider> --sandbox $SANDBOX_NAME"
+  log_info "  4. OpenAI-compatible API: http://127.0.0.1:8642/v1"
+
+  if [[ -n "$CHAT_UI_URL" ]]; then
+    log_info "  5. Remote dashboard: $CHAT_UI_URL"
+  fi
+
+  if [[ "$HEADLESS" == "true" && -z "$CHAT_UI_URL" ]]; then
+    log_info "  5. SSH tunnel: ssh -L 18790:127.0.0.1:18790 $(whoami)@$(hostname -f)"
+  fi
+
+  log_info "  6. Nous Portal login (interactive): nemohermes $SANDBOX_NAME exec --tty -- hermes setup --portal"
 }
 
 main "$@"

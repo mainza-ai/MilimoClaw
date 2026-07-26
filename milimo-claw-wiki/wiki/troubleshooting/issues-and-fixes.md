@@ -5,7 +5,7 @@
 **Sources**:
 - `milimo-claw-docs/troubleshooting/ISSUES_AND_FIXES_AUDIT.md`
 
-**Last updated**: 2026-07-12
+**Last updated**: 2026-07-25
 
 **Tags**: #troubleshooting #audit #fixes
 
@@ -759,3 +759,98 @@ bash scripts/check-plugin-sync.sh
 ```
 
 **See also**: [[common-issues]] — Milimo Tools Not Visible in Hermes Agent Toolset; [[hermes-profile]] — Hermes Tool Registration section
+
+---
+
+## Issue 23 — Sandbox Onboarding Hangs at [6/8]: NVIDIA_INFERENCE_API_KEY Missing (2026-07-25)
+
+**Discovered**: Onboarding with `install-hermes.sh --non-interactive` hung at step [6/8] "Creating sandbox" after Docker build completed successfully. Step [3/8] showed: `NVIDIA_INFERENCE_API_KEY (or NEMOCLAW_PROVIDER_KEY) is required for NVIDIA Endpoints in non-interactive mode.`
+
+**Root Cause**: The `nemohermes onboard` CLI expects the API key in `NVIDIA_INFERENCE_API_KEY` (or `NEMOCLAW_PROVIDER_KEY`). The `.env` file defines `NVIDIA_API_KEY`, and `install-hermes.sh` checked for `NVIDIA_API_KEY` but never exported the renamed var. The nemohermes process couldn't find the key and failed silently during non-interactive provider configuration.
+
+**Fix** (commit `51f9cc8`):
+- `install-hermes.sh` now runs `export NVIDIA_INFERENCE_API_KEY="${NVIDIA_API_KEY}"` in two places:
+  1. After the prerequisite check (so onboarding can find it)
+  2. In the env-var dump section alongside the other `NEMOCLAW_*` vars
+
+**Verification**:
+```bash
+NVIDIA_API_KEY="$(grep NVIDIA_API_KEY .env | cut -d= -f2)" \
+NEMOCLAW_NON_INTERACTIVE=1 \
+NEMOCLAW_ACCEPT_THIRD_PARTY=1 \
+NEMOCLAW_AUTH_MODE=api_key \
+NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 \
+  ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
+```
+
+---
+
+## Issue 24 — War Room CSRF Bypass + Auth Timing Attack + Signal Safety (2026-07-25)
+
+**Discovered**: Deep code audit of `warroom/server.py` and `warroom/warroom_bridge.py` identified 25 bugs across 7 files.
+
+**Root Cause**: Multiple production-grade deficiencies:
+1. **CSRF**: Origin-vs-Host header comparison trivially bypassable; no server-generated token
+2. **Auth timing**: Bearer token compared with `==` instead of `hmac.compare_digest` (timing attack)
+3. **Signal handler**: Called `server.shutdown()` from signal context (blocking call, not reentrant)
+4. **Silent failures**: `mkdir()`, `write_text()`, `rename()`, `read_text()`, `unlink()` without error handling
+5. **Global side effects**: `os.chdir()`, `threading.stack_size()` affecting entire process
+6. **Dead code**: Three definitions of `_handle_hold_queue` (2 were dead)
+7. **Missing fallback handlers**: analytics/assistant approve/veto silently no-op'd
+8. **TOCTOU**: `exists()` + `open()` race in `_serve_static`
+9. **Import hack**: `__import__("datetime")` instead of proper `from datetime import datetime`
+10. **Quarantine**: War room crash-loop quarantine used infinite sleep loop, hanging supervisor
+11. **Socat**: War room socat forwarder always failed (EADDRINUSE — server binds 0.0.0.0 directly)
+12. **Missing CSRF in HTML**: CSRF meta tag injected by server but HTMX never read it
+13. **Health check**: `hermes_warroom_healthy` hardcoded `sandbox` user in non-root mode
+14. **Private attr access**: `_spend_handler._requests` accessed from another module
+
+**Fix** (commits `a7cd57f`, `11d7042`, `246b5b6`):
+All 14 categories fixed across `server.py`, `warroom_bridge.py`, `__init__.py`, `tools.py`, `start.sh`, `spend_handler.py`, `warroom.html`.
+Full details in `log.md` entry for 2026-07-25.
+
+**Verification**:
+```bash
+# Docker build + live test
+docker build --load -t milimo-hermes-sandbox:verify -f milimo-hermes-sandbox/Dockerfile milimo-hermes-sandbox/
+docker run --rm --detach milimo-hermes-sandbox:verify sleep infinity
+# ... run test suite (see log.md for full test matrix)
+```
+
+---
+
+## Issue 25 — `install.sh` Generated Dockerfile Uses Unpinned sandbox-base (2026-07-24)
+
+**Discovered**: Comparative audit of NemoClaw upstream vs MilimoClaw integration points.
+
+**Root Cause**: `install.sh` generates a Dockerfile with `ARG SANDBOX_BASE=ghcr.io/nvidia/nemoclaw/sandbox-base:latest` — no SHA pin. Each build picks up whatever `latest` resolves to, breaking reproducibility.
+
+**Fix** (Phase 1 of upgrade plan): See [[nemoclaw-upgrade-plan]]
+- Both `sandbox-base` and `hermes-sandbox-base` pinned to SHA digests
+- OpenClaw bumped from `2026.3.11` to `2026.7.1`
+- `NEMOCLAW_INFERENCE_PROVIDER_ID` added for v0.0.90+ route selector migration
+
+---
+
+## Issue 26 — Onboarding Hangs at [6/8] "Creating Sandbox" (2026-07-25)
+
+**Discovered**: Repeated hangs during `nemohermes onboard --recreate-sandbox` at step [6/8] "Creating sandbox". No error message, just indefinite blank output.
+
+**Root Cause**: The `--recreate-sandbox` flag triggers graceful teardown of the existing sandbox before creating a replacement. If the old sandbox has accumulated workspace state or the gateway has a stale lock, this teardown stalls indefinitely. The `nemohermes onboard` command has no built-in timeout.
+
+**Fix** (commit `83bf1ea`):
+1. **Preemptive destroy in `install-hermes.sh`**: Before calling `nemohermes onboard`, the script checks if a sandbox with phase "Ready" exists and forcefully destroys it with `NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 nemohermes <name> destroy --yes`. The old sandbox is already gone before onboarding starts, making the "recreate" step instant.
+2. **Onboarding timeout (900s)**: Wrapped `nemohermes onboard` in `timeout 900` so the script can never hang indefinitely.
+3. **Alias→function fix**: `alias nemohermes="NEMOCLAW_AGENT=hermes nemoclaw"` replaced with a proper bash function + `export -f`. Aliases are not expanded in non-interactive bash scripts by default.
+
+**Related**: The dashboard port forward also caused issues — port 18790 was added to `forward_ports` in the blueprint because the dashboard socat lands on 18790 (not 18789) when `--tui` mode is active (commit `7ea91dc`).
+
+**Verification**:
+```bash
+NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 \
+NVIDIA_API_KEY="$(grep NVIDIA_API_KEY .env | cut -d= -f2)" \
+NEMOCLAW_NON_INTERACTIVE=1 \
+NEMOCLAW_ACCEPT_THIRD_PARTY=1 \
+NEMOCLAW_AUTH_MODE=api_key \
+  ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
+```

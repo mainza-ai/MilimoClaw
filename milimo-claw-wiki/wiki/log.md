@@ -2229,14 +2229,81 @@ Each entry follows this format:
 
 ---
 
-### 2026-07-09 — Documented sandbox policy presets + non-interactive build command
+### 2026-07-25 — Production-grade war room hardening + NemoClaw upstream base image upgrade (4 phases)
 
-**Pages**: `wiki/troubleshooting/common-issues.md`, `wiki/troubleshooting/issues-and-fixes.md`, `wiki/architecture/hermes-profile.md`, `README.md`
+**Pages**: `wiki/architecture/nemoclaw-upgrade-plan.md`, `wiki/architecture/hermes-profile.md`, `wiki/troubleshooting/common-issues.md`, `wiki/troubleshooting/issues-and-fixes.md`, `wiki/index.md`, `.agents/AGENTS.md`
 
-**Source**: Operator reported that `install-hermes.sh --non-interactive` build succeeded only after certain external URLs were added to the OpenShell sandbox policy via preset YAML files. Critical production URLs: Nous Portal (`portal.nousresearch.com`), Stripe Link (`api.link.com`, `app.link.com`, `login.link.com`), Stripe (`api.stripe.com`), Sentry, Vercel, npm, PyPI, HuggingFace, GitHub.
+**Source**: Deep code audit of war room system and NemoClaw v0.0.85–v0.0.95 upstream upgrade.
+
+**Phase 1 — Base Image + Deps**:
+- Pinned `sandbox-base` and `hermes-sandbox-base` to latest upstream SHAs (`sha256:5052a448...`, `sha256:e9458647...`)
+- Bumped OpenClaw from `2026.3.11` to `2026.7.1`
+- Added `NEMOCLAW_INFERENCE_PROVIDER_ID` for v0.0.90+ inference route selector migration
+- Updated `generate-config.ts`, `.env`, CI workflow, `install-hermes.sh`
+- Docker build verified: Hermes Agent v0.18.0 (2026.7.1)
+
+### 2026-07-25 — Added dashboard port 18790 to blueprint forward_ports
+
+**Pages**: `milimo-blueprint/blueprint.yaml`, `milimo-hermes-sandbox/milimo-blueprint/blueprint.yaml`, `wiki/index.md`
+
+**Source**: Sandbox rebuild verification showed dashboard port forward not working on 18789. The Hermes dashboard socat lands on port 18790 (not 18789) when `--tui` mode is active in `start.sh`. Only 18789 was listed in `forward_ports`.
+
+**Changes**:
+- Added `- 18790` to `forward_ports` in both blueprint copies
+- Committed as `7ea91dc`
+
+**Post-rebuild access**:
+```bash
+# gRPC direct (most reliable — connects directly to dashboard service):
+openshell forward service --target-port 19119 --local 18789 milimo-hermes
+
+# SSH via socat (legacy — connects through the socat on 18790):
+openshell forward start --background 18790 milimo-hermes
+
+# War Room:
+openshell forward service --target-port 9090 --local 9090 milimo-hermes
+```
+**Phase 2 — Min Versions**:
+- Bumped `blueprint.yaml`: openshell `0.0.24→0.0.85`, openclaw `2026.3.0→2026.7.0`, hermes `2026.6.0→2026.7.0`
+
+**Phase 3 — Consistency**:
+- Fixed `plugin.yaml` version `0.1.0→0.2.0` (both copies)
+- Replaced stale `claude_model` default with `default_model`
+- Fixed README badge `v0.2.1→v0.2.0`
+- Excluded `.DS_Store` from sync check
+
+**Phase 4 — Hardening (25 bugs fixed across 7 files)**:
+- **Security**: CSRF token (replaced Origin-vs-Host), `hmac.compare_digest` auth, signal-safe shutdown via `threading.Event`
+- **Error handling**: All I/O operations (rename, mkdir, write_text, read, unlink) now have try/except with logging; silent failures eliminated
+- **Plugin resilience**: `milimo_core` imports guarded; `OpsApprovalHandler` creation guarded; `get_privacy_router` double-fail retry fixed
+- **Tools parity**: approve/veto now use bridge as primary path; corrupted JSON files logged; private `_requests` replaced with public `get_request()` API
+- **Startup reliability**: `_HERMES_PYTHON` validated before use; invalid `WARROOM_PORT` exits; socat forwarder removed (always failed EADDRINUSE); quarantine returns 1 instead of infinite loop
+- **Code quality**: `__import__("datetime")` hack replaced; duplicate path variables consolidated; unnecessary lock removed; TOCTOU fixed
+- **CSRF injection**: `warroom.html` now injects CSRF token into HTMX requests via `htmx:configRequest` handler
+- **CI fix**: Pinned `ruff==0.15.21` to avoid surprise lint breakage
+
+**AGENTS.md** — Added 28 production-grade coding standards covering error handling, security, concurrency, I/O, validation, and architecture.
+
+**install-hermes.sh fix** — Added `export NVIDIA_INFERENCE_API_KEY="${NVIDIA_API_KEY}"` so `nemohermes onboard --non-interactive` can find the API key (expected var name mismatch).
+
+**Changes**:
+- All Phase 1-4 changes committed to `develop` and merged to `main`
 
 **Changes**:
 - `wiki/troubleshooting/common-issues.md`: Added "Sandbox Blocks External URLs / Policy Presets Not Applied" entry with symptom table, required presets, fix commands
 - `wiki/troubleshooting/issues-and-fixes.md`: Added Issue 17 documenting all 9 policy presets, their whitelisted hosts, and the validated non-interactive build command including `NEMOCLAW_RECREATE_WITHOUT_BACKUP=1`
 - `wiki/architecture/hermes-profile.md`: Added non-interactive build command block; noted `NEMOCLAW_RECREATE_WITHOUT_BACKUP=1` requirement
 - `README.md`: Added headless/CI build command, policy presets table with all 9 presets and their hosts, verification commands, and warning about critical presets
+
+### 2026-07-25 — Fixed onboarding hang at [6/8] + nemohermes alias→function fix
+
+**Pages**: `milimo-hermes-sandbox/install-hermes.sh`, `milimo-blueprint/blueprint.yaml`, `milimo-hermes-sandbox/milimo-blueprint/blueprint.yaml`, `wiki/troubleshooting/common-issues.md`, `wiki/troubleshooting/issues-and-fixes.md`, `wiki/index.md`
+
+**Source**: Repeated onboarding hang at `nemohermes onboard` step [6/8] "Creating sandbox". The `--recreate-sandbox` flag waits on graceful teardown of the old sandbox workspace state, which can stall indefinitely.
+
+**Fixes** (commit `83bf1ea`):
+1. **Preemptive destroy**: Before onboarding, `install-hermes.sh` now checks if a "Ready" sandbox exists and forcefully destroys it (`NEMOCLAW_RECREATE_WITHOUT_BACKUP=1`). This avoids the [6/8] hang entirely — the old sandbox is already gone, so recreate is instant.
+2. **Onboarding timeout (900s)**: Wrapped `nemohermes onboard` in `timeout 900`. If onboarding ever hangs (network, Docker, state issue), the script exits with a clear error instead of blocking the terminal forever.
+3. **Alias → function**: `alias nemohermes=...` only works in interactive shells (bash doesn't expand aliases by default in scripts). Replaced with a proper bash function + `export -f`.
+
+**Also**: Added port 18790 to blueprint `forward_ports` (commit `7ea91dc`) — the Hermes dashboard socat lands on 18790, not 18789, when `--tui` mode is active.

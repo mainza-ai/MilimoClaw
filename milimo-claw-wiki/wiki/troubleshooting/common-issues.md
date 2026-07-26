@@ -5,7 +5,7 @@
 **Sources**:
 - `milimo-claw-docs/troubleshooting/ISSUES_AND_FIXES_AUDIT.md`
 
-**Last updated**: 2026-07-12
+**Last updated**: 2026-07-25
 
 **Tags**: #troubleshooting #issues #fixes
 
@@ -825,6 +825,46 @@ print('Tool registration signature:', tools.register_core_tools.__doc__)
 print('Expected: ctx.register_tool with toolset param')
 "
 ```
+
+---
+
+### Sandbox Creation Hangs at [6/8] — NVIDIA_INFERENCE_API_KEY Missing (FIXED 2026-07-25)
+
+**Symptom**: `nemohermes onboard --non-interactive` hangs at step [3/8] or [6/8] with:
+```
+NVIDIA_INFERENCE_API_KEY (or NEMOCLAW_PROVIDER_KEY) is required for NVIDIA Endpoints in non-interactive mode.
+```
+
+**Root Cause**: The `nemohermes onboard --non-interactive` CLI expects `NVIDIA_INFERENCE_API_KEY` (or `NEMOCLAW_PROVIDER_KEY`) to configure the inference provider. The `.env` file and `install-hermes.sh` use `NVIDIA_API_KEY` — a different env var. Without the correct var exported, non-interactive onboarding cannot proceed past provider configuration.
+
+**Fix** (commit `51f9cc8`):
+- `install-hermes.sh` now exports `export NVIDIA_INFERENCE_API_KEY="${NVIDIA_API_KEY}"` at both the prerequisite check and the env-var dump section
+- Users continue to use `NVIDIA_API_KEY` in `.env` (backward compatible)
+
+**Workaround**: Export manually before running install:
+```bash
+export NVIDIA_INFERENCE_API_KEY="$NVIDIA_API_KEY"
+```
+
+---
+
+### Onboarding Hangs at [6/8] "Creating Sandbox" — Stale Sandbox State (FIXED 2026-07-25)
+
+**Symptom**: `nemohermes onboard --recreate-sandbox` hangs indefinitely at step [6/8]:
+```
+[6/8] Creating sandbox
+──────────────────────────────────────────────────
+
+
+```
+No error message, no timeout — just blank space after the header.
+
+**Root Cause**: The `--recreate-sandbox` flag tries to gracefully tear down the existing sandbox workspace state before creating a new sandbox. If the old sandbox has accumulated state files or the gateway has a stale lock, this teardown can stall indefinitely.
+
+**Fix** (commit `83bf1ea`):
+1. **Preemptive destroy**: `install-hermes.sh` now forcefully destroys any existing "Ready" sandbox before running `nemohermes onboard`. The sandbox is already gone, so the recreate step is instant.
+2. **Timeout (900s)**: The onboarding command is wrapped in `timeout 900`. If it ever hangs, the script exits with a clear error.
+3. **Alias→function**: `alias nemohermes=...` replaced with a bash function + `export -f` (aliases don't expand in non-interactive scripts).
 
 ---
 
