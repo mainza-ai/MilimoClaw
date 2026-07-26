@@ -1,84 +1,64 @@
 ---
 name: nemoclaw-monitor-sandbox
-description: Inspects sandbox health, trace agent behavior, and diagnose problems. Use when debug nemoclaw agent issues, monitor nemoclaw sandbox, monitor nemoclaw sandbox activity, monitoring, nemoclaw, openclaw, openshell, troubleshooting.
+description: Inspects sandbox health, traces agent behavior, and diagnoses problems. Supports both OpenClaw and Hermes profiles. Use when debug nemoclaw, debug nemohermes, monitor sandbox, nemoclaw status, nemohermes status, nemoclaw logs, nemohermes logs, troubleshooting, openshell.
 ---
 
-# Nemoclaw Monitor Sandbox
+# NemoClaw Monitor Sandbox
 
 Inspect sandbox health, trace agent behavior, and diagnose problems.
 
-## Prerequisites
-
-- A running NemoClaw sandbox.
-- The OpenShell CLI on your `PATH`.
-
-Use the NemoClaw status, logs, and TUI tools together to inspect sandbox health, trace agent behavior, and diagnose problems.
-
-## Step 1: Check Sandbox Health
-
-Run the status command to view the sandbox state, blueprint run information, and active inference configuration:
+## Check Sandbox Health
 
 ```console
 $ nemoclaw <name> status
+$ nemohermes <name> status
 ```
 
-Key fields in the output include the following:
-
-- Sandbox state, which indicates whether the sandbox is running, stopped, or in an error state.
-- Blueprint run ID, which is the identifier for the most recent blueprint execution.
-- Inference provider, which shows the active provider, model, and endpoint.
-
-Run `nemoclaw <name> status` on the host to check sandbox state. Use `openshell sandbox list` for the underlying sandbox details.
-
-## Step 2: View Blueprint and Sandbox Logs
-
-Stream the most recent log output from the blueprint runner and sandbox:
+## View Logs
 
 ```console
-$ nemoclaw <name> logs
+$ nemoclaw <name> logs              # Recent logs
+$ nemoclaw <name> logs --follow     # Real-time streaming
+$ nemohermes <name> logs --tail 100 # Last 100 lines
 ```
 
-To follow the log output in real time:
+## Doctor / Diagnostics
 
 ```console
-$ nemoclaw <name> logs -f
+$ nemoclaw <name> doctor
+$ nemohermes <name> doctor --json
 ```
 
-## Step 3: Monitor Network Activity in the TUI
-
-Open the OpenShell terminal UI for a live view of sandbox network activity and egress requests:
+## Debug (Collect Diagnostics)
 
 ```console
-$ openshell term
+$ nemoclaw debug --output /tmp/nemoclaw-debug.tar.gz
+$ nemohermes debug --quick
 ```
 
-For a remote sandbox, SSH to the instance and run `openshell term` there.
-
-The TUI shows the following information:
-
-- Active network connections from the sandbox.
-- Blocked egress requests awaiting operator approval.
-- Inference routing status.
-
-Refer to Approve or Deny Agent Network Requests (see the `nemoclaw-manage-policy` skill) for details on handling blocked requests.
-
-## Step 4: Test Inference
-
-Run a test inference request to verify that the provider is responding:
+## Snapshot Management
 
 ```console
-$ nemoclaw my-assistant connect
-$ openclaw agent --agent main --local -m "Test inference" --session-id debug
+$ nemoclaw <name> snapshot create --name before-upgrade
+$ nemoclaw <name> snapshot list
+$ nemoclaw <name> snapshot restore before-upgrade
 ```
 
-If the request fails, check the following:
+## Test Inference
 
-1. Run `nemoclaw <name> status` to confirm the active provider and endpoint.
-2. Run `nemoclaw <name> logs -f` to view error messages from the blueprint runner.
-3. Verify that the inference endpoint is reachable from the host.
+```console
+$ nemohermes <name> agent --local -m "Hello, world" --session-id test
+```
+
+## Recovery
+
+```console
+$ nemohermes <name> recover
+$ nemohermes <name> shields up    # Lock config for sensitive workloads
+```
 
 ## Related Skills
 
-- `nemoclaw-reference` — Troubleshooting for common issues and resolution steps
-- `nemoclaw-manage-policy` — Approve or Deny Agent Network Requests for the operator approval flow
-- `nemoclaw-configure-inference` — Switch Inference Providers to change the active provider
+- `nemoclaw-reference` — Full CLI reference
+- `nemohermes-reference` — NemoHermes CLI reference
+- `nemoclaw-manage-policy` — Network policy management
