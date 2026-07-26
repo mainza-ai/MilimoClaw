@@ -2307,3 +2307,28 @@ openshell forward service --target-port 9090 --local 9090 milimo-hermes
 3. **Alias → function**: `alias nemohermes=...` only works in interactive shells (bash doesn't expand aliases by default in scripts). Replaced with a proper bash function + `export -f`.
 
 **Also**: Added port 18790 to blueprint `forward_ports` (commit `7ea91dc`) — the Hermes dashboard socat lands on 18790, not 18789, when `--tui` mode is active.
+
+### 2026-07-25 — Fixed toolset name mismatch + claw-status 500 + registration tests
+
+**Pages**: `tools.py`, `Dockerfile`, `server.py`, `test_registration.py`, `wiki/troubleshooting/common-issues.md`, `wiki/troubleshooting/issues-and-fixes.md`, `wiki/architecture/hermes-profile.md`, `wiki/index.md`, `wiki/log.md`
+
+**Source**: Hermes session showed tools not accessible. Agent fell back to `find`/`grep`/`read` instead of calling `milimo_status` etc.
+
+**Three root causes**:
+
+1. **Toolset name mismatch** (`8b6c9ce`): `register_core_tools()` used `toolset="milimo"` (line 1327 of `tools.py`), but `generate-config.ts` declared `"milimo-hermes"` in `API_SERVER_TOOLSETS`. The Hermes API server only exposes tools whose toolset name matches its `platform_toolsets.api_server` list. The tools were registered but invisible to every session.
+
+2. **`.pth` path blocked by Landlock** (`8b6c9ce`): The `nemoclaw_blueprint.pth` file pointed to `/opt/nemoclaw-blueprint/`, which the sandbox user cannot read (OpenShell's Landlock policy blocks `/opt/` for unprivileged users). Changed to `/sandbox/.nemoclaw/blueprints/0.1.0/` which is `chown`'d to `sandbox:sandbox`. This caused the War Room's claw-status endpoint to always 500 with `ModuleNotFoundError: No module named 'orchestrator'` even though the `.pth` file existed.
+
+3. **No registration tests**: No test verified that the toolset name in `register_core_tools()` matches the one declared in the Hermes config.
+
+**Tests added** (9 new, 67 total):
+- `test_toolset_name_matches_config` — inspects source code of `register_core_tools` for the toolset string
+- `test_toolset_name_in_config` — parses `generate-config.ts` for the toolset name
+- `test_core_tools_count` — asserts exactly 6 tools
+- `test_core_tools_names` — asserts all expected names present
+- `test_core_tools_schemas` — validates each tool has `name`, `description`, `parameters` with `type: object` and `properties`
+- `test_plugin_imports` — ensures module can load without errors
+- `test_plugin_yaml_manifest` — validates `plugin.yaml` matches the code
+- `test_register_core_tools_registers_all_tools` — mocks `ctx` and verifies all 6 tools are registered with the correct toolset
+- `test_toolset_name_in_genesis_yaml` — verifies `generate-config.ts` contains a `"milimo*"` toolset entry

@@ -40,7 +40,6 @@ type HermesBuildSettings = {
   model: string;
   inferenceProviderId: string;
   baseUrl: string;
-  providerKey: string;
   inferenceApi: string;
   managedToolGateways: {
     brokerEnabled: boolean;
@@ -77,7 +76,6 @@ function readHermesBuildSettings(env: NodeJS.ProcessEnv): HermesBuildSettings {
     model,
     inferenceProviderId: env.NEMOCLAW_INFERENCE_PROVIDER_ID || "custom",
     baseUrl,
-    providerKey: env.NEMOCLAW_PROVIDER_KEY || "custom",
     inferenceApi: env.NEMOCLAW_INFERENCE_API || "",
     managedToolGateways: {
       brokerEnabled: env.NEMOCLAW_HERMES_TOOL_GATEWAY_BROKER === "1",
