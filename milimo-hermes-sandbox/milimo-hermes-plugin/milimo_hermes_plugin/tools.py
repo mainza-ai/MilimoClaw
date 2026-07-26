@@ -1318,13 +1318,13 @@ def register_core_tools(ctx: Any) -> None:
 
     Hermes Agent v0.17+ exposes tools via ``ctx.register_tool`` rather than a
     legacy skill-registry ``register_tool`` shim. Each tool is belayed to the
-    ``milimo`` toolset so the LLM sees them as first-class callables.
+    ``milimo-hermes`` toolset so the LLM sees them as first-class callables.
     """
 
     for name, schema, handler in _CORE_TOOLS:
         ctx.register_tool(
             name=name,
-            toolset="milimo",
+            toolset="milimo-hermes",
             schema=schema,
             handler=handler,
             description=schema["description"],

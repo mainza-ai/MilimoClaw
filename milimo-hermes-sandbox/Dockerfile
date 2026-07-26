@@ -78,8 +78,11 @@ RUN /usr/bin/python3 -c "import os, site; [open(os.path.join(d, 'warroom_bridge.
 COPY milimo-blueprint/ /opt/nemoclaw-blueprint/
 RUN chmod -R a+rX,go-w /opt/nemoclaw-blueprint/
 # Make orchestrator importable from every Python interpreter
-RUN /usr/bin/python3 -c "import os, site; [open(os.path.join(d, 'nemoclaw_blueprint.pth'), 'w').write('/opt/nemoclaw-blueprint\n') for d in site.getsitepackages()]" || true \
-    && /opt/hermes/.venv/bin/python3 -c "import os, site; [open(os.path.join(d, 'nemoclaw_blueprint.pth'), 'w').write('/opt/nemoclaw-blueprint\n') for d in site.getsitepackages()]" || true
+# Note: /opt/nemoclaw-blueprint is not readable by the sandbox user
+# (OpenShell Landlock policy blocks /opt/ for unprivileged users).
+# The writable copy under /sandbox/ must be used instead.
+RUN /usr/bin/python3 -c "import os, site; [open(os.path.join(d, 'nemoclaw_blueprint.pth'), 'w').write('/sandbox/.nemoclaw/blueprints/0.1.0\n') for d in site.getsitepackages()]" || true \
+    && /opt/hermes/.venv/bin/python3 -c "import os, site; [open(os.path.join(d, 'nemoclaw_blueprint.pth'), 'w').write('/sandbox/.nemoclaw/blueprints/0.1.0\n') for d in site.getsitepackages()]" || true
 RUN mkdir -p /sandbox/.nemoclaw/blueprints/0.1.0 \
     && cp -r /opt/nemoclaw-blueprint/* /sandbox/.nemoclaw/blueprints/0.1.0/ \
     && chown -R sandbox:sandbox /sandbox/.nemoclaw/blueprints/0.1.0
