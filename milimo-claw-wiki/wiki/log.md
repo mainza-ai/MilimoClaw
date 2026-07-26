@@ -2345,3 +2345,32 @@ openshell forward service --target-port 9090 --local 9090 milimo-hermes
 - Removed `providerKey` from `generate-config.ts` (dead code — read but never used)
 - Kept in `validate-env-secret-boundary.py` allowlist (runtime allowlist is fine)
 - Docker build now: **0 warnings**
+
+### 2026-07-25 — Deep AGENTS.md revision + skill updates + forward_ports root cause
+
+**Pages**: `.agents/AGENTS.md`, `milimo-blueprint/blueprint.yaml`, `milimo-hermes-sandbox/milimo-blueprint/blueprint.yaml`, `.agents/skills/docs/*/`, `wiki/index.md`
+
+**Source**: Two-pass audit of AGENTS.md found 10+ remaining inaccuracies. Port 18789 warning persisted after initial fix.
+
+**AGENTS.md fixes** (second pass):
+- **Ground truth hierarchy**: expanded from 4 to 8 levels (contracts.py, milimo-core protocols, Hermes plugin code, wiki)
+- **Message matrix**: corrected from 34 to 45 rows — added 11 missing types
+- **File tree**: completely rewritten — added 20+ missing entries (ci/, assets/, docs/, .pre-commit, .coderabbit, Makefile, docker-compose.yml, milimo-cli, milimo_blueprint/, uv.lock, pyproject.toml, etc.)
+- **Plugin architecture**: new section documenting both `openclaw.plugin.json` + `plugin.yaml` manifests, 16 skills + 6 tools registration flow
+- **Delegation section**: documents `HermesDelegateAdapter`, `dispatch_tool` primary path, `ClawTask`/`ClawResult` types
+- **Config**: corrected from `~/.milimo/config.json` to profile-dependent (was flat wrong for Hermes)
+- **Cost guard**: attributes `lighter_prompt`/`never_block` to `milimo-blueprint/orchestrator/solo_privacy.py` (not milimo-core)
+- **All 16 legacy `.openclaw-data` paths**: corrected to `.openclaw`
+- **Hermes claw paths**: added `/sandbox/.hermes/claws/<role>/`
+
+**Skill updates** (4 of 8 rewritten):
+- `nemoclaw-deploy-remote`: replaced Brev deployment (v0.0.92+) with headless Linux server workflow
+- `nemoclaw-manage-policy`: replaced `openshell term`/`openshell policy set` with `nemoclaw policy-add/policy-remove`
+- `nemoclaw-configure-inference`: replaced `openshell inference set` with `nemoclaw/nemohermes inference set`
+- `nemoclaw-monitor-sandbox`: modern diagnostics (doctor, debug, snapshot, recover) with nemohermes equivalents
+
+**Port 18789 root cause** (commit `9ae0536`):
+- Previously only removed 18789 from `agent_profiles.hermes-milimo.sandbox.forward_ports`
+- But the NemoClaw CLI MERGES `components.sandbox.forward_ports` (base) with profile-specific ports
+- `components.sandbox.forward_ports` still had `[18789]` at line 199 — this was the actual source of the warning
+- Changed to `[8642]` across all 3 blueprint locations (base + both profiles)
