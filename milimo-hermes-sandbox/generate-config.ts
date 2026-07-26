@@ -30,20 +30,6 @@ const API_SERVER_TOOLSETS = [
   "audio",
 ];
 
-const TERMINAL_TOOLSETS = [
-  "terminal",
-  "file",
-  "code_execution",
-  "skills",
-  "todo",
-  "memory",
-  "session_search",
-  "delegation",
-  "cronjob",
-  "nemoclaw",
-  "milimo-hermes",
-];
-
 type MessagingAllowedIds = Record<string, (string | number)[]>;
 type DiscordGuilds = Record<string, { requireMention?: boolean; users?: (string | number)[] }>;
 type TelegramConfig = { requireMention?: boolean };
@@ -185,7 +171,6 @@ function buildHermesConfig(settings: HermesBuildSettings): Record<string, unknow
     },
     platform_toolsets: {
       api_server: apiServerToolsets,
-      terminal: TERMINAL_TOOLSETS,
     },
   };
 
