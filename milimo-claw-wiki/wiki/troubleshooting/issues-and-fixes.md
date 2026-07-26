@@ -889,3 +889,23 @@ cd milimo-hermes-plugin && python -m pytest tests/test_registration.py -v
 ```bash
 /opt/hermes/.venv/bin/python3 -c "import orchestrator; from milimo_core.bridge_cli import handle_collect_health; print('OK')"
 ```
+
+---
+
+## Issue 29 — "Port Forward on 18789" Warning: NEMOCLAW_DASHBOARD_PORT Override (2026-07-25)
+
+**Discovered**: Repeated warning after every `nemohermes onboard` despite 5 previous fix attempts. Complete data trace through 6 NemoClaw CLI files identified the actual cause.
+
+**Root Cause**: `install-hermes.sh` exported `NEMOCLAW_DASHBOARD_PORT=18790`. The sandbox's `start.sh` reads this env var at line 155-174 and sets `_dashboard_port=18790`, then `DASHBOARD_PUBLIC_PORT=18790`, causing the dashboard socat to bind port 18790 instead of the default 18789. The upstream Hermes agent manifest (`agents/hermes/manifest.yaml`) declares `forward_ports: [18789, 8642]`. The nemohermes CLI reads the manifest and verifies port 18789 — nothing is listening there because our env var moved it to 18790.
+
+**Failed previous fixes** (all treated symptom, not cause):
+1. Removed 18789 from blueprint `forward_ports` (CLI uses agent manifest, not blueprint)
+2. Set `CHAT_UI_URL=http://127.0.0.1:18790` (start.sh derives from NEMOCLAW_DASHBOARD_PORT, not CHAT_UI_URL)
+3. Exported `NEMOCLAW_DASHBOARD_PORT=18790` (THIS was the actual cause)
+
+**Fix** (commit `f25e860`):
+- Reverted `NEMOCLAW_DASHBOARD_PORT` export from `install-hermes.sh`
+- Reverted `CHAT_UI_URL` in blueprint back to empty string
+- Sandbox now uses default port 18789, matching upstream agent manifest
+
+**Rule**: Never set `NEMOCLAW_DASHBOARD_PORT` or override `CHAT_UI_URL` with a port number. The upstream Hermes agent manifest defines `forward_ports: [18789, 8642]` — let these defaults propagate through start.sh automatically.

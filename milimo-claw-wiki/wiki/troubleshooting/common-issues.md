@@ -892,6 +892,31 @@ No error message, no timeout — just blank space after the header.
 
 ---
 
+### "Port Forward on 18789 is Not Working" Warning During Onboard — NEMOCLAW_DASHBOARD_PORT Override (FIXED 2026-07-25)
+
+**Symptom**: `nemohermes onboard` succeeds but prints:
+```
+⚠ Deployment verification found issues:
+  ✗ dashboard: port forward not working (connection refused)
+    Port forward on 18789 is not working.
+```
+
+**Root Cause**: `install-hermes.sh` exported `NEMOCLAW_DASHBOARD_PORT=18790`. The sandbox's `start.sh` reads this env var and sets the dashboard socat port to 18790 instead of the default 18789. The upstream Hermes agent manifest (`agents/hermes/manifest.yaml`) declares `forward_ports: [18789, 8642]`. The nemohermes CLI reads the manifest and verifies port 18789 — nothing is listening there because our env var moved it to 18790.
+
+**The warning was caused by our own code.** Every previous fix treated the symptom:
+1. Removing 18789 from blueprint `forward_ports` (CLI uses agent manifest, not blueprint)
+2. Setting `CHAT_UI_URL=http://127.0.0.1:18790` (start.sh already derives from NEMOCLAW_DASHBOARD_PORT)
+3. Exporting `NEMOCLAW_DASHBOARD_PORT=18790` (THIS was the actual cause)
+
+**Fix** (commit `f25e860`):
+- Reverted `NEMOCLAW_DASHBOARD_PORT` export from `install-hermes.sh`
+- Reverted `CHAT_UI_URL` in blueprint back to empty string
+- The sandbox now uses default port 18789, matching the upstream agent manifest
+
+**Do NOT set `NEMOCLAW_DASHBOARD_PORT`** in environment or build args. Let the upstream default (18789) propagate through start.sh automatically.
+
+---
+
 ## Related Pages
 
 - [[production-spend-flow-fix-plan-2026-07-06]] — Full production fix plan

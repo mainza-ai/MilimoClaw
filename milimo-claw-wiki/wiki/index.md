@@ -333,6 +333,7 @@ See [[log]] for complete operation history.
 
 | Date | Change | Pages Affected |
 |------|--------|----------------|
+| 2026-07-25 | Reverted `NEMOCLAW_DASHBOARD_PORT` override (own code was causing socat to bind 18790 instead of 18789 — agent manifest expects 18789) | install-hermes.sh, blueprint.yaml, README.md, index.md, log.md, common-issues.md, issues-and-fixes.md |
 | 2026-07-25 | Deep AGENTS.md revision: fixed 16 legacy paths, added Hermes claw paths, dual-manifest plugin docs, complete file tree with 20+ missing entries; updated 4 skills (deploy-remote, manage-policy, configure-inference, monitor-sandbox) from legacy Brev/openshell to modern CLI; removed 18789 from all 3 blueprint forward_ports locations (root cause: CLI merges base + profile ports) | AGENTS.md, blueprint.yaml, skills/, index.md, log.md |
 | 2026-07-25 | Removed `NEMOCLAW_PROVIDER_KEY` from Dockerfile ARG/ENV (SecretsUsedInArgOrEnv warning — dead code, key injected at runtime by gateway) | Dockerfile, generate-config.ts, install-hermes.sh, index.md, log.md |
 | 2026-07-25 | Fixed onboarding hang at [6/8]: preemptive sandbox destroy + 900s timeout + alias→function fix; added 18790 to forward_ports for dashboard reliability | install-hermes.sh, blueprint.yaml, common-issues.md, issues-and-fixes.md, log.md, index.md |
