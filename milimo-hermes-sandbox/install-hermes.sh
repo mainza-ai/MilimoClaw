@@ -481,7 +481,6 @@ build_docker_image() {
   docker_args+=(--build-arg "NEMOCLAW_MODEL=${NEMOCLAW_MODEL}")
   docker_args+=(--build-arg "NEMOCLAW_INFERENCE_PROVIDER_ID=${NEMOCLAW_INFERENCE_PROVIDER_ID:-custom}")
   docker_args+=(--build-arg "NEMOCLAW_INFERENCE_BASE_URL=${NEMOCLAW_INFERENCE_BASE_URL}")
-  docker_args+=(--build-arg "CHAT_UI_URL=${CHAT_UI_URL}")
   docker_args+=(--build-arg "NEMOCLAW_MESSAGING_CHANNELS_B64=${NEMOCLAW_MESSAGING_CHANNELS_B64}")
   docker_args+=(--build-arg "NEMOCLAW_MESSAGING_ALLOWED_IDS_B64=${NEMOCLAW_MESSAGING_ALLOWED_IDS_B64}")
   docker_args+=(--build-arg "NEMOCLAW_DISCORD_GUILDS_B64=${NEMOCLAW_DISCORD_GUILDS_B64}")
