@@ -2346,7 +2346,54 @@ openshell forward service --target-port 9090 --local 9090 milimo-hermes
 - Kept in `validate-env-secret-boundary.py` allowlist (runtime allowlist is fine)
 - Docker build now: **0 warnings**
 
-### 2026-07-25 — Deep AGENTS.md revision + skill updates + forward_ports root cause
+### 2026-07-25 — Reverted NEMOCLAW_DASHBOARD_PORT override (was causing 18789 warning)
+
+**Pages**: `install-hermes.sh`, `blueprint.yaml`, `README.md`, `wiki/index.md`, `wiki/log.md`, `wiki/troubleshooting/common-issues.md`, `wiki/troubleshooting/issues-and-fixes.md`
+
+**Source**: 18789 warning persisted through 5 previous fix attempts. Completed full data trace through 6 NemoClaw CLI files referencing port 18789.
+
+**Root cause chain**:
+1. Upstream Hermes agent manifest (`agents/hermes/manifest.yaml`) declares `forward_ports: [18789, 8642]`
+2. Our `install-hermes.sh` exported `NEMOCLAW_DASHBOARD_PORT=18790` (added in commit 65d7248)
+3. `start.sh` reads `NEMOCLAW_DASHBOARD_PORT` → sets `_dashboard_port=18790` → `DASHBOARD_PUBLIC_PORT=18790` → socat binds 18790
+4. `nemohermes onboard` reads agent manifest → tries to verify 18789 → nothing listening → warning
+
+**Previous incorrect fixes** (all treating symptom, not cause):
+1. Removed 18789 from blueprint `forward_ports` (CLI ignores it — uses agent manifest)
+2. Set `CHAT_UI_URL=http://127.0.0.1:18790` in blueprint (overrode start.sh default)
+3. Exported `NEMOCLAW_DASHBOARD_PORT=18790` (THIS was the actual cause — now reverted)
+
+**Fix** (commit `f25e860`):
+- Reverted `NEMOCLAW_DASHBOARD_PORT` export from install-hermes.sh
+- Reverted `CHAT_UI_URL` in blueprint back to empty string
+- The sandbox now uses default port 18789, matching upstream agent manifest
+
+### 2026-07-25 — Final 18789 fix: stale SSH forward occupied port during CLI scan
+
+**Pages**: `install-hermes.sh`, `AGENTS.md`, `wiki/index.md`, `wiki/log.md`, `wiki/troubleshooting/common-issues.md`, `wiki/troubleshooting/issues-and-fixes.md`
+
+**Root cause chain** (final, after 6 previous failed fixes):
+
+1. Previous sandbox leaves a host-side SSH forward on **port 18789** running
+2. `install-hermes.sh` destroys the old sandbox + Docker container, but the
+   **host-side SSH process** (PID on macOS) survives — `openshell forward stop`
+   was only called in the post-onboarding section (after the CLI had already run)
+3. `nemohermes onboard` scans ports 18789-18799 for allocation via `lsof` +
+   `probePortBoundSync`. Finds 18789 occupied by the stale SSH process
+4. CLI allocates **18790** instead, injects `NEMOCLAW_DASHBOARD_PORT=18790`
+5. start.sh binds socat on 18790
+6. CLI verifies agent manifest's hardcoded `forward_ports: [18789]` → empty
+
+**Fix** (commit `5106b54` + `f8ea781`):
+- Moved `openshell forward stop 18789 18790 9090` to the **pre-onboarding**
+  cleanup section (Layer 3), BEFORE `nemohermes onboard` runs
+- Added `sleep 1` after stop for OS to release the TCP port
+- Stale SSH forward is now killed before the CLI scans for ports, so 18789
+  is free and correctly allocated
+
+**AGENTS.md**: Added deep-analysis-first instruction to prevent future
+shortcut-driven debugging. AI must now gather all information, trace fully,
+and present findings for review before implementing.
 
 **Pages**: `.agents/AGENTS.md`, `milimo-blueprint/blueprint.yaml`, `milimo-hermes-sandbox/milimo-blueprint/blueprint.yaml`, `.agents/skills/docs/*/`, `wiki/index.md`
 

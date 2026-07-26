@@ -481,7 +481,6 @@ build_docker_image() {
   docker_args+=(--build-arg "NEMOCLAW_MODEL=${NEMOCLAW_MODEL}")
   docker_args+=(--build-arg "NEMOCLAW_INFERENCE_PROVIDER_ID=${NEMOCLAW_INFERENCE_PROVIDER_ID:-custom}")
   docker_args+=(--build-arg "NEMOCLAW_INFERENCE_BASE_URL=${NEMOCLAW_INFERENCE_BASE_URL}")
-  docker_args+=(--build-arg "CHAT_UI_URL=${CHAT_UI_URL}")
   docker_args+=(--build-arg "NEMOCLAW_MESSAGING_CHANNELS_B64=${NEMOCLAW_MESSAGING_CHANNELS_B64}")
   docker_args+=(--build-arg "NEMOCLAW_MESSAGING_ALLOWED_IDS_B64=${NEMOCLAW_MESSAGING_ALLOWED_IDS_B64}")
   docker_args+=(--build-arg "NEMOCLAW_DISCORD_GUILDS_B64=${NEMOCLAW_DISCORD_GUILDS_B64}")
@@ -693,7 +692,18 @@ main() {
     docker rm -f "$_old_container" 2>/dev/null || true
   fi
 
-  # Layer 3: Verify sandbox is actually gone
+  # Layer 3: Kill stale host-side port forwards (they occupy ports in the
+  # 18789-18799 range that the nemohermes CLI scans for allocation. If a
+  # stale forward holds 18789, the CLI skips it and allocates 18790+, then
+  # the deployment verification fails because the agent manifest hardcodes
+  # forward_ports: [18789] and the allocated port doesn't match.)
+  for _port in 18789 18790 9090; do
+    timeout 5 openshell forward stop "$_port" "$SANDBOX_NAME" 2>/dev/null || true
+  done
+  # Brief wait for OS to release TCP ports after killing SSH forward processes
+  sleep 1
+
+  # Layer 4: Verify sandbox is actually gone
   local _cleanup_attempts=0
   while timeout 10 nemohermes "$SANDBOX_NAME" status --json 2>/dev/null | grep -q '"found":true'; do
     _cleanup_attempts=$((_cleanup_attempts + 1))

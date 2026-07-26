@@ -259,14 +259,13 @@ $ openclaw tui
 
 #### Option B: Hermes Profile (Web Dashboard + OpenAI-compatible API)
 
-To run the Hermes profile with web dashboard (host port 19119) and OpenAI-compatible API (port 8642):
+To run the Hermes profile with web dashboard (port 18789) and OpenAI-compatible API (port 8642):
 
 ```console
 $ export NVIDIA_API_KEY=nvapi-your-key-here
 $ export GITHUB_TOKEN=github_pat_your-token-here
 $ export NEMOCLAW_NON_INTERACTIVE=1
 $ export NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1
-$ export CHAT_UI_URL=http://localhost:18790
 $ git clone https://github.com/mainza-ai/MilimoClaw.git
 $ cd MilimoClaw
 $ cp .env.example .env
@@ -290,7 +289,7 @@ NEMOCLAW_AUTH_MODE=api_key \
   ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
 ```
 
-> **Note**: `NEMOCLAW_RECREATE_WITHOUT_BACKUP=1` is required when running non-interactively. Without it, the build hangs at the shields-backup step because sealed files cannot be read by the backup process. After rebuild, if port 18790 is not responding, restore the forward: `openshell forward start --background 18790 milimo-hermes`.
+> **Note**: `NEMOCLAW_RECREATE_WITHOUT_BACKUP=1` is required when running non-interactively. Without it, the build hangs at the shields-backup step because sealed files cannot be read by the backup process. After rebuild, the post-onboarding script sets up port forwarding automatically (dashboard on 18790, war room on 9090).
 
 **Policy presets** (applied automatically by `install-hermes.sh` post-onboarding):
 
