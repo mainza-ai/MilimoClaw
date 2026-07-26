@@ -10,10 +10,10 @@ coordination rules, and the conventions that govern how they behave and are buil
 before writing or modifying any agent-related code.**
 
 **Before making any changes or proposing a fix, you MUST:**
-1. **Gather all information first** — Read all relevant files, trace data flows, check logs, examine configs, and understand the full system before forming a hypothesis.
-2. **Analyze thoroughly** — Do not jump to conclusions. Trace root causes step by step through every layer (CLI, runtime, config, network, filesystem). Consider edge cases, timing, and state.
-3. **Present findings for review** — Before writing any code, present your complete analysis to the user for approval. Do not skip to implementation until the user confirms the analysis is correct.
-4. **No shortcuts, no lazy fixes** — Every fix must address the ROOT CAUSE, not the symptom. If a fix doesn't work, gather more information and re-analyze from scratch. Never pile band-aids on a problem without understanding why previous attempts failed.
+1. **Gather all information first** — Read all relevant files, trace data flows, check logs, examine configs, and understand the full system before forming a hypothesis. Do not stop after finding one piece of the puzzle. Trace every layer: CLI, runtime, config, network, filesystem, environment variables, git history, and upstream dependencies. If you don't have the full picture, you don't understand the problem.
+2. **Analyze thoroughly** — Do not jump to conclusions. Trace root causes step by step. Consider edge cases, timing, state, and history. Ask "what changed?" and "why did this ever work?" before asking "how do I fix it?"
+3. **Present findings for review** — Before writing any code, present your complete analysis to the user for approval. Include the data sources you checked, the hypotheses you rejected, and why your proposed fix addresses the root cause. Do not skip to implementation until the user confirms the analysis is correct.
+4. **No shortcuts, no lazy fixes** — Every fix must address the ROOT CAUSE, not the symptom. If a fix doesn't work, gather more information and re-analyze from scratch. Never pile band-aids on a problem without understanding why previous attempts failed. A fix that doesn't address the root cause is not a fix — it's technical debt.
 
 Violating these rules leads to wasted effort, incorrect fixes, and recurring bugs. This is a production-grade system — treat it as such.
 
