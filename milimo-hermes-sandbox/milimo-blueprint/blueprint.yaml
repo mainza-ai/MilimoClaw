@@ -68,8 +68,7 @@ agent_profiles:
       image: "milimo-hermes-sandbox:latest"
       name: "milimo-hermes"
       forward_ports:
-        - 18789   # Hermes dashboard (gRPC forward target)
-        - 18790   # Hermes dashboard (socat forward target)
+        - 18790   # Hermes dashboard (socat forward to port 19119)
         - 8642    # OpenAI-compatible API endpoint
         - 9090    # War Room HTTP server
       build:

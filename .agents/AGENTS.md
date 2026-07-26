@@ -70,8 +70,12 @@ layer where every message between claws is typed, logged, and validated.
 
 **NemoClaw Sandbox Filesystem Policy (per docs.nvidia.com/nemoclaw/latest/):**
 - `/sandbox/` root is **read-only** per NemoClaw Landlock policy — claws cannot write here
-- Hermes profile writable paths: `/sandbox/.hermes/`, `/sandbox/.nemoclaw/`, `/tmp/`
-- OpenClaw profile writable paths: `/sandbox/.openclaw-data/milimo/claws/<role>/`
+- **OpenClaw profile** writable paths: `/sandbox/.openclaw/milimo/claws/<role>/` (primary),
+  `/sandbox/.openclaw/milimo/` (config), `/tmp/`
+- **Hermes profile** writable paths: `/sandbox/.hermes/` (config + claws + mesh),
+  `/sandbox/.hermes/claws/<role>/` (per-claw data),
+  `/sandbox/.hermes/mesh/inbox/war_room/` (War Room queue),
+  `/sandbox/.nemoclaw/`, `/tmp/`
 - Provider credentials are stored in the **OpenShell gateway store**
 - `/opt/` is blocked for unprivileged sandbox users (Landlock) — use `/sandbox/` paths instead
 
@@ -89,7 +93,7 @@ layer where every message between claws is typed, logged, and validated.
 **Role:** Creative department. Generates all content autonomously.
 
 **Sandbox:** `content-claw`
-**Filesystem mount:** `/sandbox/.openclaw-data/milimo/claws/content`
+**Filesystem mount:** `/sandbox/.openclaw/milimo/claws/content`
 **Blueprint:** `milimo-blueprint/roles/content-claw.yaml`
 **Policy:** `milimo-blueprint/policies/content-sandbox.yaml`
 **Orchestrator:** `milimo-blueprint/orchestrator/content/`
@@ -103,7 +107,7 @@ layer where every message between claws is typed, logged, and validated.
 - Sends `brief_acknowledged` within 5 minutes of every project brief received
 
 **What it cannot do:**
-- Read `/sandbox/.openclaw-data/milimo/claws/ops`, `/sandbox/.openclaw-data/milimo/claws/finance`, `/sandbox/.openclaw-data/milimo/claws/build`, or `/sandbox/.openclaw-data/milimo/claws/assistant`
+- Read `/sandbox/.openclaw/milimo/claws/ops`, `/sandbox/.openclaw/milimo/claws/finance`, `/sandbox/.openclaw/milimo/claws/build`, or `/sandbox/.openclaw/milimo/claws/assistant`
 - Publish anything without operator REVIEW approval in the War Room
 - Make inference calls that bypass the privacy router
 
@@ -146,7 +150,7 @@ Client voice adapter → Trend injector
 **Role:** Account manager and project manager. Owns the full client lifecycle.
 
 **Sandbox:** `ops-claw`
-**Filesystem mount:** `/sandbox/.openclaw-data/milimo/claws/ops`
+**Filesystem mount:** `/sandbox/.openclaw/milimo/claws/ops`
 **Blueprint:** `milimo-blueprint/roles/ops-claw.yaml`
 **Policy:** `milimo-blueprint/policies/ops-sandbox.yaml`
 **Orchestrator:** `milimo-blueprint/orchestrator/ops/`
@@ -160,7 +164,7 @@ Client voice adapter → Trend injector
 - Always queries Finance Claw for pricing before sending any proposal
 
 **What it cannot do:**
-- Read `/sandbox/.openclaw-data/milimo/claws/finance`, `/sandbox/.openclaw-data/milimo/claws/content`, `/sandbox/.openclaw-data/milimo/claws/build`, or `/sandbox/.openclaw-data/milimo/claws/assistant`
+- Read `/sandbox/.openclaw/milimo/claws/finance`, `/sandbox/.openclaw/milimo/claws/content`, `/sandbox/.openclaw/milimo/claws/build`, or `/sandbox/.openclaw/milimo/claws/assistant`
 - Send any client-facing message without operator REVIEW approval
 - Send a `project_brief` before receiving a `pricing_response` from Finance Claw
 - Generate or send invoices — Finance Claw only
@@ -217,7 +221,7 @@ Relationship health scorer v2
 **Role:** Intelligence layer. Observes everything, acts on nothing.
 
 **Sandbox:** `analytics-claw`
-**Filesystem mount:** `/sandbox/.openclaw-data/milimo/claws/analytics`
+**Filesystem mount:** `/sandbox/.openclaw/milimo/claws/analytics`
 **Blueprint:** `milimo-blueprint/roles/analytics-claw.yaml`
 **Policy:** `milimo-blueprint/policies/analytics-sandbox.yaml`
 **Orchestrator:** `milimo-blueprint/orchestrator/analytics/`
@@ -232,13 +236,13 @@ Relationship health scorer v2
 
 **What it cannot do:**
 - Write to any external platform — read-only network access only
-- Read `/sandbox/.openclaw-data/milimo/claws/ops`, `/sandbox/.openclaw-data/milimo/claws/finance`, `/sandbox/.openclaw-data/milimo/claws/build`, or `/sandbox/.openclaw-data/milimo/claws/assistant` raw records
+- Read `/sandbox/.openclaw/milimo/claws/ops`, `/sandbox/.openclaw/milimo/claws/finance`, `/sandbox/.openclaw/milimo/claws/build`, or `/sandbox/.openclaw/milimo/claws/assistant` raw records
 - Queue HOLD actions in the War Room — it observes, never blocks
 - Perform any write operation to external APIs
 
 **Primary output — shared filesystem (CRITICAL):**
 ```
-/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json
+/sandbox/.openclaw/milimo/claws/analytics/reports/weekly-intelligence.json
 ```
 This is the only file in the entire mesh that all six claws can read
 directly without a message contract. It must be configured as a
@@ -292,7 +296,7 @@ Retention correlator → Competitor signal tracker → Forward projection engine
 **Role:** Financial nervous system. Tracks every dollar, protects every margin.
 
 **Sandbox:** `finance-claw`
-**Filesystem mount:** `/sandbox/.openclaw-data/milimo/claws/finance`
+**Filesystem mount:** `/sandbox/.openclaw/milimo/claws/finance`
 **Blueprint:** `milimo-blueprint/roles/finance-claw.yaml`
 **Policy:** `milimo-blueprint/policies/finance-sandbox.yaml`
 **Orchestrator:** `milimo-blueprint/orchestrator/finance/`
@@ -309,7 +313,7 @@ Retention correlator → Competitor signal tracker → Forward projection engine
 
 **What it cannot do:**
 - Communicate with clients directly — ever
-- Read `/sandbox/.openclaw-data/milimo/claws/ops`, `/sandbox/.openclaw-data/milimo/claws/content`, `/sandbox/.openclaw-data/milimo/claws/build`, or `/sandbox/.openclaw-data/milimo/claws/assistant`
+- Read `/sandbox/.openclaw/milimo/claws/ops`, `/sandbox/.openclaw/milimo/claws/content`, `/sandbox/.openclaw/milimo/claws/build`, or `/sandbox/.openclaw/milimo/claws/assistant`
 - Spend money without **two independent human gates** (War Room HOLD release + Stripe Link app approval)
 - Send any invoice without two-stage operator approval (see below)
 - Include line items, client names, or invoice IDs in `revenue_summary` — totals only
@@ -401,7 +405,7 @@ Margin tracker v2 → Tax category classifier v2 → Rate optimization advisor v
 **Role:** Engineering department. Ships code autonomously.
 
 **Sandbox:** `build-claw`
-**Filesystem mount:** `/sandbox/.openclaw-data/milimo/claws/build`
+**Filesystem mount:** `/sandbox/.openclaw/milimo/claws/build`
 **Blueprint:** `milimo-blueprint/roles/build-claw.yaml`
 **Policy:** `milimo-blueprint/policies/build-sandbox.yaml`
 **Orchestrator:** `milimo-blueprint/orchestrator/build/`
@@ -421,7 +425,7 @@ Margin tracker v2 → Tax category classifier v2 → Rate optimization advisor v
 - Merge any PR without operator HOLD clearance
 - Deploy to production without operator HOLD clearance (separate from PR HOLD)
 - Share source code or API keys with any other claw via inter-sandbox message
-- Read `/sandbox/.openclaw-data/milimo/claws/ops`, `/sandbox/.openclaw-data/milimo/claws/finance`, `/sandbox/.openclaw-data/milimo/claws/content`, or `/sandbox/.openclaw-data/milimo/claws/assistant`
+- Read `/sandbox/.openclaw/milimo/claws/ops`, `/sandbox/.openclaw/milimo/claws/finance`, `/sandbox/.openclaw/milimo/claws/content`, or `/sandbox/.openclaw/milimo/claws/assistant`
 
 **Two separate two-stage approval flows:**
 ```
@@ -490,7 +494,7 @@ Error pattern classifier v2 → Churn signal correlator → Auto-roadmap drafter
 **Role:** Operator bridge and cross-claw coordinator. Lucy.
 
 **Sandbox:** `assistant-claw`
-**Filesystem mount:** `/sandbox/.openclaw-data/milimo/claws/assistant`
+**Filesystem mount:** `/sandbox/.openclaw/milimo/claws/assistant`
 **Blueprint:** `milimo-blueprint/roles/assistant-claw.yaml`
 **Policy:** `milimo-blueprint/policies/assistant-sandbox.yaml`
 **Orchestrator:** `milimo-blueprint/orchestrator/assistant/`
@@ -504,7 +508,7 @@ Error pattern classifier v2 → Churn signal correlator → Auto-roadmap drafter
 - Maintains conversation context with the operator across sessions
 
 **What it cannot do:**
-- Read `/sandbox/.openclaw-data/milimo/claws/content`, `/sandbox/.openclaw-data/milimo/claws/ops`, `/sandbox/.openclaw-data/milimo/claws/analytics`, `/sandbox/.openclaw-data/milimo/claws/finance`, or `/sandbox/.openclaw-data/milimo/claws/build`
+- Read `/sandbox/.openclaw/milimo/claws/content`, `/sandbox/.openclaw/milimo/claws/ops`, `/sandbox/.openclaw/milimo/claws/analytics`, `/sandbox/.openclaw/milimo/claws/finance`, or `/sandbox/.openclaw/milimo/claws/build`
 - Send any client-facing message — operator communication only
 - Execute financial transactions, merge PRs, or publish content
 - Modify any other claw's filesystem or configuration
@@ -666,7 +670,7 @@ typed messages.
 
 **One exception — the Analytics Claw's shared read export:**
 ```
-/sandbox/.openclaw-data/milimo/claws/analytics/reports/weekly-intelligence.json
+/sandbox/.openclaw/milimo/claws/analytics/reports/weekly-intelligence.json
 ```
 This file must be configured as a read-only mount in **all six** claw
 sandbox policies. Verify with Phase A isolation tests before anything else.
@@ -854,9 +858,36 @@ milimo squad finals-resume
 
 ---
 
-## Tool Registration (Hermes Profile)
+## Plugin Architecture
 
-The Hermes Milimo plugin registers **6 core tools** via `ctx.register_tool()` in `milimo-hermes-plugin/milimo_hermes_plugin/tools.py`:
+Milimo Claw uses two plugin manifests — one per profile.
+
+**OpenClaw profile:** `milimo/openclaw.plugin.json`
+- Plugin ID: `"milimo"`, version `"0.1.0"`
+- Entry point: `milimo/src/index.ts`
+- Registered as an OpenClaw plugin via `openclaw plugins install /opt/milimo`
+
+**Hermes profile:** `milimo-hermes-plugin/plugin.yaml`
+- Plugin name: `"milimo-hermes-plugin"`, version `"0.2.0"`
+- Entry point: `milimo_hermes_plugin:register` (Python)
+- Enabled via `config.yaml`: `plugins.enabled: ["nemoclaw", "milimo-hermes"]`
+
+### Registration Flow (Hermes Profile)
+
+```
+__init__.py:register(ctx, skill_registry)
+  ├── register_all_skills(skill_registry)        # 6 claw skills + 10 infra skills
+  │     skills: build_claw, content_claw, ops_claw,
+  │             analytics_claw, finance_claw, assistant_claw
+  │     infra:  privacy_router, inference_client, provenanance_signer,
+  │             tool_generator, tool_validator, tool_sandbox,
+  │             github_client, vercel_client, sentry_client, stripe_client
+  └── register_core_tools(ctx)                   # 6 core tools (see below)
+```
+
+### Tool Registration
+
+The Hermes Milimo plugin registers **6 core tools** via `ctx.register_tool()` in `tools.py`:
 
 | Tool | Handler | Schema | Purpose |
 |---|---|---|---|
@@ -927,12 +958,15 @@ Channel management prints instructions for `nemoclaw <sandbox> channels <cmd>` �
 operations (spend request creation, approval polling). All `milimo_core` Python code avoids
 shell subprocesses for security.
 
-**Config** — `~/.milimo/config.json` is the single source of truth.
+**Config** — Profile-dependent. OpenClaw: `/sandbox/.openclaw/milimo/config.json` (or legacy `~/.milimo/config.json`).
+Hermes: `/sandbox/.hermes/config.yaml` + `/sandbox/.hermes/.env` (generated by `generate-config.ts`).
+See `milimo_paths.py:_resolve_base()` for the full resolution order (8 fallback positions).
 No separate `state.json`. All commands read from and write to one file.
 
-**Cost guard** — Daily cloud token budget: 50,000. Alert at 80%.
-Fallback strategy: `lighter_prompt` (reduce max_tokens 50%, trim enrichment
-context). Never block a claw action — always fallback, never fail.
+**Cost guard** — Daily cloud token budget: 50,000 (`CostGuardConfig(daily_token_limit=50000)` in `cost_guard.py`).
+Alert at 80% (`alert_threshold_percent = 80.0`). Fallback strategy `lighter_prompt` and
+`never_block_claw_action` are implemented in `milimo-blueprint/orchestrator/solo_privacy.py`
+and `solo-founder.yaml`, not in `milimo-core`.
 
 **Tests:**
 - Python: `pytest`, full coverage per class and method
@@ -951,12 +985,20 @@ milimo-claw/
 ├── AGENTS.md                              THIS FILE (root-level redirect)
 ├── .agents/
 │   ├── AGENTS.md                          Canonical AGENTS.md (ground truth)
-│   └── skills/                            AI coding assistant skills
-│       └── docs/
-│           ├── nemoclaw-*/                NemoClaw CLI skills
-│           └── nemohermes-reference/       NemoHermes CLI reference
+│   └── skills/
+│       ├── docs/                          AI coding assistant skills
+│       │   ├── nemoclaw-configure-inference/
+│       │   ├── nemoclaw-deploy-remote/
+│       │   ├── nemoclaw-get-started/
+│       │   ├── nemoclaw-manage-policy/
+│       │   ├── nemoclaw-monitor-sandbox/
+│       │   ├── nemoclaw-overview/
+│       │   ├── nemoclaw-reference/
+│       │   └── nemohermes-reference/
+│       └── update-docs/                   Wiki update skill
 │
 ├── milimo/                                TypeScript plugin (OpenClaw profile)
+│   ├── openclaw.plugin.json               Plugin manifest (id: "milimo")
 │   └── src/
 │       ├── index.ts                       Plugin entry point
 │       ├── cli.ts                         Command registration
@@ -966,7 +1008,7 @@ milimo-claw/
 │       └── onboard/                       Config persistence
 │
 ├── milimo-hermes-plugin/                  Python plugin (Hermes profile)
-│   ├── plugin.yaml                        Plugin manifest
+│   ├── plugin.yaml                        Plugin manifest (version 0.2.0)
 │   ├── milimo_hermes_plugin/
 │   │   ├── __init__.py                    Plugin entry: register(), on_load()
 │   │   ├── tools.py                       Tool registration (6 core tools)
@@ -977,9 +1019,6 @@ milimo-claw/
 │   │   ├── warroom_bridge.py              Filesystem I/O bridge
 │   │   └── warroom.html                   Browser UI
 │   └── tests/                             Plugin test suite
-│       ├── conftest.py
-│       ├── integration/
-│       └── test_registration.py           Toolset name + schema tests
 │
 ├── milimo-hermes-sandbox/                 Hermes sandbox Docker build
 │   ├── Dockerfile                         Sandbox image definition
@@ -990,25 +1029,41 @@ milimo-claw/
 │   ├── milimo-blueprint/                  Sandbox copy of blueprint
 │   └── milimo-hermes-plugin/              Sandbox copy of plugin
 │
-├── milimo-core/                           Python core library
+├── milimo-core/                           Python core library (54 modules)
 │   └── src/milimo_core/
 │       ├── contracts.py                   45 valid message type schemas
-│       ├── protocols/delegation.py        DelegationAdapter, ClawTask, ClawResult
-│       ├── finance/                       SpendApprovalHandler, cost guard, pricing
-│       ├── build/                         PR management, deploy, error monitoring
+│       ├── protocols/                     DelegationAdapter, mesh encryption
+│       ├── finance/                       SpendHandler, cost guard, pricing
+│       ├── build/                         PR, deploy, error, cost monitoring
 │       ├── content/                       Content generation, publishing
-│       ├── ops/                           Intake, project mgmt, scope monitoring
+│       ├── ops/                           Intake, project mgmt, scope
 │       ├── analytics/                     Signal processing, anomaly detection
 │       ├── assistant/                     Lucy assistant
-│       ├── evolution_cycle.py             5-stage evolution pipeline
-│       └── ...                            Privacy router, tool gen, bridge CLI
+│       ├── evolution/                     Evolution cycle, scheduler
+│       ├── tool_*/                        Tool generator, builder, validator,
+│       │                                 sandbox, registry, proposal
+│       ├── bridge_*.py                    Bridge CLI + server (Python ↔ TS)
+│       ├── claw_*.py                      Launcher, layouts, bootstrap
+│       ├── blueprint_*.py                 Manager, merger
+│       ├── mesh_*.py                      Relay, encryption, gateway adapter
+│       ├── provenance_*.py                Signer, verifier
+│       ├── milimo_paths.py                Path resolver (8 fallback positions)
+│       ├── privacy_router.py              Inference routing by data type
+│       ├── inference_client.py            Cloud/local inference
+│       ├── cost_guard.py                  Token budget tracking
+│       ├── service_factory.py             GitHub, Vercel, Sentry, Stripe clients
+│       ├── notifications.py               War room notifier
+│       └── ...                            Attestation, containment, SSRF, regions
 │
 ├── milimo-blueprint/                      Python orchestrator (OpenClaw profile)
-│   ├── blueprint.yaml                     Dual-track profile definitions
-│   ├── orchestrator/                      Claw implementations, contracts
+│   ├── blueprint.yaml                     Dual-track profiles (openclaw + hermes-milimo)
+│   ├── orchestrator/                      Claw implementations (62 modules)
 │   ├── roles/                             6 role blueprints
-│   ├── policies/                          Sandbox policies + presets
+│   ├── policies/                          Sandbox policies + presets/
 │   ├── templates/                         7 squad templates
+│   ├── schemas/                           YAML/JSON schema files
+│   ├── router/                            Pool/router configs
+│   ├── prompts/                           AI prompts for claw setup
 │   └── tests/                             Claw integration tests
 │
 ├── milimo-claw-wiki/wiki/                 Obsidian knowledge base
@@ -1019,17 +1074,34 @@ milimo-claw/
 │   ├── troubleshooting/                   Common issues, issues-and-fixes
 │   └── ...                                Coordination, evolution, reference
 │
-├── milimo-claw-docs/                      Legacy spec documents
-│   ├── reference/                         Ground truth specs (6 claw specs)
-│   └── prompts/                           AI implementation prompts
+├── milimo-claw-docs/                      Spec documents + implementation prompts
+│   ├── reference/                         6 claw specs + solo template spec
+│   └── prompts/                           7+ AI implementation prompts
 │
-├── milimo-server/                         HTTP server
-├── milimo-admin/                          Admin utilities
-├── milimo-mobile/                         Mobile interface
-├── scripts/                               Shell scripts (check-plugin-sync, etc.)
+├── scripts/                               check-plugin-sync, deploy, init, smoke tests
 ├── Dockerfile                             OpenClaw sandbox image
 ├── install.sh                             OpenClaw profile installer
-└── package.json                           Root dependencies (OpenClaw)
+├── Makefile                               Build/lint targets
+├── docker-compose.yml                     Local dev compose
+├── package.json                           Root dependencies (OpenClaw)
+├── pyproject.toml                          Docs build config
+├── uv.lock                                Python lockfile
+├── README.md                              Project overview
+├── LICENSE                                 Apache 2.0
+├── CODE_OF_CONDUCT.md
+├── .github/                               CI workflows
+├── .pre-commit-config.yaml                Git hooks
+├── .coderabbit.yaml                       AI review config
+├── assets/                                Images, logos
+├── docs/                                  Quick start, deployment
+├── ci/                                    CI support files
+├── test/                                  Integration test files
+├── milimo-server/                         HTTP server (OpenClaw)
+├── milimo-admin/                          Admin dashboard
+├── milimo-mobile/                         React Native mobile app
+├── milimo-cli                             Bash shell wrapper
+├── milimo_blueprint/                      Legacy blueprint dist
+└── claws_data/                            Runtime claw data (gitignored)
 ```
 
 ---
