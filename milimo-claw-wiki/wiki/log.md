@@ -2294,3 +2294,16 @@ openshell forward service --target-port 9090 --local 9090 milimo-hermes
 - `wiki/troubleshooting/issues-and-fixes.md`: Added Issue 17 documenting all 9 policy presets, their whitelisted hosts, and the validated non-interactive build command including `NEMOCLAW_RECREATE_WITHOUT_BACKUP=1`
 - `wiki/architecture/hermes-profile.md`: Added non-interactive build command block; noted `NEMOCLAW_RECREATE_WITHOUT_BACKUP=1` requirement
 - `README.md`: Added headless/CI build command, policy presets table with all 9 presets and their hosts, verification commands, and warning about critical presets
+
+### 2026-07-25 — Fixed onboarding hang at [6/8] + nemohermes alias→function fix
+
+**Pages**: `milimo-hermes-sandbox/install-hermes.sh`, `milimo-blueprint/blueprint.yaml`, `milimo-hermes-sandbox/milimo-blueprint/blueprint.yaml`, `wiki/troubleshooting/common-issues.md`, `wiki/troubleshooting/issues-and-fixes.md`, `wiki/index.md`
+
+**Source**: Repeated onboarding hang at `nemohermes onboard` step [6/8] "Creating sandbox". The `--recreate-sandbox` flag waits on graceful teardown of the old sandbox workspace state, which can stall indefinitely.
+
+**Fixes** (commit `83bf1ea`):
+1. **Preemptive destroy**: Before onboarding, `install-hermes.sh` now checks if a "Ready" sandbox exists and forcefully destroys it (`NEMOCLAW_RECREATE_WITHOUT_BACKUP=1`). This avoids the [6/8] hang entirely — the old sandbox is already gone, so recreate is instant.
+2. **Onboarding timeout (900s)**: Wrapped `nemohermes onboard` in `timeout 900`. If onboarding ever hangs (network, Docker, state issue), the script exits with a clear error instead of blocking the terminal forever.
+3. **Alias → function**: `alias nemohermes=...` only works in interactive shells (bash doesn't expand aliases by default in scripts). Replaced with a proper bash function + `export -f`.
+
+**Also**: Added port 18790 to blueprint `forward_ports` (commit `7ea91dc`) — the Hermes dashboard socat lands on 18790, not 18789, when `--tui` mode is active.

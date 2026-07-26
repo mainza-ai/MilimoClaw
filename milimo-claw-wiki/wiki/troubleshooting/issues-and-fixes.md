@@ -829,3 +829,28 @@ docker run --rm --detach milimo-hermes-sandbox:verify sleep infinity
 - Both `sandbox-base` and `hermes-sandbox-base` pinned to SHA digests
 - OpenClaw bumped from `2026.3.11` to `2026.7.1`
 - `NEMOCLAW_INFERENCE_PROVIDER_ID` added for v0.0.90+ route selector migration
+
+---
+
+## Issue 26 — Onboarding Hangs at [6/8] "Creating Sandbox" (2026-07-25)
+
+**Discovered**: Repeated hangs during `nemohermes onboard --recreate-sandbox` at step [6/8] "Creating sandbox". No error message, just indefinite blank output.
+
+**Root Cause**: The `--recreate-sandbox` flag triggers graceful teardown of the existing sandbox before creating a replacement. If the old sandbox has accumulated workspace state or the gateway has a stale lock, this teardown stalls indefinitely. The `nemohermes onboard` command has no built-in timeout.
+
+**Fix** (commit `83bf1ea`):
+1. **Preemptive destroy in `install-hermes.sh`**: Before calling `nemohermes onboard`, the script checks if a sandbox with phase "Ready" exists and forcefully destroys it with `NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 nemohermes <name> destroy --yes`. The old sandbox is already gone before onboarding starts, making the "recreate" step instant.
+2. **Onboarding timeout (900s)**: Wrapped `nemohermes onboard` in `timeout 900` so the script can never hang indefinitely.
+3. **Alias→function fix**: `alias nemohermes="NEMOCLAW_AGENT=hermes nemoclaw"` replaced with a proper bash function + `export -f`. Aliases are not expanded in non-interactive bash scripts by default.
+
+**Related**: The dashboard port forward also caused issues — port 18790 was added to `forward_ports` in the blueprint because the dashboard socat lands on 18790 (not 18789) when `--tui` mode is active (commit `7ea91dc`).
+
+**Verification**:
+```bash
+NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 \
+NVIDIA_API_KEY="$(grep NVIDIA_API_KEY .env | cut -d= -f2)" \
+NEMOCLAW_NON_INTERACTIVE=1 \
+NEMOCLAW_ACCEPT_THIRD_PARTY=1 \
+NEMOCLAW_AUTH_MODE=api_key \
+  ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
+```

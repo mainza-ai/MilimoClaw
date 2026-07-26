@@ -848,6 +848,26 @@ export NVIDIA_INFERENCE_API_KEY="$NVIDIA_API_KEY"
 
 ---
 
+### Onboarding Hangs at [6/8] "Creating Sandbox" — Stale Sandbox State (FIXED 2026-07-25)
+
+**Symptom**: `nemohermes onboard --recreate-sandbox` hangs indefinitely at step [6/8]:
+```
+[6/8] Creating sandbox
+──────────────────────────────────────────────────
+
+
+```
+No error message, no timeout — just blank space after the header.
+
+**Root Cause**: The `--recreate-sandbox` flag tries to gracefully tear down the existing sandbox workspace state before creating a new sandbox. If the old sandbox has accumulated state files or the gateway has a stale lock, this teardown can stall indefinitely.
+
+**Fix** (commit `83bf1ea`):
+1. **Preemptive destroy**: `install-hermes.sh` now forcefully destroys any existing "Ready" sandbox before running `nemohermes onboard`. The sandbox is already gone, so the recreate step is instant.
+2. **Timeout (900s)**: The onboarding command is wrapped in `timeout 900`. If it ever hangs, the script exits with a clear error.
+3. **Alias→function**: `alias nemohermes=...` replaced with a bash function + `export -f` (aliases don't expand in non-interactive scripts).
+
+---
+
 ## Related Pages
 
 - [[production-spend-flow-fix-plan-2026-07-06]] — Full production fix plan
