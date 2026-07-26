@@ -36,36 +36,39 @@ through the NVIDIA OpenShell inter-sandbox gateway — a policy-enforced communi
 layer where every message between claws is typed, logged, and validated.
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│ MILIMO CLAW MESH │
-│ │
-│ CONTENT CLAW OPS CLAW ANALYTICS CLAW FINANCE CLAW │
-│ /sandbox/.openclaw-data/ /sandbox/.openclaw-data/ /sandbox/.openclaw-data/ /sandbox/.openclaw-data/ │
-│ milimo/claws/content milimo/claws/ops milimo/claws/analytics milimo/claws/finance │
-│ OpenShell GW ── OpenShell GW── OpenShell GW ── OpenShell GW │
-│ │ │ │ │ │
-│ └───────────────┴───────────────┴───────────────┘ │
-│ INTER-SANDBOX CHANNEL │
-│ (typed contracts · logged · policy-enforced) │
-│ │
-│ BUILD CLAW (tech squads) ASSISTANT CLAW (operator bridge) │
-│ /sandbox/.openclaw-data/ /sandbox/.openclaw-data/ │
-│ milimo/claws/build milimo/claws/assistant │
-│ OpenShell GW ──────────────────────────┘ │
-│ │ ════════════════════════════════════════════════════════════════ │
-│ WAR ROOM (TUI) │
-│ Every pending action · every claw · one view │
-└──────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│ MILIMO CLAW MESH — Dual Profile                                         │
+│                                                                          │
+│  PROFILE 1: OpenClaw (TUI)       PROFILE 2: Hermes (Web Dashboard)      │
+│  ┌─────────────────────────┐    ┌──────────────────────────────────┐    │
+│  │ CONTENT  OPS  ANALYTICS │    │ CONTENT  OPS  ANALYTICS         │    │
+│  │ FINANCE  BUILD  ASSIST. │    │ FINANCE  BUILD  ASSIST.         │    │
+│  │                         │    │ ┌────────────────────────────┐  │    │
+│  │ OpenShell sandboxes     │    │ │ Hermes Agent v0.18.0       │  │    │
+│  │ (isolated per claw)     │    │ │ milimo-hermes-plugin       │  │    │
+│  │                         │    │ │ 6 registered tools         │  │    │
+│  │ milimo-core library     │    │ │ milimo-core library        │  │    │
+│  └─────────────────────────┘    │ └────────────────────────────┘  │    │
+│         │                       │                                 │    │
+│         └────── INTER-SANDBOX CHANNEL ──────────────────────────┘ │    │
+│               (typed contracts · policy-enforced)                   │    │
+│                                                                     │    │
+│  WAR ROOM:                              WAR ROOM:                   │    │
+│  TUI (milimo/src/warroom/)              HTTP (port 9090, HTMX)      │    │
+│  Keyboard-driven                        Browser-based               │    │
+│  OpenClaw profile only                  Hermes profile only         │    │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
 **NemoClaw Sandbox Filesystem Policy (per docs.nvidia.com/nemoclaw/latest/):**
 - `/sandbox/` root is **read-only** per NemoClaw Landlock policy — claws cannot write here
-- Writable claw data lives under `/sandbox/.openclaw-data/milimo/claws/<role>/`
-- Other writable paths: `/sandbox/.openclaw-data/`, `/sandbox/.nemoclaw/`, `/tmp/`
-- Provider credentials are stored in the **OpenShell gateway store** (not `~/.nemoclaw/credentials.json`, which is legacy)
+- Hermes profile writable paths: `/sandbox/.hermes/`, `/sandbox/.nemoclaw/`, `/tmp/`
+- OpenClaw profile writable paths: `/sandbox/.openclaw-data/milimo/claws/<role>/`
+- Provider credentials are stored in the **OpenShell gateway store**
+- `/opt/` is blocked for unprivileged sandbox users (Landlock) — use `/sandbox/` paths instead
 
-**Plugin namespace:** `openclaw milimo`
-**Blueprint location:** `milimo-blueprint/`
+**Plugin namespace:** `milimo` (OpenClaw) / `milimo-hermes-plugin` (Hermes)
+**Blueprint locations:** `milimo-blueprint/` + `milimo-hermes-sandbox/milimo-blueprint/`
 **TypeScript CLI:** `milimo/src/`
 **Python orchestrator:** `milimo-blueprint/orchestrator/`
 
@@ -548,7 +551,7 @@ OpenShell gateway. Every message must conform to its schema in `contracts.py`.
 ```
 
 **Contracts file:** `milimo-core/src/milimo_core/contracts.py` (shimmed at `milimo-blueprint/orchestrator/contracts.py`)
-Currently defines 33 message type schemas.
+Currently defines **45 valid message types** across **39 schema definitions**.
 
 ### Complete Message Matrix
 
@@ -678,7 +681,19 @@ response = inference_client.complete(
 ## The War Room
 
 The War Room surfaces every pending action from every claw in one
-prioritized queue. HOLD always appears above REVIEW. REVIEW above AUTO.
+prioritized queue. Two implementations exist — one per profile.
+
+**Hermes Profile (HTMX HTTP Server — port 9090):**
+- `milimo-hermes-plugin/warroom/server.py` — Python http.server with HTMX frontend
+- `milimo-hermes-plugin/warroom/warroom_bridge.py` — filesystem I/O bridge
+- `milimo-hermes-plugin/warroom/warroom.html` — HTMX browser UI
+- All 6 claws share one queue via the filesystem: `/sandbox/.hermes/mesh/inbox/war_room/*.json`
+- Approve/veto via POST requests with CSRF token + Bearer auth
+- Access: `http://localhost:9090/warroom.html`
+
+**OpenClaw Profile (TUI — keyboard-driven):**
+- `milimo/src/warroom/warroom-tui.ts` — blessed-based terminal UI
+- `milimo/src/warroom/approval.ts` — HOLD/REVIEW/AUTO/VETO engine
 
 **Queue priority:**
 ```
@@ -834,12 +849,16 @@ Never truncate or overwrite.
 **Atomic writes** — All summary JSON files: write temp file first, then
 `Path.rename()`. Never overwrite good data with a partial write.
 
-**External commands (TypeScript)** — **The plugin uses ZERO `child_process` calls.**
+**External commands (TypeScript)** — The OpenClaw plugin uses ZERO `child_process` calls.
 All Python operations route through the persistent RPC server (`bridge_server.py` on port 19999).
 Use `callPythonBridge`/`callPythonBridgeSafe` from `lib/python-bridge.ts` for Python operations.
 Use native `node:fs`, `node:os` for filesystem and system operations.
 Desktop notifications use pending-file fallback — no subprocess.
 Channel management prints instructions for `nemoclaw <sandbox> channels <cmd>` — no delegation.
+
+**External commands (Hermes plugin)** — The Hermes plugin uses `subprocess.run()` for link-cli
+operations (spend request creation, approval polling). All `milimo_core` Python code avoids
+shell subprocesses for security.
 
 **Config** — `~/.milimo/config.json` is the single source of truth.
 No separate `state.json`. All commands read from and write to one file.
