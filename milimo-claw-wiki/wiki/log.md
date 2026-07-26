@@ -2332,3 +2332,16 @@ openshell forward service --target-port 9090 --local 9090 milimo-hermes
 - `test_plugin_yaml_manifest` — validates `plugin.yaml` matches the code
 - `test_register_core_tools_registers_all_tools` — mocks `ctx` and verifies all 6 tools are registered with the correct toolset
 - `test_toolset_name_in_genesis_yaml` — verifies `generate-config.ts` contains a `"milimo*"` toolset entry
+
+### 2026-07-25 — Removed SecretsUsedInArgOrEnv Docker warnings
+
+**Pages**: `milimo-hermes-sandbox/Dockerfile`, `milimo-hermes-sandbox/generate-config.ts`, `milimo-hermes-sandbox/install-hermes.sh`, `wiki/index.md`
+
+**Source**: Docker build emitted 2 `SecretsUsedInArgOrEnv` warnings for `NEMOCLAW_PROVIDER_KEY`. Docker's linter flags any env var with `_KEY`/`_SECRET`/`_TOKEN`/`_PASSWORD` in the name.
+
+**Changes** (commit `e047cb7`):
+- Removed `ARG NEMOCLAW_PROVIDER_KEY` + `ENV NEMOCLAW_PROVIDER_KEY` from Dockerfile
+- Removed `--build-arg` and `export` from `install-hermes.sh`
+- Removed `providerKey` from `generate-config.ts` (dead code — read but never used)
+- Kept in `validate-env-secret-boundary.py` allowlist (runtime allowlist is fine)
+- Docker build now: **0 warnings**
