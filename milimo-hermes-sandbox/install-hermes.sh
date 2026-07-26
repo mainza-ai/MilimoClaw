@@ -802,19 +802,20 @@ main() {
 
   log_info "Next steps:"
   log_info "  1. Connect: nemohermes $SANDBOX_NAME connect"
-  log_info "  2. Access dashboard: http://127.0.0.1:18789/"
+  log_info "  2. Access dashboard: http://127.0.0.1:18790/"
   log_info "  3. Change model: nemohermes inference set --model <model> --provider <provider> --sandbox $SANDBOX_NAME"
   log_info "  4. OpenAI-compatible API: http://127.0.0.1:8642/v1"
+  log_info "  5. War Room: http://127.0.0.1:9090/warroom.html"
 
   if [[ -n "$CHAT_UI_URL" ]]; then
-    log_info "  5. Remote dashboard: $CHAT_UI_URL"
+    log_info "  6. Remote dashboard: $CHAT_UI_URL"
   fi
 
   if [[ "$HEADLESS" == "true" && -z "$CHAT_UI_URL" ]]; then
-    log_info "  5. SSH tunnel: ssh -L 18790:127.0.0.1:18790 $(whoami)@$(hostname -f)"
+    log_info "  6. SSH tunnel: ssh -L 18790:127.0.0.1:18790 $(whoami)@$(hostname -f)"
   fi
 
-  log_info "  6. Nous Portal login (interactive): nemohermes $SANDBOX_NAME exec --tty -- hermes setup --portal"
+  log_info "  7. Nous Portal login (interactive): nemohermes $SANDBOX_NAME exec --tty -- hermes setup --portal"
 }
 
 main "$@"
