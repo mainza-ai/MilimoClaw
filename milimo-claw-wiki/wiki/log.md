@@ -2395,6 +2395,23 @@ openshell forward service --target-port 9090 --local 9090 milimo-hermes
 shortcut-driven debugging. AI must now gather all information, trace fully,
 and present findings for review before implementing.
 
+### 2026-07-25 — Three-part CHAT_UI_URL port fix + post-onboarding cleanup
+
+**Pages**: `Dockerfile`, `install-hermes.sh`, `.env.example`, `AGENTS.md`, `README.md`, `wiki/index.md`, `wiki/log.md`
+
+**Root cause** (after 7 previous failed fixes):
+1. Dockerfile `ARG CHAT_UI_URL` defaulted to `http://127.0.0.1:8642` (API port)
+2. `.env.example` was `CHAT_UI_URL=http://localhost:18790` since commit 548588a
+3. `install-hermes.sh` passed `--build-arg CHAT_UI_URL=${CHAT_UI_URL}`, propagating the user's wrong port into the Docker build
+4. nemohermes CLI read CHAT_UI_URL from build context → allocated 18790
+5. CLI verification checked manifest's `forward_ports: [18789]` → mismatch
+
+**Three-part fix** (commits `1575718`, `6e8c8e6`, `6b94bad`):
+1. Dockerfile: ARG default 8642 → 18789
+2. install-hermes.sh: removed `--build-arg CHAT_UI_URL` passthrough
+3. .env.example: port 18790 → 18789
+4. Post-onboarding forward + next-steps: 18790 → 18789
+
 **Pages**: `.agents/AGENTS.md`, `milimo-blueprint/blueprint.yaml`, `milimo-hermes-sandbox/milimo-blueprint/blueprint.yaml`, `.agents/skills/docs/*/`, `wiki/index.md`
 
 **Source**: Two-pass audit of AGENTS.md found 10+ remaining inaccuracies. Port 18789 warning persisted after initial fix.

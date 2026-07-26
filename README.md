@@ -289,7 +289,7 @@ NEMOCLAW_AUTH_MODE=api_key \
   ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
 ```
 
-> **Note**: `NEMOCLAW_RECREATE_WITHOUT_BACKUP=1` is required when running non-interactively. Without it, the build hangs at the shields-backup step because sealed files cannot be read by the backup process. After rebuild, the post-onboarding script sets up port forwarding automatically (dashboard on 18790, war room on 9090).
+> **Note**: `NEMOCLAW_RECREATE_WITHOUT_BACKUP=1` is required when running non-interactively. Without it, the build hangs at the shields-backup step because sealed files cannot be read by the backup process. The dashboard is accessible at `http://127.0.0.1:18789/` after rebuild.
 
 **Policy presets** (applied automatically by `install-hermes.sh` post-onboarding):
 
