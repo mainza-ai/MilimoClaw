@@ -76,7 +76,7 @@ agent_profiles:
         args:
           NEMOCLAW_HERMES_DASHBOARD_TUI: "1"
           SLACK_ALLOWED_CHANNELS: ""
-          CHAT_UI_URL: ""
+          CHAT_UI_URL: "http://127.0.0.1:18790"
     policy:
       base: "sandboxes/hermes/policy.yaml"
       preset: "restricted,github"
