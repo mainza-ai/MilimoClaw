@@ -868,6 +868,30 @@ No error message, no timeout — just blank space after the header.
 
 ---
 
+### Milimo Tools Not Accessible in Hermes Session — Toolset Name Mismatch (FIXED 2026-07-25)
+
+**Symptom**: The Hermes agent session starts, the plugin is loaded (`plugins.enabled: ['nemoclaw', 'milimo-hermes']`), but the 6 core Milimo tools never appear. The agent falls back to probing the filesystem with `find`/`grep`/`read`.
+
+**Root Cause**: `register_core_tools()` in `tools.py` used `toolset="milimo"` but the Hermes config (`generate-config.ts`) declared `"milimo-hermes"` in `API_SERVER_TOOLSETS`. The API server only surfaces tools whose toolset name matches an entry in `platform_toolsets.api_server`. Since `"milimo" ≠ "milimo-hermes"`, the tools were registered in the runtime but invisible to every session.
+
+**Fix** (commit `8b6c9ce`):
+- Changed `toolset="milimo"` to `toolset="milimo-hermes"` in `register_core_tools()` (line 1327 of `tools.py`)
+- Added 9 registration tests that verify the toolset name matches between `tools.py` and `generate-config.ts`, preventing recurrence
+
+---
+
+### Claw Status Stuck on "Loading..." in War Room — .pth Path Blocked by Landlock (FIXED 2026-07-25)
+
+**Symptom**: The War Room page loads, but the "Claw Status" card stays on "Loading..." indefinitely. The `/v1/warroom/claw-status` endpoint returns 500 with `ModuleNotFoundError: No module named 'orchestrator'`.
+
+**Root Cause**: The `nemoclaw_blueprint.pth` file pointed to `/opt/nemoclaw-blueprint/`, which is not readable by the `sandbox` user. OpenShell's Landlock security policy blocks `/opt/` for unprivileged users. The `orchestrator` package could not be imported from `milimo_core.bridge_cli`.
+
+**Fix** (commit `8b6c9ce`):
+- Changed `.pth` path to `/sandbox/.nemoclaw/blueprints/0.1.0/` (owned by `sandbox:sandbox`)
+- Added `/sandbox/.nemoclaw/blueprints/0.1.0` to the `_BLUEPRINTS` search list in `server.py`
+
+---
+
 ## Related Pages
 
 - [[production-spend-flow-fix-plan-2026-07-06]] — Full production fix plan

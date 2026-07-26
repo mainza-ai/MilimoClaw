@@ -854,3 +854,38 @@ NEMOCLAW_ACCEPT_THIRD_PARTY=1 \
 NEMOCLAW_AUTH_MODE=api_key \
   ./milimo-hermes-sandbox/install-hermes.sh --non-interactive
 ```
+
+---
+
+## Issue 27 — Toolset Name Mismatch: Tools Registered but Invisible (2026-07-25)
+
+**Discovered**: Live Hermes session. Agent started, plugin loaded, but `milimo_status`/`milimo_warroom`/`milimo_approve`/`milimo_veto`/`milimo_spend`/`delegate_task` never appeared in the tool list. Agent fell back to filesystem probing.
+
+**Root Cause**: `register_core_tools()` in `tools.py` used `toolset="milimo"` (line 1327), but `generate-config.ts` declared `"milimo-hermes"` in `API_SERVER_TOOLSETS`. The Hermes API server only exposes tools whose toolset name matches an entry in `platform_toolsets.api_server`. Since `"milimo" ≠ "milimo-hermes"`, the tools were registered in the Hermes runtime but invisible to every session.
+
+**Fix** (commit `8b6c9ce`):
+- Changed `toolset="milimo"` to `toolset="milimo-hermes"` in `register_core_tools()`
+- Added 9 registration tests in `test_registration.py` that cross-reference the toolset name between `tools.py` source code and `generate-config.ts`
+
+**Verification**:
+```bash
+cd milimo-hermes-plugin && python -m pytest tests/test_registration.py -v
+# Expected: 9 passed
+```
+
+---
+
+## Issue 28 — War Room Claw-Status 500: .pth Path Blocked by Landlock (2026-07-25)
+
+**Discovered**: War Room page loaded but "Claw Status" card stayed on "Loading..." indefinitely. `/v1/warroom/claw-status` returned 500 with `ModuleNotFoundError: No module named 'orchestrator'`.
+
+**Root Cause**: The `nemoclaw_blueprint.pth` file pointed to `/opt/nemoclaw-blueprint/`. OpenShell's Landlock security policy blocks `/opt/` for unprivileged (sandbox) users. The `orchestrator` package could not be imported even though the `.pth` file existed. The duplicate copy at `/sandbox/.nemoclaw/blueprints/0.1.0/` was owned by `sandbox:sandbox` and accessible.
+
+**Fix** (commit `8b6c9ce`):
+- Changed `.pth` path from `/opt/nemoclaw-blueprint` to `/sandbox/.nemoclaw/blueprints/0.1.0`
+- Added `/sandbox/.nemoclaw/blueprints/0.1.0` to `_BLUEPRINTS` in `server.py`
+
+**Verification** (inside sandbox after rebuild):
+```bash
+/opt/hermes/.venv/bin/python3 -c "import orchestrator; from milimo_core.bridge_cli import handle_collect_health; print('OK')"
+```
