@@ -782,10 +782,11 @@ main() {
   # ── Post-onboarding: reliable port forwarding ─────────────────────────
   # The dashboard socat inside the sandbox lands on 18790 (not 18789) when
   # --tui mode is active.  SSH-based forward to 18789 connects to nothing.
-  # We forward 18790 (dashboard socat) and 9090 (war room server) using
-  # openshell forward start --background, which creates an SSH tunnel via
-  # the OpenShell gateway proxy.  Each forward has a 15s timeout so a
-  # single stuck tunnel cannot block the install script.
+  # The dashboard socat now binds 18789 (CHAT_UI_URL default).  We also
+  # forward 9090 (war room server) using openshell forward start --background,
+  # which creates an SSH tunnel via the OpenShell gateway proxy.
+  # Each forward has a 15s timeout so a single stuck tunnel cannot block
+  # the install script.
   log_info "Setting up port forwarding..."
 
   # Stop stale forwards from previous sandbox instances
@@ -794,11 +795,11 @@ main() {
   done
   sleep 1
 
-  # Dashboard: SSH tunnel to socat on 18790 (forwards to dashboard on 19119)
-  if timeout 15 openshell forward start --background 18790 "$SANDBOX_NAME" >/dev/null 2>&1; then
-    log_success "  Dashboard: http://127.0.0.1:18790/"
+  # Dashboard: SSH tunnel to socat on 18789 (forwards to dashboard on 19119)
+  if timeout 15 openshell forward start --background 18789 "$SANDBOX_NAME" >/dev/null 2>&1; then
+    log_success "  Dashboard: http://127.0.0.1:18789/"
   else
-    log_warn "  Dashboard forward failed — run: openshell forward start --background 18790 $SANDBOX_NAME"
+    log_warn "  Dashboard forward failed — run: openshell forward start --background 18789 $SANDBOX_NAME"
   fi
 
   # War Room: SSH tunnel to war room server on 9090
@@ -812,17 +813,18 @@ main() {
 
   log_info "Next steps:"
   log_info "  1. Connect: nemohermes $SANDBOX_NAME connect"
-  log_info "  2. Access dashboard: http://127.0.0.1:18790/"
+  log_info "  2. Access dashboard: http://127.0.0.1:18789/"
   log_info "  3. Change model: nemohermes inference set --model <model> --provider <provider> --sandbox $SANDBOX_NAME"
   log_info "  4. OpenAI-compatible API: http://127.0.0.1:8642/v1"
   log_info "  5. War Room: http://127.0.0.1:9090/warroom.html"
 
-  if [[ -n "$CHAT_UI_URL" ]]; then
+  # Remote dashboard URL (only for non-localhost headless deployments)
+  if [[ -n "$CHAT_UI_URL" && "$CHAT_UI_URL" != http://127.0.0.1:* && "$CHAT_UI_URL" != http://localhost:* ]]; then
     log_info "  6. Remote dashboard: $CHAT_UI_URL"
   fi
 
   if [[ "$HEADLESS" == "true" && -z "$CHAT_UI_URL" ]]; then
-    log_info "  6. SSH tunnel: ssh -L 18790:127.0.0.1:18790 $(whoami)@$(hostname -f)"
+    log_info "  6. SSH tunnel: ssh -L 18789:127.0.0.1:18789 $(whoami)@$(hostname -f)"
   fi
 
   log_info "  7. Nous Portal login (interactive): nemohermes $SANDBOX_NAME exec --tty -- hermes setup --portal"
