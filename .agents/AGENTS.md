@@ -986,16 +986,16 @@ milimo-claw/
 ├── .agents/
 │   ├── AGENTS.md                          Canonical AGENTS.md (ground truth)
 │   └── skills/
-│       ├── docs/                          AI coding assistant skills
-│       │   ├── nemoclaw-configure-inference/
-│       │   ├── nemoclaw-deploy-remote/
-│       │   ├── nemoclaw-get-started/
-│       │   ├── nemoclaw-manage-policy/
-│       │   ├── nemoclaw-monitor-sandbox/
-│       │   ├── nemoclaw-overview/
-│       │   ├── nemoclaw-reference/
-│       │   └── nemohermes-reference/
-│       └── update-docs/                   Wiki update skill
+│       ├── docs/                          AI coding assistant skill library
+│       │   ├── nemoclaw-configure-inference/  Switch inference models
+│       │   ├── nemoclaw-deploy-remote/        Headless Linux server deploy
+│       │   ├── nemoclaw-get-started/          Install, onboard, first prompt
+│       │   ├── nemoclaw-manage-policy/        Network policy management
+│       │   ├── nemoclaw-monitor-sandbox/      Health, logs, diagnostics
+│       │   ├── nemoclaw-overview/             Architecture + changelog
+│       │   ├── nemoclaw-reference/            Full CLI + config reference
+│       │   └── nemohermes-reference/          NemoHermes CLI + env vars
+│       └── update-docs/                   Scan commits, draft wiki updates
 │
 ├── milimo/                                TypeScript plugin (OpenClaw profile)
 │   ├── openclaw.plugin.json               Plugin manifest (id: "milimo")

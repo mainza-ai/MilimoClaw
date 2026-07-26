@@ -1,59 +1,50 @@
 ---
 name: nemoclaw-configure-inference
-description: Changes the active inference model without restarting the sandbox. Use when change inference runtime, inference routing, openclaw, openshell, switch nemoclaw inference model, switch nemoclaw inference models.
+description: Changes the active inference model without restarting the sandbox. Supports both OpenClaw and Hermes profiles. Use when change inference runtime, inference routing, nemoclaw inference, nemohermes inference, switch model, switch provider, openclaw, openshell.
 ---
 
-# Nemoclaw Configure Inference
+# NemoClaw Configure Inference
 
 Change the active inference model without restarting the sandbox.
 
 ## Prerequisites
 
 - A running NemoClaw sandbox.
-- The OpenShell CLI on your `PATH`.
 
-Change the active inference model while the sandbox is running.
-No restart is required.
-
-## Step 1: Switch to a Different Model
-
-Set the provider to `nvidia-nim` and specify a model from [build.nvidia.com](https://build.nvidia.com):
+## Check Current Inference Route
 
 ```console
-$ openshell inference set --provider nvidia-nim --model nvidia/nemotron-3-super-120b-a12b
+$ nemoclaw inference get
+$ nemohermes inference get
 ```
 
-This requires the `NVIDIA_API_KEY` environment variable.
-The `nemoclaw onboard` command registers this key with the OpenShell gateway on first run. `~/.nemoclaw/credentials.json` is a legacy file from earlier releases; it is auto-migrated to the gateway and deleted on first `nemoclaw onboard` after upgrading.
+## Change Model and Provider
 
-## Step 2: Verify the Active Model
+```console
+$ nemoclaw inference set --model stepfun-ai/step-3.7-flash --provider nvidia-prod
+$ nemohermes inference set --model stepfun-ai/step-3.7-flash --provider nvidia-prod
+```
 
-Run the status command to confirm the change:
+No sandbox restart required — the change takes effect immediately.
+
+## Verify the Change
 
 ```console
 $ nemoclaw <name> status
+$ nemohermes <name> status
 ```
 
-Add the `--json` flag for machine-readable output:
+Add `--json` for machine-readable output.
 
-```console
-$ nemoclaw <name> status --json
-```
+## Environment Variables
 
-The output includes the active provider, model, and endpoint.
-
-## Step 3: Available Models
-
-The following table lists the models registered with the `nvidia-nim` provider.
-You can switch to any of these models at runtime.
-
-| Model ID | Label | Context Window | Max Output |
-|---|---|---|---|
-| `nvidia/nemotron-3-super-120b-a12b` | Nemotron 3 Super 120B | 131,072 | 8,192 |
-| `nvidia/llama-3.1-nemotron-ultra-253b-v1` | Nemotron Ultra 253B | 131,072 | 4,096 |
-| `nvidia/llama-3.3-nemotron-super-49b-v1.5` | Nemotron Super 49B v1.5 | 131,072 | 4,096 |
-| `nvidia/nemotron-3-nano-30b-a3b` | Nemotron 3 Nano 30B | 131,072 | 4,096 |
+| Variable | Purpose |
+|----------|---------|
+| `NVIDIA_INFERENCE_API_KEY` | API key for NVIDIA Endpoints |
+| `NEMOCLAW_MODEL` | Default model (used during `onboard`) |
+| `NEMOCLAW_INFERENCE_PROVIDER_ID` | Provider ID (v0.0.90+) |
 
 ## Related Skills
 
-- `nemoclaw-reference` — Inference Profiles for full profile configuration details
+- `nemoclaw-reference` — Full CLI reference
+- `nemohermes-reference` — NemoHermes CLI reference
