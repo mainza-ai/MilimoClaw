@@ -17,10 +17,18 @@ When documents conflict, this order determines which is authoritative:
 
 1. **Individual claw spec documents** — ground truth for each claw's internal
    behavior, filesystem layout, network egress, and inference routing
-2. **MILIMO_CLAW_SOLO_TEMPLATE_SPEC_V2.md** — ground truth for cross-claw
+2. **`milimo-core/src/milimo_core/contracts.py`** — message type schemas and
+   valid message types (source of truth for all inter-claw contracts)
+3. **`milimo-core/src/milimo_core/protocols/`** — delegation and coordination
+   protocol definitions
+4. **Hermes plugin code** (`milimo-hermes-plugin/`) — tool registration,
+   war room server, on_load hooks (ground truth for Hermes-specific behavior)
+5. **MILIMO_CLAW_SOLO_TEMPLATE_SPEC_V2.md** — ground truth for cross-claw
    coordination, approval thresholds, and scheduling in solo mode
-3. **solo-founder.yaml** — configuration values that implement the above
-4. **This file (AGENTS.md)** — quick reference summary, not ground truth
+6. **solo-founder.yaml** — configuration values that implement the above
+7. **MilimoClaw Wiki** (`milimo-claw-wiki/wiki/`) — synthesis and navigation,
+   not authoritative on its own
+8. **This file (AGENTS.md)** — quick reference summary, not ground truth
 
 If this file conflicts with a claw spec: the claw spec wins on internal
 claw behavior. The solo template spec wins on coordination and scheduling.
@@ -562,28 +570,30 @@ Currently defines **45 valid message types** across **39 schema definitions**.
 | Content | Analytics | `performance_signal` | After every published post |
 | Content | Ops | `brief_acknowledged` | Within 5 min of project_brief |
 | Content | Ops | `deliverable_complete` | All deliverables published |
+| Content | Ops | `revision_request` | Revision requested |
+| Content | Finance | `spend_request` | Spend request |
 | Ops | Content or Build | `project_brief` | New project scoped + pricing confirmed |
 | Ops | Build | `feature_brief` | New technical feature requested |
 | Ops | Finance | `pricing_query` | Before any proposal |
 | Ops | Finance | `project_complete` | Client confirms delivery |
+| Ops | Finance | `spend_request` | Spend request |
 | Ops | Analytics | `client_health_signal` | Weekly |
 | Ops | Analytics | `client_onboarded` | New client onboarded |
 | Analytics | Content | `performance_intel` | Weekly + high-confidence opportunity |
+| Analytics | Content | `content_performance_response` | Query response |
 | Analytics | Build | `retention_signals` | Weekly + churn anomaly |
+| Analytics | Build | `behavior_query_response` | Query response |
 | Analytics | Ops | `client_health_alert` | When client health < 6.0 |
 | Analytics | Finance | `revenue_anomaly` | On anomaly detection |
-| Analytics | Content | `content_performance_response` | Query response |
-| Analytics | Build | `behavior_query_response` | Query response |
 | Finance | Ops | `pricing_response` | Within 10 min of query |
 | Finance | Ops | `invoice_ready` | After Stage 1 approval |
 | Finance | Ops | `payment_overdue` | Immediately on overdue |
 | Finance | Analytics | `revenue_summary` | Weekly + on payment |
+| Finance | War Room | `overdue_alert` | Repeated overdue |
 | Build | Ops | `deploy_complete` | Production deploy |
 | Build | Ops | `feature_brief_acknowledged` | Within 10 min of feature_brief |
 | Build | Content | `shipping_summary` | Friday 17:00 (weekly accumulated) |
 | Build | Analytics | `behavior_query` | Before sprint planning |
-| Content | Finance | `spend_request` | Spend request |
-| Ops | Finance | `spend_request` | Spend request |
 | Build | Finance | `spend_request` | Spend request |
 | Assistant | Finance | `spend_request` | Spend request |
 | Assistant | Finance | `spend_review_decision` | Stage 1 review decision |
@@ -594,6 +604,17 @@ Currently defines **45 valid message types** across **39 schema definitions**.
 | Assistant | Any worker | `assistant_query` | On operator request |
 | Assistant | Any worker | `assistant_task` | Delegated task from operator |
 | Any worker | Assistant | `assistant_response` | Response to query/task |
+| Any worker | Any | `brief` | Generic brief payload |
+| Any worker | Any | `query` | Generic query |
+| Any worker | Any | `response` | Generic response |
+| Any worker | Any | `signal` | Generic signal |
+| Any worker | Any | `deliverable` | Generic deliverable |
+| Any worker | Any | `summary` | Generic summary |
+| Finance | Assistant | `finance_summary` | Financial summary |
+| Ops | Analytics | `client_health_signal_ops` | Ops-initiated health signal |
+| Any | Any | `tool_proposal` | Evolution tool proposal |
+
+**Total: 45 valid message types** — see `milimo-core/src/milimo_core/contracts.py:VALID_MESSAGE_TYPES` for the authoritative list.
 
 ### Non-Negotiable Sequencing Rules
 
@@ -755,7 +776,7 @@ Finance runs last — its evolution uses the revenue summary it just generated.
 5. DEPLOY    — Activate, version blueprint, log to War Room evolution panel
 ```
 
-**Evolution engine:** `milimo-blueprint/orchestrator/evolution_cycle.py`
+**Evolution engine:** `milimo-core/src/milimo_core/evolution_cycle.py` (primary) + `milimo-blueprint/orchestrator/evolution_cycle.py` (shim)
 **Solo scheduler:** `milimo-blueprint/orchestrator/solo_evolution.py`
 Config key: `evolution.schedule` (per-claw times, not single `time`)
 
@@ -833,6 +854,52 @@ milimo squad finals-resume
 
 ---
 
+## Tool Registration (Hermes Profile)
+
+The Hermes Milimo plugin registers **6 core tools** via `ctx.register_tool()` in `milimo-hermes-plugin/milimo_hermes_plugin/tools.py`:
+
+| Tool | Handler | Schema | Purpose |
+|---|---|---|---|
+| `milimo_status` | `handle_milimo_status` | JSON Schema | Query claw health and status |
+| `milimo_warroom` | `handle_milimo_warroom` | JSON Schema | Read/act on war room queue |
+| `milimo_approve` | `handle_milimo_approve` | JSON Schema | Approve a pending action |
+| `milimo_veto` | `handle_milimo_veto` | JSON Schema | Veto a pending action |
+| `milimo_spend` | `handle_milimo_spend` | JSON Schema | Initiate spend flow via Link CLI |
+| `delegate_task` | `handle_delegate_task` | JSON Schema | Delegate task to another claw |
+
+**Registration flow:**
+```
+__init__.py:register(ctx) → tools.py:register_core_tools(ctx)
+  → for each (name, schema, handler) in _CORE_TOOLS:
+      ctx.register_tool(name=name, toolset="milimo-hermes",
+                        schema=schema, handler=handler,
+                        description=schema["description"])
+```
+
+**Toolset name:** Tools are registered under `toolset="milimo-hermes"`. The Hermes
+API server's `platform_toolsets.api_server` includes `"milimo-hermes"`. If these
+names diverge, the tools are registered but invisible to every session.
+
+**Tests:** `milimo-hermes-plugin/tests/test_registration.py` (9 tests) verifies
+toolset name consistency, schema validity, and count.
+
+---
+
+## Delegation System
+
+Claw-to-claw task delegation uses a typed protocol in `milimo-core/src/milimo_core/protocols/delegation.py`:
+
+- `DelegationAdapter` — abstract base class with `delegate(tasks) → list[ClawResult]`
+- `ClawTask` — task definition with `claw`, `goal`, `context`, `priority`
+- `ClawResult` — result with `claw`, `output`, `success`, `error`
+
+**Hermes implementation:** `milimo-hermes-plugin/milimo_hermes_plugin/delegation.py`
+- `HermesDelegateAdapter` — primary path uses `ctx.dispatch_tool("delegate_task", ...)`
+- Fallback path uses Hermes internal `tools.registry` API (wrapped in try/except)
+- Enforced by `DELEGATION_MAX_CONCURRENT_CHILDREN=6` env var
+
+---
+
 ## Development Conventions
 
 **Inference calls** — `data_type` is mandatory on every call. No exceptions.
@@ -881,161 +948,88 @@ context). Never block a claw action — always fallback, never fail.
 
 ```
 milimo-claw/
-├── AGENTS.md                            THIS FILE — quick reference
+├── AGENTS.md                              THIS FILE (root-level redirect)
+├── .agents/
+│   ├── AGENTS.md                          Canonical AGENTS.md (ground truth)
+│   └── skills/                            AI coding assistant skills
+│       └── docs/
+│           ├── nemoclaw-*/                NemoClaw CLI skills
+│           └── nemohermes-reference/       NemoHermes CLI reference
 │
-├── milimo/                              TypeScript plugin
+├── milimo/                                TypeScript plugin (OpenClaw profile)
 │   └── src/
-│       ├── index.ts                     Plugin entry point
-│       ├── cli.ts                       Command registration
-│       ├── commands/
-│       │   ├── onboard.ts
-│       │   ├── init.ts
-│       │   ├── squad.ts
-│       │   ├── warroom.ts
-│       │   ├── blueprint.ts
-│       │   ├── finals-mode.ts           Deep Work Mode CLI
-│       │   ├── action.ts
-│       │   ├── health.ts
-│       │   ├── payment.ts
-│       │   ├── verify.ts
-│       │   ├── badge.ts
-│       │   └── slash.ts
-│       ├── warroom/
-│       │   ├── warroom-tui.ts           War Room TUI (blessed)
-│       │   ├── approval.ts              HOLD/REVIEW/AUTO/VETO engine
-│       │   ├── audit.ts
-│       │   ├── evolution.ts             Evolution log display
-│       │   ├── health-dashboard.ts
-│       │   ├── health-collector.ts
-│       │   ├── digest.ts                Morning/evening brief
-│       │   ├── notifier.ts
-│       │   ├── realtime-bridge.ts
-│       │   └── rate-limiter.ts
-│       ├── mesh/
-│       │   ├── gateway-client.ts        OpenShell gateway connection
-│       │   └── message-encryption.ts   AES-256-GCM message encryption
-│       └── onboard/
-│           ├── config.ts                Config persistence (~/.milimo/config.json)
-│           ├── template.ts
-│           ├── validate.ts
-│           └── prompt.ts
+│       ├── index.ts                       Plugin entry point
+│       ├── cli.ts                         Command registration
+│       ├── commands/                      CLI subcommands
+│       ├── warroom/                       War Room TUI (blessed)
+│       ├── mesh/                          Gateway client + encryption
+│       └── onboard/                       Config persistence
 │
-├── milimo-blueprint/                    Python orchestrator
-│   ├── blueprint.yaml
-│   ├── orchestrator/
-│   │   ├── contracts.py                 24 inter-claw message schemas
-│   │   ├── mesh.py
-│   │   ├── privacy_router.py
-│   │   ├── evolution_cycle.py           5-stage evolution pipeline
-│   │   ├── pattern_detector.py
-│   │   ├── tool_proposal.py
-│   │   ├── tool_builder.py
-│   │   ├── tool_registry.py
-│   │   ├── blueprint_manager.py
-│   │   ├── marketplace_manager.py
-│   │   ├── bridge_cli.py                TypeScript ↔ Python bridge
-│   │   ├── solo_init.py
-│   │   ├── solo_warroom.py
-│   │   ├── solo_privacy.py              Cost guard + lighter_prompt fallback
-│   │   ├── solo_deep_work.py
-│   │   ├── solo_evolution.py            Staggered per-claw evolution scheduler
-│   │   ├── solo_sandbox.py              Policy generator + mount helpers
-│   │   ├── health_collector.py
-│   │   ├── content/
-│   │   │   ├── content_init.py
-│   │   │   ├── content_generator.py
-│   │   │   ├── brief_manager.py
-│   │   │   ├── approval_handler.py
-│   │   │   ├── platform_publisher.py
-│   │   │   ├── performance_monitor.py
-│   │   │   ├── publish_scheduler.py
-│   │   │   ├── brand_voice.py
-│   │   │   ├── content_scheduler.py
-│   │   │   └── content_claw.py
-│   │   ├── ops/
-│   │   │   ├── ops_init.py
-│   │   │   ├── intake_manager.py
-│   │   │   ├── project_manager.py
-│   │   │   ├── comms_manager.py
-│   │   │   ├── scope_monitor.py
-│   │   │   ├── health_scorer.py
-│   │   │   ├── approval_handler.py
-│   │   │   ├── signal_dispatcher.py
-│   │   │   ├── ops_scheduler.py
-│   │   │   └── ops_claw.py
-│   │   ├── analytics/
-│   │   │   ├── analytics_init.py
-│   │   │   ├── signal_processor.py
-│   │   │   ├── report_generator.py
-│   │   │   ├── anomaly_detector.py
-│   │   │   ├── opportunity_scorer.py
-│   │   │   ├── baseline_manager.py
-│   │   │   ├── query_handler.py         2-min SLA enforced + logged
-│   │   │   ├── forward_projector.py
-│   │   │   ├── signal_dispatcher.py
-│   │   │   ├── analytics_scheduler.py
-│   │   │   └── analytics_claw.py
-│   │   ├── finance/
-│   │   │   ├── finance_init.py
-│   │   │   ├── pricing_engine.py
-│   │   │   ├── invoice_manager.py
-│   │   │   ├── payment_monitor.py
-│   │   │   ├── payment_risk_scorer.py
-│   │   │   ├── expense_tracker.py
-│   │   │   ├── revenue_tracker.py
-│   │   │   ├── approval_handler.py
-│   │   │   ├── signal_dispatcher.py
-│   │   │   ├── finance_scheduler.py
-│   │   │   └── finance_claw.py
-│   │   └── build/
-│   │       ├── build_init.py
-│   │       ├── issue_manager.py         5-min Analytics timeout
-│   │       ├── code_generator.py
-│   │       ├── pr_manager.py
-│   │       ├── deploy_manager.py
-│   │       ├── error_monitor.py
-│   │       ├── cost_monitor.py
-│   │       ├── dependency_auditor.py
-│   │       ├── doc_maintainer.py
-│   │       ├── approval_handler.py
-│   │       ├── signal_dispatcher.py     10-min feature_brief_acknowledged
-│   │       ├── build_scheduler.py
-│ │ └── build_claw.py
-│ │ ├── assistant/
-│ │ │ ├── lucy.py Operator bridge · cross-claw coordinator
-│ │ │ ├── assistant_init.py
-│ │ │ ├── query_router.py
-│ │ │ ├── response_relay.py
-│ │ │ └── assistant_claw.py
-│ ├── roles/ 6 role blueprints
-│ ├── policies/ 6 sandbox policies
-│   │                                    ALL must include weekly-intelligence.json mount
-│   ├── templates/                       7 squad templates
-│   └── tests/
-│       ├── test_phase_a_isolation.py    ← RUN THIS FIRST (pytest -m phase_a)
-│       ├── test_phase_b_warroom.py
-│       ├── test_ops_mvr_integration.py
-│       ├── test_finance_mvr_integration.py
-│       ├── test_build_mvr_integration.py
-│       └── test_analytics_integration.py
+├── milimo-hermes-plugin/                  Python plugin (Hermes profile)
+│   ├── plugin.yaml                        Plugin manifest
+│   ├── milimo_hermes_plugin/
+│   │   ├── __init__.py                    Plugin entry: register(), on_load()
+│   │   ├── tools.py                       Tool registration (6 core tools)
+│   │   ├── delegation.py                  HermesDelegateAdapter
+│   │   └── skills/                        Claw skill handlers
+│   ├── warroom/
+│   │   ├── server.py                      HTMX HTTP server (port 9090)
+│   │   ├── warroom_bridge.py              Filesystem I/O bridge
+│   │   └── warroom.html                   Browser UI
+│   └── tests/                             Plugin test suite
+│       ├── conftest.py
+│       ├── integration/
+│       └── test_registration.py           Toolset name + schema tests
 │
-└── milimo-claw-docs/
-    ├── reference/                       Spec documents (ground truth)
-    │   ├── MILIMO_CLAW_CONTENT_CLAW_SPEC.md
-    │   ├── MILIMO_CLAW_OPS_CLAW_SPEC.md
-    │   ├── MILIMO_CLAW_ANALYTICS_CLAW_SPEC.md
-    │   ├── MILIMO_CLAW_FINANCE_CLAW_SPEC.md
-│ ├── MILIMO_CLAW_BUILD_CLAW_SPEC.md
-│ ├── MILIMO_CLAW_ASSISTANT_SYSTEM_PROMPT_TEMPLATE.md
-│ └── MILIMO_CLAW_SOLO_TEMPLATE_SPEC_V2.md
-    └── prompts/                         AI implementation prompts
-        ├── CONTENT_CLAW_IMPLEMENTATION_PROMPT.md
-        ├── OPS_CLAW_IMPLEMENTATION_PROMPT.md
-        ├── ANALYTICS_CLAW_IMPLEMENTATION_PROMPT.md
-        ├── FINANCE_CLAW_IMPLEMENTATION_PROMPT.md
-├── BUILD_CLAW_IMPLEMENTATION_PROMPT.md
-├── ASSISTANT_CLAW_IMPLEMENTATION_PROMPT.md
-└── SOLO_TEMPLATE_V2_REMEDIATION_PROMPT.md
+├── milimo-hermes-sandbox/                 Hermes sandbox Docker build
+│   ├── Dockerfile                         Sandbox image definition
+│   ├── install-hermes.sh                  Install + onboard script
+│   ├── generate-config.ts                 Hermes config.yaml generator
+│   ├── scripts/                           start.sh, gateway control, validators
+│   ├── agent_config/                      SOUL.md system prompt
+│   ├── milimo-blueprint/                  Sandbox copy of blueprint
+│   └── milimo-hermes-plugin/              Sandbox copy of plugin
+│
+├── milimo-core/                           Python core library
+│   └── src/milimo_core/
+│       ├── contracts.py                   45 valid message type schemas
+│       ├── protocols/delegation.py        DelegationAdapter, ClawTask, ClawResult
+│       ├── finance/                       SpendApprovalHandler, cost guard, pricing
+│       ├── build/                         PR management, deploy, error monitoring
+│       ├── content/                       Content generation, publishing
+│       ├── ops/                           Intake, project mgmt, scope monitoring
+│       ├── analytics/                     Signal processing, anomaly detection
+│       ├── assistant/                     Lucy assistant
+│       ├── evolution_cycle.py             5-stage evolution pipeline
+│       └── ...                            Privacy router, tool gen, bridge CLI
+│
+├── milimo-blueprint/                      Python orchestrator (OpenClaw profile)
+│   ├── blueprint.yaml                     Dual-track profile definitions
+│   ├── orchestrator/                      Claw implementations, contracts
+│   ├── roles/                             6 role blueprints
+│   ├── policies/                          Sandbox policies + presets
+│   ├── templates/                         7 squad templates
+│   └── tests/                             Claw integration tests
+│
+├── milimo-claw-wiki/wiki/                 Obsidian knowledge base
+│   ├── index.md                           Master table of contents
+│   ├── log.md                             Append-only operation log
+│   ├── architecture/                      System architecture
+│   ├── claws/                             Per-claw documentation
+│   ├── troubleshooting/                   Common issues, issues-and-fixes
+│   └── ...                                Coordination, evolution, reference
+│
+├── milimo-claw-docs/                      Legacy spec documents
+│   ├── reference/                         Ground truth specs (6 claw specs)
+│   └── prompts/                           AI implementation prompts
+│
+├── milimo-server/                         HTTP server
+├── milimo-admin/                          Admin utilities
+├── milimo-mobile/                         Mobile interface
+├── scripts/                               Shell scripts (check-plugin-sync, etc.)
+├── Dockerfile                             OpenClaw sandbox image
+├── install.sh                             OpenClaw profile installer
+└── package.json                           Root dependencies (OpenClaw)
 ```
 
 ---
