@@ -191,10 +191,11 @@ check_prerequisites() {
     exit 1
   fi
 
-  # Check for nemohermes alias
+  # Check for nemohermes CLI (create function fallback if not installed)
   if ! command -v nemohermes &>/dev/null; then
-    log_warn "nemohermes alias not found. Creating alias..."
-    alias nemohermes="NEMOCLAW_AGENT=hermes nemoclaw"
+    log_warn "nemohermes CLI not found. Creating fallback function..."
+    nemohermes() { NEMOCLAW_AGENT=hermes nemoclaw "$@"; }
+    export -f nemohermes
   fi
 
   # Check Docker
@@ -654,12 +655,24 @@ main() {
     return 0
   fi
 
+  # Preemptively destroy any existing sandbox to avoid [6/8] hang
+  # caused by nemohermes onboard --recreate-sandbox waiting on
+  # graceful teardown of the old sandbox workspace state.
+  if nemohermes "$SANDBOX_NAME" status --json 2>/dev/null | grep -q '"phase":"Ready"'; then
+    log_info "Destroying existing sandbox '$SANDBOX_NAME' before rebuild..."
+    NEMOCLAW_RECREATE_WITHOUT_BACKUP=1 nemohermes "$SANDBOX_NAME" destroy --yes 2>/dev/null || true
+    log_success "Existing sandbox destroyed."
+  fi
+
   # Run onboarding
-  log_info "Starting Hermes onboarding..."
+  # Timeout for onboarding command (15 min). nemohermes onboard can hang
+  # indefinitely at [6/8] Creating sandbox if the destroy step stalls.
+  local _onboard_timeout="900"
+  log_info "Starting Hermes onboarding (timeout: ${_onboard_timeout}s)..."
   log_info "Command: $onboard_cmd"
   echo ""
 
-  if eval "$onboard_cmd"; then
+  if timeout "$_onboard_timeout" bash -c "$onboard_cmd"; then
     log_success "Hermes onboarding completed!"
     echo ""
 
