@@ -892,20 +892,25 @@ cd milimo-hermes-plugin && python -m pytest tests/test_registration.py -v
 
 ---
 
-## Issue 29 — "Port Forward on 18789" Warning: NEMOCLAW_DASHBOARD_PORT Override (2026-07-25)
+## Issue 29 — "Port Forward on 18789" Warning: Stale SSH Forward Occupied Port During CLI Allocation (2026-07-25)
 
-**Discovered**: Repeated warning after every `nemohermes onboard` despite 5 previous fix attempts. Complete data trace through 6 NemoClaw CLI files identified the actual cause.
+**Discovered**: Warning persisted through 6 previous fix attempts. Complete data trace through nemohermes CLI's port allocation logic (`dashboard-port.js`, `sandbox-create-launch.js`, `ports.js`) and start.sh port resolution.
 
-**Root Cause**: `install-hermes.sh` exported `NEMOCLAW_DASHBOARD_PORT=18790`. The sandbox's `start.sh` reads this env var at line 155-174 and sets `_dashboard_port=18790`, then `DASHBOARD_PUBLIC_PORT=18790`, causing the dashboard socat to bind port 18790 instead of the default 18789. The upstream Hermes agent manifest (`agents/hermes/manifest.yaml`) declares `forward_ports: [18789, 8642]`. The nemohermes CLI reads the manifest and verifies port 18789 — nothing is listening there because our env var moved it to 18790.
+**Root Cause**: After destroying the old sandbox, a **host-side SSH forward process** on port 18789 survived (`openshell forward` creates SSH tunnels on the macOS host). The `install-hermes.sh` only called `openshell forward stop` in the **post-onboarding** section — after the CLI had already made its port allocation decision.
 
-**Failed previous fixes** (all treated symptom, not cause):
+The nemohermes CLI dynamically allocates a dashboard port by scanning 18789-18799 for the first free port (`findAvailableDashboardPort` in `dashboard-port.js`). It found 18789 occupied by the stale SSH process, allocated 18790 instead, and injected `NEMOCLAW_DASHBOARD_PORT=18790` into the sandbox. The deployment verification then checked the agent manifest's **hardcoded** `forward_ports: [18789]` — which never matched the dynamically allocated port.
+
+**6 failed fixes** (all treated symptoms, not the actual cause):
 1. Removed 18789 from blueprint `forward_ports` (CLI uses agent manifest, not blueprint)
 2. Set `CHAT_UI_URL=http://127.0.0.1:18790` (start.sh derives from NEMOCLAW_DASHBOARD_PORT, not CHAT_UI_URL)
-3. Exported `NEMOCLAW_DASHBOARD_PORT=18790` (THIS was the actual cause)
+3. Exported `NEMOCLAW_DASHBOARD_PORT=18790` (just confirmed the CLI's own injection)
+4. Reverted `NEMOCLAW_DASHBOARD_PORT` export (correct but insufficient — CLI still injects its own value)
+5. Reverted `CHAT_UI_URL` in blueprint (irrelevant — CLI doesn't use blueprint for verification)
+6. Added static socat in start.sh (reverted — band-aid on wrong layer)
 
-**Fix** (commit `f25e860`):
-- Reverted `NEMOCLAW_DASHBOARD_PORT` export from `install-hermes.sh`
-- Reverted `CHAT_UI_URL` in blueprint back to empty string
-- Sandbox now uses default port 18789, matching upstream agent manifest
+**Fix** (commits `5106b54` + `f8ea781`):
+- Moved `openshell forward stop 18789 18790 9090` to the **pre-onboarding** cleanup section
+- Added `sleep 1` after stop for OS to release the TCP port
+- Stale SSH forward is now killed before the CLI scans ports, so 18789 is free and correctly allocated
 
-**Rule**: Never set `NEMOCLAW_DASHBOARD_PORT` or override `CHAT_UI_URL` with a port number. The upstream Hermes agent manifest defines `forward_ports: [18789, 8642]` — let these defaults propagate through start.sh automatically.
+**Rule**: Port forward cleanup must happen BEFORE the nemohermes CLI's port scan, not after. The CLI allocates ports from 18789-18799 dynamically. Any stale forward in that range causes misallocation.

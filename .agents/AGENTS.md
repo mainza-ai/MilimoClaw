@@ -9,6 +9,14 @@ coordination rules, and the conventions that govern how they behave and are buil
 **Any AI coding assistant working on this codebase must read this file in full
 before writing or modifying any agent-related code.**
 
+**Before making any changes or proposing a fix, you MUST:**
+1. **Gather all information first** — Read all relevant files, trace data flows, check logs, examine configs, and understand the full system before forming a hypothesis.
+2. **Analyze thoroughly** — Do not jump to conclusions. Trace root causes step by step through every layer (CLI, runtime, config, network, filesystem). Consider edge cases, timing, and state.
+3. **Present findings for review** — Before writing any code, present your complete analysis to the user for approval. Do not skip to implementation until the user confirms the analysis is correct.
+4. **No shortcuts, no lazy fixes** — Every fix must address the ROOT CAUSE, not the symptom. If a fix doesn't work, gather more information and re-analyze from scratch. Never pile band-aids on a problem without understanding why previous attempts failed.
+
+Violating these rules leads to wasted effort, incorrect fixes, and recurring bugs. This is a production-grade system — treat it as such.
+
 ---
 
 ## Ground Truth Hierarchy
