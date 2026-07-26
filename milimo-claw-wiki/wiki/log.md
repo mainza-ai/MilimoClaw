@@ -2438,3 +2438,15 @@ and present findings for review before implementing.
 - But the NemoClaw CLI MERGES `components.sandbox.forward_ports` (base) with profile-specific ports
 - `components.sandbox.forward_ports` still had `[18789]` at line 199 — this was the actual source of the warning
 - Changed to `[8642]` across all 3 blueprint locations (base + both profiles)
+
+### 2026-07-25 — Added terminal platform toolset to Hermes config
+
+**Pages**: `milimo-hermes-sandbox/generate-config.ts`, `wiki/index.md`, `wiki/log.md`
+
+**Source**: Hermes session showed "Blocked — the tool layer is missing" when calling `milimo_spend`. Session info log revealed only 12 built-in toolsets were loaded; `milimo-hermes` was excluded from terminal/chat sessions.
+
+**Root Cause**: `generate-config.ts` only configured `platform_toolsets.api_server` with the `milimo-hermes` toolset. The interactive chat session (`nemohermes connect` → `hermes` CLI) uses the `terminal` platform, which had no toolset configuration. Milimo tools were only available via the OpenAI-compatible API (port 8642), not in terminal sessions.
+
+**Fix** (commit `7642a41`):
+- Added `TERMINAL_TOOLSETS` array with terminal-relevant tools plus `milimo-hermes`
+- Added `platform_toolsets.terminal` to the generated `config.yaml`

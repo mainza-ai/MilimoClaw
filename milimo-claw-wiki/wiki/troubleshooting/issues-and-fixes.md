@@ -914,3 +914,21 @@ The nemohermes CLI dynamically allocates a dashboard port by scanning 18789-1879
 - Stale SSH forward is now killed before the CLI scans ports, so 18789 is free and correctly allocated
 
 **Rule**: Port forward cleanup must happen BEFORE the nemohermes CLI's port scan, not after. The CLI allocates ports from 18789-18799 dynamically. Any stale forward in that range causes misallocation.
+
+---
+
+## Issue 30 — Milimo Tools Blocked in Hermes Chat Sessions: Missing Terminal Platform Toolset (2026-07-25)
+
+**Discovered**: Agent successfully used `milimo_status` but then reported "Blocked — the tool layer is missing" for `milimo_spend`. Session info log showed only 12 built-in Hermes toolsets; `milimo-hermes` was absent despite being registered in the runtime.
+
+**Root Cause**: `generate-config.ts` generated `platform_toolsets` with only an `api_server` key. The interactive chat session (`nemohermes connect` → `hermes` CLI) uses the `terminal` platform, which had no toolset configuration. Milimo tools were only accessible through the OpenAI-compatible API (port 8642), not in terminal/chat sessions.
+
+**Fix** (commit `7642a41`):
+1. Added `TERMINAL_TOOLSETS` array in `generate-config.ts` with terminal-relevant tools (terminal, file, code_execution, skills, todo, memory, session_search, delegation, cronjob, nemoclaw, milimo-hermes)
+2. Added `platform_toolsets.terminal` alongside existing `platform_toolsets.api_server` in `buildHermesConfig()`
+
+**Verification** (after rebuild):
+```bash
+nemohermes milimo-hermes connect
+# Inside sandbox, run `hermes` — tools should now appear
+```

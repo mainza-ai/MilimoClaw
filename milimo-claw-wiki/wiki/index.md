@@ -333,6 +333,7 @@ See [[log]] for complete operation history.
 
 | Date | Change | Pages Affected |
 |------|--------|----------------|
+| 2026-07-25 | Added `platform_toolsets.terminal` with `milimo-hermes` to Hermes config so Milimo tools work in chat sessions (not just API server) | generate-config.ts, index.md, log.md |
 | 2026-07-25 | Fixed port 18789 root cause: three-part fix — Dockerfile ARG default (8642→18789), removed --build-arg CHAT_UI_URL override, .env.example port (18790→18789); updated post-onboarding forward + next-steps from 18790 to 18789; enhanced AGENTS.md critical rules | install-hermes.sh, Dockerfile, .env.example, AGENTS.md, README.md, index.md, log.md |
 | 2026-07-25 | Removed `NEMOCLAW_PROVIDER_KEY` from Dockerfile ARG/ENV (SecretsUsedInArgOrEnv warning — dead code, key injected at runtime by gateway) | Dockerfile, generate-config.ts, install-hermes.sh, index.md, log.md |
 | 2026-07-25 | Fixed onboarding hang at [6/8]: preemptive sandbox destroy + 900s timeout + alias→function fix; added 18790 to forward_ports for dashboard reliability | install-hermes.sh, blueprint.yaml, common-issues.md, issues-and-fixes.md, log.md, index.md |

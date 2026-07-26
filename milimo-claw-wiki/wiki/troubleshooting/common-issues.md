@@ -880,6 +880,19 @@ No error message, no timeout — just blank space after the header.
 
 ---
 
+### Milimo Tools Blocked in Chat Session — Missing Terminal Platform Toolset (FIXED 2026-07-25)
+
+**Symptom**: `milimo_spend`, `milimo_approve`, `milimo_veto`, `milimo_warroom` are registered (importable, visible in `_CORE_TOOLS`), but the agent says "The registered tools are not loaded in this session." API server calls work but terminal/chat sessions fail.
+
+**Root Cause**: `generate-config.ts` only configured `platform_toolsets.api_server` with `milimo-hermes`. The interactive chat session (`nemohermes connect` → `hermes`) uses the `terminal` platform, which had no toolset configuration. Session info logs showed no `milimo-hermes` entries in the loaded tools list.
+
+**Fix** (commit `7642a41`):
+- Added `TERMINAL_TOOLSETS` array in `generate-config.ts` including `milimo-hermes`
+- Added `platform_toolsets.terminal` to the generated Hermes config
+- After rebuild, terminal sessions include `milimo-hermes` tools alongside built-in tools
+
+---
+
 ### Claw Status Stuck on "Loading..." in War Room — .pth Path Blocked by Landlock (FIXED 2026-07-25)
 
 **Symptom**: The War Room page loads, but the "Claw Status" card stays on "Loading..." indefinitely. The `/v1/warroom/claw-status` endpoint returns 500 with `ModuleNotFoundError: No module named 'orchestrator'`.
