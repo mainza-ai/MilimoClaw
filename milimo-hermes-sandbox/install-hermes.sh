@@ -593,7 +593,7 @@ main() {
   onboard_cmd=$(build_onboard_command)
 
   # Set build arg environment variables (Docker will use these for ARGs in Dockerfile)
-  export NEMOCLAW_MODEL="${NEMOCLAW_MODEL:-deepseek-ai/deepseek-v4-flash}"
+  export NEMOCLAW_MODEL="${NEMOCLAW_MODEL:-nvidia/nemotron-4-mini-4b}"
   export NEMOCLAW_INFERENCE_PROVIDER_ID="${NEMOCLAW_INFERENCE_PROVIDER_ID:-custom}"
   export NEMOCLAW_INFERENCE_BASE_URL="${NEMOCLAW_INFERENCE_BASE_URL:-https://inference.local/v1}"
   export NVIDIA_INFERENCE_API_KEY="${NVIDIA_API_KEY:-}"

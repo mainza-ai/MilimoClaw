@@ -99,7 +99,7 @@ RUN chmod -R a+rX /opt/nemoclaw-hermes-config/generate-config.ts \
     && find /opt/nemoclaw-hermes-config -type f -exec chmod 444 {} +
 
 # Build args for config that varies per deployment
-ARG NEMOCLAW_MODEL=deepseek-ai/deepseek-v4-flash
+ARG NEMOCLAW_MODEL=nvidia/nemotron-4-mini-4b
 ARG NEMOCLAW_INFERENCE_PROVIDER_ID=custom
 ARG NEMOCLAW_INFERENCE_BASE_URL=https://inference.local/v1
 ARG CHAT_UI_URL=http://127.0.0.1:18789
